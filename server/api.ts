@@ -3,9 +3,10 @@ import { randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { getDb, makeRef, uid, type Db } from './db'
-import { statusOrder, type CargoType, type ShipmentStatus } from '../src/lib/data'
+import { statusLabels, statusOrder, type CargoType, type ShipmentStatus } from '../src/lib/data'
 import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } from '../src/lib/geo'
 import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion, type Position } from './live'
+import { attachShipmentToClient, logShipmentActivity, mountClients } from './clients'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean }
@@ -33,7 +34,7 @@ const requestOut = (r: Row, quotes: Row[]) => ({
 })
 const shipmentOut = (r: Row, events: Row[]) => ({
   id: r.id, ref: r.ref, shipperId: r.shipper_id, mode: r.mode, origin: r.origin, destination: r.destination, cargo: r.cargo, description: r.description, status: r.status, eta: DATE(r.eta), customer: r.customer,
-  vesselName: r.vessel_name ?? undefined, mmsi: r.mmsi ?? undefined, flight: r.flight ?? undefined, departedAt: r.departed_at ? ISO(r.departed_at) : undefined,
+  vesselName: r.vessel_name ?? undefined, mmsi: r.mmsi ?? undefined, flight: r.flight ?? undefined, departedAt: r.departed_at ? ISO(r.departed_at) : undefined, clientId: r.client_id ?? undefined, consigneeId: r.consignee_id ?? undefined,
   events: events.map((e) => ({ status: e.status, at: ISO(e.at), place: e.place, note: e.note ?? undefined })),
 })
 
@@ -358,6 +359,7 @@ export function apiRouter() {
     await db.query('insert into shipments (id,ref,request_id,shipper_id,user_id,mode,origin,destination,cargo,description,status,eta,customer) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
       [sid, r0.ref, r0.id, q.shipper_id, user.id, mode, r0.origin, r0.destination, r0.cargo, r0.description || `${r0.quantity} × ${r0.cargo}`, 'booked', new Date(Date.now() + (q.transit_days + 4) * 86400000).toISOString().slice(0, 10), r0.contact_name])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, 'booked', r0.origin, `Booking confirmed with ${shipper.name}. Quote accepted at $${q.price}.`])
+    await attachShipmentToClient(db, q.shipper_id, user.id, sid, r0.contact_name, r0.contact_email)
     const [shipment] = await loadShipments(db, 'id = $1', [sid])
     const [request] = await loadRequests(db, 'id = $1', [q.request_id])
     res.status(201).json({ shipment, request })
@@ -382,6 +384,7 @@ export function apiRouter() {
     await db.query('update shipments set status = $2 where id = $1', [s.id, next])
     if (next === 'in_transit') { await db.query('update shipments set departed_at = coalesce(departed_at, now()) where id = $1', [s.id]) }
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, next, idx < 3 ? s.origin : s.destination, note])
+    await logShipmentActivity(db, s.id, `${s.ref} moved to “${statusLabels[next]}”${note ? ` — ${note}` : '.'}`)
     const [shipment] = await loadShipments(db, 'id = $1', [s.id])
     res.json({ shipment })
   }))
@@ -406,6 +409,8 @@ export function apiRouter() {
     res.set('Cache-Control', 'no-store')
     res.json({ position: await resolvePosition(rows[0], events) })
   }))
+  mountClients(r, { getDb, requireUser, HttpError, wrap, loadShipments })
+
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.
     const r3 = (n: number) => Math.round(n * 1000) / 1000

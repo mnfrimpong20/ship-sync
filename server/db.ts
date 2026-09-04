@@ -28,6 +28,7 @@ export async function getDb(): Promise<Db> {
   await migrate(db)
   await seed(db)
   await ensureAdmins(db)
+  await seedClientDemo(db)
   return db
 }
 
@@ -148,6 +149,78 @@ alter table shipments add column if not exists mmsi text;
 alter table shipments add column if not exists flight text;
 alter table shipments add column if not exists departed_at timestamptz;
 alter table users add column if not exists is_admin boolean not null default false;
+create table if not exists clients (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  user_id text references users(id),
+  name text not null,
+  company text not null default '',
+  email text not null default '',
+  phone text not null default '',
+  whatsapp text not null default '',
+  city text not null default '',
+  tags jsonb not null default '[]',
+  notes text not null default '',
+  source text not null default 'manual',
+  status text not null default 'active',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (shipper_id, user_id)
+);
+create table if not exists client_consignees (
+  id text primary key,
+  client_id text not null references clients(id) on delete cascade,
+  name text not null,
+  phone text not null default '',
+  address text not null default '',
+  city text not null default '',
+  country text not null default 'GH',
+  relationship text not null default '',
+  is_default boolean not null default false
+);
+create table if not exists client_activities (
+  id text primary key,
+  client_id text not null references clients(id) on delete cascade,
+  shipper_id text not null,
+  type text not null,
+  body text not null default '',
+  at timestamptz not null default now(),
+  due_at timestamptz,
+  done boolean not null default false,
+  created_by text
+);
+create table if not exists invoices (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  client_id text not null references clients(id) on delete cascade,
+  shipment_id text references shipments(id) on delete set null,
+  number text not null,
+  status text not null default 'draft',
+  currency text not null default 'USD',
+  items jsonb not null default '[]',
+  subtotal int not null default 0,
+  tax int not null default 0,
+  total int not null default 0,
+  issued_at date not null default current_date,
+  due_at date,
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  unique (shipper_id, number)
+);
+create table if not exists payments (
+  id text primary key,
+  invoice_id text not null references invoices(id) on delete cascade,
+  amount int not null,
+  method text not null default 'bank',
+  at date not null default current_date,
+  note text not null default ''
+);
+alter table shipments add column if not exists client_id text references clients(id);
+alter table shipments add column if not exists consignee_id text;
+create index if not exists idx_clients_shipper on clients(shipper_id);
+create index if not exists idx_activities_client on client_activities(client_id);
+create index if not exists idx_invoices_client on invoices(client_id);
+create index if not exists idx_shipments_client on shipments(client_id);
 alter table shippers add column if not exists verified_at timestamptz;
 alter table shippers add column if not exists verified_by text;
 create index if not exists idx_requests_user on requests(user_id);
@@ -223,4 +296,22 @@ async function ensureAdmins(d: Db) {
   await d.query(`insert into users (id,email,name,password_hash,role,shipper_id,is_admin) values ('u_admin','admin@shipsync.demo','Ship Sync Admin',$1,'customer',null,true) on conflict (email) do update set is_admin = true`, [hash])
   const extra = (process.env.ADMIN_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
   if (extra.length) await d.query('update users set is_admin = true where email = any($1::text[])', [extra])
+}
+
+/** A sample offline client for the Gold Coast demo shipper so the client workspace has something to show. Idempotent. */
+async function seedClientDemo(d: Db) {
+  const { rows } = await d.query<{ n: string }>(`select count(*)::text as n from clients where shipper_id = 'gold-coast-freight' and source = 'manual'`)
+  if (Number(rows[0].n) > 0) return
+  const cid = 'cl_demo_kofi'
+  await d.query(`insert into clients (id,shipper_id,name,company,email,phone,whatsapp,city,tags,notes,source) values ($1,'gold-coast-freight','Kofi Mensah','Mensah Auto Parts','kofi@mensahparts.com','+1 713 555 0188','+1 713 555 0188','Houston, TX','["repeat","vehicles","wholesale"]','Ships 1–2 vehicles a quarter plus spare parts. Prefers WhatsApp. Pays by bank transfer, usually within a week.','manual')`, [cid])
+  await d.query(`insert into client_consignees (id,client_id,name,phone,address,city,country,relationship,is_default) values ('cs_demo_1',$1,'Yaw Mensah','+233 24 555 0190','Plot 14, Spintex Road','Accra','GH','Brother',true), ('cs_demo_2',$1,'Adwoa Mensah','+233 20 555 0177','Adum, near Kejetia','Kumasi','GH','Sister',false)`, [cid])
+  const now = Date.now()
+  const acts: [string, string, string, number, number | null][] = [
+    ['ac_demo_1', 'call', 'Called about the Q4 vehicle shipment — wants a 2018 RAV4 collected from a dealer in Katy, TX. Sending quote Monday.', -6, null],
+    ['ac_demo_2', 'note', 'Consignee in Accra is his brother Yaw; Kumasi deliveries go to Adwoa.', -5, null],
+    ['ac_demo_3', 'reminder', 'Follow up on RAV4 quote', -1, 2],
+  ]
+  for (const [id, type, body, days, due] of acts) await d.query(`insert into client_activities (id,client_id,shipper_id,type,body,at,due_at) values ($1,$2,'gold-coast-freight',$3,$4,$5,$6)`, [id, cid, type, body, new Date(now + days * 86400000), due == null ? null : new Date(now + due * 86400000)])
+  await d.query(`insert into invoices (id,shipper_id,client_id,number,status,items,subtotal,tax,total,issued_at,due_at,notes) values ('inv_demo_1','gold-coast-freight',$1,'INV-2026-0001','sent','[{"description":"RoRo ocean freight, Houston → Tema (2017 Honda Accord)","qty":1,"unit":1450},{"description":"Port handling & documentation, Tema","qty":1,"unit":220}]',1670,0,1670,$2,$3,'Duty and destination charges payable by consignee at Tema.')`, [cid, dateOnly(addDays(-12)), dateOnly(addDays(18))])
+  await d.query(`insert into payments (id,invoice_id,amount,method,at,note) values ('pay_demo_1','inv_demo_1',800,'bank',$1,'Deposit')`, [dateOnly(addDays(-9))])
 }

@@ -15,6 +15,12 @@ export interface Position {
   at: string; source: 'aisstream' | 'adsb.lol'; name?: string; id: string
 }
 
+export interface VesselStatic {
+  callSign?: string; imo?: string; type?: number; destination?: string
+  eta?: { month: number; day: number; hour: number; minute: number }
+  length?: number; beam?: number; draught?: number
+}
+
 /* ------------------------------------------------------------------ AIS */
 const AIS_URL = process.env.AISSTREAM_URL || 'wss://stream.aisstream.io/v0/stream'
 type Box = [LngLat, LngLat]
@@ -64,6 +70,11 @@ class AisWorker {
   private mmsis = new Set<string>()
   private latest = new Map<string, Position>()
   private names = new Map<string, string>()
+  /** Voyage/static data from ShipStaticData (message 5): broadcast every 6 min, so it trickles in after the first fix. */
+  private statics = new Map<string, VesselStatic>()
+  /** Where and when we first heard each ship this session — the closest thing AIS gives to an origin. */
+  private firstSeen = new Map<string, { lat: number; lon: number; at: string }>()
+  private navStatus = new Map<string, number>()
   private db: Db | null = null
   private flushTimer: NodeJS.Timeout | null = null
   private dirty = new Set<string>()
@@ -96,7 +107,7 @@ class AisWorker {
   /** Drop regional traffic not heard from in 6h; watched vessels are kept so "last known" survives. */
   private prune() {
     const cutoff = Date.now() - 6 * 60 * 60_000
-    for (const [id, p] of this.latest) if (!this.mmsis.has(id) && new Date(p.at).getTime() < cutoff) { this.latest.delete(id); this.names.delete(id) }
+    for (const [id, p] of this.latest) if (!this.mmsis.has(id) && new Date(p.at).getTime() < cutoff) { this.latest.delete(id); this.names.delete(id); this.statics.delete(id); this.firstSeen.delete(id); this.navStatus.delete(id) }
   }
 
   async refreshWatchlist() {
@@ -116,8 +127,23 @@ class AisWorker {
     if (!mmsi) return
     this.lastMessageAt = Date.now()
     if (msg.MessageType === 'ShipStaticData') {
-      const n = (msg.Message?.ShipStaticData?.Name ?? meta.ShipName ?? '').trim()
+      const d = msg.Message?.ShipStaticData ?? {}
+      const n = (d.Name ?? meta.ShipName ?? '').trim()
       if (n) this.names.set(mmsi, n)
+      const dim = d.Dimension ?? {}
+      const eta = d.Eta ?? {}
+      const length = num(dim.A) != null && num(dim.B) != null ? dim.A + dim.B : undefined
+      const beam = num(dim.C) != null && num(dim.D) != null ? dim.C + dim.D : undefined
+      this.statics.set(mmsi, {
+        callSign: (d.CallSign ?? '').trim() || undefined,
+        imo: d.ImoNumber ? String(d.ImoNumber) : undefined,
+        type: num(d.Type),
+        destination: (d.Destination ?? '').trim() || undefined,
+        eta: eta.Month && eta.Day ? { month: eta.Month, day: eta.Day, hour: eta.Hour ?? 0, minute: eta.Minute ?? 0 } : undefined,
+        length: length && length > 0 ? length : undefined,
+        beam: beam && beam > 0 ? beam : undefined,
+        draught: num(d.MaximumStaticDraught) || undefined,
+      })
       return
     }
     if (msg.MessageType !== 'PositionReport') return
@@ -125,6 +151,8 @@ class AisWorker {
     const lat = Number(meta.latitude ?? p.Latitude), lon = Number(meta.longitude ?? p.Longitude)
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return
     const name = (meta.ShipName ?? '').trim() || this.names.get(mmsi)
+    if (num(p.NavigationalStatus) != null) this.navStatus.set(mmsi, p.NavigationalStatus)
+    if (!this.firstSeen.has(mmsi)) this.firstSeen.set(mmsi, { lat, lon, at: new Date(meta.time_utc ?? Date.now()).toISOString() })
     this.latest.set(mmsi, { id: mmsi, lat, lon, speed: num(p.Sog), course: num(p.Cog), heading: p.TrueHeading === 511 ? undefined : num(p.TrueHeading), at: new Date(meta.time_utc ?? Date.now()).toISOString(), source: 'aisstream', name: name || undefined })
     // Persist watched vessels (so a restart keeps last-known); the regional feed stays in memory.
     if (this.mmsis.has(mmsi)) { this.dirty.add(mmsi); this.scheduleFlush() }
@@ -149,6 +177,11 @@ class AisWorker {
   }
 
   get(mmsi: string) { return this.latest.get(mmsi) ?? null }
+  /** Everything known about one ship: last fix + voyage data + where we first heard it. */
+  detail(mmsi: string) {
+    const p = this.latest.get(mmsi); if (!p) return null
+    return { ...p, ...(this.statics.get(mmsi) ?? {}), navStatus: this.navStatus.get(mmsi), firstSeen: this.firstSeen.get(mmsi) ?? null, watched: this.mmsis.has(mmsi) }
+  }
   /** Everything currently known on the lane — Gulf of Guinea coast plus the Atlantic approach (for the live map). */
   region(maxAgeMin = 180) {
     const cutoff = Date.now() - maxAgeMin * 60_000

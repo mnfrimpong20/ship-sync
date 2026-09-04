@@ -353,6 +353,14 @@ export function apiRouter() {
     res.set('Cache-Control', 'no-store')
     res.json({ vessels, flights, congestion: ais.congestion(), ais: { status: ais.status, enabled: ais.enabled, lastMessageAt: ais.lastMessageAt ? new Date(ais.lastMessageAt).toISOString() : null, coastVessels: ais.coast().length, error: ais.lastError || undefined }, ports: Object.fromEntries(Object.entries(destGeo).map(([k, g]) => [k, { name: g.port.name, at: g.port.at, airport: g.airport }])) })
   }))
+  r.get('/live/vessel/:mmsi', wrap(async (req, res) => {
+    const mmsi = String(req.params.mmsi)
+    if (!/^\d{9}$/.test(mmsi)) throw new HttpError(400, 'Invalid MMSI.')
+    const v = ais.detail(mmsi)
+    if (!v) throw new HttpError(404, 'No recent AIS data for that vessel.')
+    res.set('Cache-Control', 'no-store')
+    res.json({ vessel: v })
+  }))
   r.get('/track/:ref', wrap(async (req, res) => {
     const db = await getDb()
     const [shipment] = await loadShipments(db, 'upper(ref) = upper($1)', [req.params.ref])

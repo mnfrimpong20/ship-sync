@@ -5,9 +5,11 @@ import { ArrowRight, BadgeCheck, Car, Check, ChevronDown, ClipboardList, Contain
 import { fadeUp, stagger } from '../lib/motion'
 import { countries, faqs, shippers, testimonials } from '../lib/data'
 import { Section, SectionHeader, ShipperCard, Avatar } from './ui'
+import { congestionLabel, useCongestion } from '../lib/useCongestion'
 
 /* ---------- Destinations ---------- */
 export function Destinations() {
+  const cg = useCongestion()
   return (
     <Section id="destinations" light>
       <SectionHeader light eyebrow="Destinations" title="Every major port and airport on the Gulf of Guinea" body="Pick a country to see typical transit times, then request quotes from shippers who run that lane every week." />
@@ -21,6 +23,7 @@ export function Destinations() {
               <div className="flex items-center justify-between"><dt className="flex items-center gap-1.5 text-ink-muted"><Ship size={14} aria-hidden="true" />Ocean</dt><dd className="font-semibold text-ink">{c.oceanDays} d</dd></div>
               <div className="flex items-center justify-between"><dt className="flex items-center gap-1.5 text-ink-muted"><Plane size={14} aria-hidden="true" />Air</dt><dd className="font-semibold text-ink">{c.airDays} d</dd></div>
             </dl>
+            {(() => { const l = cg?.enabled ? congestionLabel(cg.congestion[c.code]) : null; return l ? <p className={`mt-3 flex items-center gap-1.5 text-xs ${l.level === 'heavy' ? 'text-danger' : l.level === 'busy' ? 'text-gold-deep' : 'text-ink-muted'}`}><span className={`h-1.5 w-1.5 rounded-full ${l.level === 'heavy' ? 'bg-danger' : l.level === 'busy' ? 'bg-gold-deep' : 'bg-teal'}`} aria-hidden="true" />Port now: {l.text}</p> : null })()}
             <Link to={`/quote?destination=${c.code}`} className="mt-5 inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-gold-deep hover:underline focus-ring rounded">Get quotes <ArrowRight size={15} aria-hidden="true" /></Link>
           </motion.div>
         ))}

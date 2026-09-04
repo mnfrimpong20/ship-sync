@@ -3,7 +3,7 @@ import { Logo } from './ui'
 import { countries } from '../lib/data'
 
 const cols = [
-  { title: 'Ship', links: [['Get a quote', '/quote'], ['Track a shipment', '/track'], ['Browse shippers', '/shippers'], ['How it works', '/#how']] },
+  { title: 'Ship', links: [['Get a quote', '/quote'], ['Track a shipment', '/track'], ['Live map', '/live'], ['Browse shippers', '/shippers'], ['How it works', '/#how']] },
   { title: 'Shippers', links: [['List your company', '/signup?role=shipper'], ['Pricing', '/#pricing'], ['Shipper dashboard', '/dashboard/shipper'], ['Verification', '/#features']] },
   { title: 'Company', links: [['About', '/#about'], ['FAQ', '/#faq'], ['Contact', 'mailto:hello@shipsync.africa'], ['Careers', '/#about']] },
 ]

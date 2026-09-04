@@ -9,6 +9,7 @@ const links = [
   { to: '/quote', label: 'Ship' },
   { to: '/shippers', label: 'Shippers' },
   { to: '/track', label: 'Track' },
+  { to: '/live', label: 'Live map' },
   { to: '/#how', label: 'How it works' },
   { to: '/#pricing', label: 'Pricing' },
 ]

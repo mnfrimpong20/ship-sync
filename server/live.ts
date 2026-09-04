@@ -207,6 +207,7 @@ const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : u
 export const ais = new AisWorker()
 
 /* ------------------------------------------------------------------ ADS-B */
+const ADSB_URL = process.env.ADSB_URL || 'https://api.adsb.lol' // override for local mocks
 const flightCache = new Map<string, { at: number; pos: Position | null }>()
 const FLIGHT_TTL = 30_000
 
@@ -218,7 +219,7 @@ export async function flightPosition(callsignRaw: string): Promise<Position | nu
   let pos: Position | null = null
   try {
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000)
-    const res = await fetch(`https://api.adsb.lol/v2/callsign/${encodeURIComponent(cs)}`, { signal: ctl.signal, headers: { accept: 'application/json' } })
+    const res = await fetch(`${ADSB_URL}/v2/callsign/${encodeURIComponent(cs)}`, { signal: ctl.signal, headers: { accept: 'application/json' } })
     clearTimeout(t)
     if (res.ok) {
       const data = (await res.json()) as { ac?: any[] }
@@ -230,28 +231,92 @@ export async function flightPosition(callsignRaw: string): Promise<Position | nu
   return pos
 }
 
-/** Live flights over the West Africa region (for the live map). */
-let regionCache: { at: number; list: Position[] } = { at: 0, list: [] }
-export async function flightsInRegion(): Promise<Position[]> {
+/** Aircraft as kept for the live map. `id` is the ICAO hex (stable per airframe); callsign changes per flight. */
+export interface Aircraft extends Position {
+  callsign?: string; registration?: string; type?: string; description?: string; squawk?: string; category?: string
+  cargo: boolean; onGround: boolean; vertRate?: number
+}
+
+/** Hubs the lanes start from and pass over; adsb.lol caps a point query at 250 nm, so each hub is one circle. */
+const AIR_HUBS: [string, number, number][] = [
+  ['London', 51.5, -0.1], ['Frankfurt', 50.1, 8.7], ['Madrid', 40.4, -3.7], ['Lisbon', 38.7, -9.1], ['Milan', 45.5, 9.2],
+  ['New York', 40.7, -74.0], ['Atlanta', 33.7, -84.4], ['Houston', 29.8, -95.4], ['Chicago', 41.9, -87.6], ['Miami', 25.8, -80.2], ['Los Angeles', 34.0, -118.2], ['Minneapolis', 44.9, -93.3],
+  ['Canary Islands', 28.0, -15.5], ['Dakar', 14.0, -17.0], ['Monrovia', 7.5, -8.5], ['Accra–Lagos', 6.0, 1.5],
+  ['Dubai', 25.3, 55.4], ['Guangzhou', 23.4, 113.3],
+]
+
+/** ICAO airline prefixes of all-cargo operators (the ones that actually fly freight into West Africa and the big integrators). */
+const CARGO_AIRLINES = new Set(['GTI', 'CLX', 'CLU', 'BOX', 'FDX', 'UPS', 'ABW', 'MPH', 'GEC', 'CKS', 'ABX', 'ATN', 'NCA', 'CAO', 'SQC', 'TAY', 'ABR', 'BCS', 'DAE', 'DHK', 'SRR', 'CKK', 'GSS', 'ICL', 'AZG', 'MSX', 'PAC', 'QAC', 'TPA', 'AHK', 'SOO', 'SWN', 'AJK', 'NPT', 'LCO', 'KYE', 'CJT', 'RCF', 'MAA', 'ETV'])
+/** Freighter-only airframe types (ADS-B type codes). */
+const FREIGHTER_TYPES = new Set(['MD11', 'B748', 'B77L', 'A124', 'B74F', 'A30B', 'B762', 'DC10', 'A332F', 'A33F'])
+
+function isCargo(callsign: string, type: string, desc: string) {
+  const prefix = callsign.replace(/[^A-Z].*$/, '').slice(0, 3)
+  return CARGO_AIRLINES.has(prefix) || FREIGHTER_TYPES.has(type) || /freighter|cargo|\bF\b/i.test(desc)
+}
+
+const aircraftOf = (a: any): Aircraft => {
+  const callsign = String(a.flight ?? '').trim()
+  const type = String(a.t ?? '')
+  return {
+    id: a.hex, lat: a.lat, lon: a.lon, speed: num(a.gs), course: num(a.track), altitude: typeof a.alt_baro === 'number' ? a.alt_baro : undefined,
+    at: new Date(Date.now() - (a.seen ?? 0) * 1000).toISOString(), source: 'adsb.lol', name: callsign || a.r || a.hex,
+    callsign: callsign || undefined, registration: a.r || undefined, type: type || undefined, description: a.desc || undefined, squawk: a.squawk || undefined, category: a.category || undefined,
+    cargo: isCargo(callsign, type, String(a.desc ?? '')), onGround: a.alt_baro === 'ground', vertRate: num(a.baro_rate),
+  }
+}
+
+/** Live flights across the hubs (for the live map). Each hub keeps its last good answer if one poll fails. */
+const hubCache = new Map<string, Aircraft[]>()
+let regionCache: { at: number; list: Aircraft[] } = { at: 0, list: [] }
+let regionInflight: Promise<Aircraft[]> | null = null
+export async function flightsInRegion(): Promise<Aircraft[]> {
   if (Date.now() - regionCache.at < FLIGHT_TTL) return regionCache.list
-  const list: Position[] = []
-  try {
-    // adsb.lol point queries: 250 nm is the API's maximum radius, so three circles cover Dakar → Lagos.
-    const centres: [number, number][] = [[6.0, 1.5], [7.5, -8.5], [14.0, -17.0]]
-    const all = await Promise.all(centres.map(async ([lat, lon]) => {
+  if (regionInflight) return regionInflight
+  regionInflight = (async () => {
+    await Promise.allSettled(AIR_HUBS.map(async ([name, lat, lon]) => {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000)
-      const res = await fetch(`https://api.adsb.lol/v2/point/${lat}/${lon}/250`, { signal: ctl.signal, headers: { accept: 'application/json' } })
-      clearTimeout(t)
-      if (!res.ok) return []
-      const d = (await res.json()) as { ac?: any[] }
-      return (d.ac ?? []).filter((a) => Number.isFinite(a.lat) && Number.isFinite(a.lon))
+      try {
+        const res = await fetch(`${ADSB_URL}/v2/point/${lat}/${lon}/250`, { signal: ctl.signal, headers: { accept: 'application/json' } })
+        if (!res.ok) return
+        const d = (await res.json()) as { ac?: any[] }
+        hubCache.set(name, (d.ac ?? []).filter((a) => Number.isFinite(a.lat) && Number.isFinite(a.lon)).map(aircraftOf))
+      } catch { /* keep the previous answer for this hub */ } finally { clearTimeout(t) }
     }))
-    const seen = new Set<string>()
-    for (const a of all.flat()) {
-      if (seen.has(a.hex)) continue; seen.add(a.hex)
-      list.push({ id: a.hex, lat: a.lat, lon: a.lon, speed: num(a.gs), course: num(a.track), altitude: typeof a.alt_baro === 'number' ? a.alt_baro : undefined, at: new Date(Date.now() - (a.seen ?? 0) * 1000).toISOString(), source: 'adsb.lol', name: (a.flight ?? '').trim() || a.r || a.hex })
+    const seen = new Map<string, Aircraft>()
+    for (const list of hubCache.values()) for (const a of list) if (!seen.has(a.id)) seen.set(a.id, a)
+    regionCache = { at: Date.now(), list: [...seen.values()] }
+    regionInflight = null
+    return regionCache.list
+  })()
+  return regionInflight
+}
+
+export interface Airport { icao: string; iata?: string; name: string; city?: string; country?: string; lat: number; lon: number }
+export interface FlightRoute { origin: Airport; destination: Airport; via?: Airport[]; plausible: boolean }
+const routeCache = new Map<string, { at: number; route: FlightRoute | null }>()
+const ROUTE_TTL = 15 * 60_000
+
+/** adsb.lol's crowd-sourced route database: callsign + position → the flight's scheduled airports. Not available for every flight. */
+export async function flightRoute(callsign: string, lat: number, lon: number): Promise<FlightRoute | null> {
+  const cs = callsign.trim().toUpperCase(); if (!cs) return null
+  const hit = routeCache.get(cs); if (hit && Date.now() - hit.at < ROUTE_TTL) return hit.route
+  let route: FlightRoute | null = null
+  try {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000)
+    const res = await fetch(`${ADSB_URL}/api/0/routeset`, { method: 'POST', signal: ctl.signal, headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ planes: [{ callsign: cs, lat, lng: lon }] }) })
+    clearTimeout(t)
+    if (res.ok) {
+      const [r] = (await res.json()) as any[]
+      const aps: Airport[] = (r?._airports ?? []).map((a: any) => ({ icao: a.icao, iata: a.iata || undefined, name: a.name, city: a.location || undefined, country: a.countryiso2 || undefined, lat: a.lat, lon: a.lon }))
+      if (aps.length >= 2) route = { origin: aps[0], destination: aps[aps.length - 1], via: aps.length > 2 ? aps.slice(1, -1) : undefined, plausible: !!r.plausible }
     }
-    regionCache = { at: Date.now(), list }
-  } catch { regionCache = { at: Date.now(), list: regionCache.list } }
-  return regionCache.list
+  } catch { /* offline — no route */ }
+  routeCache.set(cs, { at: Date.now(), route })
+  return route
+}
+
+/** One aircraft from the last hub sweep, by ICAO hex. */
+export function aircraft(hex: string): Aircraft | null {
+  return regionCache.list.find((a) => a.id === hex.toLowerCase()) ?? null
 }

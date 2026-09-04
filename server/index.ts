@@ -1,5 +1,6 @@
 import express from 'express'
 import cookieParser from 'cookie-parser'
+import compression from 'compression'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { apiRouter } from './api'
@@ -17,6 +18,7 @@ async function main() {
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', 1)
+  app.use(compression()) // /api/live/region carries thousands of vessels; gzip cuts it ~8x
   app.use(express.json({ limit: '200kb' }))
   app.use(cookieParser())
   app.use('/api', apiRouter())

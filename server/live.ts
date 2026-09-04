@@ -22,7 +22,11 @@ const WEST_AFRICA_BOX: Box = [[-20, 3.5], [10, 16]] // Dakar → Lagos, incl. ap
 /** Atlantic approach to the lane: Cape Verde, Canaries, Moroccan and Portuguese coasts. AISStream's community receivers
  *  are dense here and almost absent on the Gulf of Guinea coast, so this is where southbound ships are actually seen. */
 const APPROACH_BOX: Box = [[-26, 16], [-5, 40]]
-const REGION_BOXES: Box[] = [WEST_AFRICA_BOX, APPROACH_BOX]
+/** Origin regions the lanes start from: Europe (Atlantic, North Sea, Baltic, Mediterranean) and the US coasts. */
+const EUROPE_BOX: Box = [[-12, 35], [32, 62]]
+const US_EAST_GULF_BOX: Box = [[-98, 24], [-65, 46]]
+const US_WEST_BOX: Box = [[-130, 30], [-115, 50]]
+const REGION_BOXES: Box[] = [WEST_AFRICA_BOX, APPROACH_BOX, EUROPE_BOX, US_EAST_GULF_BOX, US_WEST_BOX]
 const ATLANTIC_BOX: Box = [[-80, 3.5], [10, 55]] // wide box so subscribed MMSIs are reported anywhere on the lane
 
 const toAis = (b: Box) => [[b[0][1], b[0][0]], [b[1][1], b[1][0]]] // AISStream wants [[lat,lon],[lat,lon]]

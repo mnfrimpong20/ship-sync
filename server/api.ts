@@ -346,7 +346,9 @@ export function apiRouter() {
     res.json({ position: await resolvePosition(rows[0], events) })
   }))
   r.get('/live/region', wrap(async (_req, res) => {
-    const vessels = ais.region().map((p) => ({ ...p, kind: 'vessel' }))
+    // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.
+    const r3 = (n: number) => Math.round(n * 1000) / 1000
+    const vessels = ais.region().map((p) => ({ id: p.id, name: p.name, lat: r3(p.lat), lon: r3(p.lon), speed: p.speed, course: p.course, at: p.at, source: p.source, kind: 'vessel' }))
     const flights = (await flightsInRegion()).map((p) => ({ ...p, kind: 'flight' }))
     res.set('Cache-Control', 'no-store')
     res.json({ vessels, flights, congestion: ais.congestion(), ais: { status: ais.status, enabled: ais.enabled, lastMessageAt: ais.lastMessageAt ? new Date(ais.lastMessageAt).toISOString() : null, coastVessels: ais.coast().length, error: ais.lastError || undefined }, ports: Object.fromEntries(Object.entries(destGeo).map(([k, g]) => [k, { name: g.port.name, at: g.port.at, airport: g.airport }])) })

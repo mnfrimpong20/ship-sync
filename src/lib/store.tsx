@@ -3,7 +3,9 @@ import { shippers as seedShippers, type CargoType, type Mode, type Shipment, typ
 import type { PositionPayload } from '../components/LiveMap'
 
 export type Role = 'customer' | 'shipper'
-export interface User { id: string; name: string; email: string; role: Role; company?: string; shipperId?: string }
+export interface User { id: string; name: string; email: string; role: Role; company?: string; shipperId?: string; admin?: boolean }
+export type ShipperProfileInput = Pick<Shipper, 'name' | 'tagline' | 'hq' | 'founded' | 'modes' | 'destinations' | 'origins' | 'cargo' | 'services' | 'about' | 'priceIndex' | 'responseHours'>
+export type AdminShipper = Shipper & { owner: { email: string; name: string } | null; quoteCount: number; shipmentCount: number }
 
 export interface QuoteRequest {
   id: string
@@ -62,6 +64,9 @@ interface Store {
   track: (ref: string) => Promise<Shipment | null>
   position: (ref: string) => Promise<PositionPayload | null>
   setTransit: (id: string, t: { vesselName?: string; mmsi?: string; flight?: string }) => Promise<void>
+  updateShipper: (p: ShipperProfileInput) => Promise<Shipper>
+  adminShippers: () => Promise<AdminShipper[]>
+  adminVerify: (id: string, v: { verified: boolean; plan?: Shipper['plan'] }) => Promise<Shipper>
 }
 
 export class ApiError extends Error {
@@ -158,8 +163,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setShipments((prev) => prev.map((s) => (s.id === id ? shipment : s)))
   }, [])
 
-  const value = useMemo<Store>(() => ({ ready, user, shippers, requests, shipments, shipperById, login, signup, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit }),
-    [ready, user, shippers, requests, shipments, shipperById, login, signup, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit])
+  const updateShipper = useCallback<Store['updateShipper']>(async (p) => {
+    const { shipper, user: u } = await api<{ shipper: Shipper; user: User }>('/shippers/me', { method: 'PATCH', json: p })
+    setShippers((prev) => prev.map((s) => (s.id === shipper.id ? shipper : s)))
+    setUser(u)
+    return shipper
+  }, [])
+  const adminShippers = useCallback<Store['adminShippers']>(async () => (await api<{ shippers: AdminShipper[] }>('/admin/shippers')).shippers, [])
+  const adminVerify = useCallback<Store['adminVerify']>(async (id, v) => {
+    const { shipper } = await api<{ shipper: Shipper }>(`/admin/shippers/${id}/verify`, { json: v })
+    setShippers((prev) => prev.map((s) => (s.id === shipper.id ? shipper : s)))
+    return shipper
+  }, [])
+
+  const value = useMemo<Store>(() => ({ ready, user, shippers, requests, shipments, shipperById, login, signup, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit, updateShipper, adminShippers, adminVerify }),
+    [ready, user, shippers, requests, shipments, shipperById, login, signup, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit, updateShipper, adminShippers, adminVerify])
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }
 

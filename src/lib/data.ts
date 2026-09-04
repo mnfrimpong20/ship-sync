@@ -59,6 +59,9 @@ export interface Shipper {
   plan: 'starter' | 'pro' | 'enterprise'
   initials: string
   hue: string
+  demo?: boolean
+  verifiedAt?: string
+  createdAt?: string
 }
 
 export const shippers: Shipper[] = [

@@ -54,7 +54,7 @@ export default function Nav() {
               <AnimatePresence>
                 {menu && (
                   <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} role="menu" className="card-dark absolute right-0 mt-2 w-52 overflow-hidden p-1.5">
-                    <Link role="menuitem" to={dash} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><LayoutDashboard size={16} aria-hidden="true" /> Dashboard</Link>
+                    <Link role="menuitem" to={dash} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><LayoutDashboard size={16} aria-hidden="true" /> Open workspace</Link>
                     {user.role === 'shipper' && <Link role="menuitem" to="/dashboard/clients" className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><Users size={16} aria-hidden="true" /> Clients</Link>}
                     {user.admin && <Link role="menuitem" to="/admin" className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><ShieldCheck size={16} aria-hidden="true" /> Admin</Link>}
                     <button role="menuitem" onClick={() => { logout().finally(() => nav('/')) }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-surface-2 focus-ring"><LogOut size={16} aria-hidden="true" /> Sign out</button>
@@ -83,7 +83,7 @@ export default function Nav() {
               <div className="mt-4 flex flex-col gap-2 pb-2">
                 {user ? (
                   <>
-                    <Link to={dash} className="btn-ghost">Dashboard</Link>
+                    <Link to={dash} className="btn-ghost">Open workspace</Link>
                     {user.role === 'shipper' && <Link to="/dashboard/clients" className="btn-ghost">Clients</Link>}
                     {user.admin && <Link to="/admin" className="btn-ghost">Admin</Link>}
                     <button onClick={() => { logout().finally(() => nav('/')) }} className="btn-ghost">Sign out</button>

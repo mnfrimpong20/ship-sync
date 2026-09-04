@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
     "lint": "oxlint",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "vendor:maplibre": "node -e \"const fs=require('fs');fs.mkdirSync('public/vendor/maplibre',{recursive:true});for(const f of ['maplibre-gl-worker.mjs','maplibre-gl-shared.mjs'])fs.copyFileSync('node_modules/maplibre-gl/dist/'+f,'public/vendor/maplibre/'+f)\"",
+    "postinstall": "npm run vendor:maplibre"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

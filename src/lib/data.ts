@@ -109,6 +109,10 @@ export interface Shipment {
   eta: string
   events: TrackingEvent[]
   customer: string
+  vesselName?: string
+  mmsi?: string
+  flight?: string
+  departedAt?: string
 }
 
 export const sampleShipments: Shipment[] = [

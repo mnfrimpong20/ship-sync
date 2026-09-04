@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { shippers as seedShippers, type CargoType, type Mode, type Shipment, type Shipper } from './data'
+import type { PositionPayload } from '../components/LiveMap'
 
 export type Role = 'customer' | 'shipper'
 export interface User { id: string; name: string; email: string; role: Role; company?: string; shipperId?: string }
@@ -59,6 +60,8 @@ interface Store {
   advanceShipment: (id: string, note?: string) => Promise<void>
   matchShippers: (r: Pick<QuoteRequest, 'origin' | 'destination' | 'mode' | 'cargo'>) => Promise<Match[]>
   track: (ref: string) => Promise<Shipment | null>
+  position: (ref: string) => Promise<PositionPayload | null>
+  setTransit: (id: string, t: { vesselName?: string; mmsi?: string; flight?: string }) => Promise<void>
 }
 
 export class ApiError extends Error {
@@ -146,8 +149,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try { return (await api<{ shipment: Shipment }>(`/track/${encodeURIComponent(ref.trim())}`)).shipment } catch (e) { if (e instanceof ApiError && e.status === 404) return null; throw e }
   }, [])
 
-  const value = useMemo<Store>(() => ({ ready, user, shippers, requests, shipments, shipperById, login, signup, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track }),
-    [ready, user, shippers, requests, shipments, shipperById, login, signup, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track])
+  const position = useCallback<Store['position']>(async (ref) => {
+    try { return (await api<{ position: PositionPayload }>(`/track/${encodeURIComponent(ref.trim())}/position`)).position } catch { return null }
+  }, [])
+
+  const setTransit = useCallback<Store['setTransit']>(async (id, t) => {
+    const { shipment } = await api<{ shipment: Shipment }>(`/shipments/${id}/transit`, { json: t })
+    setShipments((prev) => prev.map((s) => (s.id === id ? shipment : s)))
+  }, [])
+
+  const value = useMemo<Store>(() => ({ ready, user, shippers, requests, shipments, shipperById, login, signup, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit }),
+    [ready, user, shippers, requests, shipments, shipperById, login, signup, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit])
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }
 

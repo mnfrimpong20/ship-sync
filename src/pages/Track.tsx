@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, Loader2, Search } from 'lucide-react'
+import { Check, Loader2, Plane, Radio, Search, Ship } from 'lucide-react'
 import { cargoLabel, countryByCode, statusLabels, statusOrder, type Shipment } from '../lib/data'
 import { useStore } from '../lib/store'
 import { Avatar, ModeBadge, Pill, fmtDate, fmtDateTime } from '../components/ui'
+import type { PositionPayload } from '../components/LiveMap'
+
+const LiveMap = lazy(() => import('../components/LiveMap'))
 import { fadeUp, stagger } from '../lib/motion'
 
 export default function Track() {
@@ -60,6 +63,41 @@ export default function Track() {
   )
 }
 
+function LivePanel({ s }: { s: Shipment }) {
+  const { position } = useStore()
+  const [pos, setPos] = useState<PositionPayload | null>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let live = true
+    const load = () => position(s.ref).then((p) => { if (live) { setPos(p); setLoading(false) } })
+    load()
+    const t = setInterval(load, 30_000)
+    return () => { live = false; clearInterval(t) }
+  }, [s.ref, s.status, position])
+  if (loading) return <div className="mt-6 grid min-h-[320px] place-items-center rounded-[var(--radius-md)] border border-border bg-surface-2 text-sm text-text-muted"><span className="flex items-center gap-2"><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Loading map…</span></div>
+  if (!pos || !pos.route) return null
+  const fix = pos.live ?? pos.lastKnown
+  const Icon = pos.mode === 'air' ? Plane : Ship
+  return (
+    <div className="mt-6">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-semibold text-text">
+          <Icon size={16} className="text-gold" aria-hidden="true" />
+          {pos.carrier.vesselName ?? pos.carrier.flight ?? (pos.mode === 'air' ? 'Flight' : 'Vessel')}
+          {pos.carrier.mmsi && <span className="font-mono text-xs font-normal text-text-muted">MMSI {pos.carrier.mmsi}</span>}
+        </p>
+        {pos.live ? <Pill tone="gold"><Radio size={12} className="mr-1 animate-pulse" aria-hidden="true" /> Live</Pill> : pos.lastKnown ? <Pill tone="muted">Last known</Pill> : pos.phase === 'transit' ? <Pill tone="teal">Estimated</Pill> : null}
+      </div>
+      <div className="h-[340px] md:h-[400px]">
+        <Suspense fallback={<div className="ss-map" />}><LiveMap data={pos} /></Suspense>
+      </div>
+      <p className="mt-2 text-xs text-text-muted">
+        {pos.note}{fix ? ` Signal ${fmtDateTime(fix.at)}.` : ''} Positions are public, delayed and approximate — never for navigation or safety decisions.
+      </p>
+    </div>
+  )
+}
+
 export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: boolean }) {
   const { shipperById } = useStore()
   const shipper = shipperById(s.shipperId) ?? { id: s.shipperId, name: 'Shipper', hq: '', initials: 'SS', hue: '#E3B54A' }
@@ -90,6 +128,8 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
               {statusOrder.map((st, i) => <li key={st} className={`${i <= idx ? 'text-text' : ''} ${i > 3 ? 'hidden md:block' : ''}`}>{statusLabels[st]}</li>)}
             </ol>
           </div>
+
+          <LivePanel s={s} />
 
           <ol className="mt-8 space-y-0" aria-label="Tracking history">
             {[...s.events].reverse().map((ev, i, arr) => (

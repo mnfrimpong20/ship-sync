@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, PlusCircle, Send, Ship, TrendingUp, X } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Plane, PlusCircle, Send, Ship, TrendingUp, X } from 'lucide-react'
 import { cargoLabel, countryByCode, statusLabels, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
 import { Avatar, Empty, ModeBadge, Pill, Rating, fmtDate, money } from '../components/ui'
@@ -180,8 +180,10 @@ function ShipmentsTab() {
 
 /* ================= SHIPPER ================= */
 export function ShipperDashboard() {
-  const { ready, user, requests, shipments, sendQuote, advanceShipment, shipperById } = useStore()
+  const { ready, user, requests, shipments, sendQuote, advanceShipment, shipperById, setTransit } = useStore()
   const [quoting, setQuoting] = useState<string | null>(null)
+  const [transitFor, setTransitFor] = useState<string | null>(null)
+  const [tf, setTf] = useState({ vesselName: '', mmsi: '', flight: '' })
   const [form, setForm] = useState({ price: '', transit: '', notes: '' })
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
@@ -205,6 +207,14 @@ export function ShipperDashboard() {
       await sendQuote(r.id, { price, transitDays: transit, notes: form.notes || (shipper.tagline ? `${shipper.tagline}.` : ''), includes: [r.pickup ? 'Pickup' : 'Drop-off at warehouse', r.mode === 'air' ? 'Air freight' : 'Ocean freight', r.delivery ? 'Door delivery' : 'Port handling', ...(r.insurance ? ['All-risk insurance'] : [])] })
       setQuoting(null); setForm({ price: '', transit: '', notes: '' }); setToast(`Quote sent to ${r.contact.name}.`)
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not send the quote.') }
+    finally { setBusy(false) }
+  }
+  const saveTransit = async (id: string, mode: 'air' | 'ocean') => {
+    setBusy(true); setError('')
+    try {
+      await setTransit(id, mode === 'air' ? { flight: tf.flight } : { vesselName: tf.vesselName, mmsi: tf.mmsi })
+      setTransitFor(null); setTf({ vesselName: '', mmsi: '', flight: '' }); setToast('Tracking details saved — customers now see the live position.')
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not save tracking details.') }
     finally { setBusy(false) }
   }
   const advance = async (id: string, ref: string) => {
@@ -278,6 +288,29 @@ export function ShipperDashboard() {
                     <Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill>
                     {s.status !== 'delivered' && <button onClick={() => advance(s.id, s.ref)} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60">Mark next step <ChevronRight size={14} aria-hidden="true" /></button>}
                   </div>
+                  {s.status !== 'delivered' && (
+                    <div className="mt-3 border-t border-border pt-3">
+                      {transitFor === s.id ? (
+                        <form onSubmit={(e) => { e.preventDefault(); saveTransit(s.id, s.mode) }} className="grid gap-2">
+                          {s.mode === 'air' ? (
+                            <div><label htmlFor={`fl-${s.id}`} className="label-dark">Flight callsign (ICAO)</label><input id={`fl-${s.id}`} className="input-dark !min-h-10 uppercase" placeholder="e.g. CLX775" value={tf.flight} onChange={(e) => setTf({ ...tf, flight: e.target.value })} required /></div>
+                          ) : (
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <div><label htmlFor={`vn-${s.id}`} className="label-dark">Vessel name</label><input id={`vn-${s.id}`} className="input-dark !min-h-10" placeholder="e.g. MSC Alessia" value={tf.vesselName} onChange={(e) => setTf({ ...tf, vesselName: e.target.value })} /></div>
+                              <div><label htmlFor={`mm-${s.id}`} className="label-dark">MMSI (9 digits)</label><input id={`mm-${s.id}`} className="input-dark !min-h-10 font-mono" placeholder="e.g. 636019825" inputMode="numeric" value={tf.mmsi} onChange={(e) => setTf({ ...tf, mmsi: e.target.value.replace(/\D/g, '').slice(0, 9) })} /></div>
+                            </div>
+                          )}
+                          <p className="text-[11px] text-text-muted">{s.mode === 'air' ? 'Find the ICAO callsign on the airway bill or flightradar24 (e.g. British Airways 75 = BAW75).' : 'The MMSI is on the bill of lading or any vessel-tracking site. It enables live AIS position on the customer’s tracking page.'}</p>
+                          <div className="flex justify-end gap-2"><button type="button" onClick={() => setTransitFor(null)} className="btn-ghost !min-h-9 !px-3 text-xs">Cancel</button><button disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60">Save</button></div>
+                        </form>
+                      ) : (
+                        <button onClick={() => { setTransitFor(s.id); setTf({ vesselName: s.vesselName ?? '', mmsi: s.mmsi ?? '', flight: s.flight ?? '' }) }} className="flex min-h-9 w-full items-center gap-2 text-left text-xs text-text-muted hover:text-gold focus-ring rounded">
+                          {s.mode === 'air' ? <Plane size={14} aria-hidden="true" /> : <Ship size={14} aria-hidden="true" />}
+                          {s.flight || s.vesselName ? <>{s.flight ?? s.vesselName}{s.mmsi ? ` · MMSI ${s.mmsi}` : ''} <span className="text-gold">Edit</span></> : <span>Add {s.mode === 'air' ? 'flight number' : 'vessel & MMSI'} for live tracking</span>}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </li>
               )
             })}

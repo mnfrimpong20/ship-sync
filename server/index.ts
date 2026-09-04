@@ -5,7 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { apiRouter } from './api'
 import { getDb } from './db'
-import { ais } from './live'
+import { ais, startAirSweep } from './live'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
@@ -15,6 +15,7 @@ const port = Number(process.env.PORT || 5000)
 async function main() {
   const db = await getDb() // connect, migrate, seed before accepting traffic
   ais.start(db).catch((e) => console.error('[ais]', e))
+  startAirSweep()
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', 1)

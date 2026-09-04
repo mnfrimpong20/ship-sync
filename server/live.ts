@@ -216,17 +216,14 @@ export async function flightPosition(callsignRaw: string): Promise<Position | nu
   if (!cs) return null
   const hit = flightCache.get(cs)
   if (hit && Date.now() - hit.at < FLIGHT_TTL) return hit.pos
+  // The hub sweep may already have it — free and instant.
+  const swept = regionList.find((a) => a.callsign === cs)
+  if (swept) { flightCache.set(cs, { at: Date.now(), pos: swept }); return swept }
   let pos: Position | null = null
-  try {
-    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000)
-    const res = await fetch(`${ADSB_URL}/v2/callsign/${encodeURIComponent(cs)}`, { signal: ctl.signal, headers: { accept: 'application/json' } })
-    clearTimeout(t)
-    if (res.ok) {
-      const data = (await res.json()) as { ac?: any[] }
-      const ac = (data.ac ?? []).find((a) => Number.isFinite(a.lat) && Number.isFinite(a.lon))
-      if (ac) pos = { id: cs, lat: ac.lat, lon: ac.lon, speed: num(ac.gs), course: num(ac.track), altitude: typeof ac.alt_baro === 'number' ? ac.alt_baro : undefined, at: new Date(Date.now() - (ac.seen ?? 0) * 1000).toISOString(), source: 'adsb.lol', name: (ac.flight ?? cs).trim() }
-    }
-  } catch { /* offline or blocked — treat as no data */ }
+  const p = pickProvider() ?? PROVIDERS[0]
+  const list = await adsbGet(p, p.callsign(cs))
+  const ac = list?.[0]
+  if (ac) pos = { id: cs, lat: ac.lat, lon: ac.lon, speed: num(ac.gs), course: num(ac.track), altitude: typeof ac.alt_baro === 'number' ? ac.alt_baro : undefined, at: new Date(Date.now() - (ac.seen ?? 0) * 1000).toISOString(), source: 'adsb.lol', name: (ac.flight ?? cs).trim() }
   flightCache.set(cs, { at: Date.now(), pos })
   return pos
 }
@@ -266,30 +263,65 @@ const aircraftOf = (a: any): Aircraft => {
   }
 }
 
-/** Live flights across the hubs (for the live map). Each hub keeps its last good answer if one poll fails. */
-const hubCache = new Map<string, Aircraft[]>()
-let regionCache: { at: number; list: Aircraft[] } = { at: 0, list: [] }
-let regionInflight: Promise<Aircraft[]> | null = null
-export async function flightsInRegion(): Promise<Aircraft[]> {
-  if (Date.now() - regionCache.at < FLIGHT_TTL) return regionCache.list
-  if (regionInflight) return regionInflight
-  regionInflight = (async () => {
-    await Promise.allSettled(AIR_HUBS.map(async ([name, lat, lon]) => {
-      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000)
-      try {
-        const res = await fetch(`${ADSB_URL}/v2/point/${lat}/${lon}/250`, { signal: ctl.signal, headers: { accept: 'application/json' } })
-        if (!res.ok) return
-        const d = (await res.json()) as { ac?: any[] }
-        hubCache.set(name, (d.ac ?? []).filter((a) => Number.isFinite(a.lat) && Number.isFinite(a.lon)).map(aircraftOf))
-      } catch { /* keep the previous answer for this hub */ } finally { clearTimeout(t) }
-    }))
-    const seen = new Map<string, Aircraft>()
-    for (const list of hubCache.values()) for (const a of list) if (!seen.has(a.id)) seen.set(a.id, a)
-    regionCache = { at: Date.now(), list: [...seen.values()] }
-    regionInflight = null
-    return regionCache.list
-  })()
-  return regionInflight
+/* Public ADS-B aggregators (all readsb-style JSON). adsb.lol allows only a few requests per ~10 s per IP, adsb.fi about
+ * one per second, so the sweep is a paced background loop that rotates hubs across providers instead of a burst. */
+interface AdsbProvider { name: string; point: (lat: number, lon: number) => string; callsign: (cs: string) => string; key: 'ac' | 'aircraft'; minGapMs: number; backoffUntil: number; lastAt: number; ok: number; fail: number }
+const PROVIDERS: AdsbProvider[] = [
+  { name: 'adsb.fi', point: (la, lo) => `${process.env.ADSBFI_URL || 'https://opendata.adsb.fi/api'}/v2/lat/${la}/lon/${lo}/dist/250`, callsign: (cs) => `${process.env.ADSBFI_URL || 'https://opendata.adsb.fi/api'}/v2/callsign/${encodeURIComponent(cs)}`, key: 'aircraft', minGapMs: 1500, backoffUntil: 0, lastAt: 0, ok: 0, fail: 0 },
+  { name: 'adsb.lol', point: (la, lo) => `${ADSB_URL}/v2/point/${la}/${lo}/250`, callsign: (cs) => `${ADSB_URL}/v2/callsign/${encodeURIComponent(cs)}`, key: 'ac', minGapMs: 6000, backoffUntil: 0, lastAt: 0, ok: 0, fail: 0 },
+  { name: 'airplanes.live', point: (la, lo) => `${process.env.AIRPLANESLIVE_URL || 'https://api.airplanes.live'}/v2/point/${la}/${lo}/250`, callsign: (cs) => `${process.env.AIRPLANESLIVE_URL || 'https://api.airplanes.live'}/v2/callsign/${encodeURIComponent(cs)}`, key: 'ac', minGapMs: 1500, backoffUntil: 0, lastAt: 0, ok: 0, fail: 0 },
+]
+const UA = 'ShipSync live map (+https://github.com/mnfrimpong20/ship-sync)'
+
+async function adsbGet(p: AdsbProvider, url: string): Promise<any[] | null> {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000)
+  try {
+    p.lastAt = Date.now()
+    const res = await fetch(url, { signal: ctl.signal, headers: { accept: 'application/json', 'user-agent': UA } })
+    if (res.status === 429 || res.status === 403) { p.backoffUntil = Date.now() + 30_000; p.fail++; return null }
+    if (!res.ok) { p.fail++; return null }
+    const d = (await res.json()) as Record<string, any[]>
+    p.ok++
+    return (d[p.key] ?? d.ac ?? d.aircraft ?? []).filter((a) => Number.isFinite(a.lat) && Number.isFinite(a.lon))
+  } catch { p.fail++; return null } finally { clearTimeout(t) }
+}
+
+/** The provider that is free right now and has waited longest since its last call; null when all are cooling down. */
+function pickProvider(): AdsbProvider | null {
+  const now = Date.now()
+  const free = PROVIDERS.filter((p) => p.backoffUntil <= now && now - p.lastAt >= p.minGapMs)
+  return free.sort((a, b) => a.lastAt - b.lastAt)[0] ?? null
+}
+
+/** Live flights across the hubs (for the live map). A background loop refreshes one hub at a time, so no provider is burst. */
+const hubCache = new Map<string, { at: number; list: Aircraft[] }>()
+let regionList: Aircraft[] = []
+let sweepStarted = false
+export function startAirSweep() {
+  if (sweepStarted) return; sweepStarted = true
+  let i = 0
+  const tick = async () => {
+    const p = pickProvider()
+    if (p) {
+      const [name, lat, lon] = AIR_HUBS[i % AIR_HUBS.length]; i++
+      const list = await adsbGet(p, p.point(lat, lon))
+      if (list) {
+        hubCache.set(name, { at: Date.now(), list: list.map(aircraftOf) })
+        const seen = new Map<string, Aircraft>()
+        const cutoff = Date.now() - 5 * 60_000
+        for (const h of hubCache.values()) { if (h.at < cutoff) continue; for (const a of h.list) if (!seen.has(a.id)) seen.set(a.id, a) }
+        regionList = [...seen.values()]
+      }
+    }
+    setTimeout(tick, 700)
+  }
+  tick()
+}
+export function flightsInRegion(): Aircraft[] { return regionList }
+/** Health for the API: how many hubs are fresh and what each provider has done. */
+export function airStatus() {
+  const fresh = [...hubCache.values()].filter((h) => Date.now() - h.at < 2 * 60_000).length
+  return { hubs: AIR_HUBS.length, freshHubs: fresh, providers: PROVIDERS.map((p) => ({ name: p.name, ok: p.ok, fail: p.fail, coolingDown: p.backoffUntil > Date.now() })) }
 }
 
 export interface Airport { icao: string; iata?: string; name: string; city?: string; country?: string; lat: number; lon: number }
@@ -306,6 +338,7 @@ export async function flightRoute(callsign: string, lat: number, lon: number): P
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000)
     const res = await fetch(`${ADSB_URL}/api/0/routeset`, { method: 'POST', signal: ctl.signal, headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ planes: [{ callsign: cs, lat, lng: lon }] }) })
     clearTimeout(t)
+    if (res.status === 429) { routeCache.set(cs, { at: Date.now() - ROUTE_TTL + 20_000, route: null }); return null } // retry in 20 s
     if (res.ok) {
       const [r] = (await res.json()) as any[]
       const aps: Airport[] = (r?._airports ?? []).map((a: any) => ({ icao: a.icao, iata: a.iata || undefined, name: a.name, city: a.location || undefined, country: a.countryiso2 || undefined, lat: a.lat, lon: a.lon }))
@@ -318,5 +351,5 @@ export async function flightRoute(callsign: string, lat: number, lon: number): P
 
 /** One aircraft from the last hub sweep, by ICAO hex. */
 export function aircraft(hex: string): Aircraft | null {
-  return regionCache.list.find((a) => a.id === hex.toLowerCase()) ?? null
+  return regionList.find((a) => a.id === hex.toLowerCase()) ?? null
 }

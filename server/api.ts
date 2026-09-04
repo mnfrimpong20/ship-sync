@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { getDb, makeRef, uid, type Db } from './db'
 import { statusOrder, type CargoType, type ShipmentStatus } from '../src/lib/data'
 import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } from '../src/lib/geo'
-import { ais, aircraft, flightPosition, flightRoute, flightsInRegion, type Position } from './live'
+import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion, type Position } from './live'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string }
@@ -349,9 +349,9 @@ export function apiRouter() {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.
     const r3 = (n: number) => Math.round(n * 1000) / 1000
     const vessels = ais.region().map((p) => ({ id: p.id, name: p.name, lat: r3(p.lat), lon: r3(p.lon), speed: p.speed, course: p.course, at: p.at, source: p.source, kind: 'vessel' }))
-    const flights = (await flightsInRegion()).filter((a) => !a.onGround).map((a) => ({ id: a.id, name: a.name, lat: r3(a.lat), lon: r3(a.lon), speed: a.speed, course: a.course, altitude: a.altitude, at: a.at, source: a.source, cargo: a.cargo, kind: 'flight' }))
+    const flights = flightsInRegion().filter((a) => !a.onGround).map((a) => ({ id: a.id, name: a.name, lat: r3(a.lat), lon: r3(a.lon), speed: a.speed, course: a.course, altitude: a.altitude, at: a.at, source: a.source, cargo: a.cargo, kind: 'flight' }))
     res.set('Cache-Control', 'no-store')
-    res.json({ vessels, flights, congestion: ais.congestion(), ais: { status: ais.status, enabled: ais.enabled, lastMessageAt: ais.lastMessageAt ? new Date(ais.lastMessageAt).toISOString() : null, coastVessels: ais.coast().length, error: ais.lastError || undefined }, ports: Object.fromEntries(Object.entries(destGeo).map(([k, g]) => [k, { name: g.port.name, at: g.port.at, airport: g.airport }])) })
+    res.json({ vessels, flights, congestion: ais.congestion(), ais: { status: ais.status, enabled: ais.enabled, lastMessageAt: ais.lastMessageAt ? new Date(ais.lastMessageAt).toISOString() : null, coastVessels: ais.coast().length, error: ais.lastError || undefined }, adsb: airStatus(), ports: Object.fromEntries(Object.entries(destGeo).map(([k, g]) => [k, { name: g.port.name, at: g.port.at, airport: g.airport }])) })
   }))
   r.get('/live/vessel/:mmsi', wrap(async (req, res) => {
     const mmsi = String(req.params.mmsi)
@@ -364,7 +364,6 @@ export function apiRouter() {
   r.get('/live/flight/:hex', wrap(async (req, res) => {
     const hex = String(req.params.hex).toLowerCase()
     if (!/^~?[0-9a-f]{6}$/.test(hex)) throw new HttpError(400, 'Invalid aircraft id.')
-    await flightsInRegion() // make sure the sweep is fresh
     const a = aircraft(hex)
     if (!a) throw new HttpError(404, 'No recent ADS-B data for that aircraft.')
     const route = a.callsign ? await flightRoute(a.callsign, a.lat, a.lon) : null

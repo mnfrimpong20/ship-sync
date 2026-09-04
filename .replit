@@ -1,4 +1,4 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "postgresql-16"]
 run = "npm run dev"
 entrypoint = "server/index.ts"
 
@@ -8,6 +8,18 @@ channel = "stable-24_05"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[workflows]
+runButton = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
 
 [deployment]
 deploymentTarget = "autoscale"

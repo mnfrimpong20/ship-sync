@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Plane, Ship } from 'lucide-react'
-import { cargoTypes, countries, origins, type CargoType, type Mode } from '../lib/data'
+import { cargoTypes, countries, countryByCode, origins, type CargoType, type Mode } from '../lib/data'
 import { useStore, type Match, type NewRequest } from '../lib/store'
 import { Avatar, ModeBadge, Rating, money } from '../components/ui'
 import { ease } from '../lib/motion'
+import { congestionLabel, useCongestion } from '../lib/useCongestion'
 
 type Form = NewRequest
 const stepsMeta = ['Route', 'Cargo', 'Services', 'Contact']
@@ -38,6 +39,8 @@ export default function Quote() {
   }, [form.origin, form.destination, form.mode, form.cargo, matchShippers])
   useEffect(() => { if (user) setForm((f) => ({ ...f, contact: { ...f.contact, name: f.contact.name || user.name, email: f.contact.email || user.email } })) }, [user])
   const preferred = sp.get('shipper') ? shipperById(sp.get('shipper')!) : undefined
+  const cg = useCongestion()
+  const portNow = cg?.enabled && form.mode !== 'air' ? congestionLabel(cg.congestion[form.destination]) : null
   useEffect(() => { window.scrollTo({ top: 0 }) }, [step])
 
   const validate = () => {
@@ -184,6 +187,11 @@ export default function Quote() {
                   ))}
                 </AnimatePresence>
               </ul>
+              {portNow && (
+                <p className={`mt-4 rounded-lg border p-3 text-xs ${portNow.level === 'heavy' ? 'border-danger/40 bg-danger/10 text-danger' : portNow.level === 'busy' ? 'border-gold/40 bg-gold/10 text-gold' : 'border-border bg-surface-2 text-text-muted'}`}>
+                  {countryByCode(form.destination)?.ports[0]} right now: {portNow.text}.{portNow.level !== 'clear' ? ' Shippers may quote longer transit.' : ''}
+                </p>
+              )}
               {matches.length > 0 && (
                 <p className="mt-4 border-t border-border pt-4 text-xs text-text-muted">Estimated range for {money(estimate(form).lo)}–{money(estimate(form).hi)} based on recent quotes on this lane. Final prices come from shippers.</p>
               )}

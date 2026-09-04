@@ -17,10 +17,14 @@ export interface Position {
 
 /* ------------------------------------------------------------------ AIS */
 const AIS_URL = process.env.AISSTREAM_URL || 'wss://stream.aisstream.io/v0/stream'
-const WEST_AFRICA_BOX: [LngLat, LngLat] = [[-20, 3.5], [10, 16]] // Dakar → Lagos, incl. approaches
-const ATLANTIC_BOX: [LngLat, LngLat] = [[-80, 3.5], [10, 55]] // wide box so subscribed MMSIs are reported anywhere on the lane
-
 type Box = [LngLat, LngLat]
+const WEST_AFRICA_BOX: Box = [[-20, 3.5], [10, 16]] // Dakar → Lagos, incl. approaches
+/** Atlantic approach to the lane: Cape Verde, Canaries, Moroccan and Portuguese coasts. AISStream's community receivers
+ *  are dense here and almost absent on the Gulf of Guinea coast, so this is where southbound ships are actually seen. */
+const APPROACH_BOX: Box = [[-26, 16], [-5, 40]]
+const REGION_BOXES: Box[] = [WEST_AFRICA_BOX, APPROACH_BOX]
+const ATLANTIC_BOX: Box = [[-80, 3.5], [10, 55]] // wide box so subscribed MMSIs are reported anywhere on the lane
+
 const toAis = (b: Box) => [[b[0][1], b[0][0]], [b[1][1], b[1][0]]] // AISStream wants [[lat,lon],[lat,lon]]
 
 /** One AISStream socket with auto-reconnect. Subscription payload is rebuilt on every (re)connect. */
@@ -76,12 +80,19 @@ class AisWorker {
     this.db = db
     const { rows } = await db.query<any>('select * from vessel_positions')
     for (const r of rows) this.latest.set(r.mmsi, { id: r.mmsi, lat: Number(r.lat), lon: Number(r.lon), speed: r.sog ?? undefined, course: r.cog ?? undefined, heading: r.heading ?? undefined, at: new Date(r.at).toISOString(), source: 'aisstream', name: r.name ?? undefined })
-    this.regional = new AisSocket(this.key, () => ({ BoundingBoxes: [toAis(WEST_AFRICA_BOX)] }), (m) => this.onMessage(m, false))
+    this.regional = new AisSocket(this.key, () => ({ BoundingBoxes: REGION_BOXES.map(toAis) }), (m) => this.onMessage(m, false))
     this.watch = new AisSocket(this.key, () => (this.mmsis.size ? { BoundingBoxes: [toAis(ATLANTIC_BOX)], FiltersShipMMSI: [...this.mmsis] } : null), (m) => this.onMessage(m, true))
     await this.refreshWatchlist()
     if (!this.enabled) return
     this.regional.start(); this.watch.start()
     setInterval(() => this.refreshWatchlist().catch(() => {}), 60_000)
+    setInterval(() => this.prune(), 10 * 60_000)
+  }
+
+  /** Drop regional traffic not heard from in 6h; watched vessels are kept so "last known" survives. */
+  private prune() {
+    const cutoff = Date.now() - 6 * 60 * 60_000
+    for (const [id, p] of this.latest) if (!this.mmsis.has(id) && new Date(p.at).getTime() < cutoff) { this.latest.delete(id); this.names.delete(id) }
   }
 
   async refreshWatchlist() {
@@ -134,15 +145,19 @@ class AisWorker {
   }
 
   get(mmsi: string) { return this.latest.get(mmsi) ?? null }
-  /** Everything currently known in the West Africa region (for the live map / congestion). */
+  /** Everything currently known on the lane — Gulf of Guinea coast plus the Atlantic approach (for the live map). */
   region(maxAgeMin = 180) {
     const cutoff = Date.now() - maxAgeMin * 60_000
-    return [...this.latest.values()].filter((p) => inBox([p.lon, p.lat], WEST_AFRICA_BOX) && new Date(p.at).getTime() > cutoff)
+    return [...this.latest.values()].filter((p) => REGION_BOXES.some((b) => inBox([p.lon, p.lat], b)) && new Date(p.at).getTime() > cutoff)
+  }
+  /** Vessels reported on the West African coast itself — 0 means no AIS receiver there is currently feeding AISStream. */
+  coast(maxAgeMin = 180) {
+    return this.region(maxAgeMin).filter((p) => inBox([p.lon, p.lat], WEST_AFRICA_BOX))
   }
   /** Vessels within each port's approach box, and how many of them look anchored (< 1 kn). */
   congestion() {
     const out: Record<string, { total: number; anchored: number }> = {}
-    const pts = this.region()
+    const pts = this.coast()
     for (const [code, g] of Object.entries(destGeo)) {
       const inApproach = pts.filter((p) => inBox([p.lon, p.lat], g.approach))
       out[code] = { total: inApproach.length, anchored: inApproach.filter((p) => (p.speed ?? 0) < 1).length }

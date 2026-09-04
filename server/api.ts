@@ -349,7 +349,7 @@ export function apiRouter() {
     const vessels = ais.region().map((p) => ({ ...p, kind: 'vessel' }))
     const flights = (await flightsInRegion()).map((p) => ({ ...p, kind: 'flight' }))
     res.set('Cache-Control', 'no-store')
-    res.json({ vessels, flights, congestion: ais.congestion(), ais: { status: ais.status, enabled: ais.enabled, lastMessageAt: ais.lastMessageAt ? new Date(ais.lastMessageAt).toISOString() : null, error: ais.lastError || undefined }, ports: Object.fromEntries(Object.entries(destGeo).map(([k, g]) => [k, { name: g.port.name, at: g.port.at, airport: g.airport }])) })
+    res.json({ vessels, flights, congestion: ais.congestion(), ais: { status: ais.status, enabled: ais.enabled, lastMessageAt: ais.lastMessageAt ? new Date(ais.lastMessageAt).toISOString() : null, coastVessels: ais.coast().length, error: ais.lastError || undefined }, ports: Object.fromEntries(Object.entries(destGeo).map(([k, g]) => [k, { name: g.port.name, at: g.port.at, airport: g.airport }])) })
   }))
   r.get('/track/:ref', wrap(async (req, res) => {
     const db = await getDb()

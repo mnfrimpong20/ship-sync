@@ -131,6 +131,21 @@ create table if not exists shipment_events (
   place text not null,
   note text
 );
+create table if not exists vessel_positions (
+  mmsi text primary key,
+  name text,
+  lat double precision not null,
+  lon double precision not null,
+  sog real,
+  cog real,
+  heading real,
+  at timestamptz not null,
+  updated timestamptz not null default now()
+);
+alter table shipments add column if not exists vessel_name text;
+alter table shipments add column if not exists mmsi text;
+alter table shipments add column if not exists flight text;
+alter table shipments add column if not exists departed_at timestamptz;
 create index if not exists idx_requests_user on requests(user_id);
 create index if not exists idx_quotes_request on quotes(request_id);
 create index if not exists idx_shipments_user on shipments(user_id);
@@ -190,8 +205,10 @@ async function seed(d: Db) {
     await d.query('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes,sent_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [q.id, q.req, q.shipper, q.price, q.days, dateOnly(addDays(q.valid)), q.notes, JSON.stringify(q.inc), addDays(q.sent)])
   }
 
+  const transit: Record<string, { vessel?: string; flight?: string }> = { s1: { vessel: 'MSC Alessia' }, s2: { flight: 'BAW75' }, s3: { vessel: 'Grande Africa' } }
   for (const s of sampleShipments) {
-    await d.query('insert into shipments (id,ref,shipper_id,user_id,mode,origin,destination,cargo,description,status,eta,customer) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [s.id, s.ref, s.shipperId, 'u_demo', s.mode, s.origin, s.destination, s.cargo, s.description, s.status, s.eta, s.customer])
+    const dep = s.events.find((e) => e.status === 'in_transit')?.at ?? null
+    await d.query('insert into shipments (id,ref,shipper_id,user_id,mode,origin,destination,cargo,description,status,eta,customer,vessel_name,flight,departed_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)', [s.id, s.ref, s.shipperId, 'u_demo', s.mode, s.origin, s.destination, s.cargo, s.description, s.status, s.eta, s.customer, transit[s.id]?.vessel ?? null, transit[s.id]?.flight ?? null, dep])
     for (const e of s.events) await d.query('insert into shipment_events (shipment_id,status,at,place,note) values ($1,$2,$3,$4,$5)', [s.id, e.status, e.at, e.place, e.note ?? null])
   }
 }

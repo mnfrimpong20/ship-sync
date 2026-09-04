@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { getDb, makeRef, uid, type Db } from './db'
 import { statusOrder, type CargoType, type ShipmentStatus } from '../src/lib/data'
+import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } from '../src/lib/geo'
+import { ais, flightPosition, flightsInRegion, type Position } from './live'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string }
@@ -31,8 +33,47 @@ const requestOut = (r: Row, quotes: Row[]) => ({
 })
 const shipmentOut = (r: Row, events: Row[]) => ({
   id: r.id, ref: r.ref, shipperId: r.shipper_id, mode: r.mode, origin: r.origin, destination: r.destination, cargo: r.cargo, description: r.description, status: r.status, eta: DATE(r.eta), customer: r.customer,
+  vesselName: r.vessel_name ?? undefined, mmsi: r.mmsi ?? undefined, flight: r.flight ?? undefined, departedAt: r.departed_at ? ISO(r.departed_at) : undefined,
   events: events.map((e) => ({ status: e.status, at: ISO(e.at), place: e.place, note: e.note ?? undefined })),
 })
+
+/* ---------------- live position ---------------- */
+const STALE_AIR_MIN = 30, STALE_SEA_MIN = 6 * 60
+export async function resolvePosition(r: Row, events: Row[]) {
+  const mode: 'air' | 'ocean' = r.mode
+  const dest = destGeo[r.destination]
+  const o: LngLat | undefined = originCoords[r.origin]
+  const d: LngLat | undefined = dest ? (mode === 'air' ? dest.airport.at : dest.port.at) : undefined
+  const idx = statusOrder.indexOf(r.status as ShipmentStatus)
+  const transitIdx = statusOrder.indexOf('in_transit'), arrivedIdx = statusOrder.indexOf('arrived')
+  const departed = r.departed_at ? new Date(r.departed_at) : events.find((e) => e.status === 'in_transit')?.at ? new Date(events.find((e) => e.status === 'in_transit')!.at) : null
+  const eta = new Date(DATE(r.eta) + 'T12:00:00Z')
+  let progress = idx < transitIdx ? 0 : idx >= arrivedIdx ? 1 : 0.5
+  if (idx >= transitIdx && idx < arrivedIdx && departed) progress = Math.max(0.02, Math.min(0.98, (Date.now() - departed.getTime()) / Math.max(1, eta.getTime() - departed.getTime())))
+  const estimated = o && d ? alongGreatCircle(o, d, progress) : undefined
+
+  let live: Position | null = null, lastKnown: Position | null = null
+  if (idx >= transitIdx && idx < arrivedIdx) {
+    if (mode === 'air' && r.flight) live = await flightPosition(r.flight)
+    if (mode === 'ocean' && r.mmsi) {
+      const p = ais.get(r.mmsi)
+      if (p) { const ageMin = (Date.now() - new Date(p.at).getTime()) / 60000; if (ageMin <= STALE_SEA_MIN) live = p; else lastKnown = p }
+    }
+    if (live && mode === 'air') { const ageMin = (Date.now() - new Date(live.at).getTime()) / 60000; if (ageMin > STALE_AIR_MIN) { lastKnown = live; live = null } }
+  }
+  const phase = idx < transitIdx ? 'pre' : idx >= arrivedIdx ? 'post' : 'transit'
+  return {
+    mode, phase, status: r.status, progress: Number(progress.toFixed(3)),
+    route: o && d ? { origin: { name: r.origin, at: o }, destination: { name: mode === 'air' ? dest!.airport.name : dest!.port.name, at: d }, path: greatCircle(o, d, 96) } : null,
+    carrier: { vesselName: r.vessel_name ?? undefined, mmsi: r.mmsi ?? undefined, flight: r.flight ?? undefined },
+    live, lastKnown, estimated: estimated ? { lat: estimated[1], lon: estimated[0] } : null,
+    sources: { ais: ais.status, adsb: 'public' },
+    note: live ? (mode === 'air' ? 'Live position from public ADS-B (adsb.lol). Delayed and not for navigation.' : 'Live AIS position via AISStream. Terrestrial AIS only — ships go dark mid-ocean.')
+      : lastKnown ? 'Last known position — no recent signal. Ships are often out of AIS range mid-ocean.'
+      : phase === 'transit' ? (mode === 'ocean' && !r.mmsi ? 'Estimated from departure and ETA. Add the vessel MMSI for live AIS tracking.' : mode === 'air' && !r.flight ? 'Estimated from departure and ETA. Add the flight number for live tracking.' : 'Estimated from departure and ETA — no live signal right now.')
+      : phase === 'pre' ? 'Not yet departed.' : 'Arrived at destination.',
+  }
+}
 const userOut = (r: Row, company?: string): ApiUser => ({ id: r.id, name: r.name, email: r.email, role: r.role, shipperId: r.shipper_id ?? undefined, company })
 
 class HttpError extends Error {
@@ -149,6 +190,12 @@ const zRequest = zMatch.extend({
   quantity: z.number().int().min(1), weightKg: z.number().int().min(0).optional(), description: z.string().max(2000).default(''), pickup: z.boolean(), delivery: z.boolean(), insurance: z.boolean(),
   readyDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), contact: z.object({ name: z.string().trim().min(2), email: z.string().trim().email(), phone: z.string().trim().min(7) }),
   password: z.string().min(8).optional(),
+})
+const zTransit = z.object({
+  vesselName: z.string().trim().max(80).optional().or(z.literal('').transform(() => undefined)),
+  mmsi: z.string().trim().regex(/^\d{9}$/, 'MMSI is a 9-digit number.').optional().or(z.literal('').transform(() => undefined)),
+  flight: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3,8}$/, 'Use the ICAO flight callsign, e.g. CLX775 or BAW75.').optional().or(z.literal('').transform(() => undefined)),
+  departedAt: z.string().datetime().optional(),
 })
 const zQuote = z.object({ price: z.number().int().min(1), transitDays: z.number().int().min(1), notes: z.string().max(2000).default(''), includes: z.array(z.string()).default([]), validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() })
 
@@ -272,9 +319,37 @@ export function apiRouter() {
     const next = statusOrder[idx + 1]
     const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 500) : null
     await db.query('update shipments set status = $2 where id = $1', [s.id, next])
+    if (next === 'in_transit') { await db.query('update shipments set departed_at = coalesce(departed_at, now()) where id = $1', [s.id]) }
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, next, idx < 3 ? s.origin : s.destination, note])
     const [shipment] = await loadShipments(db, 'id = $1', [s.id])
     res.json({ shipment })
+  }))
+  r.post('/shipments/:id/transit', wrap(async (req, res) => {
+    const db = await getDb(); const user = await requireUser(db, req)
+    const { rows } = await db.query<Row>('select * from shipments where id = $1', [req.params.id])
+    const s = rows[0]
+    if (!s) throw new HttpError(404, 'Shipment not found.')
+    if (user.role !== 'shipper' || s.shipper_id !== user.shipperId) throw new HttpError(403, 'Only the handling shipper can update this shipment.')
+    const body = zTransit.parse(req.body)
+    await db.query('update shipments set vessel_name = $2, mmsi = $3, flight = $4, departed_at = coalesce($5, departed_at) where id = $1',
+      [s.id, body.vesselName ?? null, body.mmsi ?? null, body.flight ?? null, body.departedAt ? new Date(body.departedAt) : null])
+    await ais.refreshWatchlist()
+    const [shipment] = await loadShipments(db, 'id = $1', [s.id])
+    res.json({ shipment })
+  }))
+  r.get('/track/:ref/position', wrap(async (req, res) => {
+    const db = await getDb()
+    const { rows } = await db.query<Row>('select * from shipments where upper(ref) = upper($1)', [req.params.ref])
+    if (!rows[0]) throw new HttpError(404, 'We couldn’t find a shipment with that reference.')
+    const { rows: events } = await db.query<Row>('select * from shipment_events where shipment_id = $1 order by at asc', [rows[0].id])
+    res.set('Cache-Control', 'no-store')
+    res.json({ position: await resolvePosition(rows[0], events) })
+  }))
+  r.get('/live/region', wrap(async (_req, res) => {
+    const vessels = ais.region().map((p) => ({ ...p, kind: 'vessel' }))
+    const flights = (await flightsInRegion()).map((p) => ({ ...p, kind: 'flight' }))
+    res.set('Cache-Control', 'no-store')
+    res.json({ vessels, flights, congestion: ais.congestion(), ais: { status: ais.status, enabled: ais.enabled, lastMessageAt: ais.lastMessageAt ? new Date(ais.lastMessageAt).toISOString() : null, error: ais.lastError || undefined }, ports: Object.fromEntries(Object.entries(destGeo).map(([k, g]) => [k, { name: g.port.name, at: g.port.at, airport: g.airport }])) })
   }))
   r.get('/track/:ref', wrap(async (req, res) => {
     const db = await getDb()

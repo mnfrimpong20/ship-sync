@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { apiRouter } from './api'
 import { getDb } from './db'
+import { ais } from './live'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
@@ -11,7 +12,8 @@ const isProd = process.env.NODE_ENV === 'production'
 const port = Number(process.env.PORT || 5000)
 
 async function main() {
-  await getDb() // connect, migrate, seed before accepting traffic
+  const db = await getDb() // connect, migrate, seed before accepting traffic
+  ais.start(db).catch((e) => console.error('[ais]', e))
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', 1)

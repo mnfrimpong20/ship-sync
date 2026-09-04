@@ -140,6 +140,7 @@ export default function Live() {
                 })}
               </ul>
               {data && !data.ais.enabled && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">Vessel data appears once an AISStream key is configured on the server.</p>}
+              {data && data.flights.length === 0 && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">No aircraft shown: community ADS-B receivers over West Africa are sparse, so coverage comes and goes. Flights are tracked over North America and Europe and reappear near the coast when a receiver is online.</p>}
               {anchoredTotal >= 15 && <p className="mt-3 text-xs text-gold">High congestion across the region — expect extra days for clearance.</p>}
             </div>
             <div className="card-dark mt-4 p-5">

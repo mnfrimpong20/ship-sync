@@ -9,6 +9,9 @@ import { ShipperDirectory, ShipperProfile } from './pages/Shippers'
 import Track from './pages/Track'
 import Live from './pages/Live'
 import Admin from './pages/Admin'
+import Clients from './pages/Clients'
+import ClientDetailPage from './pages/ClientDetail'
+import InvoiceView from './pages/InvoiceView'
 import { Login, Signup } from './pages/Auth'
 import { CustomerDashboard, ShipperDashboard } from './pages/Dashboard'
 import { StoreProvider } from './lib/store'
@@ -43,6 +46,9 @@ function Shell() {
               <Route path="/signup" element={<Signup />} />
               <Route path="/dashboard" element={<CustomerDashboard />} />
               <Route path="/dashboard/shipper" element={<ShipperDashboard />} />
+              <Route path="/dashboard/clients" element={<Clients />} />
+              <Route path="/dashboard/clients/:id" element={<ClientDetailPage />} />
+              <Route path="/dashboard/invoices/:id" element={<InvoiceView />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="*" element={<Home />} />
             </Routes>

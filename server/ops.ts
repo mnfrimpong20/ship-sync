@@ -308,6 +308,7 @@ export function mountOps(r: Router, d: Deps) {
       else await setShipmentStatus(db, st.shipmentId, 'delivered', `Delivered by ${me.name}${b.note ? ` — ${b.note}` : '.'}`)
     }
     const updated = await ownRun(db, shipperId, run.id)
+    if (b.lat != null || b.lon != null || b.seq != null) await db.query('update runs set distance_km = $2 where id = $1', [run.id, runDistance(updated.start, updated.stops)])
     if (updated.stops.length && updated.stops.every((s) => s.status !== 'pending') && updated.status === 'in_progress') { await db.query(`update runs set status = 'done' where id = $1`, [run.id]); if (run.vehicleId) await db.query(`update vehicles set status = 'available' where id = $1 and status = 'on_run'`, [run.vehicleId]) }
     res.json({ run: await ownRun(db, shipperId, run.id) })
   }))

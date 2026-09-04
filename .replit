@@ -1,0 +1,15 @@
+modules = ["nodejs-20"]
+run = "npm run dev"
+entrypoint = "src/main.tsx"
+
+[nix]
+channel = "stable-24_05"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[deployment]
+deploymentTarget = "static"
+build = ["sh", "-c", "npm install && npm run build"]
+publicDir = "dist"

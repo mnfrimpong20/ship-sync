@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Plane, PlusCircle, Send, Ship, TrendingUp, X } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Pencil, Plane, PlusCircle, Send, Ship, TrendingUp, X } from 'lucide-react'
 import { cargoLabel, countryByCode, statusLabels, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
 import { Avatar, Empty, ModeBadge, Pill, Rating, fmtDate, money } from '../components/ui'
 import { ShipmentDetail } from './Track'
+import ProfileEditor from '../components/ProfileEditor'
 import { fadeUp, stagger } from '../lib/motion'
 
 function Stat({ icon: Icon, label, value, hint }: { icon: typeof Inbox; label: string; value: string | number; hint?: string }) {
@@ -183,6 +184,7 @@ export function ShipperDashboard() {
   const { ready, user, requests, shipments, sendQuote, advanceShipment, shipperById, setTransit } = useStore()
   const [quoting, setQuoting] = useState<string | null>(null)
   const [transitFor, setTransitFor] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
   const [tf, setTf] = useState({ vesselName: '', mmsi: '', flight: '' })
   const [form, setForm] = useState({ price: '', transit: '', notes: '' })
   const [toast, setToast] = useState('')
@@ -194,7 +196,8 @@ export function ShipperDashboard() {
   if (user.role !== 'shipper' || !user.shipperId) return <Navigate to="/dashboard" replace />
   const me = user.shipperId
   const leads = requests.filter((r) => r.status === 'open')
-  const shipper: Pick<Shipper, 'id' | 'name' | 'hq' | 'plan' | 'onTime' | 'tagline'> = shipperById(me) ?? { id: me, name: user.company ?? 'Your company', hq: '', plan: 'starter', onTime: 0, tagline: '' }
+  const full = shipperById(me)
+  const shipper: Pick<Shipper, 'id' | 'name' | 'hq' | 'plan' | 'onTime' | 'tagline' | 'verified'> = full ?? { id: me, name: user.company ?? 'Your company', hq: '', plan: 'starter', onTime: 0, tagline: '', verified: false }
   const myQuotes = requests.flatMap((r) => r.quotes.filter((q) => q.shipperId === me).map((q) => ({ q, r })))
   const won = myQuotes.filter((x) => x.q.status === 'accepted').length
   const myShipments = shipments.filter((s) => s.shipperId === me)
@@ -223,9 +226,13 @@ export function ShipperDashboard() {
   }
 
   return (
-    <Layout title={shipper.name} sub={`${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan`} cta={<Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link>}>
+    <Layout title={shipper.name} sub={`${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan`} cta={<div className="flex flex-wrap gap-2"><button onClick={() => setEditing((e) => !e)} className="btn-gold" aria-expanded={editing}><Pencil size={16} aria-hidden="true" /> Edit profile</button><Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link></div>}>
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
       {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
+      {!shipper.verified && !editing && (
+        <p className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-text"><BadgeCheck size={16} className="text-gold" aria-hidden="true" /> Not yet verified. Complete your profile — Ship Sync reviews licence and insurance before granting the badge, which lifts you in matching and reassures customers.</p>
+      )}
+      {editing && full && <ProfileEditor shipper={full} onDone={(msg) => { setEditing(false); if (msg) setToast(msg) }} />}
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat icon={Inbox} label="New leads" value={leads.filter((r) => !r.quotes.some((q) => q.shipperId === me)).length} hint="Matching your lanes" />
         <Stat icon={Send} label="Quotes sent" value={myQuotes.length} hint={`${won} won`} />

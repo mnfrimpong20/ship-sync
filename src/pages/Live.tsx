@@ -5,13 +5,15 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { setupMapLibre } from '../lib/mapSetup'
 import { motion } from 'motion/react'
 import type { FeatureCollection, Point } from 'geojson'
-import { Anchor, ArrowRight, Compass, Flag, MapPin, Navigation, Plane, Radio, Ship, TriangleAlert, X } from 'lucide-react'
+import { Anchor, ArrowRight, MapPin, Plane, Radio, Ship, TriangleAlert } from 'lucide-react'
 import { MAP_STYLE, brandBasemap, type LivePos } from '../components/LiveMap'
 import { countries } from '../lib/data'
 import { greatCircle, originCoords, destGeo, type LngLat } from '../lib/geo'
 import { fadeUp, stagger } from '../lib/motion'
 import { Pill } from '../components/ui'
-import { compass, flagFromMmsi, formatEta, navStatusLabel, shipTypeLabel } from '../lib/ais'
+import { useStore } from '../lib/store'
+import { countryByCode } from '../lib/data'
+import { FlightCard, VesselCard, type FlightDetail, type VesselDetail } from '../components/CarrierCards'
 
 interface RegionPayload {
   vessels: (LivePos & { id: string; kind: 'vessel' })[]
@@ -21,18 +23,6 @@ interface RegionPayload {
   ports: Record<string, { name: string; at: LngLat; airport: { name: string; at: LngLat } }>
 }
 
-interface VesselDetail extends LivePos {
-  id: string; callSign?: string; imo?: string; type?: number; destination?: string
-  eta?: { month: number; day: number; hour: number; minute: number }
-  length?: number; beam?: number; draught?: number; navStatus?: number
-  firstSeen: { lat: number; lon: number; at: string } | null; watched: boolean
-}
-interface Airport { icao: string; iata?: string; name: string; city?: string; country?: string; lat: number; lon: number }
-interface FlightDetail extends LivePos {
-  id: string; callsign?: string; registration?: string; type?: string; description?: string; squawk?: string; category?: string
-  cargo: boolean; onGround: boolean; vertRate?: number
-  route: { origin: Airport; destination: Airport; via?: Airport[]; airline?: string; plausible: boolean } | null
-}
 type Selection = { kind: 'vessel' | 'flight'; id: string }
 
 /** The lanes Ship Sync's shippers actually run — drawn as great-circle arcs into the Gulf of Guinea. */
@@ -47,6 +37,8 @@ export default function Live() {
   const [data, setData] = useState<RegionPayload | null>(null)
   const [error, setError] = useState('')
   const [updated, setUpdated] = useState<Date | null>(null)
+  const { user, shipments, setTransit } = useStore()
+  const [assignMsg, setAssignMsg] = useState('')
   const [params, setParams] = useSearchParams()
   const [selected, setSelectedState] = useState<Selection | null>(() => {
     const v = params.get('vessel'), f = params.get('flight')
@@ -54,7 +46,7 @@ export default function Live() {
   })
   /** Selection lives in the URL too (?vessel=MMSI / ?flight=HEX) so a ship or plane can be shared or refreshed. */
   const setSelected = (sel: Selection | null) => {
-    setSelectedState(sel)
+    setSelectedState(sel); setAssignMsg('')
     setParams((prev) => { const n = new URLSearchParams(prev); n.delete('vessel'); n.delete('flight'); if (sel) n.set(sel.kind, sel.id); return n }, { replace: true })
   }
   const [vessel, setVessel] = useState<VesselDetail | null>(null)
@@ -164,6 +156,34 @@ export default function Live() {
     if (m.getSource('vessels')) apply(); else m.once('style.load', () => setTimeout(apply, 0))
   }, [data, cargoOnly])
 
+  /** Signed-in shippers can attach the selected ship/plane to one of their active shipments straight from the map. */
+  const assignFooter = (kind: 'vessel' | 'flight', carrier: { id: string; name?: string; callsign?: string } | null) => {
+    if (!user || user.role !== 'shipper' || !carrier) return null
+    const mode = kind === 'vessel' ? 'ocean' : 'air'
+    const mine = shipments.filter((x) => x.mode === mode && x.status !== 'delivered')
+    const already = mine.find((x) => (kind === 'vessel' ? x.mmsi === carrier.id : x.flight && carrier.callsign && x.flight.toUpperCase() === carrier.callsign.toUpperCase()))
+    if (!mine.length) return null
+    const label = kind === 'vessel' ? (carrier.name || `MMSI ${carrier.id}`) : (carrier.callsign || carrier.id)
+    return (
+      <div className="mt-4 border-t border-border pt-3">
+        {already ? <p className="text-xs text-teal">Assigned to your shipment <span className="font-mono">{already.ref}</span>.</p> : (
+          <label className="block text-xs text-text-muted">Assign {label} to a shipment
+            <select className="input-dark mt-1 !min-h-10 text-sm" defaultValue="" onChange={async (e) => {
+              const id = e.target.value; if (!id) return
+              try {
+                await setTransit(id, kind === 'vessel' ? { vesselName: carrier.name, mmsi: carrier.id } : { flight: carrier.callsign })
+                setAssignMsg(`Saved — customers tracking ${mine.find((x) => x.id === id)?.ref} now see this ${kind === 'vessel' ? 'ship' : 'flight'}.`)
+              } catch (err) { setAssignMsg(err instanceof Error ? err.message : 'Could not assign.') }
+            }}>
+              <option value="">Choose a shipment…</option>
+              {mine.map((x) => <option key={x.id} value={x.id}>{x.ref} · {x.origin} → {countryByCode(x.destination)?.name ?? x.destination}</option>)}
+            </select>
+          </label>
+        )}
+        {assignMsg && <p className="mt-2 text-xs text-gold" role="status">{assignMsg}</p>}
+      </div>
+    )
+  }
   const clearSelection = () => { setSelected(null); (map.current?.getSource('selected') as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] }) }
   const anchoredTotal = useMemo(() => Object.values(data?.congestion ?? {}).reduce((n, c) => n + c.anchored, 0), [data])
   const aisLabel = !data ? 'Connecting…' : data.ais.status === 'live' ? 'AIS live' : data.ais.enabled ? (data.ais.status === 'error' ? 'AIS error' : 'AIS connecting') : 'AIS not configured'
@@ -194,8 +214,8 @@ export default function Live() {
             <p className="mt-2 flex items-start gap-2 text-xs text-text-muted"><TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden="true" /> Positions come from public, delayed feeds (AISStream, adsb.fi, adsb.lol). Terrestrial AIS only covers the coast, so ships mid-ocean are not shown. Not for navigation or safety decisions. Basemap © CARTO, © OpenStreetMap contributors.</p>
           </div>
           <aside className="lg:col-span-3">
-            {selected?.kind === 'vessel' && <VesselCard mmsi={selected.id} v={vessel} err={detailErr} onClose={clearSelection} />}
-            {selected?.kind === 'flight' && <FlightCard f={flight} err={detailErr} onClose={clearSelection} />}
+            {selected?.kind === 'vessel' && <VesselCard mmsi={selected.id} v={vessel} err={detailErr} onClose={clearSelection} footer={assignFooter('vessel', vessel)} />}
+            {selected?.kind === 'flight' && <FlightCard f={flight} err={detailErr} onClose={clearSelection} footer={assignFooter('flight', flight && (flight.callsign ? flight : null))} />}
             {!selected && data && (data.vessels.length > 0 || data.flights.length > 0) && <p className="mb-4 text-xs text-text-muted"><MapPin size={12} className="mr-1 inline" aria-hidden="true" />Click any ship or aircraft for its details, origin/destination and ETA.</p>}
             <div className="card-dark p-5">
               <h2 className="!text-lg">Port approaches</h2>
@@ -231,113 +251,3 @@ export default function Live() {
   )
 }
 
-function Row({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null
-  return <div className="flex justify-between gap-3 py-1.5 text-sm"><dt className="shrink-0 text-text-muted">{label}</dt><dd className="text-right text-text">{value}</dd></div>
-}
-
-function ago(iso: string) {
-  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
-  return min < 1 ? 'just now' : min < 60 ? `${min} min ago` : min < 60 * 48 ? `${Math.round(min / 60)} h ago` : `${Math.round(min / 1440)} d ago`
-}
-
-/** Everything AIS tells us about one ship. AIS carries the *next* destination and ETA but never the port of origin, so
- *  "first seen" (where our feed first heard it) is the closest honest stand-in. */
-function VesselCard({ mmsi, v, err, onClose }: { mmsi: string; v: VesselDetail | null; err: string; onClose: () => void }) {
-  const flag = flagFromMmsi(mmsi)
-  const type = shipTypeLabel(v?.type)
-  const status = navStatusLabel(v?.navStatus)
-  const moving = (v?.speed ?? 0) >= 1
-  return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-dark mb-4 p-5" aria-live="polite">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="eyebrow !text-[10px]">Vessel</p>
-          <h2 className="!text-lg leading-tight">{v?.name || 'Unnamed vessel'}</h2>
-          <p className="mt-1 text-xs text-text-muted">{[flag, type].filter(Boolean).join(' · ') || 'Awaiting static data'}</p>
-        </div>
-        <button type="button" onClick={onClose} className="focus-ring -mr-2 -mt-2 rounded-md p-2 text-text-muted hover:text-text" aria-label="Close vessel details"><X size={16} aria-hidden="true" /></button>
-      </div>
-      {err && <p className="mt-3 text-xs text-danger">{err}</p>}
-      {v && (
-        <>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            <Pill tone={moving ? 'teal' : 'muted'}><Navigation size={11} className="mr-1" aria-hidden="true" />{status ?? (moving ? 'Under way' : 'Stopped')}</Pill>
-            {v.watched && <Pill tone="gold"><Ship size={11} className="mr-1" aria-hidden="true" />Carrying a Ship Sync shipment</Pill>}
-          </div>
-          <dl className="mt-3 divide-y divide-border">
-            <Row label="Reported destination" value={v.destination} />
-            <Row label="Reported ETA" value={formatEta(v.eta)} />
-            <Row label="Speed" value={v.speed != null ? `${v.speed.toFixed(1)} kn` : undefined} />
-            <Row label="Course" value={v.course != null ? `${Math.round(v.course)}° ${compass(v.course) ?? ''}` : undefined} />
-            <Row label="Heading" value={v.heading != null ? `${Math.round(v.heading)}°` : undefined} />
-            <Row label="Position" value={`${Math.abs(v.lat).toFixed(3)}° ${v.lat >= 0 ? 'N' : 'S'}, ${Math.abs(v.lon).toFixed(3)}° ${v.lon >= 0 ? 'E' : 'W'}`} />
-            <Row label="Size" value={v.length ? `${v.length} m × ${v.beam ?? '?'} m` : undefined} />
-            <Row label="Draught" value={v.draught ? `${v.draught} m` : undefined} />
-            <Row label="MMSI" value={v.id} />
-            <Row label="IMO" value={v.imo && v.imo !== '0' ? v.imo : undefined} />
-            <Row label="Call sign" value={v.callSign} />
-            <Row label="Last signal" value={ago(v.at)} />
-          </dl>
-          <p className="mt-3 flex items-start gap-2 text-xs text-text-muted"><Compass size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
-            {v.firstSeen
-              ? <span>Origin isn't broadcast by AIS — ships only report their next port. Our feed first heard this ship {ago(v.firstSeen.at)} at {Math.abs(v.firstSeen.lat).toFixed(2)}° {v.firstSeen.lat >= 0 ? 'N' : 'S'}, {Math.abs(v.firstSeen.lon).toFixed(2)}° {v.firstSeen.lon >= 0 ? 'E' : 'W'}.</span>
-              : <span>Origin isn't broadcast by AIS — ships only report their next port.</span>}
-          </p>
-          {!v.destination && <p className="mt-2 flex items-start gap-2 text-xs text-text-muted"><Flag size={14} className="mt-0.5 shrink-0" aria-hidden="true" />Destination, ETA and dimensions arrive with the ship's static broadcast (every 6 minutes) — check back shortly.</p>}
-        </>
-      )}
-      {!v && !err && <p className="mt-3 text-xs text-text-muted">Loading…</p>}
-    </motion.div>
-  )
-}
-
-const airportLabel = (a: Airport) => `${a.city ?? a.name}${a.iata ? ` (${a.iata})` : ''}`
-
-/** Everything public ADS-B tells us about one aircraft, plus adsbdb.com's route lookup (origin → destination). */
-function FlightCard({ f, err, onClose }: { f: FlightDetail | null; err: string; onClose: () => void }) {
-  const climbing = (f?.vertRate ?? 0) > 300, descending = (f?.vertRate ?? 0) < -300
-  return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-dark mb-4 p-5" aria-live="polite">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="eyebrow !text-[10px]">Aircraft</p>
-          <h2 className="!text-lg leading-tight">{f?.callsign || f?.registration || 'Aircraft'}</h2>
-          <p className="mt-1 text-xs text-text-muted">{[f?.route?.airline, f?.description ?? f?.type, f?.registration].filter(Boolean).join(' · ') || 'Awaiting identification'}</p>
-        </div>
-        <button type="button" onClick={onClose} className="focus-ring -mr-2 -mt-2 rounded-md p-2 text-text-muted hover:text-text" aria-label="Close aircraft details"><X size={16} aria-hidden="true" /></button>
-      </div>
-      {err && <p className="mt-3 text-xs text-danger">{err}</p>}
-      {f && (
-        <>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            <Pill tone={f.cargo ? 'gold' : 'sky'}><Plane size={11} className="mr-1" aria-hidden="true" />{f.cargo ? 'Cargo flight' : 'Passenger / other'}</Pill>
-            {f.onGround ? <Pill tone="muted">On the ground</Pill> : climbing ? <Pill tone="teal">Climbing</Pill> : descending ? <Pill tone="teal">Descending</Pill> : <Pill tone="teal">Cruising</Pill>}
-          </div>
-          {f.route ? (
-            <div className="mt-3 rounded-lg bg-surface-2 p-3 text-sm">
-              <div className="flex items-center gap-2"><span className="text-text">{airportLabel(f.route.origin)}</span><ArrowRight size={14} className="shrink-0 text-gold" aria-hidden="true" /><span className="text-text">{airportLabel(f.route.destination)}</span></div>
-              <p className="mt-1 text-xs text-text-muted">{f.route.origin.name} → {f.route.destination.name}{f.route.via?.length ? ` via ${f.route.via.map(airportLabel).join(', ')}` : ''}{f.route.plausible ? '' : ' · route unconfirmed'}</p>
-            </div>
-          ) : (
-            <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">{f.callsign ? 'No route on file for this callsign — the public route database covers scheduled flights best; charters and positioning flights are often missing.' : 'No callsign broadcast, so the route can\'t be looked up.'}</p>
-          )}
-          <dl className="mt-3 divide-y divide-border">
-            <Row label="Altitude" value={f.onGround ? 'Ground' : f.altitude != null ? `${Math.round(f.altitude).toLocaleString()} ft` : undefined} />
-            <Row label="Ground speed" value={f.speed != null ? `${Math.round(f.speed)} kt (${Math.round(f.speed * 1.852)} km/h)` : undefined} />
-            <Row label="Track" value={f.course != null ? `${Math.round(f.course)}° ${compass(f.course) ?? ''}` : undefined} />
-            <Row label="Vertical rate" value={f.vertRate != null && f.vertRate !== 0 ? `${f.vertRate > 0 ? '+' : ''}${f.vertRate} ft/min` : undefined} />
-            <Row label="Position" value={`${Math.abs(f.lat).toFixed(3)}° ${f.lat >= 0 ? 'N' : 'S'}, ${Math.abs(f.lon).toFixed(3)}° ${f.lon >= 0 ? 'E' : 'W'}`} />
-            <Row label="Aircraft type" value={f.type} />
-            <Row label="Registration" value={f.registration} />
-            <Row label="ICAO hex" value={f.id} />
-            <Row label="Squawk" value={f.squawk} />
-            <Row label="Last signal" value={ago(f.at)} />
-          </dl>
-          <p className="mt-3 flex items-start gap-2 text-xs text-text-muted"><Compass size={14} className="mt-0.5 shrink-0" aria-hidden="true" />Position from public ADS-B receivers (adsb.fi, adsb.lol). Route from adsbdb.com, matched on callsign — a best effort, not the airline's record. Route data © David J Taylor &amp; Jim Mason.</p>
-        </>
-      )}
-      {!f && !err && <p className="mt-3 text-xs text-text-muted">Loading…</p>}
-    </motion.div>
-  )
-}

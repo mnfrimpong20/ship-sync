@@ -6,6 +6,7 @@ import { cargoLabel, countryByCode, statusLabels, statusOrder, type Shipment } f
 import { useStore } from '../lib/store'
 import { Avatar, ModeBadge, Pill, fmtDate, fmtDateTime } from '../components/ui'
 import type { PositionPayload } from '../components/LiveMap'
+import { FlightCard, VesselCard } from '../components/CarrierCards'
 
 const LiveMap = lazy(() => import('../components/LiveMap'))
 import { fadeUp, stagger } from '../lib/motion'
@@ -94,6 +95,8 @@ function LivePanel({ s }: { s: Shipment }) {
       <p className="mt-2 text-xs text-text-muted">
         {pos.note}{fix ? ` Signal ${fmtDateTime(fix.at)}.` : ''} Positions are public, delayed and approximate — never for navigation or safety decisions.
       </p>
+      {pos.detail?.kind === 'vessel' && <VesselCard mmsi={pos.detail.id} v={pos.detail} className="mt-4 !bg-surface-2/60" />}
+      {pos.detail?.kind === 'flight' && <FlightCard f={pos.detail} className="mt-4 !bg-surface-2/60" />}
     </div>
   )
 }

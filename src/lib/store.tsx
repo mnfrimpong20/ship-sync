@@ -74,7 +74,7 @@ export class ApiError extends Error {
   constructor(status: number, message: string) { super(message); this.status = status }
 }
 
-async function api<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
+export async function api<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method: init?.method ?? (init?.json !== undefined ? 'POST' : 'GET'),
     headers: { ...(init?.json !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(init?.headers ?? {}) },

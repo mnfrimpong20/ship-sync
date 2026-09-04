@@ -116,6 +116,8 @@ export interface Shipment {
   mmsi?: string
   flight?: string
   departedAt?: string
+  clientId?: string
+  consigneeId?: string
 }
 
 export const sampleShipments: Shipment[] = [

@@ -32,13 +32,18 @@ export function navStatusLabel(s?: number): string | undefined {
   return map[s]
 }
 
-/** AIS ETA is month/day/hour/minute with no year; pick the nearest future occurrence. */
+/** AIS ETA is month/day/hour/minute with no year, and crews often forget to update it — so a date well in the past is
+ *  shown as broadcast and flagged, rather than silently rolled into next year. */
 export function formatEta(eta?: { month: number; day: number; hour: number; minute: number }): string | undefined {
   if (!eta || !eta.month || !eta.day || eta.month > 12 || eta.day > 31) return undefined
   const now = new Date()
-  let d = new Date(Date.UTC(now.getUTCFullYear(), eta.month - 1, eta.day, eta.hour === 24 ? 0 : eta.hour, eta.minute === 60 ? 0 : eta.minute))
-  if (d.getTime() < now.getTime() - 30 * 86400000) d = new Date(Date.UTC(now.getUTCFullYear() + 1, eta.month - 1, eta.day, eta.hour, eta.minute))
-  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: eta.hour < 24 ? 'numeric' : undefined, minute: eta.hour < 24 ? '2-digit' : undefined, timeZone: 'UTC' }) + ' UTC'
+  const hasTime = eta.hour < 24
+  const d = new Date(Date.UTC(now.getUTCFullYear(), eta.month - 1, eta.day, hasTime ? eta.hour : 0, eta.minute < 60 ? eta.minute : 0))
+  const daysPast = (now.getTime() - d.getTime()) / 86400000
+  // Late-December ETA seen in early January → last year's date rolled over; treat as next occurrence.
+  if (daysPast > 300) d.setUTCFullYear(d.getUTCFullYear() + 1)
+  const str = d.toLocaleString('en-US', { month: 'short', day: 'numeric', ...(hasTime ? { hour: 'numeric', minute: '2-digit' } : {}), timeZone: 'UTC' }) + ' UTC'
+  return daysPast > 2 && daysPast <= 300 ? `${str} (not updated by crew)` : str
 }
 
 /** Compass point for a course/heading in degrees. */

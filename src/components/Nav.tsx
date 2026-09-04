@@ -54,7 +54,7 @@ export default function Nav() {
                 {menu && (
                   <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} role="menu" className="card-dark absolute right-0 mt-2 w-52 overflow-hidden p-1.5">
                     <Link role="menuitem" to={dash} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><LayoutDashboard size={16} aria-hidden="true" /> Dashboard</Link>
-                    <button role="menuitem" onClick={() => { logout(); nav('/') }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-surface-2 focus-ring"><LogOut size={16} aria-hidden="true" /> Sign out</button>
+                    <button role="menuitem" onClick={() => { logout().finally(() => nav('/')) }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-surface-2 focus-ring"><LogOut size={16} aria-hidden="true" /> Sign out</button>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -81,7 +81,7 @@ export default function Nav() {
                 {user ? (
                   <>
                     <Link to={dash} className="btn-ghost">Dashboard</Link>
-                    <button onClick={() => { logout(); nav('/') }} className="btn-ghost">Sign out</button>
+                    <button onClick={() => { logout().finally(() => nav('/')) }} className="btn-ghost">Sign out</button>
                   </>
                 ) : <Link to="/login" className="btn-ghost">Sign in</Link>}
                 <Link to="/quote" className="btn-gold">Get a quote</Link>

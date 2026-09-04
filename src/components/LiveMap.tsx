@@ -4,6 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { setupMapLibre } from '../lib/mapSetup'
 import type { LngLat } from '../lib/geo'
 import type { FeatureCollection } from 'geojson'
+import type { CarrierDetail } from './CarrierCards'
 
 export interface LivePos { lat: number; lon: number; speed?: number; course?: number; heading?: number; altitude?: number; at: string; source: string; name?: string }
 export interface PositionPayload {
@@ -17,6 +18,7 @@ export interface PositionPayload {
   lastKnown: LivePos | null
   estimated: { lat: number; lon: number } | null
   note: string
+  detail?: CarrierDetail | null
 }
 
 /** Free, keyless dark basemap (CARTO, attribution required and shown). */

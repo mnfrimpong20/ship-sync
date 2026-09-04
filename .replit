@@ -1,6 +1,6 @@
 modules = ["nodejs-20"]
 run = "npm run dev"
-entrypoint = "src/main.tsx"
+entrypoint = "server/index.ts"
 
 [nix]
 channel = "stable-24_05"
@@ -10,6 +10,6 @@ localPort = 5000
 externalPort = 80
 
 [deployment]
-deploymentTarget = "static"
+deploymentTarget = "autoscale"
 build = ["sh", "-c", "npm install && npm run build"]
-publicDir = "dist"
+run = ["sh", "-c", "npm start"]

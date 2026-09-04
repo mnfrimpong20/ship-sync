@@ -47,6 +47,7 @@ export default function Live() {
   const [vessel, setVessel] = useState<VesselDetail | null>(null)
   const [vesselErr, setVesselErr] = useState('')
   const selectedRef = useRef<string | null>(null)
+  const flownTo = useRef<string | null>(null)
   selectedRef.current = selected
 
   // Detail for the clicked ship; re-fetched with each 30s refresh so speed/position stay current.
@@ -54,7 +55,17 @@ export default function Live() {
     if (!selected) { setVessel(null); setVesselErr(''); return }
     let live = true
     fetch(`/api/live/vessel/${selected}`).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || 'Unavailable'); return j.vessel as VesselDetail })
-      .then((v) => { if (live) { setVessel(v); setVesselErr('') } })
+      .then((v) => {
+        if (!live) return
+        setVessel(v); setVesselErr('')
+        // Selected via URL (shared link / refresh): highlight and fly to the ship once.
+        const m = map.current
+        if (m && flownTo.current !== v.id) {
+          flownTo.current = v.id
+          const put = () => { (m.getSource('selected') as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [v.lon, v.lat] } }] }); m.easeTo({ center: [v.lon, v.lat], zoom: Math.max(m.getZoom(), 6), duration: 900 }) }
+          if (m.getSource('selected')) put(); else m.once('style.load', () => setTimeout(put, 0))
+        }
+      })
       .catch((e: Error) => { if (live) setVesselErr(e.message) })
     return () => { live = false }
   }, [selected, data])
@@ -104,6 +115,7 @@ export default function Live() {
       m.on('click', 'vessels', (e) => {
         const f = e.features?.[0]; if (!f) return
         const id = String((f.properties as { id: string }).id)
+        flownTo.current = id
         setSelected(id)
         const c = (f.geometry as Point).coordinates as LngLat
         ;(m.getSource('selected') as maplibregl.GeoJSONSource).setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } }] })

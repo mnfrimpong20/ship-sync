@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Bell, ChevronDown, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, Menu, Package, PlusCircle, Radar, Search, ShieldCheck, Ship, UserCog, Users, X } from 'lucide-react'
+import { Bell, ChevronDown, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, X } from 'lucide-react'
 import { Logo } from './ui'
 import { useStore } from '../lib/store'
 import { clientsApi } from '../lib/clients'
@@ -32,13 +32,24 @@ export default function AppShell() {
   const openLeads = isShipper ? requests.filter((r) => r.status === 'open' && !r.quotes.some((q) => q.shipperId === user.shipperId)).length : requests.reduce((n, r) => n + (r.status === 'open' ? r.quotes.length : 0), 0)
   const active = shipments.filter((s) => s.status !== 'delivered').length
 
-  const items: Item[] = isShipper
+  const staffRole = user.staffRole ?? 'owner'
+  const isDriver = isShipper && staffRole === 'driver'
+  const canManage = isShipper && (staffRole === 'owner' || staffRole === 'dispatcher')
+  const items: Item[] = isDriver
+    ? [
+        { to: '/dashboard/runs', label: 'My runs', icon: MapPinned, end: true },
+        { to: '/dashboard/team', label: 'Team', icon: UsersRound },
+      ]
+    : isShipper
     ? [
         { to: '/dashboard/shipper', label: 'Overview', icon: LayoutDashboard, end: true },
         { to: '/dashboard/shipper?view=leads', label: 'Leads & quotes', icon: Inbox, badge: openLeads },
         { to: '/dashboard/shipper?view=shipments', label: 'Shipments', icon: Ship, badge: active },
         { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders },
-        { to: '/dashboard/shipper?view=profile', label: 'Company profile', icon: UserCog },
+        { to: '/dashboard/routes', label: 'Routes', icon: MapPinned },
+        ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck } as Item] : []),
+        { to: '/dashboard/team', label: 'Team', icon: UsersRound },
+        ...(staffRole === 'owner' ? [{ to: '/dashboard/shipper?view=profile', label: 'Company profile', icon: UserCog } as Item] : []),
       ]
     : [
         { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -47,7 +58,7 @@ export default function AppShell() {
         { to: '/quote', label: 'New request', icon: PlusCircle },
       ]
   const tools: Item[] = [
-    { to: '/live', label: 'Live map', icon: Radar },
+    ...(isDriver ? [] : [{ to: '/live', label: 'Live map', icon: Radar } as Item]),
     { to: '/track', label: 'Track a shipment', icon: Search },
     ...(user.admin ? [{ to: '/admin', label: 'Verification', icon: ShieldCheck } as Item] : []),
   ]
@@ -77,7 +88,7 @@ export default function AppShell() {
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="flex h-16 items-center justify-between px-5"><Logo /><button onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-lg text-text-muted lg:hidden focus-ring" aria-label="Close menu"><X size={18} /></button></div>
-      <div className="px-4 pb-3"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : 'Customer'}</p></div>
+      <div className="px-4 pb-3"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : 'Customer'}</p>{isShipper && user.staffRole && <p className="text-[11px] text-text-muted/70">{user.staffRole.charAt(0).toUpperCase() + user.staffRole.slice(1)}</p>}</div>
       <nav className="flex-1 space-y-6 overflow-y-auto px-3" aria-label="Application">
         <NavItems list={items} />
         <div><p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted/70">Tools</p><NavItems list={tools} /></div>
@@ -116,7 +127,7 @@ export default function AppShell() {
                 {menu && (
                   <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} role="menu" className="card-dark absolute right-0 mt-2 w-56 overflow-hidden p-1.5">
                     <p className="px-3 py-2 text-xs text-text-muted">{user.email}</p>
-                    {isShipper && <Link role="menuitem" to="/dashboard/shipper?view=profile" className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><UserCog size={16} aria-hidden="true" /> Company profile</Link>}
+                    {isShipper && staffRole === 'owner' && <Link role="menuitem" to="/dashboard/shipper?view=profile" className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><UserCog size={16} aria-hidden="true" /> Company profile</Link>}
                     {user.admin && <Link role="menuitem" to="/admin" className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><ShieldCheck size={16} aria-hidden="true" /> Admin</Link>}
                     <button role="menuitem" onClick={() => { logout().finally(() => nav('/')) }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-surface-2 focus-ring"><LogOut size={16} aria-hidden="true" /> Sign out</button>
                   </motion.div>

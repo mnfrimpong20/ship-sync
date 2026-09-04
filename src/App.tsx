@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
-import { HashRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { HashRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
+import AppShell from './components/AppShell'
 import Home from './pages/Home'
 import Quote from './pages/Quote'
 import { ShipperDirectory, ShipperProfile } from './pages/Shippers'
@@ -26,7 +27,8 @@ function ScrollManager() {
   return null
 }
 
-function Shell() {
+/** Public marketing site: big header, footer, page transitions. */
+function MarketingLayout() {
   const loc = useLocation()
   return (
     <div className="flex min-h-screen flex-col">
@@ -35,23 +37,7 @@ function Shell() {
       <main id="main" className="flex-1">
         <AnimatePresence mode="wait">
           <motion.div key={loc.pathname} variants={page} initial="initial" animate="animate" exit="exit">
-            <Routes location={loc}>
-              <Route path="/" element={<Home />} />
-              <Route path="/quote" element={<Quote />} />
-              <Route path="/shippers" element={<ShipperDirectory />} />
-              <Route path="/shippers/:id" element={<ShipperProfile />} />
-              <Route path="/track" element={<Track />} />
-              <Route path="/live" element={<Live />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/dashboard" element={<CustomerDashboard />} />
-              <Route path="/dashboard/shipper" element={<ShipperDashboard />} />
-              <Route path="/dashboard/clients" element={<Clients />} />
-              <Route path="/dashboard/clients/:id" element={<ClientDetailPage />} />
-              <Route path="/dashboard/invoices/:id" element={<InvoiceView />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="*" element={<Home />} />
-            </Routes>
+            <Outlet />
           </motion.div>
         </AnimatePresence>
       </main>
@@ -66,7 +52,28 @@ export default function App() {
       <StoreProvider>
         <HashRouter>
           <ScrollManager />
-          <Shell />
+          <Routes>
+            <Route element={<MarketingLayout />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/quote" element={<Quote />} />
+              <Route path="/shippers" element={<ShipperDirectory />} />
+              <Route path="/shippers/:id" element={<ShipperProfile />} />
+              <Route path="/track" element={<Track />} />
+              <Route path="/live" element={<Live />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="*" element={<Home />} />
+            </Route>
+            {/* The signed-in application lives in its own shell, apart from the marketing site. */}
+            <Route element={<AppShell />}>
+              <Route path="/dashboard" element={<CustomerDashboard />} />
+              <Route path="/dashboard/shipper" element={<ShipperDashboard />} />
+              <Route path="/dashboard/clients" element={<Clients />} />
+              <Route path="/dashboard/clients/:id" element={<ClientDetailPage />} />
+              <Route path="/dashboard/invoices/:id" element={<InvoiceView />} />
+              <Route path="/admin" element={<Admin />} />
+            </Route>
+          </Routes>
         </HashRouter>
       </StoreProvider>
     </MotionConfig>

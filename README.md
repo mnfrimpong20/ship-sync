@@ -18,3 +18,5 @@ Copy `.env.example` to `.env` (or set Replit secrets). On Replit, add a PostgreS
 **API** (all JSON, under `/api`): `auth/signup`, `auth/login`, `auth/logout`, `auth/me` · `shippers`, `shippers/:id`, `match` · `requests` (GET own / POST new; guests pass a `password` to create an account) · `requests/:id/quotes` (shipper) · `quotes/:id/accept` (customer) · `shipments`, `shipments/:id/advance` (shipper) · `track/:ref` (public).
 
 See `DESIGN.md` for the design brief (palette, type, sections, motion rules).
+
+**Hero footage** — three clips from Pexels (free for commercial use, no attribution required), trimmed to 10s and re-encoded in `public/video/`: [Cargo Container Ships In Port](https://www.pexels.com/video/cargo-container-ships-in-port-3840442/) by Tom Fisk, [Cargo Jet Taking Off from Busy Airport](https://www.pexels.com/video/cargo-jet-taking-off-from-busy-airport-37723633/) by Tuan Vy Spotter, [Workers Unloading a Delivery Truck](https://www.pexels.com/video/workers-unloading-a-delivery-truck-6169116/) by Tima Miroshnichenko.

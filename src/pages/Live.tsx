@@ -31,7 +31,7 @@ interface Airport { icao: string; iata?: string; name: string; city?: string; co
 interface FlightDetail extends LivePos {
   id: string; callsign?: string; registration?: string; type?: string; description?: string; squawk?: string; category?: string
   cargo: boolean; onGround: boolean; vertRate?: number
-  route: { origin: Airport; destination: Airport; via?: Airport[]; plausible: boolean } | null
+  route: { origin: Airport; destination: Airport; via?: Airport[]; airline?: string; plausible: boolean } | null
 }
 type Selection = { kind: 'vessel' | 'flight'; id: string }
 
@@ -191,7 +191,7 @@ export default function Live() {
         <div className="mt-8 grid gap-6 lg:grid-cols-12">
           <div className="lg:col-span-9">
             <div ref={box} className="ss-map h-[62vh] min-h-[420px]" role="img" aria-label="Live map of vessels and aircraft around West Africa" />
-            <p className="mt-2 flex items-start gap-2 text-xs text-text-muted"><TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden="true" /> Positions come from public, delayed feeds (AISStream, adsb.lol). Terrestrial AIS only covers the coast, so ships mid-ocean are not shown. Not for navigation or safety decisions. Basemap © CARTO, © OpenStreetMap contributors.</p>
+            <p className="mt-2 flex items-start gap-2 text-xs text-text-muted"><TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden="true" /> Positions come from public, delayed feeds (AISStream, adsb.fi, adsb.lol). Terrestrial AIS only covers the coast, so ships mid-ocean are not shown. Not for navigation or safety decisions. Basemap © CARTO, © OpenStreetMap contributors.</p>
           </div>
           <aside className="lg:col-span-3">
             {selected?.kind === 'vessel' && <VesselCard mmsi={selected.id} v={vessel} err={detailErr} onClose={clearSelection} />}
@@ -216,7 +216,7 @@ export default function Live() {
               </ul>
               {data && !data.ais.enabled && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">Vessel data appears once an AISStream key is configured on the server.</p>}
               {data && data.ais.status === 'live' && (data.ais.coastVessels ?? 0) === 0 && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">Counts are 0 because no community AIS receiver on the Gulf of Guinea coast is feeding AISStream right now. Ships are still tracked across Europe, the US coasts and the Atlantic approach, and reappear here when a coastal receiver comes online.</p>}
-              {data && data.flights.length === 0 && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">No aircraft right now — the public ADS-B feed (adsb.lol) may be briefly unavailable. Aircraft are polled around the hub airports on these lanes; community receivers over West Africa itself are sparse.</p>}
+              {data && data.flights.length === 0 && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">No aircraft right now — the public ADS-B feeds (adsb.fi, adsb.lol) may be briefly unavailable. Aircraft are polled around the hub airports on these lanes; community receivers over West Africa itself are sparse.</p>}
               {anchoredTotal >= 15 && <p className="mt-3 text-xs text-gold">High congestion across the region — expect extra days for clearance.</p>}
             </div>
             <div className="card-dark mt-4 p-5">
@@ -294,7 +294,7 @@ function VesselCard({ mmsi, v, err, onClose }: { mmsi: string; v: VesselDetail |
 
 const airportLabel = (a: Airport) => `${a.city ?? a.name}${a.iata ? ` (${a.iata})` : ''}`
 
-/** Everything public ADS-B tells us about one aircraft, plus adsb.lol's crowd-sourced route (origin → destination). */
+/** Everything public ADS-B tells us about one aircraft, plus adsbdb.com's route lookup (origin → destination). */
 function FlightCard({ f, err, onClose }: { f: FlightDetail | null; err: string; onClose: () => void }) {
   const climbing = (f?.vertRate ?? 0) > 300, descending = (f?.vertRate ?? 0) < -300
   return (
@@ -303,7 +303,7 @@ function FlightCard({ f, err, onClose }: { f: FlightDetail | null; err: string; 
         <div>
           <p className="eyebrow !text-[10px]">Aircraft</p>
           <h2 className="!text-lg leading-tight">{f?.callsign || f?.registration || 'Aircraft'}</h2>
-          <p className="mt-1 text-xs text-text-muted">{[f?.description ?? f?.type, f?.registration].filter(Boolean).join(' · ') || 'Awaiting identification'}</p>
+          <p className="mt-1 text-xs text-text-muted">{[f?.route?.airline, f?.description ?? f?.type, f?.registration].filter(Boolean).join(' · ') || 'Awaiting identification'}</p>
         </div>
         <button type="button" onClick={onClose} className="focus-ring -mr-2 -mt-2 rounded-md p-2 text-text-muted hover:text-text" aria-label="Close aircraft details"><X size={16} aria-hidden="true" /></button>
       </div>
@@ -320,7 +320,7 @@ function FlightCard({ f, err, onClose }: { f: FlightDetail | null; err: string; 
               <p className="mt-1 text-xs text-text-muted">{f.route.origin.name} → {f.route.destination.name}{f.route.via?.length ? ` via ${f.route.via.map(airportLabel).join(', ')}` : ''}{f.route.plausible ? '' : ' · route unconfirmed'}</p>
             </div>
           ) : (
-            <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">{f.callsign ? 'No route on file for this callsign — the public route database (adsb.lol) covers scheduled flights best.' : 'No callsign broadcast, so the route can\'t be looked up.'}</p>
+            <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">{f.callsign ? 'No route on file for this callsign — the public route database covers scheduled flights best; charters and positioning flights are often missing.' : 'No callsign broadcast, so the route can\'t be looked up.'}</p>
           )}
           <dl className="mt-3 divide-y divide-border">
             <Row label="Altitude" value={f.onGround ? 'Ground' : f.altitude != null ? `${Math.round(f.altitude).toLocaleString()} ft` : undefined} />
@@ -334,7 +334,7 @@ function FlightCard({ f, err, onClose }: { f: FlightDetail | null; err: string; 
             <Row label="Squawk" value={f.squawk} />
             <Row label="Last signal" value={ago(f.at)} />
           </dl>
-          <p className="mt-3 flex items-start gap-2 text-xs text-text-muted"><Compass size={14} className="mt-0.5 shrink-0" aria-hidden="true" />Position from public ADS-B receivers (adsb.lol); the route comes from a community database matched on callsign, so it is a best effort, not the airline's record.</p>
+          <p className="mt-3 flex items-start gap-2 text-xs text-text-muted"><Compass size={14} className="mt-0.5 shrink-0" aria-hidden="true" />Position from public ADS-B receivers (adsb.fi, adsb.lol). Route from adsbdb.com, matched on callsign — a best effort, not the airline's record. Route data © David J Taylor &amp; Jim Mason.</p>
         </>
       )}
       {!f && !err && <p className="mt-3 text-xs text-text-muted">Loading…</p>}

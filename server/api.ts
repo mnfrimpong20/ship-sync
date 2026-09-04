@@ -8,7 +8,7 @@ import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } fro
 import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion, type Position } from './live'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
-export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string }
+export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean }
 type Row = Record<string, any>
 
 const SESSION_COOKIE = 'ss_session'
@@ -23,7 +23,7 @@ const J = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : v)
 const shipperOut = (r: Row) => ({
   id: r.id, name: r.name, tagline: r.tagline, hq: r.hq, founded: r.founded, modes: J(r.modes), destinations: J(r.destinations), origins: J(r.origins), cargo: J(r.cargo),
   rating: Number(r.rating), reviews: r.reviews, verified: r.verified, responseHours: r.response_hours, onTime: r.on_time, services: J(r.services), about: r.about,
-  priceIndex: r.price_index, plan: r.plan, initials: r.initials, hue: r.hue, demo: r.demo,
+  priceIndex: r.price_index, plan: r.plan, initials: r.initials, hue: r.hue, demo: r.demo, verifiedAt: r.verified_at ? ISO(r.verified_at) : undefined, createdAt: r.created_at ? ISO(r.created_at) : undefined,
 })
 const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.shipper_id, price: r.price, currency: r.currency, transitDays: r.transit_days, validUntil: DATE(r.valid_until), notes: r.notes, includes: J(r.includes), status: r.status, sentAt: ISO(r.sent_at) })
 const requestOut = (r: Row, quotes: Row[]) => ({
@@ -62,7 +62,18 @@ export async function resolvePosition(r: Row, events: Row[]) {
     if (live && mode === 'air') { const ageMin = (Date.now() - new Date(live.at).getTime()) / 60000; if (ageMin > STALE_AIR_MIN) { lastKnown = live; live = null } }
   }
   const phase = idx < transitIdx ? 'pre' : idx >= arrivedIdx ? 'post' : 'transit'
+  // Everything the live map knows about the carrier itself (flag, type, reported destination / scheduled route…).
+  let detail: Record<string, unknown> | null = null
+  if (mode === 'ocean' && r.mmsi) { const v = ais.detail(r.mmsi); if (v) detail = { kind: 'vessel', ...v } }
+  if (mode === 'air' && r.flight) {
+    const cs = String(r.flight).toUpperCase()
+    const a = flightsInRegion().find((x) => x.callsign === cs)
+    const route = await flightRoute(cs)
+    if (a) detail = { kind: 'flight', ...a, route }
+    else if (route || live || lastKnown) detail = { kind: 'flight', id: cs, callsign: cs, cargo: false, onGround: false, ...(live ?? lastKnown ?? {}), route }
+  }
   return {
+    detail,
     mode, phase, status: r.status, progress: Number(progress.toFixed(3)),
     route: o && d ? { origin: { name: r.origin, at: o }, destination: { name: mode === 'air' ? dest!.airport.name : dest!.port.name, at: d }, path: greatCircle(o, d, 96) } : null,
     carrier: { vesselName: r.vessel_name ?? undefined, mmsi: r.mmsi ?? undefined, flight: r.flight ?? undefined },
@@ -74,7 +85,7 @@ export async function resolvePosition(r: Row, events: Row[]) {
       : phase === 'pre' ? 'Not yet departed.' : 'Arrived at destination.',
   }
 }
-const userOut = (r: Row, company?: string): ApiUser => ({ id: r.id, name: r.name, email: r.email, role: r.role, shipperId: r.shipper_id ?? undefined, company })
+const userOut = (r: Row, company?: string): ApiUser => ({ id: r.id, name: r.name, email: r.email, role: r.role, shipperId: r.shipper_id ?? undefined, company, admin: !!r.is_admin })
 
 class HttpError extends Error {
   status: number
@@ -99,6 +110,8 @@ async function createSession(db: Db, res: Response, userId: string) {
 }
 
 const requireUser = async (db: Db, req: Request) => { const u = await currentUser(db, req); if (!u) throw new HttpError(401, 'Please sign in.'); return u }
+const requireAdmin = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (!u.admin) throw new HttpError(403, 'Admin access only.'); return u }
+const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'SS'
 
 async function loadUserWithCompany(db: Db, id: string) {
   const { rows } = await db.query<Row>('select u.*, s.name as company from users u left join shippers s on s.id = u.shipper_id where u.id = $1', [id])
@@ -197,6 +210,22 @@ const zTransit = z.object({
   flight: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3,8}$/, 'Use the ICAO flight callsign, e.g. CLX775 or BAW75.').optional().or(z.literal('').transform(() => undefined)),
   departedAt: z.string().datetime().optional(),
 })
+const COUNTRY_CODES = ['GH', 'NG', 'LR', 'TG', 'CI', 'SL', 'SN'] as const
+const zProfile = z.object({
+  name: z.string().trim().min(2, 'Company name is too short.').max(80),
+  tagline: z.string().trim().max(120).default(''),
+  hq: z.string().trim().max(80).default(''),
+  founded: z.number().int().min(1900).max(new Date().getFullYear()),
+  modes: z.array(z.enum(['air', 'ocean'])).min(1, 'Choose at least one mode.'),
+  destinations: z.array(z.enum(COUNTRY_CODES)).min(1, 'Choose at least one destination.'),
+  origins: z.array(z.string().trim().min(2).max(60)).max(25),
+  cargo: z.array(z.enum(['barrels', 'boxes', 'pallets', 'vehicle', 'container20', 'container40', 'commercial'])).min(1, 'Choose at least one cargo type.'),
+  services: z.array(z.string().trim().min(2).max(60)).max(12),
+  about: z.string().trim().max(2000).default(''),
+  priceIndex: z.number().int().min(1).max(3),
+  responseHours: z.number().int().min(1).max(168),
+})
+const zVerify = z.object({ verified: z.boolean(), plan: z.enum(['starter', 'pro', 'enterprise']).optional() })
 const zQuote = z.object({ price: z.number().int().min(1), transitDays: z.number().int().min(1), notes: z.string().max(2000).default(''), includes: z.array(z.string()).default([]), validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() })
 
 /* ---------------- router ---------------- */
@@ -229,6 +258,38 @@ export function apiRouter() {
   // shippers (public)
   r.get('/shippers', wrap(async (_req, res) => { const db = await getDb(); const { rows } = await db.query<Row>('select * from shippers order by rating desc, reviews desc'); res.json({ shippers: rows.map(shipperOut) }) }))
   r.get('/shippers/:id', wrap(async (req, res) => { const db = await getDb(); const { rows } = await db.query<Row>('select * from shippers where id = $1', [req.params.id]); if (!rows[0]) throw new HttpError(404, 'Shipper not found.'); res.json({ shipper: shipperOut(rows[0]) }) }))
+  r.patch('/shippers/me', wrap(async (req, res) => {
+    const db = await getDb(); const user = await requireUser(db, req)
+    if (user.role !== 'shipper' || !user.shipperId) throw new HttpError(403, 'Only shipper accounts have a company profile.')
+    const b = zProfile.parse(req.body)
+    await db.query(
+      `update shippers set name=$2, tagline=$3, hq=$4, founded=$5, modes=$6, destinations=$7, origins=$8, cargo=$9, services=$10, about=$11, price_index=$12, response_hours=$13, initials=$14 where id = $1`,
+      [user.shipperId, b.name, b.tagline, b.hq, b.founded, JSON.stringify(b.modes), JSON.stringify([...new Set(b.destinations)]), JSON.stringify([...new Set(b.origins)]), JSON.stringify([...new Set(b.cargo)]), JSON.stringify([...new Set(b.services)]), b.about, b.priceIndex, b.responseHours, initialsOf(b.name)],
+    )
+    const { rows } = await db.query<Row>('select * from shippers where id = $1', [user.shipperId])
+    res.json({ shipper: shipperOut(rows[0]), user: await loadUserWithCompany(db, user.id) })
+  }))
+
+  // admin
+  r.get('/admin/shippers', wrap(async (req, res) => {
+    const db = await getDb(); await requireAdmin(db, req)
+    const { rows } = await db.query<Row>(`
+      select s.*, u.email as owner_email, u.name as owner_name,
+        (select count(*) from quotes q where q.shipper_id = s.id)::int as quote_count,
+        (select count(*) from shipments x where x.shipper_id = s.id)::int as shipment_count
+      from shippers s left join users u on u.shipper_id = s.id order by s.verified asc, s.created_at desc`)
+    res.json({ shippers: rows.map((r) => ({ ...shipperOut(r), owner: r.owner_email ? { email: r.owner_email, name: r.owner_name } : null, quoteCount: r.quote_count, shipmentCount: r.shipment_count })) })
+  }))
+  r.post('/admin/shippers/:id/verify', wrap(async (req, res) => {
+    const db = await getDb(); const admin = await requireAdmin(db, req)
+    const b = zVerify.parse(req.body)
+    const { rows: ex } = await db.query<Row>('select id from shippers where id = $1', [req.params.id])
+    if (!ex[0]) throw new HttpError(404, 'Shipper not found.')
+    await db.query('update shippers set verified = $2, verified_at = case when $2 then now() else null end, verified_by = case when $2 then $3 else null end, plan = coalesce($4, plan) where id = $1', [req.params.id, b.verified, admin.email, b.plan ?? null])
+    const { rows } = await db.query<Row>('select * from shippers where id = $1', [req.params.id])
+    res.json({ shipper: shipperOut(rows[0]) })
+  }))
+
   r.post('/match', wrap(async (req, res) => { const db = await getDb(); res.json({ matches: await matchShippers(db, zMatch.parse(req.body)) }) }))
 
   // requests

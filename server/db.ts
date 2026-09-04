@@ -27,6 +27,7 @@ export async function getDb(): Promise<Db> {
   }
   await migrate(db)
   await seed(db)
+  await ensureAdmins(db)
   return db
 }
 
@@ -146,6 +147,9 @@ alter table shipments add column if not exists vessel_name text;
 alter table shipments add column if not exists mmsi text;
 alter table shipments add column if not exists flight text;
 alter table shipments add column if not exists departed_at timestamptz;
+alter table users add column if not exists is_admin boolean not null default false;
+alter table shippers add column if not exists verified_at timestamptz;
+alter table shippers add column if not exists verified_by text;
 create index if not exists idx_requests_user on requests(user_id);
 create index if not exists idx_quotes_request on quotes(request_id);
 create index if not exists idx_shipments_user on shipments(user_id);
@@ -211,4 +215,12 @@ async function seed(d: Db) {
     await d.query('insert into shipments (id,ref,shipper_id,user_id,mode,origin,destination,cargo,description,status,eta,customer,vessel_name,flight,departed_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)', [s.id, s.ref, s.shipperId, 'u_demo', s.mode, s.origin, s.destination, s.cargo, s.description, s.status, s.eta, s.customer, transit[s.id]?.vessel ?? null, transit[s.id]?.flight ?? null, dep])
     for (const e of s.events) await d.query('insert into shipment_events (shipment_id,status,at,place,note) values ($1,$2,$3,$4,$5)', [s.id, e.status, e.at, e.place, e.note ?? null])
   }
+}
+
+/** Admin accounts: the demo admin (password `shipsync`) plus any emails in ADMIN_EMAILS. Idempotent, runs on every boot. */
+async function ensureAdmins(d: Db) {
+  const hash = await bcrypt.hash(DEMO_PASSWORD, 10)
+  await d.query(`insert into users (id,email,name,password_hash,role,shipper_id,is_admin) values ('u_admin','admin@shipsync.demo','Ship Sync Admin',$1,'customer',null,true) on conflict (email) do update set is_admin = true`, [hash])
+  const extra = (process.env.ADMIN_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+  if (extra.length) await d.query('update users set is_admin = true where email = any($1::text[])', [extra])
 }

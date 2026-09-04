@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Pencil, Plane, PlusCircle, Send, Ship, TrendingUp, X } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Pencil, Plane, PlusCircle, Send, Ship, TrendingUp, Users, X } from 'lucide-react'
 import { cargoLabel, countryByCode, statusLabels, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
 import { Avatar, Empty, ModeBadge, Pill, Rating, fmtDate, money } from '../components/ui'
@@ -226,7 +226,7 @@ export function ShipperDashboard() {
   }
 
   return (
-    <Layout title={shipper.name} sub={`${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan`} cta={<div className="flex flex-wrap gap-2"><button onClick={() => setEditing((e) => !e)} className="btn-gold" aria-expanded={editing}><Pencil size={16} aria-hidden="true" /> Edit profile</button><Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link></div>}>
+    <Layout title={shipper.name} sub={`${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan`} cta={<div className="flex flex-wrap gap-2"><Link to="/dashboard/clients" className="btn-gold"><Users size={16} aria-hidden="true" /> Clients</Link><button onClick={() => setEditing((e) => !e)} className="btn-ghost" aria-expanded={editing}><Pencil size={16} aria-hidden="true" /> Edit profile</button><Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link></div>}>
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
       {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
       {!shipper.verified && !editing && (
@@ -290,7 +290,7 @@ export function ShipperDashboard() {
                 <li key={s.id} className="card-dark p-4">
                   <div className="flex items-center justify-between"><p className="font-mono text-xs text-gold">{s.ref}</p><ModeBadge mode={s.mode} /></div>
                   <p className="mt-1 text-sm font-semibold text-text">{s.origin} → {d.flag} {d.name}</p>
-                  <p className="text-xs text-text-muted">{s.description} · {s.customer}</p>
+                  <p className="text-xs text-text-muted">{s.description} · {s.clientId ? <Link to={`/dashboard/clients/${s.clientId}`} className="text-gold hover:underline focus-ring rounded">{s.customer}</Link> : s.customer}</p>
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill>
                     {s.status !== 'delivered' && <button onClick={() => advance(s.id, s.ref)} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60">Mark next step <ChevronRight size={14} aria-hidden="true" /></button>}

@@ -93,7 +93,7 @@ export default function Clients() {
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><motion.p variants={fadeUp} className="eyebrow mb-1">Clients</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{user.company ?? 'Your'} clients</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">Everyone you ship for — marketplace customers and your own book of business — with consignees, bookings, invoices and follow-ups in one place.</motion.p></div>
-            <motion.div variants={fadeUp} className="flex gap-2"><Link to="/dashboard/shipper" className="btn-ghost">Dashboard</Link><button onClick={() => setAdding(true)} className="btn-gold"><Plus size={16} aria-hidden="true" /> Add client</button></motion.div>
+            <motion.div variants={fadeUp} className="flex gap-2"><button onClick={() => setAdding(true)} className="btn-gold"><Plus size={16} aria-hidden="true" /> Add client</button></motion.div>
           </div>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

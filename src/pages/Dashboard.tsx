@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Pencil, Plane, PlusCircle, Send, Ship, TrendingUp, Users, X } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Pencil, Plane, PlusCircle, Send, Ship, TrendingUp, X } from 'lucide-react'
 import { cargoLabel, countryByCode, statusLabels, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
 import { Avatar, Empty, ModeBadge, Pill, Rating, fmtDate, money } from '../components/ui'
@@ -25,7 +25,7 @@ function Layout({ title, sub, children, cta }: { title: string; sub: string; chi
       <div className="container-x py-10 md:py-14">
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Dashboard</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{title}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">{sub}</motion.p></div>
+            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Workspace</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{title}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">{sub}</motion.p></div>
             {cta && <motion.div variants={fadeUp}>{cta}</motion.div>}
           </div>
           {children}
@@ -39,7 +39,9 @@ function Layout({ title, sub, children, cta }: { title: string; sub: string; chi
 export function CustomerDashboard() {
   const { ready, user, requests, shipments, acceptQuote, shipperById } = useStore()
   const [sp, setSp] = useSearchParams()
-  const [tab, setTab] = useState<'requests' | 'shipments'>('requests')
+  const [tab, setTabState] = useState<'requests' | 'shipments'>(sp.get('tab') === 'shipments' ? 'shipments' : 'requests')
+  const setTab = (t: 'requests' | 'shipments') => { setTabState(t); setSp(t === 'requests' ? {} : { tab: t }, { replace: true }) }
+  useEffect(() => { const t = sp.get('tab'); setTabState(t === 'shipments' ? 'shipments' : 'requests') }, [sp])
   const [openReq, setOpenReq] = useState<string | null>(sp.get('request'))
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
@@ -182,9 +184,13 @@ function ShipmentsTab() {
 /* ================= SHIPPER ================= */
 export function ShipperDashboard() {
   const { ready, user, requests, shipments, sendQuote, advanceShipment, shipperById, setTransit } = useStore()
+  const [sp] = useSearchParams()
+  const nav = useNavigate()
+  const view = (sp.get('view') as 'leads' | 'shipments' | 'profile' | null) ?? 'overview'
   const [quoting, setQuoting] = useState<string | null>(null)
   const [transitFor, setTransitFor] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
+  useEffect(() => { setEditing(view === 'profile') }, [view])
   const [tf, setTf] = useState({ vesselName: '', mmsi: '', flight: '' })
   const [form, setForm] = useState({ price: '', transit: '', notes: '' })
   const [toast, setToast] = useState('')
@@ -226,22 +232,22 @@ export function ShipperDashboard() {
   }
 
   return (
-    <Layout title={shipper.name} sub={`${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan`} cta={<div className="flex flex-wrap gap-2"><Link to="/dashboard/clients" className="btn-gold"><Users size={16} aria-hidden="true" /> Clients</Link><button onClick={() => setEditing((e) => !e)} className="btn-ghost" aria-expanded={editing}><Pencil size={16} aria-hidden="true" /> Edit profile</button><Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link></div>}>
+    <Layout title={view === 'leads' ? 'Leads & quotes' : view === 'shipments' ? 'Shipments' : view === 'profile' ? 'Company profile' : shipper.name} sub={view === 'overview' ? `${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan` : shipper.name} cta={<div className="flex flex-wrap gap-2">{view !== 'profile' && <button onClick={() => setEditing((e) => !e)} className="btn-ghost" aria-expanded={editing}><Pencil size={16} aria-hidden="true" /> Edit profile</button>}<Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link></div>}>
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
       {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
       {!shipper.verified && !editing && (
         <p className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-text"><BadgeCheck size={16} className="text-gold" aria-hidden="true" /> Not yet verified. Complete your profile — Ship Sync reviews licence and insurance before granting the badge, which lifts you in matching and reassures customers.</p>
       )}
-      {editing && full && <ProfileEditor shipper={full} onDone={(msg) => { setEditing(false); if (msg) setToast(msg) }} />}
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {editing && full && <ProfileEditor shipper={full} onDone={(msg) => { setEditing(false); if (msg) setToast(msg); if (view === 'profile') nav('/dashboard/shipper') }} />}
+      {view === 'overview' && <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat icon={Inbox} label="New leads" value={leads.filter((r) => !r.quotes.some((q) => q.shipperId === me)).length} hint="Matching your lanes" />
         <Stat icon={Send} label="Quotes sent" value={myQuotes.length} hint={`${won} won`} />
         <Stat icon={TrendingUp} label="Win rate" value={myQuotes.length ? `${Math.round((won / myQuotes.length) * 100)}%` : '—'} hint="Last 90 days" />
         <Stat icon={Ship} label="Active shipments" value={myShipments.filter((s) => s.status !== 'delivered').length} hint={`${shipper.onTime}% on-time`} />
-      </div>
+      </div>}
 
       <div className="mt-10 grid gap-8 lg:grid-cols-12">
-        <section className="lg:col-span-7" aria-labelledby="leads-h">
+        {view !== 'shipments' && view !== 'profile' && <section className={view === 'leads' ? 'lg:col-span-12' : 'lg:col-span-7'} aria-labelledby="leads-h">
           <h2 id="leads-h" className="!text-xl">Shipment requests for your lanes</h2>
           <p className="mt-1 text-sm text-text-muted">Reply fast — customers see response time on your profile.</p>
           <div className="mt-4 space-y-3">
@@ -277,9 +283,9 @@ export function ShipperDashboard() {
               )
             })}
           </div>
-        </section>
+        </section>}
 
-        <section className="lg:col-span-5" aria-labelledby="ship-h">
+        {view !== 'leads' && view !== 'profile' && <section className={view === 'shipments' ? 'lg:col-span-12' : 'lg:col-span-5'} aria-labelledby="ship-h">
           <h2 id="ship-h" className="!text-xl">Your shipments</h2>
           <p className="mt-1 text-sm text-text-muted">Update status to keep customers’ tracking pages current.</p>
           <ul className="mt-4 space-y-3">
@@ -322,7 +328,7 @@ export function ShipperDashboard() {
               )
             })}
           </ul>
-        </section>
+        </section>}
       </div>
     </Layout>
   )

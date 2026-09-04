@@ -329,7 +329,7 @@ export interface FlightRoute { origin: Airport; destination: Airport; via?: Airp
 const routeCache = new Map<string, { at: number; route: FlightRoute | null }>()
 const ROUTE_TTL = 15 * 60_000
 
-let routeStats = { ok: 0, fail: 0, lastStatus: 0 }
+let routeStats: { ok: number; fail: number; lastStatus: number; lastBody?: string } = { ok: 0, fail: 0, lastStatus: 0 }
 /** adsb.lol's crowd-sourced route database: callsign + position → the flight's scheduled airports. Not available for every
  *  flight. Shares adsb.lol's tight per-IP quota with the hub sweep, so it waits for that provider's slot instead of bursting. */
 export async function flightRoute(callsign: string, lat: number, lon: number): Promise<FlightRoute | null> {
@@ -347,14 +347,19 @@ export async function flightRoute(callsign: string, lat: number, lon: number): P
     status = res.status
     if (res.status === 429) lol.backoffUntil = Date.now() + 15_000
     if (res.ok) {
-      const [r] = (await res.json()) as any[]
+      // The service answers 200 or 201 and, depending on client, sometimes a JSON string wrapping the JSON — unwrap both.
+      let body: unknown = await res.text()
+      for (let i = 0; i < 2 && typeof body === 'string'; i++) { try { body = JSON.parse(body) } catch { break } }
+      routeStats.lastBody = typeof body === 'string' ? body.slice(0, 160) : JSON.stringify(body).slice(0, 160)
+      const r = Array.isArray(body) ? body[0] : (body as any)?.planes?.[0] ?? body
       const aps: Airport[] = (r?._airports ?? []).map((a: any) => ({ icao: a.icao, iata: a.iata || undefined, name: a.name, city: a.location || undefined, country: a.countryiso2 || undefined, lat: a.lat, lon: a.lon }))
       if (aps.length >= 2) route = { origin: aps[0], destination: aps[aps.length - 1], via: aps.length > 2 ? aps.slice(1, -1) : undefined, plausible: !!r.plausible }
     }
   } catch { /* offline — no route */ }
-  routeStats = { ok: routeStats.ok + (status === 200 ? 1 : 0), fail: routeStats.fail + (status === 200 ? 0 : 1), lastStatus: status }
+  const good = status >= 200 && status < 300
+  routeStats = { ...routeStats, ok: routeStats.ok + (good ? 1 : 0), fail: routeStats.fail + (good ? 0 : 1), lastStatus: status }
   // A genuine "no route on file" is cached for the full TTL; a rate-limit or outage is retried after 20 s.
-  routeCache.set(cs, { at: status === 200 ? Date.now() : Date.now() - ROUTE_TTL + 20_000, route })
+  routeCache.set(cs, { at: good ? Date.now() : Date.now() - ROUTE_TTL + 20_000, route })
   return route
 }
 

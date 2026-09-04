@@ -30,7 +30,11 @@ function RoleToggle({ role, setRole }: { role: Role; setRole: (r: Role) => void 
   )
 }
 
-const DemoNote = () => <p className="mt-4 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">Demo mode: any email and password signs you in. Data is stored in your browser only.</p>
+const DemoNote = ({ role }: { role: Role }) => (
+  <p className="mt-4 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">
+    Try a demo account — {role === 'shipper' ? <><span className="font-mono text-text">ops@atlanticbridge.demo</span> (Atlantic Bridge Logistics)</> : <span className="font-mono text-text">demo@shipsync.demo</span>}, password <span className="font-mono text-text">shipsync</span>.
+  </p>
+)
 
 export function Login() {
   const [sp] = useSearchParams()
@@ -41,12 +45,15 @@ export function Login() {
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!/^\S+@\S+\.\S+$/.test(email)) return setErr('Enter a valid email address.')
-    if (pw.length < 4) return setErr('Password must be at least 4 characters.')
+    if (pw.length < 1) return setErr('Enter your password.')
     setErr(''); setBusy(true)
-    setTimeout(() => { login(email, role); nav(sp.get('next') || (role === 'shipper' ? '/dashboard/shipper' : '/dashboard')) }, 600)
+    try {
+      const u = await login(email, pw)
+      nav(sp.get('next') || (u.role === 'shipper' ? '/dashboard/shipper' : '/dashboard'))
+    } catch (err) { setErr(err instanceof Error ? err.message : 'Sign in failed.'); setBusy(false) }
   }
   return (
     <Shell title="Welcome back" sub="Sign in to see your quotes, bookings and tracking." aside={<Aside />}>
@@ -57,7 +64,7 @@ export function Login() {
         {err && <p role="alert" className="text-sm text-danger">{err}</p>}
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Signing in</> : 'Sign in'}</motion.button>
         <p className="text-center text-sm text-text-muted">New here? <Link to={`/signup?role=${role}`} className="text-gold hover:underline">Create an account</Link></p>
-        <DemoNote />
+        <DemoNote role={role} />
       </form>
     </Shell>
   )
@@ -71,7 +78,7 @@ export function Signup() {
   const [f, setF] = useState({ name: '', email: '', company: '', pw: '', agree: false })
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (f.name.trim().length < 2) return setErr('Enter your name.')
     if (!/^\S+@\S+\.\S+$/.test(f.email)) return setErr('Enter a valid email address.')
@@ -79,7 +86,10 @@ export function Signup() {
     if (f.pw.length < 8) return setErr('Password must be at least 8 characters.')
     if (!f.agree) return setErr('Please accept the terms to continue.')
     setErr(''); setBusy(true)
-    setTimeout(() => { signup({ name: f.name, email: f.email, role, company: role === 'shipper' ? f.company : undefined }); nav(role === 'shipper' ? '/dashboard/shipper' : '/dashboard') }, 700)
+    try {
+      await signup({ name: f.name, email: f.email, password: f.pw, role, company: role === 'shipper' ? f.company : undefined })
+      nav(sp.get('next') || (role === 'shipper' ? '/dashboard/shipper' : '/dashboard'))
+    } catch (err) { setErr(err instanceof Error ? err.message : 'Sign up failed.'); setBusy(false) }
   }
   return (
     <Shell title={role === 'shipper' ? 'List your shipping company' : 'Create your account'} sub={role === 'shipper' ? 'Start receiving matched shipment requests. Free Starter plan, upgrade any time.' : 'Save quotes, book shippers and track every shipment in one place.'} aside={<Aside shipper={role === 'shipper'} />}>
@@ -93,7 +103,6 @@ export function Signup() {
         {err && <p role="alert" className="text-sm text-danger">{err}</p>}
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Creating account</> : role === 'shipper' ? 'Create shipper account' : 'Create account'}</motion.button>
         <p className="text-center text-sm text-text-muted">Already have an account? <Link to={`/login?role=${role}`} className="text-gold hover:underline">Sign in</Link></p>
-        <DemoNote />
       </form>
     </Shell>
   )

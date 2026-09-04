@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { ArrowLeft, BadgeCheck, Building2, CalendarDays, Check, Clock, Filter, MapPin, Search, Star, X } from 'lucide-react'
-import { cargoLabel, cargoTypes, countries, countryByCode, shipperById, shippers, type Mode } from '../lib/data'
+import { cargoLabel, cargoTypes, countries, countryByCode, type Mode } from '../lib/data'
+import { useStore } from '../lib/store'
 import { fadeUp, stagger } from '../lib/motion'
 import { Avatar, Empty, ModeBadge, Rating, ShipperCard } from '../components/ui'
 
 export function ShipperDirectory() {
+  const { shippers } = useStore()
   const [q, setQ] = useState('')
   const [dest, setDest] = useState('')
   const [mode, setMode] = useState<Mode | ''>('')
@@ -24,7 +26,7 @@ export function ShipperDirectory() {
       .filter((s) => !cargo || s.cargo.includes(cargo as never))
       .filter((s) => !verifiedOnly || s.verified)
       .sort((a, b) => sort === 'rating' ? b.rating - a.rating : sort === 'reviews' ? b.reviews - a.reviews : a.responseHours - b.responseHours)
-  }, [q, dest, mode, cargo, verifiedOnly, sort])
+  }, [shippers, q, dest, mode, cargo, verifiedOnly, sort])
   const active = [dest, mode, cargo, verifiedOnly ? 'v' : ''].filter(Boolean).length
   const clear = () => { setDest(''); setMode(''); setCargo(''); setVerifiedOnly(false); setQ('') }
 
@@ -79,7 +81,9 @@ export function ShipperDirectory() {
 
 export function ShipperProfile() {
   const { id } = useParams()
+  const { ready, shipperById } = useStore()
   const s = shipperById(id ?? '')
+  if (!s && !ready) return <div className="container-x py-20 text-center text-text-muted">Loading profile…</div>
   if (!s) return (
     <div className="container-x py-20 text-text"><Empty title="Shipper not found" body="This profile may have been removed or the link is wrong." action={<Link to="/shippers" className="btn-gold">Back to directory</Link>} /></div>
   )

@@ -1,28 +1,37 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2, Search } from 'lucide-react'
-import { cargoLabel, countryByCode, shipperById, statusLabels, statusOrder, type Shipment } from '../lib/data'
+import { cargoLabel, countryByCode, statusLabels, statusOrder, type Shipment } from '../lib/data'
 import { useStore } from '../lib/store'
 import { Avatar, ModeBadge, Pill, fmtDate, fmtDateTime } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 
 export default function Track() {
   const [sp, setSp] = useSearchParams()
-  const { shipments } = useStore()
+  const { track } = useStore()
   const [ref, setRef] = useState(sp.get('ref') ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const current = sp.get('ref') ? shipments.find((s) => s.ref.toLowerCase() === sp.get('ref')!.toLowerCase()) : undefined
+  const [current, setCurrent] = useState<Shipment | undefined>()
+  const samples = ['SS-4F7K2Q', 'SS-9B3MX1', 'SS-2LR8TD']
+
+  useEffect(() => {
+    const r = sp.get('ref')
+    if (!r) { setCurrent(undefined); return }
+    let live = true
+    setLoading(true); setError('')
+    track(r).then((s) => { if (!live) return; if (s) setCurrent(s); else { setCurrent(undefined); setError('We couldn’t find a shipment with that reference. Check the format (SS-XXXXXX) or try a sample below.') } })
+      .catch((e) => live && setError(e instanceof Error ? e.message : 'Lookup failed.'))
+      .finally(() => live && setLoading(false))
+    return () => { live = false }
+  }, [sp, track])
 
   const lookup = (e: React.FormEvent) => {
-    e.preventDefault(); setError(''); setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      const found = shipments.find((s) => s.ref.toLowerCase() === ref.trim().toLowerCase())
-      if (!found) { setError('We couldn’t find a shipment with that reference. Check the format (SS-XXXXXX) or try a sample below.'); setSp({}); return }
-      setSp({ ref: found.ref })
-    }, 700)
+    e.preventDefault()
+    const v = ref.trim().toUpperCase()
+    if (!v) { setError('Enter a shipment reference.'); return }
+    setSp({ ref: v })
   }
 
   return (
@@ -40,7 +49,7 @@ export default function Track() {
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold !min-h-12" disabled={loading}>{loading ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Looking up</> : 'Track'}</motion.button>
           </motion.form>
           {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
-          <motion.p variants={fadeUp} className="mt-3 text-xs text-text-muted">Try a sample: {shipments.slice(0, 3).map((s) => <button key={s.id} onClick={() => { setRef(s.ref); setSp({ ref: s.ref }) }} className="ml-2 font-mono text-gold hover:underline focus-ring rounded">{s.ref}</button>)}</motion.p>
+          <motion.p variants={fadeUp} className="mt-3 text-xs text-text-muted">Try a sample: {samples.map((r) => <button key={r} onClick={() => { setRef(r); setSp({ ref: r }) }} className="ml-2 font-mono text-gold hover:underline focus-ring rounded">{r}</button>)}</motion.p>
         </motion.div>
 
         <AnimatePresence mode="wait">
@@ -52,7 +61,8 @@ export default function Track() {
 }
 
 export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: boolean }) {
-  const shipper = shipperById(s.shipperId)!
+  const { shipperById } = useStore()
+  const shipper = shipperById(s.shipperId) ?? { id: s.shipperId, name: 'Shipper', hq: '', initials: 'SS', hue: '#E3B54A' }
   const dest = countryByCode(s.destination)!
   const idx = statusOrder.indexOf(s.status)
   const pct = (idx / (statusOrder.length - 1)) * 100

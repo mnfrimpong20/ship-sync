@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, PlusCircle, Send, Ship, TrendingUp, X } from 'lucide-react'
-import { cargoLabel, countryByCode, shipperById, statusLabels, type CargoType } from '../lib/data'
+import { cargoLabel, countryByCode, statusLabels, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
 import { Avatar, Empty, ModeBadge, Pill, Rating, fmtDate, money } from '../components/ui'
 import { ShipmentDetail } from './Track'
@@ -36,12 +36,15 @@ function Layout({ title, sub, children, cta }: { title: string; sub: string; chi
 
 /* ================= CUSTOMER ================= */
 export function CustomerDashboard() {
-  const { user, requests, shipments, acceptQuote } = useStore()
+  const { ready, user, requests, shipments, acceptQuote, shipperById } = useStore()
   const [sp, setSp] = useSearchParams()
-  const [tab, setTab] = useState<'requests' | 'shipments'>(sp.get('request') ? 'requests' : 'requests')
+  const [tab, setTab] = useState<'requests' | 'shipments'>('requests')
   const [openReq, setOpenReq] = useState<string | null>(sp.get('request'))
   const [toast, setToast] = useState('')
+  const [error, setError] = useState('')
+  const [busyQuote, setBusyQuote] = useState<string | null>(null)
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
+  if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading your dashboard…</div></div>
   if (!user) return <Navigate to="/login?next=/dashboard" replace />
   if (user.role === 'shipper') return <Navigate to="/dashboard/shipper" replace />
 
@@ -49,15 +52,20 @@ export function CustomerDashboard() {
   const quotesCount = requests.reduce((n, r) => n + r.quotes.length, 0)
   const active = shipments.filter((s) => s.status !== 'delivered')
 
-  const accept = (r: QuoteRequest, qid: string) => {
-    const sh = acceptQuote(r.id, qid)
-    setToast(`Booked with ${shipperById(sh.shipperId)?.name}. Reference ${sh.ref}.`)
-    setOpenReq(null); setTab('shipments'); setSp({})
+  const accept = async (r: QuoteRequest, qid: string) => {
+    setBusyQuote(qid); setError('')
+    try {
+      const sh = await acceptQuote(r.id, qid)
+      setToast(`Booked with ${shipperById(sh.shipperId)?.name ?? 'your shipper'}. Reference ${sh.ref}.`)
+      setOpenReq(null); setTab('shipments'); setSp({})
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not accept this quote.') }
+    finally { setBusyQuote(null) }
   }
 
   return (
     <Layout title={`Hello, ${user.name.split(' ')[0]}`} sub="Your quote requests, bookings and live shipments." cta={<Link to="/quote" className="btn-gold"><PlusCircle size={18} aria-hidden="true" /> New shipment request</Link>}>
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
+      {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <Stat icon={Inbox} label="Open requests" value={open.length} hint={`${quotesCount} quotes received`} />
         <Stat icon={Ship} label="Active shipments" value={active.length} hint="In transit or clearing" />
@@ -102,7 +110,7 @@ export function CustomerDashboard() {
                         ) : (
                           <div className="mt-4 grid gap-3 md:grid-cols-2">
                             {[...r.quotes].sort((a, b) => a.price - b.price).map((q, i) => {
-                              const s = shipperById(q.shipperId)!
+                              const s = shipperById(q.shipperId) ?? { id: q.shipperId, name: 'Shipper', initials: 'SS', hue: '#E3B54A', rating: 0, reviews: 0, verified: false }
                               const best = i === 0 && r.status === 'open'
                               return (
                                 <div key={q.id} className={`relative rounded-[var(--radius-md)] border p-4 ${q.status === 'accepted' ? 'border-teal bg-teal/5' : q.status === 'declined' ? 'border-border opacity-50' : best ? 'border-gold' : 'border-border bg-surface-2'}`}>
@@ -120,7 +128,7 @@ export function CustomerDashboard() {
                                   <div className="mt-4 flex items-center justify-between gap-2">
                                     <p className="text-xs text-text-muted">Valid until {fmtDate(q.validUntil)}</p>
                                     {q.status === 'accepted' ? <Pill tone="green">Accepted</Pill> : q.status === 'declined' ? <Pill tone="muted">Declined</Pill> : (
-                                      <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => accept(r, q.id)} className="btn-gold !min-h-10 !px-4 text-sm">Accept & book</motion.button>
+                                      <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => accept(r, q.id)} disabled={busyQuote !== null} className="btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60">{busyQuote === q.id ? 'Booking…' : 'Accept & book'}</motion.button>
                                     )}
                                   </div>
                                 </div>
@@ -172,30 +180,42 @@ function ShipmentsTab() {
 
 /* ================= SHIPPER ================= */
 export function ShipperDashboard() {
-  const { user, requests, shipments, sendQuote, advanceShipment, matchShippers } = useStore()
+  const { ready, user, requests, shipments, sendQuote, advanceShipment, shipperById } = useStore()
   const [quoting, setQuoting] = useState<string | null>(null)
   const [form, setForm] = useState({ price: '', transit: '', notes: '' })
   const [toast, setToast] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
-  const me = user?.shipperId ?? 'atlantic-bridge'
-  const leads = useMemo(() => requests.filter((r) => r.status === 'open' && matchShippers(r).some((m) => m.shipper.id === me)), [requests, matchShippers, me])
+  if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading your dashboard…</div></div>
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/shipper" replace />
-  if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
-  const shipper = shipperById(me)!
+  if (user.role !== 'shipper' || !user.shipperId) return <Navigate to="/dashboard" replace />
+  const me = user.shipperId
+  const leads = requests.filter((r) => r.status === 'open')
+  const shipper: Pick<Shipper, 'id' | 'name' | 'hq' | 'plan' | 'onTime' | 'tagline'> = shipperById(me) ?? { id: me, name: user.company ?? 'Your company', hq: '', plan: 'starter', onTime: 0, tagline: '' }
   const myQuotes = requests.flatMap((r) => r.quotes.filter((q) => q.shipperId === me).map((q) => ({ q, r })))
   const won = myQuotes.filter((x) => x.q.status === 'accepted').length
   const myShipments = shipments.filter((s) => s.shipperId === me)
 
-  const submitQuote = (r: QuoteRequest) => {
+  const submitQuote = async (r: QuoteRequest) => {
     const price = Number(form.price), transit = Number(form.transit)
     if (!price || !transit) return
-    sendQuote(r.id, { shipperId: me, price, currency: 'USD', transitDays: transit, validUntil: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), notes: form.notes || `${shipper.tagline}.`, includes: [r.pickup ? 'Pickup' : 'Drop-off at warehouse', r.mode === 'air' ? 'Air freight' : 'Ocean freight', r.delivery ? 'Door delivery' : 'Port handling', ...(r.insurance ? ['All-risk insurance'] : [])] })
-    setQuoting(null); setForm({ price: '', transit: '', notes: '' }); setToast(`Quote sent to ${r.contact.name}.`)
+    setBusy(true); setError('')
+    try {
+      await sendQuote(r.id, { price, transitDays: transit, notes: form.notes || (shipper.tagline ? `${shipper.tagline}.` : ''), includes: [r.pickup ? 'Pickup' : 'Drop-off at warehouse', r.mode === 'air' ? 'Air freight' : 'Ocean freight', r.delivery ? 'Door delivery' : 'Port handling', ...(r.insurance ? ['All-risk insurance'] : [])] })
+      setQuoting(null); setForm({ price: '', transit: '', notes: '' }); setToast(`Quote sent to ${r.contact.name}.`)
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not send the quote.') }
+    finally { setBusy(false) }
+  }
+  const advance = async (id: string, ref: string) => {
+    setBusy(true); setError('')
+    try { await advanceShipment(id); setToast(`${ref} updated.`) } catch (err) { setError(err instanceof Error ? err.message : 'Could not update the shipment.') } finally { setBusy(false) }
   }
 
   return (
     <Layout title={shipper.name} sub={`${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan`} cta={<Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link>}>
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
+      {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat icon={Inbox} label="New leads" value={leads.filter((r) => !r.quotes.some((q) => q.shipperId === me)).length} hint="Matching your lanes" />
         <Stat icon={Send} label="Quotes sent" value={myQuotes.length} hint={`${won} won`} />
@@ -212,7 +232,7 @@ export function ShipperDashboard() {
             {leads.map((r) => {
               const d = countryByCode(r.destination)!
               const mine = r.quotes.find((q) => q.shipperId === me)
-              const competing = r.quotes.filter((q) => q.shipperId !== me).length
+              const competing = r.competingQuotes ?? r.quotes.filter((q) => q.shipperId !== me).length
               return (
                 <motion.div key={r.id} layout className="card-dark p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -232,7 +252,7 @@ export function ShipperDashboard() {
                           <div><label htmlFor={`t-${r.id}`} className="label-dark">Transit (days)</label><input id={`t-${r.id}`} type="number" min={1} required className="input-dark" value={form.transit} onChange={(e) => setForm({ ...form, transit: e.target.value })} /></div>
                           <div className="sm:col-span-2"><label htmlFor={`n-${r.id}`} className="label-dark">Notes to customer</label><textarea id={`n-${r.id}`} rows={2} className="input-dark py-2" placeholder="Sailing date, what’s included, duty handling…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
                         </div>
-                        <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setQuoting(null)} className="btn-ghost !min-h-10 !px-4 text-sm"><X size={15} aria-hidden="true" /> Cancel</button><button className="btn-gold !min-h-10 !px-4 text-sm"><Send size={15} aria-hidden="true" /> Send quote</button></div>
+                        <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setQuoting(null)} className="btn-ghost !min-h-10 !px-4 text-sm"><X size={15} aria-hidden="true" /> Cancel</button><button disabled={busy} className="btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60"><Send size={15} aria-hidden="true" /> {busy ? 'Sending…' : 'Send quote'}</button></div>
                       </motion.form>
                     )}
                   </AnimatePresence>
@@ -256,7 +276,7 @@ export function ShipperDashboard() {
                   <p className="text-xs text-text-muted">{s.description} · {s.customer}</p>
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill>
-                    {s.status !== 'delivered' && <button onClick={() => { advanceShipment(s.id); setToast(`${s.ref} updated.`) }} className="btn-ghost !min-h-9 !px-3 text-xs">Mark next step <ChevronRight size={14} aria-hidden="true" /></button>}
+                    {s.status !== 'delivered' && <button onClick={() => advance(s.id, s.ref)} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60">Mark next step <ChevronRight size={14} aria-hidden="true" /></button>}
                   </div>
                 </li>
               )

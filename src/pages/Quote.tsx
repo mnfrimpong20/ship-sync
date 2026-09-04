@@ -1,30 +1,42 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Plane, Ship } from 'lucide-react'
-import { cargoTypes, countries, origins, shipperById, type CargoType, type Mode } from '../lib/data'
-import { useStore, type QuoteRequest } from '../lib/store'
+import { cargoTypes, countries, origins, type CargoType, type Mode } from '../lib/data'
+import { useStore, type Match, type NewRequest } from '../lib/store'
 import { Avatar, ModeBadge, Rating, money } from '../components/ui'
 import { ease } from '../lib/motion'
 
-type Form = Omit<QuoteRequest, 'id' | 'ref' | 'createdAt' | 'status' | 'quotes'>
+type Form = NewRequest
 const stepsMeta = ['Route', 'Cargo', 'Services', 'Contact']
 
 export default function Quote() {
   const [sp] = useSearchParams()
   const nav = useNavigate()
-  const { user, createRequest, matchShippers } = useStore()
+  const { user, createRequest, matchShippers, shipperById } = useStore()
   const [step, setStep] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [submitError, setSubmitError] = useState('')
+  const [matches, setMatches] = useState<Match[]>([])
+  const [matching, setMatching] = useState(true)
   const [form, setForm] = useState<Form>({
     origin: sp.get('origin') || 'New York, NY', destination: sp.get('destination') || 'GH', mode: (sp.get('mode') as Mode | 'either') || 'either',
     cargo: 'barrels', quantity: 2, weightKg: undefined, description: '', pickup: true, delivery: true, insurance: false,
     readyDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
     contact: { name: user?.name ?? '', email: user?.email ?? '', phone: '' },
+    password: '',
   })
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }))
-  const matches = useMemo(() => matchShippers(form), [form, matchShippers])
+  useEffect(() => {
+    let live = true
+    setMatching(true)
+    const t = setTimeout(() => {
+      matchShippers(form).then((m) => { if (live) { setMatches(m); setMatching(false) } }).catch(() => { if (live) setMatching(false) })
+    }, 200)
+    return () => { live = false; clearTimeout(t) }
+  }, [form.origin, form.destination, form.mode, form.cargo, matchShippers])
+  useEffect(() => { if (user) setForm((f) => ({ ...f, contact: { ...f.contact, name: f.contact.name || user.name, email: f.contact.email || user.email } })) }, [user])
   const preferred = sp.get('shipper') ? shipperById(sp.get('shipper')!) : undefined
   useEffect(() => { window.scrollTo({ top: 0 }) }, [step])
 
@@ -35,14 +47,19 @@ export default function Quote() {
       if (form.contact.name.trim().length < 2) e.name = 'Please enter your name.'
       if (!/^\S+@\S+\.\S+$/.test(form.contact.email)) e.email = 'Enter a valid email.'
       if (form.contact.phone.replace(/\D/g, '').length < 7) e.phone = 'Enter a phone number shippers can reach.'
+      if (!user && (form.password ?? '').length < 8) e.password = 'Choose a password of at least 8 characters.'
     }
     setErrors(e)
     return Object.keys(e).length === 0
   }
   const next = () => { if (!validate()) return; if (step < 3) setStep(step + 1); else submit() }
-  const submit = () => {
-    setSubmitting(true)
-    setTimeout(() => { const r = createRequest(form); nav(`/dashboard?request=${r.id}`) }, 1400)
+  const submit = async () => {
+    setSubmitting(true); setSubmitError('')
+    try {
+      const { password, ...rest } = form
+      const r = await createRequest(user ? rest : { ...rest, password })
+      nav(`/dashboard?request=${r.id}`)
+    } catch (err) { setSubmitError(err instanceof Error ? err.message : 'Could not send your request.'); setSubmitting(false) }
   }
 
   return (
@@ -119,6 +136,14 @@ export default function Quote() {
                       <div><label htmlFor="cemail" className="label-dark">Email</label><input id="cemail" type="email" className="input-dark" value={form.contact.email} onChange={(e) => set('contact', { ...form.contact, email: e.target.value })} aria-invalid={!!errors.email} autoComplete="email" />{errors.email && <p className="mt-1 text-xs text-danger">{errors.email}</p>}</div>
                       <div><label htmlFor="cphone" className="label-dark">Phone / WhatsApp</label><input id="cphone" type="tel" className="input-dark" value={form.contact.phone} onChange={(e) => set('contact', { ...form.contact, phone: e.target.value })} aria-invalid={!!errors.phone} autoComplete="tel" placeholder="+1 …" />{errors.phone && <p className="mt-1 text-xs text-danger">{errors.phone}</p>}</div>
                     </div>
+                    {!user && (
+                      <div>
+                        <label htmlFor="cpw" className="label-dark">Create a password</label>
+                        <input id="cpw" type="password" className="input-dark" value={form.password ?? ''} onChange={(e) => set('password', e.target.value)} aria-invalid={!!errors.password} autoComplete="new-password" />
+                        {errors.password ? <p className="mt-1 text-xs text-danger">{errors.password}</p> : <p className="mt-1 text-xs text-text-muted">We’ll create your free Ship Sync account so you can compare quotes and book. Already have one? <Link to="/login?next=/quote" className="text-gold hover:underline">Sign in</Link>.</p>}
+                      </div>
+                    )}
+                    {submitError && <p role="alert" className="text-sm text-danger">{submitError}</p>}
                     <p className="text-xs text-text-muted">By submitting you agree to receive quotes from matching shippers. Ship Sync never shares your details beyond the shippers you’re matched with.</p>
                   </div>
                 )}
@@ -141,8 +166,11 @@ export default function Quote() {
               {preferred && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-sm text-text">You started from <strong>{preferred.name}</strong>’s profile — they’ll be notified first.</p>}
               <ul className="mt-4 space-y-3">
                 <AnimatePresence initial={false}>
-                  {matches.length === 0 && (
+                  {matches.length === 0 && !matching && (
                     <motion.li initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="rounded-lg border border-dashed border-border p-4 text-sm text-text-muted">No shipper currently serves this exact lane and cargo. Try “Either” mode, or we’ll forward your request to nearby operators manually.</motion.li>
+                  )}
+                  {matches.length === 0 && matching && (
+                    <motion.li initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 rounded-lg border border-dashed border-border p-4 text-sm text-text-muted"><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Finding shippers on this lane…</motion.li>
                   )}
                   {matches.slice(0, 5).map((m) => (
                     <motion.li key={m.shipper.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="flex items-start gap-3 rounded-lg border border-border bg-surface-2 p-3">

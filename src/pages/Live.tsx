@@ -16,7 +16,7 @@ interface RegionPayload {
   vessels: (LivePos & { id: string; kind: 'vessel' })[]
   flights: (LivePos & { id: string; kind: 'flight' })[]
   congestion: Record<string, { total: number; anchored: number }>
-  ais: { status: 'off' | 'connecting' | 'live' | 'error'; enabled: boolean; lastMessageAt: string | null; error?: string }
+  ais: { status: 'off' | 'connecting' | 'live' | 'error'; enabled: boolean; lastMessageAt: string | null; coastVessels?: number; error?: string }
   ports: Record<string, { name: string; at: LngLat; airport: { name: string; at: LngLat } }>
 }
 
@@ -104,7 +104,7 @@ export default function Live() {
           <div className="max-w-2xl">
             <motion.p variants={fadeUp} className="eyebrow mb-2">Live lanes</motion.p>
             <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4vw,3rem)]">The Gulf of Guinea, right now</motion.h1>
-            <motion.p variants={fadeUp} className="mt-2 text-text-muted">Every ship on the West African coast and every aircraft over it, from public AIS and ADS-B feeds — plus the lanes Ship Sync shippers sail from North America, Europe and Asia.</motion.p>
+            <motion.p variants={fadeUp} className="mt-2 text-text-muted">Ships on the Atlantic approach and the West African coast and aircraft over them, from public AIS and ADS-B feeds — plus the lanes Ship Sync shippers sail from North America, Europe and Asia.</motion.p>
           </div>
           <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2 text-sm">
             <Pill tone={data?.ais.status === 'live' ? 'gold' : 'muted'}><Radio size={12} className={`mr-1 ${data?.ais.status === 'live' ? 'animate-pulse' : ''}`} aria-hidden="true" /> {aisLabel}</Pill>
@@ -140,6 +140,7 @@ export default function Live() {
                 })}
               </ul>
               {data && !data.ais.enabled && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">Vessel data appears once an AISStream key is configured on the server.</p>}
+              {data && data.ais.status === 'live' && (data.ais.coastVessels ?? 0) === 0 && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">Counts are 0 because no community AIS receiver on the Gulf of Guinea coast is feeding AISStream right now. Ships are still tracked on the Atlantic approach (Canaries, Morocco, Portugal) and reappear here when a coastal receiver comes online.</p>}
               {data && data.flights.length === 0 && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">No aircraft shown: community ADS-B receivers over West Africa are sparse, so coverage comes and goes. Flights are tracked over North America and Europe and reappear near the coast when a receiver is online.</p>}
               {anchoredTotal >= 15 && <p className="mt-3 text-xs text-gold">High congestion across the region — expect extra days for clearance.</p>}
             </div>

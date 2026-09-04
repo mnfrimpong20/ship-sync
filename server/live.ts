@@ -325,43 +325,41 @@ export function airStatus() {
 }
 
 export interface Airport { icao: string; iata?: string; name: string; city?: string; country?: string; lat: number; lon: number }
-export interface FlightRoute { origin: Airport; destination: Airport; via?: Airport[]; plausible: boolean }
+export interface FlightRoute { origin: Airport; destination: Airport; via?: Airport[]; airline?: string; plausible: boolean }
 const routeCache = new Map<string, { at: number; route: FlightRoute | null }>()
 const ROUTE_TTL = 15 * 60_000
 
-let routeStats: { ok: number; fail: number; lastStatus: number; lastBody?: string } = { ok: 0, fail: 0, lastStatus: 0 }
-/** adsb.lol's crowd-sourced route database: callsign + position → the flight's scheduled airports. Not available for every
- *  flight. Shares adsb.lol's tight per-IP quota with the hub sweep, so it waits for that provider's slot instead of bursting. */
-export async function flightRoute(callsign: string, lat: number, lon: number): Promise<FlightRoute | null> {
+let routeStats: { ok: number; fail: number; lastStatus: number } = { ok: 0, fail: 0, lastStatus: 0 }
+const ADSBDB_URL = process.env.ADSBDB_URL || 'https://api.adsbdb.com'
+let lastRouteCall = 0
+/** adsbdb.com's open callsign lookup: scheduled origin/destination airports and the airline. Not every callsign is on
+ *  file (charters, positioning flights, GA). Looked up per click, cached 15 min, never stored. */
+export async function flightRoute(callsign: string): Promise<FlightRoute | null> {
   const cs = callsign.trim().toUpperCase(); if (!cs) return null
   const hit = routeCache.get(cs); if (hit && Date.now() - hit.at < ROUTE_TTL) return hit.route
-  const lol = PROVIDERS.find((p) => p.name === 'adsb.lol')!
-  for (let i = 0; i < 20 && (Date.now() - lol.lastAt < lol.minGapMs || lol.backoffUntil > Date.now()); i++) await new Promise((r) => setTimeout(r, 500))
+  const wait = 400 - (Date.now() - lastRouteCall); if (wait > 0) await new Promise((r) => setTimeout(r, wait)) // be polite: ≤ ~2/s
+  lastRouteCall = Date.now()
   let route: FlightRoute | null = null
   let status = 0
   try {
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000)
-    lol.lastAt = Date.now()
-    const res = await fetch(`${ADSB_URL}/api/0/routeset`, { method: 'POST', signal: ctl.signal, headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': UA }, body: JSON.stringify({ planes: [{ callsign: cs, lat, lng: lon }] }) })
+    const res = await fetch(`${ADSBDB_URL}/v0/callsign/${encodeURIComponent(cs)}`, { signal: ctl.signal, headers: { accept: 'application/json', 'user-agent': UA } })
     clearTimeout(t)
     status = res.status
-    if (res.status === 429) lol.backoffUntil = Date.now() + 15_000
     if (res.ok) {
-      // The service answers 200 or 201 and, depending on client, sometimes a JSON string wrapping the JSON — unwrap both.
-      let body: unknown = await res.text()
-      for (let i = 0; i < 2 && typeof body === 'string'; i++) { try { body = JSON.parse(body) } catch { break } }
-      routeStats.lastBody = typeof body === 'string' ? body.slice(0, 160) : JSON.stringify(body).slice(0, 160)
-      const r = Array.isArray(body) ? body[0] : (body as any)?.planes?.[0] ?? body
-      const aps: Airport[] = (r?._airports ?? []).map((a: any) => ({ icao: a.icao, iata: a.iata || undefined, name: a.name, city: a.location || undefined, country: a.countryiso2 || undefined, lat: a.lat, lon: a.lon }))
-      if (aps.length >= 2) route = { origin: aps[0], destination: aps[aps.length - 1], via: aps.length > 2 ? aps.slice(1, -1) : undefined, plausible: !!r.plausible }
+      const fr = ((await res.json()) as any)?.response?.flightroute
+      const ap = (a: any): Airport | null => (a && a.icao_code ? { icao: a.icao_code, iata: a.iata_code || undefined, name: a.name, city: a.municipality || undefined, country: a.country_iso_name || undefined, lat: Number(a.latitude), lon: Number(a.longitude) } : null)
+      const o = ap(fr?.origin), d = ap(fr?.destination)
+      if (o && d) route = { origin: o, destination: d, airline: fr.airline?.name || undefined, plausible: true }
     }
   } catch { /* offline — no route */ }
-  const good = status >= 200 && status < 300
-  routeStats = { ...routeStats, ok: routeStats.ok + (good ? 1 : 0), fail: routeStats.fail + (good ? 0 : 1), lastStatus: status }
-  // A genuine "no route on file" is cached for the full TTL; a rate-limit or outage is retried after 20 s.
+  const good = res200(status)
+  routeStats = { ok: routeStats.ok + (good ? 1 : 0), fail: routeStats.fail + (good ? 0 : 1), lastStatus: status }
+  // "Not on file" (404) is a real answer and is cached for the full TTL; rate-limits and outages are retried after 20 s.
   routeCache.set(cs, { at: good ? Date.now() : Date.now() - ROUTE_TTL + 20_000, route })
   return route
 }
+const res200 = (s: number) => s === 200 || s === 404
 
 /** One aircraft from the last hub sweep, by ICAO hex. */
 export function aircraft(hex: string): Aircraft | null {

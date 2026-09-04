@@ -366,7 +366,7 @@ export function apiRouter() {
     if (!/^~?[0-9a-f]{6}$/.test(hex)) throw new HttpError(400, 'Invalid aircraft id.')
     const a = aircraft(hex)
     if (!a) throw new HttpError(404, 'No recent ADS-B data for that aircraft.')
-    const route = a.callsign ? await flightRoute(a.callsign, a.lat, a.lon) : null
+    const route = a.callsign ? await flightRoute(a.callsign) : null
     res.set('Cache-Control', 'no-store')
     res.json({ flight: { ...a, route } })
   }))

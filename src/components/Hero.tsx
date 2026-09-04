@@ -4,6 +4,7 @@ import { motion } from 'motion/react'
 import { ArrowRight, BadgeCheck, Plane, Ship, ShieldCheck, Clock } from 'lucide-react'
 import { fadeUp, stagger } from '../lib/motion'
 import { countries, origins, type Mode } from '../lib/data'
+import HeroVideo from './HeroVideo'
 
 export default function Hero() {
   const nav = useNavigate()
@@ -13,11 +14,11 @@ export default function Hero() {
 
   return (
     <section className="relative overflow-hidden bg-bg text-text">
-      {/* backdrop */}
+      {/* backdrop: cycling video, then brand glows, grid and route arcs on top */}
+      <HeroVideo />
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <div className="absolute -top-40 left-1/2 h-[720px] w-[1200px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(227,181,74,0.18),transparent)]" />
-        <div className="absolute right-[-200px] top-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(closest-side,rgba(45,212,191,0.12),transparent)]" />
-        <svg className="absolute inset-0 h-full w-full opacity-[0.07]" aria-hidden="true"><defs><pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#fff" strokeWidth="1" /></pattern></defs><rect width="100%" height="100%" fill="url(#grid)" /></svg>
+        <div className="absolute -top-40 left-1/2 h-[720px] w-[1200px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(227,181,74,0.14),transparent)]" />
+        <svg className="absolute inset-0 h-full w-full opacity-[0.05]" aria-hidden="true"><defs><pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#fff" strokeWidth="1" /></pattern></defs><rect width="100%" height="100%" fill="url(#grid)" /></svg>
         <RouteMap />
       </div>
 

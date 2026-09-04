@@ -1,0 +1,269 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { AnimatePresence, motion } from 'motion/react'
+import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, PlusCircle, Send, Ship, TrendingUp, X } from 'lucide-react'
+import { cargoLabel, countryByCode, shipperById, statusLabels, type CargoType } from '../lib/data'
+import { useStore, type QuoteRequest } from '../lib/store'
+import { Avatar, Empty, ModeBadge, Pill, Rating, fmtDate, money } from '../components/ui'
+import { ShipmentDetail } from './Track'
+import { fadeUp, stagger } from '../lib/motion'
+
+function Stat({ icon: Icon, label, value, hint }: { icon: typeof Inbox; label: string; value: string | number; hint?: string }) {
+  return (
+    <motion.div variants={fadeUp} className="card-dark p-5">
+      <div className="flex items-center justify-between"><p className="text-sm text-text-muted">{label}</p><Icon size={18} className="text-gold" aria-hidden="true" /></div>
+      <p className="mt-2 font-heading text-3xl font-bold text-text">{value}</p>
+      {hint && <p className="mt-1 text-xs text-text-muted">{hint}</p>}
+    </motion.div>
+  )
+}
+
+function Layout({ title, sub, children, cta }: { title: string; sub: string; children: React.ReactNode; cta?: React.ReactNode }) {
+  return (
+    <div className="bg-bg text-text">
+      <div className="container-x py-10 md:py-14">
+        <motion.div initial="hidden" animate="show" variants={stagger}>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Dashboard</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{title}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">{sub}</motion.p></div>
+            {cta && <motion.div variants={fadeUp}>{cta}</motion.div>}
+          </div>
+          {children}
+        </motion.div>
+      </div>
+    </div>
+  )
+}
+
+/* ================= CUSTOMER ================= */
+export function CustomerDashboard() {
+  const { user, requests, shipments, acceptQuote } = useStore()
+  const [sp, setSp] = useSearchParams()
+  const [tab, setTab] = useState<'requests' | 'shipments'>(sp.get('request') ? 'requests' : 'requests')
+  const [openReq, setOpenReq] = useState<string | null>(sp.get('request'))
+  const [toast, setToast] = useState('')
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
+  if (!user) return <Navigate to="/login?next=/dashboard" replace />
+  if (user.role === 'shipper') return <Navigate to="/dashboard/shipper" replace />
+
+  const open = requests.filter((r) => r.status === 'open')
+  const quotesCount = requests.reduce((n, r) => n + r.quotes.length, 0)
+  const active = shipments.filter((s) => s.status !== 'delivered')
+
+  const accept = (r: QuoteRequest, qid: string) => {
+    const sh = acceptQuote(r.id, qid)
+    setToast(`Booked with ${shipperById(sh.shipperId)?.name}. Reference ${sh.ref}.`)
+    setOpenReq(null); setTab('shipments'); setSp({})
+  }
+
+  return (
+    <Layout title={`Hello, ${user.name.split(' ')[0]}`} sub="Your quote requests, bookings and live shipments." cta={<Link to="/quote" className="btn-gold"><PlusCircle size={18} aria-hidden="true" /> New shipment request</Link>}>
+      <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
+      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+        <Stat icon={Inbox} label="Open requests" value={open.length} hint={`${quotesCount} quotes received`} />
+        <Stat icon={Ship} label="Active shipments" value={active.length} hint="In transit or clearing" />
+        <Stat icon={Package} label="Delivered" value={shipments.filter((s) => s.status === 'delivered').length} hint="All time" />
+      </div>
+
+      <div className="mt-8 flex gap-1 border-b border-border" role="tablist">
+        {(['requests', 'shipments'] as const).map((t) => (
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 px-4 text-sm font-medium capitalize focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : 'Shipments'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
+        ))}
+      </div>
+
+      {tab === 'requests' && (
+        <div className="mt-6 space-y-4">
+          {requests.length === 0 && <Empty title="No quote requests yet" body="Post your first shipment and matching shippers will reply with itemised quotes." action={<Link to="/quote" className="btn-gold">Request quotes</Link>} />}
+          {requests.map((r) => {
+            const dest = countryByCode(r.destination)!
+            const isOpen = openReq === r.id
+            const accepted = r.quotes.find((q) => q.status === 'accepted')
+            return (
+              <motion.div key={r.id} layout className="card-dark overflow-hidden">
+                <button onClick={() => setOpenReq(isOpen ? null : r.id)} aria-expanded={isOpen} className="flex w-full flex-wrap items-center justify-between gap-3 p-5 text-left hover:bg-surface-2/50 focus-ring">
+                  <div className="flex items-center gap-4">
+                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-gold/15 text-gold"><FileText size={20} aria-hidden="true" /></span>
+                    <div>
+                      <p className="font-semibold text-text">{r.origin} → {dest.flag} {dest.name} <span className="font-normal text-text-muted">· {r.quantity} × {cargoLabel(r.cargo)}</span></p>
+                      <p className="text-xs text-text-muted">{r.ref} · posted {fmtDate(r.createdAt)} · {r.mode === 'either' ? 'air or ocean' : r.mode}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {r.status === 'booked' ? <Pill tone="green">Booked · {shipperById(accepted?.shipperId ?? '')?.name}</Pill> : <Pill tone={r.quotes.length ? 'gold' : 'muted'}>{r.quotes.length ? `${r.quotes.length} quote${r.quotes.length > 1 ? 's' : ''}` : 'Awaiting quotes'}</Pill>}
+                    <ChevronRight size={18} className={`text-text-muted transition-transform ${isOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
+                  </div>
+                </button>
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }} className="overflow-hidden">
+                      <div className="border-t border-border p-5">
+                        <p className="text-sm text-text-muted">{r.description || 'No description provided.'} {r.pickup && '· Pickup'} {r.delivery && '· Door delivery'} {r.insurance && '· Insurance'}</p>
+                        {r.quotes.length === 0 ? (
+                          <p className="mt-4 flex items-center gap-2 rounded-lg bg-surface-2 p-4 text-sm text-text-muted"><Clock size={16} aria-hidden="true" /> Shippers usually reply within 24 hours. We’ll email you at {r.contact.email}.</p>
+                        ) : (
+                          <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            {[...r.quotes].sort((a, b) => a.price - b.price).map((q, i) => {
+                              const s = shipperById(q.shipperId)!
+                              const best = i === 0 && r.status === 'open'
+                              return (
+                                <div key={q.id} className={`relative rounded-[var(--radius-md)] border p-4 ${q.status === 'accepted' ? 'border-teal bg-teal/5' : q.status === 'declined' ? 'border-border opacity-50' : best ? 'border-gold' : 'border-border bg-surface-2'}`}>
+                                  {best && <span className="absolute -top-2.5 left-4 rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-ink">Lowest price</span>}
+                                  <div className="flex items-start gap-3">
+                                    <Avatar initials={s.initials} hue={s.hue} size={40} />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{s.name}{s.verified && <BadgeCheck size={14} className="text-gold" aria-label="Verified" />}</p>
+                                      <div className="mt-1 flex flex-wrap gap-1.5"><Rating value={s.rating} count={s.reviews} /></div>
+                                    </div>
+                                    <div className="text-right"><p className="font-heading text-2xl font-bold text-text">{money(q.price)}</p><p className="text-xs text-text-muted">~{q.transitDays} days</p></div>
+                                  </div>
+                                  <ul className="mt-3 flex flex-wrap gap-1.5">{q.includes.map((x) => <li key={x} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted">{x}</li>)}</ul>
+                                  <p className="mt-3 text-xs text-text-muted">{q.notes}</p>
+                                  <div className="mt-4 flex items-center justify-between gap-2">
+                                    <p className="text-xs text-text-muted">Valid until {fmtDate(q.validUntil)}</p>
+                                    {q.status === 'accepted' ? <Pill tone="green">Accepted</Pill> : q.status === 'declined' ? <Pill tone="muted">Declined</Pill> : (
+                                      <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => accept(r, q.id)} className="btn-gold !min-h-10 !px-4 text-sm">Accept & book</motion.button>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
+
+      {tab === 'shipments' && <ShipmentsTab />}
+    </Layout>
+  )
+}
+
+function ShipmentsTab() {
+  const { shipments } = useStore()
+  const [sel, setSel] = useState<string | null>(shipments[0]?.id ?? null)
+  const s = shipments.find((x) => x.id === sel)
+  if (shipments.length === 0) return <div className="mt-6"><Empty title="No shipments yet" body="Accept a quote on one of your requests and it will appear here with live tracking." /></div>
+  return (
+    <div className="mt-6 grid gap-6 lg:grid-cols-12">
+      <ul className="space-y-2 lg:col-span-4" aria-label="Your shipments">
+        {shipments.map((x) => {
+          const d = countryByCode(x.destination)!
+          return (
+            <li key={x.id}>
+              <button onClick={() => setSel(x.id)} aria-current={sel === x.id} className={`w-full rounded-[var(--radius-md)] border p-4 text-left transition-colors focus-ring ${sel === x.id ? 'border-gold bg-surface' : 'border-border bg-surface/50 hover:bg-surface'}`}>
+                <div className="flex items-center justify-between"><p className="font-mono text-xs text-gold">{x.ref}</p><ModeBadge mode={x.mode} /></div>
+                <p className="mt-1.5 text-sm font-semibold text-text">{x.origin} → {d.flag} {d.name}</p>
+                <p className="text-xs text-text-muted">{x.description}</p>
+                <p className="mt-2 text-xs"><Pill tone={x.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[x.status]}</Pill></p>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      <div className="lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}</div>
+    </div>
+  )
+}
+
+/* ================= SHIPPER ================= */
+export function ShipperDashboard() {
+  const { user, requests, shipments, sendQuote, advanceShipment, matchShippers } = useStore()
+  const [quoting, setQuoting] = useState<string | null>(null)
+  const [form, setForm] = useState({ price: '', transit: '', notes: '' })
+  const [toast, setToast] = useState('')
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
+  const me = user?.shipperId ?? 'atlantic-bridge'
+  const leads = useMemo(() => requests.filter((r) => r.status === 'open' && matchShippers(r).some((m) => m.shipper.id === me)), [requests, matchShippers, me])
+  if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/shipper" replace />
+  if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
+  const shipper = shipperById(me)!
+  const myQuotes = requests.flatMap((r) => r.quotes.filter((q) => q.shipperId === me).map((q) => ({ q, r })))
+  const won = myQuotes.filter((x) => x.q.status === 'accepted').length
+  const myShipments = shipments.filter((s) => s.shipperId === me)
+
+  const submitQuote = (r: QuoteRequest) => {
+    const price = Number(form.price), transit = Number(form.transit)
+    if (!price || !transit) return
+    sendQuote(r.id, { shipperId: me, price, currency: 'USD', transitDays: transit, validUntil: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), notes: form.notes || `${shipper.tagline}.`, includes: [r.pickup ? 'Pickup' : 'Drop-off at warehouse', r.mode === 'air' ? 'Air freight' : 'Ocean freight', r.delivery ? 'Door delivery' : 'Port handling', ...(r.insurance ? ['All-risk insurance'] : [])] })
+    setQuoting(null); setForm({ price: '', transit: '', notes: '' }); setToast(`Quote sent to ${r.contact.name}.`)
+  }
+
+  return (
+    <Layout title={shipper.name} sub={`${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan`} cta={<Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link>}>
+      <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat icon={Inbox} label="New leads" value={leads.filter((r) => !r.quotes.some((q) => q.shipperId === me)).length} hint="Matching your lanes" />
+        <Stat icon={Send} label="Quotes sent" value={myQuotes.length} hint={`${won} won`} />
+        <Stat icon={TrendingUp} label="Win rate" value={myQuotes.length ? `${Math.round((won / myQuotes.length) * 100)}%` : '—'} hint="Last 90 days" />
+        <Stat icon={Ship} label="Active shipments" value={myShipments.filter((s) => s.status !== 'delivered').length} hint={`${shipper.onTime}% on-time`} />
+      </div>
+
+      <div className="mt-10 grid gap-8 lg:grid-cols-12">
+        <section className="lg:col-span-7" aria-labelledby="leads-h">
+          <h2 id="leads-h" className="!text-xl">Shipment requests for your lanes</h2>
+          <p className="mt-1 text-sm text-text-muted">Reply fast — customers see response time on your profile.</p>
+          <div className="mt-4 space-y-3">
+            {leads.length === 0 && <Empty title="No open leads right now" body="New requests matching your origins, destinations and cargo types will appear here and by email." />}
+            {leads.map((r) => {
+              const d = countryByCode(r.destination)!
+              const mine = r.quotes.find((q) => q.shipperId === me)
+              const competing = r.quotes.filter((q) => q.shipperId !== me).length
+              return (
+                <motion.div key={r.id} layout className="card-dark p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-text">{r.quantity} × {cargoLabel(r.cargo as CargoType)} · {r.origin} → {d.flag} {d.name}</p>
+                      <p className="mt-0.5 text-xs text-text-muted">{r.ref} · {r.mode === 'either' ? 'air or ocean' : r.mode} · ready {fmtDate(r.readyDate)} {r.weightKg ? `· ~${r.weightKg} kg` : ''}</p>
+                      <p className="mt-2 text-sm text-text-muted">{r.description || 'No description.'}</p>
+                      <ul className="mt-2 flex flex-wrap gap-1.5">{r.pickup && <li><Pill tone="muted">Pickup</Pill></li>}{r.delivery && <li><Pill tone="muted">Door delivery</Pill></li>}{r.insurance && <li><Pill tone="muted">Insurance</Pill></li>}</ul>
+                    </div>
+                    <div className="text-right text-xs text-text-muted"><p>{competing} competing quote{competing === 1 ? '' : 's'}</p>{mine ? <Pill tone="teal">Quoted {money(mine.price)}</Pill> : <button onClick={() => setQuoting(quoting === r.id ? null : r.id)} className="btn-gold mt-2 !min-h-10 !px-4 text-sm" aria-expanded={quoting === r.id}>Send quote</button>}</div>
+                  </div>
+                  <AnimatePresence initial={false}>
+                    {quoting === r.id && (
+                      <motion.form initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }} onSubmit={(e) => { e.preventDefault(); submitQuote(r) }} className="overflow-hidden">
+                        <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
+                          <div><label htmlFor={`p-${r.id}`} className="label-dark">Total price (USD)</label><input id={`p-${r.id}`} type="number" min={1} required className="input-dark" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
+                          <div><label htmlFor={`t-${r.id}`} className="label-dark">Transit (days)</label><input id={`t-${r.id}`} type="number" min={1} required className="input-dark" value={form.transit} onChange={(e) => setForm({ ...form, transit: e.target.value })} /></div>
+                          <div className="sm:col-span-2"><label htmlFor={`n-${r.id}`} className="label-dark">Notes to customer</label><textarea id={`n-${r.id}`} rows={2} className="input-dark py-2" placeholder="Sailing date, what’s included, duty handling…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+                        </div>
+                        <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={() => setQuoting(null)} className="btn-ghost !min-h-10 !px-4 text-sm"><X size={15} aria-hidden="true" /> Cancel</button><button className="btn-gold !min-h-10 !px-4 text-sm"><Send size={15} aria-hidden="true" /> Send quote</button></div>
+                      </motion.form>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className="lg:col-span-5" aria-labelledby="ship-h">
+          <h2 id="ship-h" className="!text-xl">Your shipments</h2>
+          <p className="mt-1 text-sm text-text-muted">Update status to keep customers’ tracking pages current.</p>
+          <ul className="mt-4 space-y-3">
+            {myShipments.length === 0 && <li><Empty title="No shipments yet" body="Accepted quotes become shipments you can update here." /></li>}
+            {myShipments.map((s) => {
+              const d = countryByCode(s.destination)!
+              return (
+                <li key={s.id} className="card-dark p-4">
+                  <div className="flex items-center justify-between"><p className="font-mono text-xs text-gold">{s.ref}</p><ModeBadge mode={s.mode} /></div>
+                  <p className="mt-1 text-sm font-semibold text-text">{s.origin} → {d.flag} {d.name}</p>
+                  <p className="text-xs text-text-muted">{s.description} · {s.customer}</p>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill>
+                    {s.status !== 'delivered' && <button onClick={() => { advanceShipment(s.id); setToast(`${s.ref} updated.`) }} className="btn-ghost !min-h-9 !px-3 text-xs">Mark next step <ChevronRight size={14} aria-hidden="true" /></button>}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      </div>
+    </Layout>
+  )
+}

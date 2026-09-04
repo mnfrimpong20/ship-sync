@@ -13,6 +13,12 @@ import Admin from './pages/Admin'
 import Clients from './pages/Clients'
 import ClientDetailPage from './pages/ClientDetail'
 import InvoiceView from './pages/InvoiceView'
+import Team from './pages/Team'
+import Fleet from './pages/Fleet'
+import RunsList from './pages/Routes'
+import RoutePlanner from './pages/RoutePlanner'
+import MyRuns from './pages/MyRuns'
+import Join from './pages/Join'
 import { Login, Signup } from './pages/Auth'
 import { CustomerDashboard, ShipperDashboard } from './pages/Dashboard'
 import { StoreProvider } from './lib/store'
@@ -62,6 +68,7 @@ export default function App() {
               <Route path="/live" element={<Live />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/join" element={<Join />} />
               <Route path="*" element={<Home />} />
             </Route>
             {/* The signed-in application lives in its own shell, apart from the marketing site. */}
@@ -71,6 +78,11 @@ export default function App() {
               <Route path="/dashboard/clients" element={<Clients />} />
               <Route path="/dashboard/clients/:id" element={<ClientDetailPage />} />
               <Route path="/dashboard/invoices/:id" element={<InvoiceView />} />
+              <Route path="/dashboard/team" element={<Team />} />
+              <Route path="/dashboard/fleet" element={<Fleet />} />
+              <Route path="/dashboard/routes" element={<RunsList />} />
+              <Route path="/dashboard/routes/:id" element={<RoutePlanner />} />
+              <Route path="/dashboard/runs" element={<MyRuns />} />
               <Route path="/admin" element={<Admin />} />
             </Route>
           </Routes>

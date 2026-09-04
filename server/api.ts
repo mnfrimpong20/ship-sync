@@ -7,9 +7,10 @@ import { statusLabels, statusOrder, type CargoType, type ShipmentStatus } from '
 import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } from '../src/lib/geo'
 import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion, type Position } from './live'
 import { attachShipmentToClient, logShipmentActivity, mountClients } from './clients'
+import { mountOps } from './ops'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
-export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean }
+export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'driver' }
 type Row = Record<string, any>
 
 const SESSION_COOKIE = 'ss_session'
@@ -86,7 +87,7 @@ export async function resolvePosition(r: Row, events: Row[]) {
       : phase === 'pre' ? 'Not yet departed.' : 'Arrived at destination.',
   }
 }
-const userOut = (r: Row, company?: string): ApiUser => ({ id: r.id, name: r.name, email: r.email, role: r.role, shipperId: r.shipper_id ?? undefined, company, admin: !!r.is_admin })
+const userOut = (r: Row, company?: string): ApiUser => ({ id: r.id, name: r.name, email: r.email, role: r.role, shipperId: r.shipper_id ?? undefined, company, admin: !!r.is_admin, staffRole: r.shipper_id ? (r.staff_role ?? 'owner') : undefined })
 
 class HttpError extends Error {
   status: number
@@ -99,7 +100,7 @@ async function currentUser(db: Db, req: Request): Promise<ApiUser | null> {
   const sid = req.cookies?.[SESSION_COOKIE]
   if (!sid) return null
   const { rows } = await db.query<Row>(
-    `select u.*, s.name as company from sessions se join users u on u.id = se.user_id left join shippers s on s.id = u.shipper_id where se.id = $1 and se.expires_at > now()`, [sid],
+    `select u.*, s.name as company, st.role as staff_role from sessions se join users u on u.id = se.user_id left join shippers s on s.id = u.shipper_id left join staff st on st.user_id = u.id and st.shipper_id = u.shipper_id where se.id = $1 and se.expires_at > now()`, [sid],
   )
   return rows[0] ? userOut(rows[0], rows[0].company ?? undefined) : null
 }
@@ -115,7 +116,7 @@ const requireAdmin = async (db: Db, req: Request) => { const u = await requireUs
 const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'SS'
 
 async function loadUserWithCompany(db: Db, id: string) {
-  const { rows } = await db.query<Row>('select u.*, s.name as company from users u left join shippers s on s.id = u.shipper_id where u.id = $1', [id])
+  const { rows } = await db.query<Row>('select u.*, s.name as company, st.role as staff_role from users u left join shippers s on s.id = u.shipper_id left join staff st on st.user_id = u.id and st.shipper_id = u.shipper_id where u.id = $1', [id])
   return userOut(rows[0], rows[0].company ?? undefined)
 }
 
@@ -410,6 +411,7 @@ export function apiRouter() {
     res.json({ position: await resolvePosition(rows[0], events) })
   }))
   mountClients(r, { getDb, requireUser, HttpError, wrap, loadShipments })
+  mountOps(r, { getDb, requireUser, createSession, loadUserWithCompany, HttpError, wrap, loadShipments })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

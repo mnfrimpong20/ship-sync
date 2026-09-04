@@ -29,6 +29,7 @@ export async function getDb(): Promise<Db> {
   await seed(db)
   await ensureAdmins(db)
   await seedClientDemo(db)
+  await seedOpsDemo(db)
   return db
 }
 
@@ -215,6 +216,79 @@ create table if not exists payments (
   at date not null default current_date,
   note text not null default ''
 );
+create table if not exists staff (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  user_id text references users(id),
+  name text not null,
+  email text not null,
+  phone text not null default '',
+  role text not null default 'agent',
+  status text not null default 'invited',
+  base text not null default 'origin',
+  city text not null default '',
+  invite_token text,
+  created_at timestamptz not null default now(),
+  unique (shipper_id, email)
+);
+create table if not exists vehicles (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  name text not null,
+  type text not null default 'van',
+  plate text not null default '',
+  capacity_kg int,
+  capacity_note text not null default '',
+  base text not null default 'origin',
+  city text not null default '',
+  country text not null default '',
+  status text not null default 'available',
+  driver_id text references staff(id) on delete set null,
+  notes text not null default '',
+  created_at timestamptz not null default now()
+);
+create table if not exists runs (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  name text not null,
+  kind text not null default 'delivery',
+  run_date date not null,
+  driver_id text references staff(id) on delete set null,
+  vehicle_id text references vehicles(id) on delete set null,
+  start_label text not null default '',
+  start_lat double precision,
+  start_lon double precision,
+  status text not null default 'planned',
+  distance_km real,
+  notes text not null default '',
+  created_at timestamptz not null default now()
+);
+create table if not exists run_stops (
+  id text primary key,
+  run_id text not null references runs(id) on delete cascade,
+  seq int not null default 0,
+  shipment_id text references shipments(id) on delete set null,
+  label text not null,
+  address text not null default '',
+  lat double precision,
+  lon double precision,
+  contact text not null default '',
+  phone text not null default '',
+  status text not null default 'pending',
+  done_at timestamptz,
+  note text not null default ''
+);
+create table if not exists geocache (
+  q text primary key,
+  lat double precision,
+  lon double precision,
+  label text,
+  at timestamptz not null default now()
+);
+create index if not exists idx_staff_shipper on staff(shipper_id);
+create index if not exists idx_staff_user on staff(user_id);
+create index if not exists idx_runs_shipper on runs(shipper_id);
+create index if not exists idx_stops_run on run_stops(run_id);
 alter table shipments add column if not exists client_id text references clients(id);
 alter table shipments add column if not exists consignee_id text;
 create index if not exists idx_clients_shipper on clients(shipper_id);
@@ -314,4 +388,34 @@ async function seedClientDemo(d: Db) {
   for (const [id, type, body, days, due] of acts) await d.query(`insert into client_activities (id,client_id,shipper_id,type,body,at,due_at) values ($1,$2,'gold-coast-freight',$3,$4,$5,$6)`, [id, cid, type, body, new Date(now + days * 86400000), due == null ? null : new Date(now + due * 86400000)])
   await d.query(`insert into invoices (id,shipper_id,client_id,number,status,items,subtotal,tax,total,issued_at,due_at,notes) values ('inv_demo_1','gold-coast-freight',$1,'INV-2026-0001','sent','[{"description":"RoRo ocean freight, Houston → Tema (2017 Honda Accord)","qty":1,"unit":1450},{"description":"Port handling & documentation, Tema","qty":1,"unit":220}]',1670,0,1670,$2,$3,'Duty and destination charges payable by consignee at Tema.')`, [cid, dateOnly(addDays(-12)), dateOnly(addDays(18))])
   await d.query(`insert into payments (id,invoice_id,amount,method,at,note) values ('pay_demo_1','inv_demo_1',800,'bank',$1,'Deposit')`, [dateOnly(addDays(-9))])
+}
+
+/** Every shipper user is the owner of their company's staff list; plus a small demo team + fleet for Gold Coast. Idempotent. */
+async function seedOpsDemo(d: Db) {
+  const { rows: owners } = await d.query<{ id: string; name: string; email: string; shipper_id: string }>(`select u.id, u.name, u.email, u.shipper_id from users u where u.role = 'shipper' and u.shipper_id is not null and not exists (select 1 from staff s where s.user_id = u.id)`)
+  for (const u of owners) await d.query(`insert into staff (id,shipper_id,user_id,name,email,role,status,base) values ($1,$2,$3,$4,$5,'owner','active','origin') on conflict (shipper_id, email) do nothing`, ['st_' + uid(), u.shipper_id, u.id, u.name, u.email])
+  const { rows } = await d.query<{ n: string }>(`select count(*)::text as n from vehicles where shipper_id = 'gold-coast-freight'`)
+  if (Number(rows[0].n) > 0) return
+  // Demo drivers get real logins (password `shipsync`) so the driver view can be tried.
+  const hash = await bcrypt.hash(DEMO_PASSWORD, 10)
+  await d.query(`insert into users (id,email,name,password_hash,role,shipper_id) values ('u_demo_kwesi','kwesi@goldcoast.demo','Kwesi Appiah',$1,'shipper','gold-coast-freight'), ('u_demo_efua','efua@goldcoast.demo','Efua Danso',$1,'shipper','gold-coast-freight') on conflict (email) do nothing`, [hash])
+  await d.query(`insert into staff (id,shipper_id,user_id,name,email,phone,role,status,base,city) values
+    ('st_demo_kwesi','gold-coast-freight','u_demo_kwesi','Kwesi Appiah','kwesi@goldcoast.demo','+1 713 555 0142','driver','active','origin','Houston, TX'),
+    ('st_demo_efua','gold-coast-freight','u_demo_efua','Efua Danso','efua@goldcoast.demo','+233 24 555 0133','driver','active','destination','Accra'),
+    ('st_demo_yaa','gold-coast-freight',null,'Yaa Boakye','yaa@goldcoast.demo','+1 713 555 0161','dispatcher','invited','origin','Houston, TX')
+    on conflict (shipper_id, email) do nothing`)
+  // Two Gold Coast shipments that are ready for a pickup run and a delivery run.
+  await d.query(`insert into shipments (id,ref,shipper_id,user_id,client_id,consignee_id,mode,origin,destination,cargo,description,status,eta,customer) values
+    ('s_demo_pick','SS-7HQ2ZN','gold-coast-freight',null,'cl_demo_kofi','cs_demo_1','ocean','Katy, TX','GH','pallets','2 pallets of brake parts and filters — collect from dealer in Katy','booked',$1,'Kofi Mensah'),
+    ('s_demo_deliv','SS-3PWK8E','gold-coast-freight',null,'cl_demo_kofi','cs_demo_1','ocean','Houston, TX','GH','barrels','3 barrels — household goods for Yaw','arrived',$2,'Kofi Mensah')
+    on conflict (id) do nothing`, [dateOnly(addDays(38)), dateOnly(addDays(1))])
+  await d.query(`insert into shipment_events (shipment_id,status,at,place,note) values
+    ('s_demo_pick','booked',$1,'Katy, TX','Booking confirmed. Pickup to be scheduled.'),
+    ('s_demo_deliv','booked',$2,'Houston, TX','Booking confirmed.'), ('s_demo_deliv','picked_up',$3,'Houston, TX','Collected.'), ('s_demo_deliv','at_origin_port',$4,'Port of Houston','Consolidated.'), ('s_demo_deliv','in_transit',$5,'Atlantic Ocean','Sailed on Grande Africa.'), ('s_demo_deliv','arrived',$6,'Tema','Discharged at Tema; cleared customs.')`,
+    [addDays(-2), addDays(-40), addDays(-37), addDays(-33), addDays(-30), addDays(-1)])
+  await d.query(`update staff set invite_token = $1 where id = 'st_demo_yaa' and invite_token is null`, ['demo-invite-' + uid()])
+  await d.query(`insert into vehicles (id,shipper_id,name,type,plate,capacity_kg,base,city,country,status,driver_id,notes) values
+    ('vh_demo_1','gold-coast-freight','Box truck 1','box_truck','TX 4KR-882',3500,'origin','Houston, TX','US','available','st_demo_kwesi','26ft box truck with liftgate — barrels and pallets.'),
+    ('vh_demo_2','gold-coast-freight','Accra van','van','GR 4521-22',1200,'destination','Accra','GH','available','st_demo_efua','Sprinter van for Accra & Tema deliveries.'),
+    ('vh_demo_3','gold-coast-freight','Kumasi pickup','pickup','AS 1188-21',900,'destination','Kumasi','GH','maintenance',null,'Brake service due.')`)
 }

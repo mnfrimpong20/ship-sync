@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { setupMapLibre } from '../lib/mapSetup'
 import { motion } from 'motion/react'
 import type { FeatureCollection, Point } from 'geojson'
-import { Anchor, ArrowRight, Plane, Radio, Ship, TriangleAlert } from 'lucide-react'
+import { Anchor, ArrowRight, Compass, Flag, MapPin, Navigation, Plane, Radio, Ship, TriangleAlert, X } from 'lucide-react'
 import { MAP_STYLE, brandBasemap, type LivePos } from '../components/LiveMap'
 import { countries } from '../lib/data'
 import { greatCircle, originCoords, destGeo, type LngLat } from '../lib/geo'
 import { fadeUp, stagger } from '../lib/motion'
 import { Pill } from '../components/ui'
+import { compass, flagFromMmsi, formatEta, navStatusLabel, shipTypeLabel } from '../lib/ais'
 
 interface RegionPayload {
   vessels: (LivePos & { id: string; kind: 'vessel' })[]
@@ -18,6 +19,13 @@ interface RegionPayload {
   congestion: Record<string, { total: number; anchored: number }>
   ais: { status: 'off' | 'connecting' | 'live' | 'error'; enabled: boolean; lastMessageAt: string | null; coastVessels?: number; error?: string }
   ports: Record<string, { name: string; at: LngLat; airport: { name: string; at: LngLat } }>
+}
+
+interface VesselDetail extends LivePos {
+  id: string; callSign?: string; imo?: string; type?: number; destination?: string
+  eta?: { month: number; day: number; hour: number; minute: number }
+  length?: number; beam?: number; draught?: number; navStatus?: number
+  firstSeen: { lat: number; lon: number; at: string } | null; watched: boolean
 }
 
 /** The lanes Ship Sync's shippers actually run — drawn as great-circle arcs into the Gulf of Guinea. */
@@ -32,6 +40,24 @@ export default function Live() {
   const [data, setData] = useState<RegionPayload | null>(null)
   const [error, setError] = useState('')
   const [updated, setUpdated] = useState<Date | null>(null)
+  const [params, setParams] = useSearchParams()
+  const [selected, setSelectedState] = useState<string | null>(() => { const v = params.get('vessel'); return v && /^\d{9}$/.test(v) ? v : null })
+  /** Selection lives in the URL too (?vessel=MMSI) so a ship can be shared or refreshed. */
+  const setSelected = (id: string | null) => { setSelectedState(id); setParams((prev) => { const n = new URLSearchParams(prev); if (id) n.set('vessel', id); else n.delete('vessel'); return n }, { replace: true }) }
+  const [vessel, setVessel] = useState<VesselDetail | null>(null)
+  const [vesselErr, setVesselErr] = useState('')
+  const selectedRef = useRef<string | null>(null)
+  selectedRef.current = selected
+
+  // Detail for the clicked ship; re-fetched with each 30s refresh so speed/position stay current.
+  useEffect(() => {
+    if (!selected) { setVessel(null); setVesselErr(''); return }
+    let live = true
+    fetch(`/api/live/vessel/${selected}`).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || 'Unavailable'); return j.vessel as VesselDetail })
+      .then((v) => { if (live) { setVessel(v); setVesselErr('') } })
+      .catch((e: Error) => { if (live) setVesselErr(e.message) })
+    return () => { live = false }
+  }, [selected, data])
 
   useEffect(() => {
     let live = true
@@ -59,6 +85,9 @@ export default function Live() {
       m.addLayer({ id: 'ports', type: 'circle', source: 'ports', paint: { 'circle-radius': 4.5, 'circle-color': '#E3B54A', 'circle-stroke-color': '#0B1220', 'circle-stroke-width': 1.5 } })
       m.addSource('vessels', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       m.addLayer({ id: 'vessels', type: 'circle', source: 'vessels', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1.5, 1.4, 4, 2.5, 7, 5], 'circle-color': ['case', ['<', ['get', 'speed'], 1], '#A3AEC2', '#2DD4BF'], 'circle-opacity': 0.9, 'circle-stroke-color': '#0B1220', 'circle-stroke-width': 0.5 } })
+      m.addSource('selected', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      m.addLayer({ id: 'selected-halo', type: 'circle', source: 'selected', paint: { 'circle-radius': 14, 'circle-color': '#E3B54A', 'circle-opacity': 0.25 } })
+      m.addLayer({ id: 'selected', type: 'circle', source: 'selected', paint: { 'circle-radius': 6, 'circle-color': '#E3B54A', 'circle-stroke-color': '#0B1220', 'circle-stroke-width': 1.5 } })
       m.addSource('flights', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       m.addLayer({ id: 'flights', type: 'circle', source: 'flights', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 3, 7, 6], 'circle-color': '#7DD3FC', 'circle-opacity': 0.95, 'circle-stroke-color': '#0B1220', 'circle-stroke-width': 0.8 } })
       const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 })
@@ -72,6 +101,14 @@ export default function Live() {
         })
         m.on('mouseleave', layer, () => { m.getCanvas().style.cursor = ''; popup.remove() })
       }
+      m.on('click', 'vessels', (e) => {
+        const f = e.features?.[0]; if (!f) return
+        const id = String((f.properties as { id: string }).id)
+        setSelected(id)
+        const c = (f.geometry as Point).coordinates as LngLat
+        ;(m.getSource('selected') as maplibregl.GeoJSONSource).setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } }] })
+        if (m.getZoom() < 5) m.easeTo({ center: c, zoom: 6, duration: 900 })
+      })
       m.on('click', 'ports', (e) => { const f = e.features?.[0]; if (f) m.easeTo({ center: (f.geometry as Point).coordinates as LngLat, zoom: 8, duration: 900 }) })
     })
     // Port labels as DOM markers (independent of the basemap's glyph set).
@@ -80,6 +117,7 @@ export default function Live() {
       new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, 8] }).setLngLat(g.port.at).addTo(m)
     }
     map.current = m
+    if (import.meta.env.DEV) (window as unknown as { __ssmap?: maplibregl.Map }).__ssmap = m // for local smoke tests
     return () => { m.remove(); map.current = null }
   }, [])
 
@@ -87,9 +125,11 @@ export default function Live() {
   useEffect(() => {
     const m = map.current; if (!m || !data) return
     const apply = () => {
-      const toFc = (pts: LivePos[]): FeatureCollection => ({ type: 'FeatureCollection', features: pts.map((p) => ({ type: 'Feature', properties: { name: p.name ?? '', speed: p.speed ?? 0, altitude: p.altitude, at: p.at }, geometry: { type: 'Point', coordinates: [p.lon, p.lat] } })) })
+      const toFc = (pts: LivePos[]): FeatureCollection => ({ type: 'FeatureCollection', features: pts.map((p) => ({ type: 'Feature', properties: { id: (p as { id?: string }).id ?? '', name: p.name ?? '', speed: p.speed ?? 0, altitude: p.altitude, at: p.at }, geometry: { type: 'Point', coordinates: [p.lon, p.lat] } })) })
       ;(m.getSource('vessels') as maplibregl.GeoJSONSource | undefined)?.setData(toFc(data.vessels))
       ;(m.getSource('flights') as maplibregl.GeoJSONSource | undefined)?.setData(toFc(data.flights))
+      const sel = selectedRef.current && data.vessels.find((v) => v.id === selectedRef.current)
+      ;(m.getSource('selected') as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: sel ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [sel.lon, sel.lat] } }] : [] })
     }
     if (m.getSource('vessels')) apply(); else m.once('style.load', () => setTimeout(apply, 0))
   }, [data])
@@ -122,6 +162,10 @@ export default function Live() {
             <p className="mt-2 flex items-start gap-2 text-xs text-text-muted"><TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden="true" /> Positions come from public, delayed feeds (AISStream, adsb.lol). Terrestrial AIS only covers the coast, so ships mid-ocean are not shown. Not for navigation or safety decisions. Basemap © CARTO, © OpenStreetMap contributors.</p>
           </div>
           <aside className="lg:col-span-3">
+            {selected && (
+              <VesselCard mmsi={selected} v={vessel} err={vesselErr} onClose={() => { setSelected(null); (map.current?.getSource('selected') as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] }) }} />
+            )}
+            {!selected && data && data.vessels.length > 0 && <p className="mb-4 text-xs text-text-muted"><MapPin size={12} className="mr-1 inline" aria-hidden="true" />Click any ship for its details, reported destination and ETA.</p>}
             <div className="card-dark p-5">
               <h2 className="!text-lg">Port approaches</h2>
               <p className="mt-1 text-xs text-text-muted">Vessels within each port's approach box; grey ones are stopped (under 1 knot) — usually waiting at anchor.</p>
@@ -153,5 +197,66 @@ export default function Live() {
         </div>
       </div>
     </div>
+  )
+}
+
+function Row({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null
+  return <div className="flex justify-between gap-3 py-1.5 text-sm"><dt className="shrink-0 text-text-muted">{label}</dt><dd className="text-right text-text">{value}</dd></div>
+}
+
+function ago(iso: string) {
+  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  return min < 1 ? 'just now' : min < 60 ? `${min} min ago` : min < 60 * 48 ? `${Math.round(min / 60)} h ago` : `${Math.round(min / 1440)} d ago`
+}
+
+/** Everything AIS tells us about one ship. AIS carries the *next* destination and ETA but never the port of origin, so
+ *  "first seen" (where our feed first heard it) is the closest honest stand-in. */
+function VesselCard({ mmsi, v, err, onClose }: { mmsi: string; v: VesselDetail | null; err: string; onClose: () => void }) {
+  const flag = flagFromMmsi(mmsi)
+  const type = shipTypeLabel(v?.type)
+  const status = navStatusLabel(v?.navStatus)
+  const moving = (v?.speed ?? 0) >= 1
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-dark mb-4 p-5" aria-live="polite">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="eyebrow !text-[10px]">Vessel</p>
+          <h2 className="!text-lg leading-tight">{v?.name || 'Unnamed vessel'}</h2>
+          <p className="mt-1 text-xs text-text-muted">{[flag, type].filter(Boolean).join(' · ') || 'Awaiting static data'}</p>
+        </div>
+        <button type="button" onClick={onClose} className="focus-ring -mr-2 -mt-2 rounded-md p-2 text-text-muted hover:text-text" aria-label="Close vessel details"><X size={16} aria-hidden="true" /></button>
+      </div>
+      {err && <p className="mt-3 text-xs text-danger">{err}</p>}
+      {v && (
+        <>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <Pill tone={moving ? 'teal' : 'muted'}><Navigation size={11} className="mr-1" aria-hidden="true" />{status ?? (moving ? 'Under way' : 'Stopped')}</Pill>
+            {v.watched && <Pill tone="gold"><Ship size={11} className="mr-1" aria-hidden="true" />Carrying a Ship Sync shipment</Pill>}
+          </div>
+          <dl className="mt-3 divide-y divide-border">
+            <Row label="Reported destination" value={v.destination} />
+            <Row label="Reported ETA" value={formatEta(v.eta)} />
+            <Row label="Speed" value={v.speed != null ? `${v.speed.toFixed(1)} kn` : undefined} />
+            <Row label="Course" value={v.course != null ? `${Math.round(v.course)}° ${compass(v.course) ?? ''}` : undefined} />
+            <Row label="Heading" value={v.heading != null ? `${Math.round(v.heading)}°` : undefined} />
+            <Row label="Position" value={`${Math.abs(v.lat).toFixed(3)}° ${v.lat >= 0 ? 'N' : 'S'}, ${Math.abs(v.lon).toFixed(3)}° ${v.lon >= 0 ? 'E' : 'W'}`} />
+            <Row label="Size" value={v.length ? `${v.length} m × ${v.beam ?? '?'} m` : undefined} />
+            <Row label="Draught" value={v.draught ? `${v.draught} m` : undefined} />
+            <Row label="MMSI" value={v.id} />
+            <Row label="IMO" value={v.imo && v.imo !== '0' ? v.imo : undefined} />
+            <Row label="Call sign" value={v.callSign} />
+            <Row label="Last signal" value={ago(v.at)} />
+          </dl>
+          <p className="mt-3 flex items-start gap-2 text-xs text-text-muted"><Compass size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+            {v.firstSeen
+              ? <span>Origin isn't broadcast by AIS — ships only report their next port. Our feed first heard this ship {ago(v.firstSeen.at)} at {Math.abs(v.firstSeen.lat).toFixed(2)}° {v.firstSeen.lat >= 0 ? 'N' : 'S'}, {Math.abs(v.firstSeen.lon).toFixed(2)}° {v.firstSeen.lon >= 0 ? 'E' : 'W'}.</span>
+              : <span>Origin isn't broadcast by AIS — ships only report their next port.</span>}
+          </p>
+          {!v.destination && <p className="mt-2 flex items-start gap-2 text-xs text-text-muted"><Flag size={14} className="mt-0.5 shrink-0" aria-hidden="true" />Destination, ETA and dimensions arrive with the ship's static broadcast (every 6 minutes) — check back shortly.</p>}
+        </>
+      )}
+      {!v && !err && <p className="mt-3 text-xs text-text-muted">Loading…</p>}
+    </motion.div>
   )
 }

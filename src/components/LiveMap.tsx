@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { setupMapLibre } from '../lib/mapSetup'
 import type { LngLat } from '../lib/geo'
 import type { FeatureCollection } from 'geojson'
 
@@ -66,6 +67,7 @@ export default function LiveMap({ data, className = '' }: { data: PositionPayloa
 
   useEffect(() => {
     if (!box.current || map.current) return
+    setupMapLibre()
     const m = new maplibregl.Map({ container: box.current, style: MAP_STYLE, center: [-20, 20], zoom: 1.5, attributionControl: { compact: true }, cooperativeGestures: true })
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     map.current = m

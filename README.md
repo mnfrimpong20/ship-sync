@@ -13,6 +13,8 @@ npm start        # production: Express serves dist/ + /api
 
 Copy `.env.example` to `.env` (or set Replit secrets). On Replit, add a PostgreSQL database and `DATABASE_URL` is injected automatically.
 
+**Live tracking.** Ocean shipments with an MMSI are tracked via [AISStream](https://aisstream.io) (set `AISSTREAM_API_KEY`); air shipments with an ICAO callsign via [adsb.lol](https://api.adsb.lol) (no key). Shippers enter these from their dashboard. Without a signal the tracking page shows an estimated position along the great-circle route from departure and ETA. `GET /api/track/:ref/position` and `GET /api/live/region` (vessels + flights near the West African coast, and per-port congestion counts) are public and clearly labelled as delayed, approximate and not for navigation.
+
 **Demo accounts** (seeded on first run, password `shipsync`): customer `demo@shipsync.demo`, shippers `ops@atlanticbridge.demo` and `ops@goldcoast.demo`. The eight seeded shippers are fictional; with `DEMO_AUTO_QUOTES=true` (default) they auto-reply to new requests so the flow can be tried end to end. Set it to `false` once real shippers are on board.
 
 **API** (all JSON, under `/api`): `auth/signup`, `auth/login`, `auth/logout`, `auth/me` · `shippers`, `shippers/:id`, `match` · `requests` (GET own / POST new; guests pass a `password` to create an account) · `requests/:id/quotes` (shipper) · `quotes/:id/accept` (customer) · `shipments`, `shipments/:id/advance` (shipper) · `track/:ref` (public).

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { setupMapLibre } from '../lib/mapSetup'
 import { motion } from 'motion/react'
 import type { FeatureCollection, Point } from 'geojson'
 import { Anchor, ArrowRight, Plane, Radio, Ship, TriangleAlert } from 'lucide-react'
@@ -42,6 +43,7 @@ export default function Live() {
   // Map init: globe projection, framed on the Atlantic lanes.
   useEffect(() => {
     if (!box.current || map.current) return
+    setupMapLibre()
     const m = new maplibregl.Map({ container: box.current, style: MAP_STYLE, center: [-15, 18], zoom: 2.1, attributionControl: { compact: true }, cooperativeGestures: true })
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     m.on('style.load', () => {

@@ -7,6 +7,7 @@ import Home from './pages/Home'
 import Quote from './pages/Quote'
 import { ShipperDirectory, ShipperProfile } from './pages/Shippers'
 import Track from './pages/Track'
+import Live from './pages/Live'
 import { Login, Signup } from './pages/Auth'
 import { CustomerDashboard, ShipperDashboard } from './pages/Dashboard'
 import { StoreProvider } from './lib/store'
@@ -36,6 +37,7 @@ function Shell() {
               <Route path="/shippers" element={<ShipperDirectory />} />
               <Route path="/shippers/:id" element={<ShipperProfile />} />
               <Route path="/track" element={<Track />} />
+              <Route path="/live" element={<Live />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/dashboard" element={<CustomerDashboard />} />

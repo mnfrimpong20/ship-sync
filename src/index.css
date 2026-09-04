@@ -71,3 +71,7 @@ h3 { font-size: 1.375rem; line-height: 1.25; font-weight: 600; }
 .ss-pulse { width: 18px; height: 18px; border-radius: 999px; background: rgba(227,181,74,0.35); animation: ss-pulse 2s ease-out infinite; pointer-events: none; }
 @keyframes ss-pulse { 0% { transform: scale(0.6); opacity: 0.9 } 100% { transform: scale(3); opacity: 0 } }
 @media (prefers-reduced-motion: reduce) { .ss-pulse { animation: none } }
+
+.ss-portlabel { font: 600 11px/1 Inter, system-ui, sans-serif; color: #F4F6FA; text-shadow: 0 1px 3px rgba(0,0,0,.9); pointer-events: none; white-space: nowrap; }
+
+.ss-tag { font: 600 11px/1 Inter, system-ui, sans-serif; color: #F4F6FA; background: rgba(11,18,32,0.85); border: 1px solid; border-radius: 999px; padding: 5px 9px; white-space: nowrap; pointer-events: none; }

@@ -138,7 +138,7 @@ export default function AppShell() {
             </div>
           </div>
         </header>
-        <main id="main" className="flex-1">
+        <main id="main" className="ss-app flex-1">
           <AnimatePresence mode="wait">
             <motion.div key={loc.pathname} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
               <Outlet />

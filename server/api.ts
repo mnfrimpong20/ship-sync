@@ -9,6 +9,7 @@ import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion,
 import { attachShipmentToClient, logShipmentActivity, mountClients } from './clients'
 import { mountOps } from './ops'
 import { mountDirectory } from './directory'
+import { mountInsights } from './insights'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'driver' }
@@ -414,6 +415,7 @@ export function apiRouter() {
   }))
   mountClients(r, { getDb, requireUser, HttpError, wrap, loadShipments })
   mountOps(r, { getDb, requireUser, createSession, loadUserWithCompany, HttpError, wrap, loadShipments })
+  mountInsights(r, { getDb, requireUser, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

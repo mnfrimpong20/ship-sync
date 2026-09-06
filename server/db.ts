@@ -32,6 +32,7 @@ export async function getDb(): Promise<Db> {
   await seedClientDemo(db)
   await seedOpsDemo(db)
   await seedDirectoryDemo(db)
+  await seedHistoryDemo(db)
   return db
 }
 
@@ -433,5 +434,49 @@ async function seedDirectoryDemo(d: Db) {
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,true,case when $12 then now() else null end)`,
       [s.id, s.name, s.tagline, s.hq, s.founded, JSON.stringify(s.modes), JSON.stringify(s.destinations), JSON.stringify(s.origins), JSON.stringify(s.cargo), s.rating, s.reviews, s.verified, s.responseHours, s.onTime, JSON.stringify(s.services), s.about, s.priceIndex, s.plan, s.initials, s.hue],
     )
+  }
+}
+
+/** Ten weeks of history for the Gold Coast demo so the overview has trends: requests, quotes (won/lost), delivered shipments and paid invoices. Idempotent. */
+async function seedHistoryDemo(d: Db) {
+  const { rows } = await d.query<{ n: string }>(`select count(*)::text as n from requests where id like 'rh_%'`)
+  if (Number(rows[0].n) > 0) return
+  const sid = 'gold-coast-freight'
+  const cid = 'cl_demo_kofi'
+  const hist: { i: number; days: number; origin: string; cargo: string; desc: string; price: number; won: boolean; delivered?: boolean; invoice?: number; paidDays?: number; name: string; email: string }[] = [
+    { i: 1, days: -68, origin: 'Houston, TX', cargo: 'vehicle', desc: '2016 Honda Pilot, RoRo to Tema', price: 1650, won: true, delivered: true, invoice: 1650, paidDays: 40, name: 'Yaw Darko', email: 'yaw.d@example.com' },
+    { i: 2, days: -61, origin: 'Atlanta, GA', cargo: 'barrels', desc: '6 barrels — provisions and clothing for Kumasi', price: 720, won: true, delivered: true, invoice: 720, paidDays: 30, name: 'Adjoa Frimpong', email: 'adjoa.f@example.com' },
+    { i: 3, days: -55, origin: 'Chicago, IL', cargo: 'boxes', desc: '12 boxes of school supplies', price: 480, won: false, name: 'Michael Owusu', email: 'm.owusu@example.com' },
+    { i: 4, days: -47, origin: 'Houston, TX', cargo: 'container20', desc: '20ft container — restaurant equipment', price: 3900, won: true, delivered: true, invoice: 4120, paidDays: 22, name: 'Akosua Grill Ltd', email: 'ops@akosuagrill.example.com' },
+    { i: 5, days: -40, origin: 'Atlanta, GA', cargo: 'vehicle', desc: '2019 Hyundai Elantra', price: 1500, won: false, name: 'Kwabena Osei', email: 'k.osei@example.com' },
+    { i: 6, days: -33, origin: 'Houston, TX', cargo: 'pallets', desc: '3 pallets of solar panels', price: 1280, won: true, delivered: true, invoice: 1280, paidDays: 12, name: 'SunRise Energy GH', email: 'imports@sunrise.example.com' },
+    { i: 7, days: -26, origin: 'Chicago, IL', cargo: 'barrels', desc: '4 barrels for Sunyani', price: 560, won: true, delivered: false, invoice: 560, name: 'Efua Mensah', email: 'efua.m@example.com' },
+    { i: 8, days: -19, origin: 'Houston, TX', cargo: 'vehicle', desc: '2020 Toyota Camry', price: 1550, won: false, name: 'Daniel Boateng', email: 'd.boateng@example.com' },
+    { i: 9, days: -12, origin: 'Houston, TX', cargo: 'boxes', desc: '9 boxes — medical consumables for a clinic in Cape Coast', price: 690, won: true, delivered: false, invoice: 690, name: 'Cape Coast Clinic', email: 'admin@ccclinic.example.com' },
+    { i: 10, days: -5, origin: 'Atlanta, GA', cargo: 'container40', desc: '40ft container — building materials', price: 6200, won: false, name: 'Nana Adjei Homes', email: 'build@adjeihomes.example.com' },
+  ]
+  const hash = await bcrypt.hash(DEMO_PASSWORD, 10)
+  for (const h of hist) {
+    const uid_ = `u_hist_${h.i}`; const rid = `rh_${h.i}`; const qid = `qh_${h.i}`
+    await d.query('insert into users (id,email,name,password_hash,role,shipper_id) values ($1,$2,$3,$4,$5,null) on conflict (email) do nothing', [uid_, h.email, h.name, hash, 'customer'])
+    const created = addDays(h.days)
+    await d.query(`insert into requests (id,ref,user_id,created_at,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,status) values ($1,$2,$3,$4,$5,'GH','ocean',$6,1,null,$7,true,true,false,$8,$9,$10,'+1 555 0100',$11)`,
+      [rid, `SS-H${String(h.i).padStart(4, '0')}`, uid_, created, h.origin, h.cargo, h.desc, dateOnly(addDays(h.days + 7)), h.name, h.email, h.won ? 'booked' : 'closed'])
+    await d.query('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes,sent_at,status) values ($1,$2,$3,$4,34,$5,$6,$7,$8,$9)',
+      [qid, rid, sid, h.price, dateOnly(addDays(h.days + 14)), 'Weekly sailing from Houston to Tema.', JSON.stringify(['Pickup', 'Ocean freight', 'Door delivery']), new Date(created.getTime() + 5 * 3600000), h.won ? 'accepted' : 'declined'])
+    if (h.won) {
+      const shid = `sh_hist_${h.i}`; const status = h.delivered ? 'delivered' : 'in_transit'
+      await d.query('insert into shipments (id,ref,request_id,shipper_id,user_id,mode,origin,destination,cargo,description,status,eta,customer,client_id,created_at) values ($1,$2,$3,$4,$5,\'ocean\',$6,\'GH\',$7,$8,$9,$10,$11,$12,$13)',
+        [shid, `SS-S${String(h.i).padStart(4, '0')}`, rid, sid, uid_, h.origin, h.cargo, h.desc, status, dateOnly(addDays(h.days + 38)), h.name, cid, addDays(h.days + 1)])
+      const steps: [string, number, string][] = [['booked', 1, h.origin], ['picked_up', 4, h.origin], ['at_origin_port', 8, 'Port of Houston'], ['in_transit', 11, 'Atlantic Ocean']]
+      if (h.delivered) steps.push(['arrived', 36, 'Tema'], ['customs', 38, 'Tema'], ['out_for_delivery', 41, 'Accra'], ['delivered', 42, 'Accra'])
+      for (const [st, off, place] of steps) await d.query('insert into shipment_events (shipment_id,status,at,place) values ($1,$2,$3,$4)', [shid, st, addDays(h.days + off), place])
+      if (h.invoice) {
+        const iid = `inv_hist_${h.i}`
+        await d.query(`insert into invoices (id,shipper_id,client_id,shipment_id,number,status,items,subtotal,tax,total,issued_at,due_at) values ($1,$2,$3,$4,$5,$6,$7,$8,0,$8,$9,$10)`,
+          [iid, sid, cid, shid, `INV-2026-1${String(h.i).padStart(3, '0')}`, h.paidDays ? 'paid' : 'sent', JSON.stringify([{ description: `Ocean freight, ${h.origin} → Tema (${h.desc})`, qty: 1, unit: h.invoice }]), h.invoice, dateOnly(addDays(h.days + 2)), dateOnly(addDays(h.days + 32))])
+        if (h.paidDays) await d.query('insert into payments (id,invoice_id,amount,method,at,note) values ($1,$2,$3,\'bank\',$4,\'Paid in full\')', [`pay_hist_${h.i}`, iid, h.invoice, dateOnly(addDays(h.days + h.paidDays))])
+      }
+    }
   }
 }

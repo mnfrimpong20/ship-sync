@@ -81,7 +81,7 @@ export function Features() {
       <div className="grid gap-5 md:grid-cols-6">
         {features.map((f) => (
           <motion.div key={f.title} variants={fadeUp} whileHover={{ y: -4 }} className={`${f.accent ? 'bg-bg text-text border-bg' : 'card-light'} rounded-[var(--radius-lg)] border p-7 ${f.span}`}>
-            <span className={`grid h-11 w-11 place-items-center rounded-xl ${f.accent ? 'bg-gold text-ink' : 'bg-gold/15 text-gold-deep'}`}><f.icon size={21} aria-hidden="true" /></span>
+            <span className={`grid h-11 w-11 place-items-center rounded-xl ${f.accent ? 'bg-gold text-on-accent' : 'bg-gold/15 text-gold-deep'}`}><f.icon size={21} aria-hidden="true" /></span>
             <h3 className={`mt-5 ${f.accent ? 'text-text' : 'text-ink'}`}>{f.title}</h3>
             <p className={`mt-2 ${f.accent ? 'text-text-muted' : 'text-ink-muted'}`}>{f.body}</p>
           </motion.div>
@@ -187,7 +187,7 @@ export function Pricing() {
       <div className="grid gap-6 lg:grid-cols-3">
         {plans.map((p) => (
           <motion.div key={p.name} variants={fadeUp} whileHover={{ y: -4 }} className={`relative flex flex-col rounded-[var(--radius-lg)] border p-7 ${p.highlight ? 'border-gold bg-bg text-text shadow-[var(--shadow-dark)]' : 'card-light'}`}>
-            {p.highlight && <span className="absolute -top-3 left-7 rounded-full bg-gold px-3 py-1 text-xs font-bold text-ink">{p.tag}</span>}
+            {p.highlight && <span className="absolute -top-3 left-7 rounded-full bg-gold px-3 py-1 text-xs font-bold text-on-accent">{p.tag}</span>}
             <h3 className={p.highlight ? 'text-text' : 'text-ink'}>{p.name}</h3>
             {!p.highlight && <p className="text-sm text-ink-muted">{p.tag}</p>}
             <p className="mt-4 flex items-baseline gap-1"><span className={`font-heading text-5xl font-bold ${p.highlight ? 'text-gold' : 'text-ink'}`}>${p.price}</span><span className={p.highlight ? 'text-text-muted' : 'text-ink-muted'}>{p.per}</span></p>

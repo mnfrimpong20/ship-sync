@@ -9,9 +9,9 @@ export function Logo({ light = true, className = '' }: { light?: boolean; classN
   return (
     <Link to="/" className={`inline-flex items-center gap-2.5 focus-ring rounded-md ${className}`} aria-label="Ship Sync home">
       <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true">
-        <rect width="32" height="32" rx="8" fill={light ? '#E3B54A' : '#0B1220'} />
-        <path d="M7 20h18l-2 4H9z" fill={light ? '#0B1220' : '#E3B54A'} />
-        <path d="M11 18V9h4l6 6v3" fill="none" stroke={light ? '#0B1220' : '#E3B54A'} strokeWidth="2.2" strokeLinejoin="round" />
+        <rect width="32" height="32" rx="8" fill={light ? 'var(--color-gold)' : 'var(--color-ink)'} />
+        <path d="M7 20h18l-2 4H9z" fill={light ? 'var(--color-on-accent)' : 'var(--color-gold)'} />
+        <path d="M11 18V9h4l6 6v3" fill="none" stroke={light ? 'var(--color-on-accent)' : 'var(--color-gold)'} strokeWidth="2.2" strokeLinejoin="round" />
       </svg>
       <span className={`font-heading text-[1.35rem] font-bold tracking-tight ${light ? 'text-text' : 'text-ink'}`}>Ship<span className={light ? 'text-gold' : 'text-gold-deep'}>Sync</span></span>
     </Link>

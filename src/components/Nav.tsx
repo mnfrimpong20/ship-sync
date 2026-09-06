@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useScroll, useSpring } from 'motion/react'
 import { ChevronDown, LayoutDashboard, LogOut, Menu, X, ShieldCheck, Users } from 'lucide-react'
 import { Logo } from './ui'
+import ThemeSwitcher from './ThemeSwitcher'
 import { useStore } from '../lib/store'
 
 const links = [
@@ -45,10 +46,11 @@ export default function Nav() {
           ))}
         </nav>
         <div className="hidden items-center gap-3 lg:flex">
+          <ThemeSwitcher />
           {user ? (
             <div className="relative">
               <button onClick={() => setMenu((m) => !m)} className="btn-ghost !min-h-10 !px-4 text-sm" aria-expanded={menu} aria-haspopup="menu">
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-gold text-[11px] font-bold text-ink">{user.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}</span>
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-gold text-[11px] font-bold text-on-accent">{user.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}</span>
                 {user.name.split(' ')[0]} <ChevronDown size={14} aria-hidden="true" />
               </button>
               <AnimatePresence>
@@ -80,6 +82,7 @@ export default function Nav() {
               {links.map((l) => (
                 <Link key={l.to} to={l.to} className="flex min-h-12 items-center border-b border-border/60 text-[15px] font-medium focus-ring">{l.label}</Link>
               ))}
+              <div className="flex min-h-12 items-center justify-between border-b border-border/60 text-[15px] font-medium"><span>Colour theme</span><ThemeSwitcher align="right" /></div>
               <div className="mt-4 flex flex-col gap-2 pb-2">
                 {user ? (
                   <>

@@ -3,6 +3,7 @@ import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react
 import { AnimatePresence, motion } from 'motion/react'
 import { Bell, ChevronDown, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, X } from 'lucide-react'
 import { Logo } from './ui'
+import ThemeSwitcher from './ThemeSwitcher'
 import { useStore } from '../lib/store'
 import { clientsApi } from '../lib/clients'
 
@@ -78,7 +79,7 @@ export default function AppShell() {
           <li key={it.to}>
             <NavLink to={it.to} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors focus-ring ${act ? 'bg-gold/15 font-semibold text-gold' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} aria-current={act ? 'page' : undefined}>
               <it.icon size={17} aria-hidden="true" /><span className="flex-1">{it.label}</span>
-              {it.badge ? <span className={`rounded-full px-1.5 text-[11px] font-bold ${act ? 'bg-gold text-ink' : 'bg-surface-2 text-text'}`}>{it.badge}</span> : null}
+              {it.badge ? <span className={`rounded-full px-1.5 text-[11px] font-bold ${act ? 'bg-gold text-on-accent' : 'bg-surface-2 text-text'}`}>{it.badge}</span> : null}
             </NavLink>
           </li>
         )
@@ -117,10 +118,11 @@ export default function AppShell() {
             <span className="lg:hidden"><Logo /></span>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeSwitcher compact />
             {isShipper && <Link to="/dashboard/clients" className="relative grid h-10 w-10 place-items-center rounded-lg text-text-muted hover:text-text focus-ring" aria-label={`${dueReminders} follow-ups due`}><Bell size={18} />{dueReminders > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-gold" />}</Link>}
             <div className="relative">
               <button onClick={() => setMenu((m) => !m)} className="btn-ghost !min-h-10 !px-3 text-sm" aria-expanded={menu} aria-haspopup="menu">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-gold text-[11px] font-bold text-ink">{user.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}</span>
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-gold text-[11px] font-bold text-on-accent">{user.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}</span>
                 <span className="hidden sm:inline">{user.name.split(' ')[0]}</span><ChevronDown size={14} aria-hidden="true" />
               </button>
               <AnimatePresence>

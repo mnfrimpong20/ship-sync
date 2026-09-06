@@ -341,6 +341,14 @@ create table if not exists container_events (
 alter table shipments add column if not exists container_id text references containers(id) on delete set null;
 create index if not exists idx_shipments_container on shipments(container_id);
 create index if not exists idx_container_events on container_events(container_id);
+alter table containers add column if not exists imo text not null default '';
+alter table containers add column if not exists tracking_provider text not null default '';
+alter table containers add column if not exists tracking_status text not null default 'off';
+alter table containers add column if not exists tracking_subscribed_at timestamptz;
+alter table containers add column if not exists tracking_synced_at timestamptz;
+alter table containers add column if not exists tracking_error text not null default '';
+alter table container_events add column if not exists source text not null default 'manual';
+alter table container_events add column if not exists code text not null default '';
 
 `
 

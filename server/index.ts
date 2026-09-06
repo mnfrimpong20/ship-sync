@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { apiRouter } from './api'
 import { getDb } from './db'
 import { ais, startAirSweep } from './live'
+import { startCarrierSync } from './containers'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
@@ -16,6 +17,7 @@ async function main() {
   const db = await getDb() // connect, migrate, seed before accepting traffic
   ais.start(db).catch((e) => console.error('[ais]', e))
   startAirSweep()
+  startCarrierSync(getDb)
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', 1)

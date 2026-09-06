@@ -177,6 +177,12 @@ class AisWorker {
   }
 
   get(mmsi: string) { return this.latest.get(mmsi) ?? null }
+  /** Find a ship's MMSI from what the carrier gives us (IMO number, else exact name) using vessels heard on the feed. */
+  resolve(imo?: string, name?: string): string | null {
+    if (imo) for (const [mmsi, st] of this.statics) if (st.imo === imo) return mmsi
+    if (name) { const n = name.trim().toUpperCase(); for (const [mmsi, nm] of this.names) if (nm.trim().toUpperCase() === n) return mmsi }
+    return null
+  }
   /** Everything known about one ship: last fix + voyage data + where we first heard it. */
   detail(mmsi: string) {
     const p = this.latest.get(mmsi); if (!p) return null

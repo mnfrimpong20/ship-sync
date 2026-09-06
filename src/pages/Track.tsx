@@ -125,7 +125,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
 
           <div className="mt-8">
             <div className="relative h-2 overflow-hidden rounded-full bg-surface-2">
-              <motion.div className="absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,#2DD4BF,#E3B54A)]" initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} />
+              <motion.div className="absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,var(--color-teal),var(--color-gold))]" initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} />
             </div>
             <ol className="mt-3 grid grid-cols-4 gap-1 text-[11px] text-text-muted md:grid-cols-8">
               {statusOrder.map((st, i) => <li key={st} className={`${i <= idx ? 'text-text' : ''} ${i > 3 ? 'hidden md:block' : ''}`}>{statusLabels[st]}</li>)}

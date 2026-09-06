@@ -1,22 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0B1220;
-  --color-surface: #111B2E;
-  --color-surface-2: #182540;
-  --color-light: #F7F5F0;
+  /* Light, editorial base: warm off-white pages, navy type, gold as a sparing accent. */
+  --color-bg: #F7F5F0;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F1EEE6;
+  --color-light: #FFFFFF;
   --color-light-surface: #FFFFFF;
-  --color-text: #F4F6FA;
-  --color-text-muted: #A3AEC2;
-  --color-ink: #0B1220;
-  --color-ink-muted: #4B5563;
-  --color-gold: #E3B54A;
-  --color-gold-deep: #B8891F;
-  --color-teal: #2DD4BF;
-  --color-sky: #7DD3FC;
-  --color-border: #24324D;
-  --color-border-light: #E5E1D8;
-  --color-danger: #F87171;
+  --color-text: #0B1B33;
+  --color-text-muted: #5B6578;
+  --color-ink: #0B1B33;
+  --color-ink-muted: #5B6578;
+  --color-gold: #C99C33;
+  --color-gold-deep: #9A7420;
+  --color-teal: #0E8F7E;
+  --color-sky: #2B6CB0;
+  --color-border: #E3DED3;
+  --color-border-light: #E3DED3;
+  --color-danger: #C03A3A;
 
   --font-heading: "Fraunces", Georgia, serif;
   --font-sans: "Inter", system-ui, sans-serif;
@@ -25,8 +26,25 @@
   --radius-md: 14px;
   --radius-lg: 24px;
 
+  --shadow-dark: 0 18px 44px -24px rgb(11 27 51 / 0.18);
+  --shadow-light: 0 10px 30px -12px rgb(11 27 51 / 0.12);
+}
+
+/* Dark islands — hero, footer, live map — keep the navy identity. Tokens are re-pointed inside the scope. */
+.theme-dark {
+  --color-bg: #0B1220;
+  --color-surface: #111B2E;
+  --color-surface-2: #182540;
+  --color-text: #F4F6FA;
+  --color-text-muted: #A3AEC2;
+  --color-gold: #E3B54A;
+  --color-gold-deep: #CFA23A;
+  --color-teal: #2DD4BF;
+  --color-sky: #7DD3FC;
+  --color-border: #24324D;
+  --color-danger: #F87171;
   --shadow-dark: 0 20px 60px -20px rgb(0 0 0 / 0.5);
-  --shadow-light: 0 10px 30px -12px rgb(11 18 32 / 0.15);
+  color-scheme: dark;
 }
 
 html { scroll-behavior: smooth; }
@@ -45,11 +63,11 @@ h3 { font-size: 1.375rem; line-height: 1.25; font-weight: 600; }
 @utility no-scrollbar { scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 @utility container-fluid { @apply w-full px-5 md:px-10 xl:px-16 2xl:px-24; }
 @utility section-y { @apply py-20 md:py-28; }
-@utility eyebrow { @apply text-xs font-semibold uppercase tracking-[0.14em] text-gold; }
+@utility eyebrow { @apply text-xs font-semibold uppercase tracking-[0.14em] text-gold-deep; }
 @utility focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-bg; }
 @utility btn { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 text-[15px] font-semibold transition-colors duration-200 focus-ring; }
-@utility btn-gold { @apply btn bg-gold text-ink hover:bg-gold-deep; }
-@utility btn-ghost { @apply btn border border-border bg-transparent text-text hover:border-gold hover:text-gold; }
+@utility btn-gold { @apply btn bg-gold text-[#0B1220] hover:bg-gold-deep hover:text-white; }
+@utility btn-ghost { @apply btn border border-border bg-transparent text-text hover:border-text hover:bg-surface; }
 @utility btn-light { @apply btn border border-border-light bg-light-surface text-ink hover:border-gold-deep hover:text-gold-deep; }
 @utility card-dark { @apply rounded-[var(--radius-lg)] border border-border bg-surface shadow-[var(--shadow-dark)]; }
 @utility card-light { @apply rounded-[var(--radius-lg)] border border-border-light bg-light-surface shadow-[var(--shadow-light)]; }

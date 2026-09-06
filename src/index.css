@@ -98,6 +98,9 @@ h3 { font-size: 1.375rem; line-height: 1.25; font-weight: 600; }
 /* Edge-to-edge band with generous gutters — header, hero and footer. */
 @utility no-scrollbar { scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 @utility container-fluid { @apply w-full px-5 md:px-10 xl:px-16 2xl:px-24; }
+/* Inside the signed-in workspace every page runs edge to edge (the sidebar already frames it). */
+.ss-app .container-x { max-width: none; }
+@media (min-width: 1280px) { .ss-app .container-x { padding-left: 2.5rem; padding-right: 2.5rem; } }
 @utility section-y { @apply py-20 md:py-28; }
 @utility eyebrow { @apply text-xs font-semibold uppercase tracking-[0.14em] text-gold-deep; }
 @utility focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-bg; }

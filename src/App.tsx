@@ -6,7 +6,8 @@ import Footer from './components/Footer'
 import AppShell from './components/AppShell'
 import Home from './pages/Home'
 import Quote from './pages/Quote'
-import { ShipperDirectory, ShipperProfile } from './pages/Shippers'
+import { ShipperProfile } from './pages/Shippers'
+import Directory from './pages/Directory'
 import Track from './pages/Track'
 import Live from './pages/Live'
 import Admin from './pages/Admin'
@@ -62,7 +63,7 @@ export default function App() {
             <Route element={<MarketingLayout />}>
               <Route path="/" element={<Home />} />
               <Route path="/quote" element={<Quote />} />
-              <Route path="/shippers" element={<ShipperDirectory />} />
+              <Route path="/shippers" element={<Directory />} />
               <Route path="/shippers/:id" element={<ShipperProfile />} />
               <Route path="/track" element={<Track />} />
               <Route path="/live" element={<Live />} />

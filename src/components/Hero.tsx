@@ -77,7 +77,7 @@ export default function Hero() {
             </fieldset>
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit" className="btn-gold mt-1 w-full">Compare shipper quotes <ArrowRight size={18} aria-hidden="true" /></motion.button>
           </div>
-          <p className="mt-4 text-center text-xs text-text-muted">No account needed to request quotes. Shippers reply by email and in your dashboard.</p>
+          <p className="mt-4 text-center text-xs text-text-muted">No account needed to request quotes. Shippers reply by email and in your dashboard. <Link to="/shippers?match=1" className="text-gold underline-offset-2 hover:underline focus-ring">Not sure who to pick? Get matched →</Link></p>
         </motion.form>
       </div>
 

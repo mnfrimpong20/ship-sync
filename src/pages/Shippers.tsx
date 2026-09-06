@@ -1,83 +1,10 @@
-import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { ArrowLeft, BadgeCheck, Building2, CalendarDays, Check, Clock, Filter, MapPin, Search, Star, X } from 'lucide-react'
-import { cargoLabel, cargoTypes, countries, countryByCode, type Mode } from '../lib/data'
+import { ArrowLeft, BadgeCheck, Building2, CalendarDays, Check, Clock, MapPin, Star } from 'lucide-react'
+import { cargoLabel, countryByCode } from '../lib/data'
 import { useStore } from '../lib/store'
 import { fadeUp, stagger } from '../lib/motion'
-import { Avatar, Empty, ModeBadge, Rating, ShipperCard } from '../components/ui'
-
-export function ShipperDirectory() {
-  const { shippers } = useStore()
-  const [q, setQ] = useState('')
-  const [dest, setDest] = useState('')
-  const [mode, setMode] = useState<Mode | ''>('')
-  const [cargo, setCargo] = useState('')
-  const [verifiedOnly, setVerifiedOnly] = useState(false)
-  const [sort, setSort] = useState<'rating' | 'reviews' | 'response'>('rating')
-  const [showFilters, setShowFilters] = useState(false)
-
-  const list = useMemo(() => {
-    const ql = q.trim().toLowerCase()
-    return shippers
-      .filter((s) => !ql || s.name.toLowerCase().includes(ql) || s.hq.toLowerCase().includes(ql) || s.tagline.toLowerCase().includes(ql))
-      .filter((s) => !dest || s.destinations.includes(dest))
-      .filter((s) => !mode || s.modes.includes(mode))
-      .filter((s) => !cargo || s.cargo.includes(cargo as never))
-      .filter((s) => !verifiedOnly || s.verified)
-      .sort((a, b) => sort === 'rating' ? b.rating - a.rating : sort === 'reviews' ? b.reviews - a.reviews : a.responseHours - b.responseHours)
-  }, [shippers, q, dest, mode, cargo, verifiedOnly, sort])
-  const active = [dest, mode, cargo, verifiedOnly ? 'v' : ''].filter(Boolean).length
-  const clear = () => { setDest(''); setMode(''); setCargo(''); setVerifiedOnly(false); setQ('') }
-
-  const filters = (
-    <div className="grid gap-4">
-      <div><label htmlFor="f-dest" className="label-dark">Destination</label><select id="f-dest" className="input-dark" value={dest} onChange={(e) => setDest(e.target.value)}><option value="">All countries</option>{countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select></div>
-      <div><label htmlFor="f-mode" className="label-dark">Mode</label><select id="f-mode" className="input-dark" value={mode} onChange={(e) => setMode(e.target.value as Mode | '')}><option value="">Air or ocean</option><option value="ocean">Ocean</option><option value="air">Air</option></select></div>
-      <div><label htmlFor="f-cargo" className="label-dark">Cargo type</label><select id="f-cargo" className="input-dark" value={cargo} onChange={(e) => setCargo(e.target.value)}><option value="">Any cargo</option>{cargoTypes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
-      <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-text"><input type="checkbox" className="h-5 w-5 accent-gold" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} /> Verified shippers only</label>
-      {active > 0 && <button onClick={clear} className="btn-ghost !min-h-10 text-sm"><X size={16} aria-hidden="true" /> Clear filters</button>}
-    </div>
-  )
-
-  return (
-    <div className="bg-bg text-text">
-      <div className="container-x py-10 md:py-16">
-        <motion.div initial="hidden" animate="show" variants={stagger} className="max-w-2xl">
-          <motion.p variants={fadeUp} className="eyebrow mb-2">Directory</motion.p>
-          <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4vw,3rem)]">Air & ocean shippers to West Africa</motion.h1>
-          <motion.p variants={fadeUp} className="mt-2 text-text-muted">Every company here has a public profile, real customer ratings, and a response-time record. Verified shippers have had their licence and insurance checked.</motion.p>
-        </motion.div>
-
-        <div className="mt-8 grid gap-8 lg:grid-cols-12">
-          <aside className="lg:col-span-3">
-            <div className="lg:sticky lg:top-24">
-              <div className="relative">
-                <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" />
-                <input aria-label="Search shippers" className="input-dark !pl-10" placeholder="Search by name or city" value={q} onChange={(e) => setQ(e.target.value)} />
-              </div>
-              <button onClick={() => setShowFilters((s) => !s)} className="btn-ghost mt-3 w-full lg:hidden" aria-expanded={showFilters}><Filter size={16} aria-hidden="true" /> Filters {active > 0 && <span className="rounded-full bg-gold px-2 text-xs text-ink">{active}</span>}</button>
-              <div className={`card-dark mt-3 p-5 ${showFilters ? '' : 'hidden lg:block'}`}>{filters}</div>
-            </div>
-          </aside>
-          <div className="lg:col-span-9">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-text-muted" aria-live="polite">{list.length} shipper{list.length === 1 ? '' : 's'}{dest ? ` to ${countryByCode(dest)?.name}` : ''}</p>
-              <label className="flex items-center gap-2 text-sm text-text-muted">Sort by<select className="input-dark !w-auto !min-h-10" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}><option value="rating">Highest rated</option><option value="reviews">Most reviews</option><option value="response">Fastest response</option></select></label>
-            </div>
-            {list.length === 0 ? (
-              <Empty title="No shippers match those filters" body="Try widening the destination or cargo type — or post a quote request and we’ll route it to the closest operators." action={<button onClick={clear} className="btn-gold">Clear filters</button>} />
-            ) : (
-              <motion.div key={list.map((s) => s.id).join()} initial="hidden" animate="show" variants={stagger} className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {list.map((s) => <ShipperCard key={s.id} s={s} />)}
-              </motion.div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+import { Avatar, Empty, ModeBadge, Rating } from '../components/ui'
 
 export function ShipperProfile() {
   const { id } = useParams()

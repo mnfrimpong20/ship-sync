@@ -100,13 +100,13 @@ function RouteMap() {
   return (
     <svg className="absolute inset-x-0 top-0 hidden h-full w-full lg:block" viewBox="0 0 1440 800" fill="none" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <defs>
-        <linearGradient id="arc" x1="0" x2="1"><stop offset="0" stopColor="#E3B54A" stopOpacity="0" /><stop offset="0.5" stopColor="#E3B54A" stopOpacity="0.55" /><stop offset="1" stopColor="#2DD4BF" stopOpacity="0" /></linearGradient>
+        <linearGradient id="arc" x1="0" x2="1"><stop offset="0" stopColor="var(--color-gold)" stopOpacity="0" /><stop offset="0.5" stopColor="var(--color-gold)" stopOpacity="0.55" /><stop offset="1" stopColor="#2DD4BF" stopOpacity="0" /></linearGradient>
       </defs>
       {['M120 260 Q 620 60 1010 520', 'M420 140 Q 760 120 1030 540', 'M1380 200 Q 1200 380 1040 545', 'M60 420 Q 560 380 1010 530'].map((d, i) => (
         <motion.path key={d} d={d} stroke="url(#arc)" strokeWidth="1.5" strokeDasharray="6 10" initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: 2.2, delay: 0.6 + i * 0.25, ease: 'easeOut' }} />
       ))}
-      <motion.circle cx="1025" cy="535" r="6" fill="#E3B54A" initial={{ scale: 0 }} animate={{ scale: [0, 1.4, 1] }} transition={{ delay: 2.2, duration: 0.6 }} />
-      <motion.circle cx="1025" cy="535" r="18" stroke="#E3B54A" strokeWidth="1" initial={{ opacity: 0 }} animate={{ opacity: [0, 0.6, 0], scale: [0.6, 1.6, 2] }} transition={{ delay: 2.4, duration: 2.4, repeat: Infinity, repeatDelay: 1 }} />
+      <motion.circle cx="1025" cy="535" r="6" fill="var(--color-gold)" initial={{ scale: 0 }} animate={{ scale: [0, 1.4, 1] }} transition={{ delay: 2.2, duration: 0.6 }} />
+      <motion.circle cx="1025" cy="535" r="18" stroke="var(--color-gold)" strokeWidth="1" initial={{ opacity: 0 }} animate={{ opacity: [0, 0.6, 0], scale: [0.6, 1.6, 2] }} transition={{ delay: 2.4, duration: 2.4, repeat: Infinity, repeatDelay: 1 }} />
     </svg>
   )
 }

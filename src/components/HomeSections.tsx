@@ -241,16 +241,21 @@ export function FinalCTA() {
   return (
     <section className="bg-bg pb-20 md:pb-28">
       <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: '-100px' }} variants={stagger} className="container-x">
-        <motion.div variants={fadeUp} className="relative overflow-hidden rounded-[var(--radius-lg)] bg-[linear-gradient(120deg,#E3B54A,#B8891F_60%,#8A6516)] px-6 py-14 text-ink md:px-14 md:py-20">
-          <Handshake className="absolute -right-6 -top-6 h-48 w-48 text-ink/10" aria-hidden="true" />
+        <motion.div variants={fadeUp} className="theme-dark relative overflow-hidden rounded-[var(--radius-lg)] bg-bg px-6 py-14 text-text shadow-[var(--shadow-dark)] md:px-14 md:py-20">
+          <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+            <div className="absolute -right-24 -top-32 h-96 w-96 rounded-full bg-gold/20 blur-3xl" />
+            <div className="absolute -bottom-40 left-1/3 h-80 w-80 rounded-full bg-teal/10 blur-3xl" />
+          </div>
+          <Handshake className="absolute -right-6 -top-6 h-48 w-48 text-gold/15" aria-hidden="true" />
           <div className="relative grid items-center gap-8 md:grid-cols-12">
             <div className="md:col-span-8">
-              <h2 className="text-ink">Ready to ship to West Africa?</h2>
-              <p className="mt-3 max-w-xl text-lg text-ink/80">Post your shipment now and have verified quotes in your inbox by tomorrow. Shippers: join 120+ companies already winning bookings.</p>
+              <p className="eyebrow mb-3">Get started</p>
+              <h2>Ready to ship to West Africa?</h2>
+              <p className="mt-3 max-w-xl text-lg text-text-muted">Post your shipment now and have verified quotes in your inbox by tomorrow. Shippers: join 120+ companies already winning bookings.</p>
             </div>
             <div className="flex flex-col gap-3 md:col-span-4 md:items-end">
-              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/quote" className="btn w-full bg-ink text-text hover:bg-surface-2 md:w-auto">Get free quotes <ArrowRight size={18} aria-hidden="true" /></Link></motion.div>
-              <Link to="/signup?role=shipper" className="btn w-full border border-ink/30 text-ink hover:bg-ink/10 md:w-auto">List your company</Link>
+              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/quote" className="btn-gold w-full md:w-auto">Get free quotes <ArrowRight size={18} aria-hidden="true" /></Link></motion.div>
+              <Link to="/signup?role=shipper" className="btn-ghost w-full md:w-auto">List your company</Link>
             </div>
           </div>
         </motion.div>

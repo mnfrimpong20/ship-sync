@@ -189,7 +189,7 @@ export default function Live() {
   const aisLabel = !data ? 'Connecting…' : data.ais.status === 'live' ? 'AIS live' : data.ais.enabled ? (data.ais.status === 'error' ? 'AIS error' : 'AIS connecting') : 'AIS not configured'
 
   return (
-    <div className="bg-bg text-text">
+    <div className="theme-dark bg-bg text-text">
       <div className="container-x py-10 md:py-14">
         <motion.div initial="hidden" animate="show" variants={stagger} className="flex flex-wrap items-end justify-between gap-6">
           <div className="max-w-2xl">

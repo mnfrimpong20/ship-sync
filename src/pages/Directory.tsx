@@ -81,9 +81,9 @@ function FitRing({ fit }: { fit: number }) {
   const r = 22; const c = 2 * Math.PI * r
   return (
     <svg width="60" height="60" viewBox="0 0 60 60" role="img" aria-label={`${fit}% match`} className="shrink-0">
-      <circle cx="30" cy="30" r={r} fill="none" stroke="#24324D" strokeWidth="5" />
-      <circle cx="30" cy="30" r={r} fill="none" stroke={fit >= 75 ? '#2DD4BF' : fit >= 50 ? '#E3B54A' : '#A3AEC2'} strokeWidth="5" strokeLinecap="round" strokeDasharray={`${(c * fit) / 100} ${c}`} transform="rotate(-90 30 30)" />
-      <text x="30" y="34" textAnchor="middle" fontSize="13" fontWeight="700" fill="#F4F6FA">{fit}</text>
+      <circle cx="30" cy="30" r={r} fill="none" stroke="var(--color-border)" strokeWidth="5" />
+      <circle cx="30" cy="30" r={r} fill="none" stroke={fit >= 75 ? 'var(--color-teal)' : fit >= 50 ? 'var(--color-gold)' : 'var(--color-text-muted)'} strokeWidth="5" strokeLinecap="round" strokeDasharray={`${(c * fit) / 100} ${c}`} transform="rotate(-90 30 30)" />
+      <text x="30" y="34" textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--color-text)">{fit}</text>
     </svg>
   )
 }

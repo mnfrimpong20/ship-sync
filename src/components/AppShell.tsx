@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Bell, ChevronDown, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, X } from 'lucide-react'
+import { Bell, ChevronDown, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, X } from 'lucide-react'
 import { Logo } from './ui'
 import ThemeSwitcher from './ThemeSwitcher'
 import { useStore } from '../lib/store'
@@ -46,6 +46,7 @@ export default function AppShell() {
         { to: '/dashboard/shipper', label: 'Overview', icon: LayoutDashboard, end: true },
         { to: '/dashboard/shipper?view=leads', label: 'Leads & quotes', icon: Inbox, badge: openLeads },
         { to: '/dashboard/shipments', label: 'Shipments', icon: Ship, badge: active },
+        { to: '/dashboard/containers', label: 'Containers', icon: Container },
         { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders },
         { to: '/dashboard/routes', label: 'Routes', icon: MapPinned },
         ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck } as Item] : []),

@@ -37,7 +37,7 @@ export default function Nav() {
   return (
     <header className={`sticky top-0 z-50 transition-colors duration-300 ${scrolled || !marketing ? 'border-b border-border bg-bg/85 backdrop-blur-xl' : 'bg-transparent'}`}>
       {marketing && <motion.div className="absolute inset-x-0 top-0 h-0.5 origin-left bg-gold" style={{ scaleX: progress }} aria-hidden="true" />}
-      <div className="container-x flex h-[72px] items-center justify-between gap-6">
+      <div className="container-fluid flex h-[72px] items-center justify-between gap-6">
         <Logo />
         <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary">
           {links.map((l) => (
@@ -76,7 +76,7 @@ export default function Nav() {
       <AnimatePresence>
         {open && (
           <motion.nav initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="border-t border-border bg-bg lg:hidden" aria-label="Mobile">
-            <div className="container-x flex flex-col py-3">
+            <div className="container-fluid flex flex-col py-3">
               {links.map((l) => (
                 <Link key={l.to} to={l.to} className="flex min-h-12 items-center border-b border-border/60 text-[15px] font-medium focus-ring">{l.label}</Link>
               ))}

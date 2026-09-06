@@ -22,7 +22,7 @@ export default function Hero() {
         <RouteMap />
       </div>
 
-      <div className="container-x relative grid gap-12 pb-20 pt-16 md:pb-28 md:pt-24 lg:grid-cols-12 lg:items-center">
+      <div className="container-fluid relative grid gap-12 pb-20 pt-16 md:pb-28 md:pt-24 lg:grid-cols-12 lg:items-center">
         <motion.div className="lg:col-span-7" initial="hidden" animate="show" variants={stagger}>
           <motion.p variants={fadeUp} className="eyebrow mb-5 flex items-center gap-2"><span className="h-px w-8 bg-gold" aria-hidden="true" />Air & ocean freight to West Africa</motion.p>
           <motion.h1 variants={fadeUp} className="max-w-3xl">
@@ -45,7 +45,7 @@ export default function Hero() {
         <motion.form
           initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
           onSubmit={(e) => { e.preventDefault(); nav(`/quote?origin=${encodeURIComponent(origin)}&destination=${dest}&mode=${mode}`) }}
-          className="card-dark relative p-6 md:p-7 lg:col-span-5"
+          className="card-dark relative w-full p-6 md:p-7 lg:col-span-5 lg:max-w-[540px] lg:justify-self-end"
           aria-label="Quick quote"
         >
           <div className="mb-5 flex items-center justify-between">
@@ -81,7 +81,7 @@ export default function Hero() {
         </motion.form>
       </div>
 
-      <div className="container-x relative">
+      <div className="container-fluid relative">
         <motion.dl initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger} className="grid grid-cols-2 gap-6 border-t border-border py-10 md:grid-cols-4">
           {[['120+', 'Verified shippers'], ['7', 'West African countries'], ['48k', 'Shipments quoted'], ['94%', 'Average on-time rate']].map(([v, l]) => (
             <motion.div key={l} variants={fadeUp}>

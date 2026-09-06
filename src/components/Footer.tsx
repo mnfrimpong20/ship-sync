@@ -11,7 +11,7 @@ const cols = [
 export default function Footer() {
   return (
     <footer className="border-t border-border bg-bg text-text">
-      <div className="container-x grid gap-10 py-16 md:grid-cols-12">
+      <div className="container-fluid grid gap-10 py-16 md:grid-cols-12">
         <div className="md:col-span-4">
           <Logo />
           <p className="mt-4 max-w-xs text-sm text-text-muted">The marketplace for air and ocean freight to West Africa. Verified shippers, transparent quotes, tracked deliveries.</p>
@@ -37,7 +37,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="border-t border-border">
-        <div className="container-x flex flex-col gap-2 py-6 text-xs text-text-muted md:flex-row md:items-center md:justify-between">
+        <div className="container-fluid flex flex-col gap-2 py-6 text-xs text-text-muted md:flex-row md:items-center md:justify-between">
           <p>© {new Date().getFullYear()} Ship Sync, Inc. All rights reserved.</p>
           <p className="flex gap-4"><a href="#" className="hover:text-gold">Privacy</a><a href="#" className="hover:text-gold">Terms</a><a href="#" className="hover:text-gold">Shipper agreement</a></p>
         </div>

@@ -49,6 +49,28 @@ export function DirectoryCard({ s, quote }: { s: Shipper; quote?: string }) {
   )
 }
 
+
+/** Auto-scrolling featured strip: the list is rendered twice and slid with a CSS keyframe, paused on hover/focus. Static when it fits. */
+function FeaturedCarousel({ items }: { items: Shipper[] }) {
+  const loop = items.length > 3
+  const list = loop ? [...items, ...items] : items
+  const Card = ({ s, i }: { s: Shipper; i: number }) => (
+    <Link to={`/shippers/${s.id}`} aria-hidden={loop && i >= items.length ? true : undefined} tabIndex={loop && i >= items.length ? -1 : undefined} className="group relative mr-4 w-[300px] shrink-0 overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-br from-surface to-bg p-5 transition-colors hover:border-gold/60 focus-ring">
+      <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40" style={{ background: s.hue }} aria-hidden="true" />
+      <div className="flex items-center gap-3"><Avatar initials={s.initials} hue={s.hue} size={44} /><div className="min-w-0"><p className="truncate font-heading text-base font-bold">{s.name}</p><p className="truncate text-xs text-text-muted">{s.hq}</p></div></div>
+      <p className="mt-3 line-clamp-2 text-sm text-text-muted">{s.tagline}</p>
+      <div className="mt-3 flex items-center gap-2 text-xs"><Rating value={s.rating} count={s.reviews} /><span className="ml-auto text-text-muted">{s.destinations.length} {s.destinations.length === 1 ? 'country' : 'countries'}</span></div>
+    </Link>
+  )
+  return (
+    <div className="relative -mx-5 overflow-hidden md:-mx-10 xl:-mx-16 2xl:-mx-24" style={{ maskImage: 'linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent)', WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent)' }}>
+      <div className={`flex w-max pl-5 md:pl-10 xl:pl-16 2xl:pl-24 ${loop ? 'ss-marquee !pl-0' : ''}`} style={loop ? { animationDuration: `${items.length * 9}s` } : undefined}>
+        {list.map((s, i) => <Card key={`${s.id}-${i}`} s={s} i={i} />)}
+      </div>
+    </div>
+  )
+}
+
 function Skeleton() {
   return <div className="h-[330px] animate-pulse rounded-2xl border border-border bg-surface/60" aria-hidden="true" />
 }
@@ -245,16 +267,7 @@ export default function Directory() {
               <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gold"><Crown size={14} aria-hidden="true" /> Featured shippers{dest ? ` · ${countryByCode(dest)?.name}` : ''}</p><p className="mt-1 text-sm text-text-muted">Enterprise partners with priority placement. Sponsored.</p></div>
               <Link to="/#pricing" className="text-sm text-text-muted underline-offset-4 hover:text-gold hover:underline focus-ring">Get your company featured →</Link>
             </div>
-            <div className="no-scrollbar -mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-2 md:-mx-10 md:px-10 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
-              {featured.map((s) => (
-                <Link key={s.id} to={`/shippers/${s.id}`} className="group relative w-[300px] shrink-0 snap-start overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-br from-surface to-bg p-5 transition-colors hover:border-gold/60 focus-ring">
-                  <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40" style={{ background: s.hue }} aria-hidden="true" />
-                  <div className="flex items-center gap-3"><Avatar initials={s.initials} hue={s.hue} size={44} /><div className="min-w-0"><p className="truncate font-heading text-base font-bold">{s.name}</p><p className="truncate text-xs text-text-muted">{s.hq}</p></div></div>
-                  <p className="mt-3 line-clamp-2 text-sm text-text-muted">{s.tagline}</p>
-                  <div className="mt-3 flex items-center gap-2 text-xs"><Rating value={s.rating} count={s.reviews} /><span className="ml-auto text-text-muted">{s.destinations.length} {s.destinations.length === 1 ? 'country' : 'countries'}</span></div>
-                </Link>
-              ))}
-            </div>
+            <FeaturedCarousel items={featured} />
           </div>
         </section>
       )}

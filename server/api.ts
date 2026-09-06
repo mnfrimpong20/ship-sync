@@ -8,6 +8,7 @@ import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } fro
 import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion, type Position } from './live'
 import { attachShipmentToClient, logShipmentActivity, mountClients } from './clients'
 import { mountOps } from './ops'
+import { mountDirectory } from './directory'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'driver' }
@@ -258,6 +259,7 @@ export function apiRouter() {
   r.get('/auth/me', wrap(async (req, res) => { const db = await getDb(); res.json({ user: await currentUser(db, req) }) }))
 
   // shippers (public)
+  mountDirectory(r, { getDb, shipperOut, wrap })
   r.get('/shippers', wrap(async (_req, res) => { const db = await getDb(); const { rows } = await db.query<Row>('select * from shippers order by rating desc, reviews desc'); res.json({ shippers: rows.map(shipperOut) }) }))
   r.get('/shippers/:id', wrap(async (req, res) => { const db = await getDb(); const { rows } = await db.query<Row>('select * from shippers where id = $1', [req.params.id]); if (!rows[0]) throw new HttpError(404, 'Shipper not found.'); res.json({ shipper: shipperOut(rows[0]) }) }))
   r.patch('/shippers/me', wrap(async (req, res) => {

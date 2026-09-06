@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import bcrypt from 'bcryptjs'
 import { sampleShipments, shippers as seedShippers } from '../src/lib/data'
+import { extraShippers } from './seedShippers'
 
 /** Minimal query interface satisfied by both `pg` and PGlite. */
 export interface Db {
@@ -30,6 +31,7 @@ export async function getDb(): Promise<Db> {
   await ensureAdmins(db)
   await seedClientDemo(db)
   await seedOpsDemo(db)
+  await seedDirectoryDemo(db)
   return db
 }
 
@@ -418,4 +420,18 @@ async function seedOpsDemo(d: Db) {
     ('vh_demo_1','gold-coast-freight','Box truck 1','box_truck','TX 4KR-882',3500,'origin','Houston, TX','US','available','st_demo_kwesi','26ft box truck with liftgate — barrels and pallets.'),
     ('vh_demo_2','gold-coast-freight','Accra van','van','GR 4521-22',1200,'destination','Accra','GH','available','st_demo_efua','Sprinter van for Accra & Tema deliveries.'),
     ('vh_demo_3','gold-coast-freight','Kumasi pickup','pickup','AS 1188-21',900,'destination','Kumasi','GH','maintenance',null,'Brake service due.')`)
+}
+
+/** Extra fictional shippers so the directory has depth for search and pagination. Idempotent — inserts only the ones missing. */
+async function seedDirectoryDemo(d: Db) {
+  const { rows } = await d.query<{ id: string }>('select id from shippers')
+  const have = new Set(rows.map((r) => r.id))
+  for (const s of extraShippers) {
+    if (have.has(s.id)) continue
+    await d.query(
+      `insert into shippers (id,name,tagline,hq,founded,modes,destinations,origins,cargo,rating,reviews,verified,response_hours,on_time,services,about,price_index,plan,initials,hue,demo,verified_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,true,case when $12 then now() else null end)`,
+      [s.id, s.name, s.tagline, s.hq, s.founded, JSON.stringify(s.modes), JSON.stringify(s.destinations), JSON.stringify(s.origins), JSON.stringify(s.cargo), s.rating, s.reviews, s.verified, s.responseHours, s.onTime, JSON.stringify(s.services), s.about, s.priceIndex, s.plan, s.initials, s.hue],
+    )
+  }
 }

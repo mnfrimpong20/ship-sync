@@ -19,6 +19,7 @@ import Fleet from './pages/Fleet'
 import RunsList from './pages/Routes'
 import RoutePlanner from './pages/RoutePlanner'
 import MyRuns from './pages/MyRuns'
+import Shipments from './pages/Shipments'
 import Join from './pages/Join'
 import { Login, Signup } from './pages/Auth'
 import { CustomerDashboard, ShipperDashboard } from './pages/Dashboard'
@@ -76,6 +77,7 @@ export default function App() {
             <Route element={<AppShell />}>
               <Route path="/dashboard" element={<CustomerDashboard />} />
               <Route path="/dashboard/shipper" element={<ShipperDashboard />} />
+              <Route path="/dashboard/shipments" element={<Shipments />} />
               <Route path="/dashboard/clients" element={<Clients />} />
               <Route path="/dashboard/clients/:id" element={<ClientDetailPage />} />
               <Route path="/dashboard/invoices/:id" element={<InvoiceView />} />

@@ -519,9 +519,15 @@ async function seedHistoryDemo(d: Db) {
 }
 
 /** Two demo containers for Gold Coast: one on the water with two orders loaded, one just booked. Idempotent. */
+/** Demo orders in CN-2026-001 must not be ahead of the container itself (it has sailed, so they are in transit on Grande Africa). Idempotent; also runs on existing databases. */
+async function alignContainerDemo(d: Db) {
+  await d.query(`update shipments set container_id = 'cn_demo_1', status = 'in_transit', vessel_name = 'Grande Africa', mmsi = '247189000' where id in ('sh_hist_7','sh_hist_9') and shipper_id = 'gold-coast-freight' and exists (select 1 from containers where id = 'cn_demo_1' and status = 'sailed')`)
+  await d.query(`delete from shipment_events where shipment_id in ('sh_hist_7','sh_hist_9') and status in ('arrived','customs','out_for_delivery','delivered') and exists (select 1 from containers where id = 'cn_demo_1' and status = 'sailed')`)
+}
+
 async function seedContainerDemo(d: Db) {
   const { rows } = await d.query<{ n: string }>(`select count(*)::text as n from containers where shipper_id = 'gold-coast-freight'`)
-  if (Number(rows[0].n) > 0) return
+  if (Number(rows[0].n) > 0) { await alignContainerDemo(d); return }
   await d.query(`insert into containers (id,shipper_id,ref,number,size,line,booking_ref,seal,vessel_name,mmsi,voyage,origin_port,destination,destination_port,cutoff_date,etd,eta,status,notes,created_at) values
     ('cn_demo_1','gold-coast-freight','CN-2026-001','MSKU7712043','40hc','Maersk','MAEU2298811','ML-448120','Grande Africa','247189000','GA2236','Port of Houston','GH','Tema',$1,$2,$3,'sailed','Mixed barrels and boxes. Consignee list emailed to Tema agent.',$4),
     ('cn_demo_2','gold-coast-freight','CN-2026-002','','40ft','MSC','MSCUHOU5521','','','','','Port of Houston','GH','Tema',$5,$6,$7,'loading','Vehicle + barrels consolidation for the Sept 19 sailing.',$8)`,
@@ -534,7 +540,7 @@ async function seedContainerDemo(d: Db) {
     ('cn_demo_2','booked',$5,'Houston, TX','Booked 40ft with MSC.','Nana Boateng'),
     ('cn_demo_2','loading',$6,'Gold Coast yard, Houston','First pallets in.','Kwesi Appiah')`,
     [addDays(-20), addDays(-16), addDays(-13), addDays(-11), addDays(-3), addDays(-1)])
-  await d.query(`update shipments set container_id = 'cn_demo_1' where id in ('sh_hist_7','sh_hist_9') and shipper_id = 'gold-coast-freight'`)
+  await alignContainerDemo(d)
   await d.query(`update shipments set container_id = 'cn_demo_2', status = 'picked_up' where id = 's_demo_pick' and shipper_id = 'gold-coast-freight' and status = 'booked'`)
   await d.query(`insert into shipment_events (shipment_id,status,at,place,note) select 's_demo_pick','picked_up',$1,'Gold Coast yard, Houston','Loaded into container CN-2026-002.' where not exists (select 1 from shipment_events where shipment_id = 's_demo_pick' and status = 'picked_up')`, [addDays(-1)])
   // Won orders still waiting to be consolidated into a container.

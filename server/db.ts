@@ -33,6 +33,7 @@ export async function getDb(): Promise<Db> {
   await seedOpsDemo(db)
   await seedDirectoryDemo(db)
   await seedHistoryDemo(db)
+  await seedContainerDemo(db)
   return db
 }
 
@@ -305,6 +306,42 @@ create index if not exists idx_quotes_request on quotes(request_id);
 create index if not exists idx_shipments_user on shipments(user_id);
 create index if not exists idx_shipments_shipper on shipments(shipper_id);
 create index if not exists idx_events_shipment on shipment_events(shipment_id);
+create table if not exists containers (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  ref text not null,
+  number text not null default '',
+  size text not null default '40ft',
+  line text not null default '',
+  booking_ref text not null default '',
+  seal text not null default '',
+  vessel_name text not null default '',
+  mmsi text not null default '',
+  voyage text not null default '',
+  origin_port text not null default '',
+  destination text not null default 'GH',
+  destination_port text not null default '',
+  cutoff_date date,
+  etd date,
+  eta date,
+  status text not null default 'booked',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  unique (shipper_id, ref)
+);
+create table if not exists container_events (
+  id serial primary key,
+  container_id text not null references containers(id) on delete cascade,
+  status text not null,
+  at timestamptz not null default now(),
+  place text not null default '',
+  note text not null default '',
+  by_name text not null default ''
+);
+alter table shipments add column if not exists container_id text references containers(id) on delete set null;
+create index if not exists idx_shipments_container on shipments(container_id);
+create index if not exists idx_container_events on container_events(container_id);
+
 `
 
 async function migrate(d: Db) {
@@ -479,4 +516,37 @@ async function seedHistoryDemo(d: Db) {
       }
     }
   }
+}
+
+/** Two demo containers for Gold Coast: one on the water with two orders loaded, one just booked. Idempotent. */
+async function seedContainerDemo(d: Db) {
+  const { rows } = await d.query<{ n: string }>(`select count(*)::text as n from containers where shipper_id = 'gold-coast-freight'`)
+  if (Number(rows[0].n) > 0) return
+  await d.query(`insert into containers (id,shipper_id,ref,number,size,line,booking_ref,seal,vessel_name,mmsi,voyage,origin_port,destination,destination_port,cutoff_date,etd,eta,status,notes,created_at) values
+    ('cn_demo_1','gold-coast-freight','CN-2026-001','MSKU7712043','40hc','Maersk','MAEU2298811','ML-448120','Grande Africa','247189000','GA2236','Port of Houston','GH','Tema',$1,$2,$3,'sailed','Mixed barrels and boxes. Consignee list emailed to Tema agent.',$4),
+    ('cn_demo_2','gold-coast-freight','CN-2026-002','','40ft','MSC','MSCUHOU5521','','','','','Port of Houston','GH','Tema',$5,$6,$7,'loading','Vehicle + barrels consolidation for the Sept 19 sailing.',$8)`,
+    [dateOnly(addDays(-14)), dateOnly(addDays(-11)), dateOnly(addDays(22)), addDays(-20), dateOnly(addDays(9)), dateOnly(addDays(12)), dateOnly(addDays(46)), addDays(-3)])
+  await d.query(`insert into container_events (container_id,status,at,place,note,by_name) values
+    ('cn_demo_1','booked',$1,'Houston, TX','Booked 40HC with Maersk for the Sept sailing.','Nana Boateng'),
+    ('cn_demo_1','loading',$2,'Gold Coast yard, Houston','Loading started.','Kwesi Appiah'),
+    ('cn_demo_1','gated_in',$3,'Port of Houston','Gate-in confirmed, seal ML-448120.','Nana Boateng'),
+    ('cn_demo_1','sailed',$4,'Port of Houston','Sailed on Grande Africa, voyage GA2236.','Nana Boateng'),
+    ('cn_demo_2','booked',$5,'Houston, TX','Booked 40ft with MSC.','Nana Boateng'),
+    ('cn_demo_2','loading',$6,'Gold Coast yard, Houston','First pallets in.','Kwesi Appiah')`,
+    [addDays(-20), addDays(-16), addDays(-13), addDays(-11), addDays(-3), addDays(-1)])
+  await d.query(`update shipments set container_id = 'cn_demo_1' where id in ('sh_hist_7','sh_hist_9') and shipper_id = 'gold-coast-freight'`)
+  await d.query(`update shipments set container_id = 'cn_demo_2', status = 'picked_up' where id = 's_demo_pick' and shipper_id = 'gold-coast-freight' and status = 'booked'`)
+  await d.query(`insert into shipment_events (shipment_id,status,at,place,note) select 's_demo_pick','picked_up',$1,'Gold Coast yard, Houston','Loaded into container CN-2026-002.' where not exists (select 1 from shipment_events where shipment_id = 's_demo_pick' and status = 'picked_up')`, [addDays(-1)])
+  // Won orders still waiting to be consolidated into a container.
+  await d.query(`insert into shipments (id,ref,shipper_id,user_id,client_id,mode,origin,destination,cargo,description,status,eta,customer,created_at) values
+    ('s_demo_wait_1','SS-9KD4LM','gold-coast-freight',null,'cl_demo_kofi','ocean','Houston, TX','GH','vehicle','2019 Toyota RAV4 — title and keys with the yard','booked',$1,'Kofi Mensah',$3),
+    ('s_demo_wait_2','SS-2QW8NB','gold-coast-freight',null,null,'ocean','Dallas, TX','GH','barrels','4 barrels — clothing, shoes and dry goods for Kumasi','booked',$1,'Abena Owusu',$4),
+    ('s_demo_wait_3','SS-6TR1PA','gold-coast-freight',null,null,'ocean','Houston, TX','NG','boxes','12 boxes of medical supplies for a clinic in Lagos','picked_up',$2,'Chidi Okafor',$5)
+    on conflict (id) do nothing`, [dateOnly(addDays(46)), dateOnly(addDays(40)), addDays(-4), addDays(-2), addDays(-6)])
+  await d.query(`insert into shipment_events (shipment_id,status,at,place,note) select v.* from (values
+    ('s_demo_wait_1','booked',$1::timestamptz,'Houston, TX','Quote accepted. Awaiting container.'),
+    ('s_demo_wait_2','booked',$2::timestamptz,'Dallas, TX','Quote accepted. Pickup to be scheduled.'),
+    ('s_demo_wait_3','booked',$3::timestamptz,'Houston, TX','Quote accepted.'),
+    ('s_demo_wait_3','picked_up',$4::timestamptz,'Gold Coast yard, Houston','Collected and palletised.')) as v(shipment_id,status,at,place,note)
+    where not exists (select 1 from shipment_events e where e.shipment_id = v.shipment_id and e.status = v.status)`, [addDays(-4), addDays(-2), addDays(-6), addDays(-3)])
 }

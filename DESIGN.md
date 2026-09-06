@@ -2,32 +2,31 @@
 
 Ship Sync is a marketplace that connects air and ocean shippers (freight forwarders, consolidators, carriers) with customers shipping to West Africa — Ghana, Nigeria, Liberia, Togo, Côte d'Ivoire, Sierra Leone, Senegal. Audience: diaspora individuals shipping barrels/boxes/vehicles home, SME importers, and the shippers who serve them. Goal: quote requests from customers and sign-ups from shippers.
 
-## 1. Style direction — "Premium Logistics Editorial"
+## 1. Style direction — "Light Logistics Editorial"
 
-Dark navy foundation with warm gold accents, generous whitespace, large editorial headlines, bento-style feature cards, and glass-tinted surfaces over deep navy for the hero and dashboards. Why: freight is a trust business — people are handing over vehicles and containers worth thousands. Navy reads as reliable and institutional; gold adds warmth and echoes West-African kente/adinkra tones without cliché. The editorial type scale makes it feel like an established brand, not a startup template.
+Warm off-white pages, deep navy type, and gold used sparingly as the brand signature (logo, primary button, small highlights). Large editorial serif headlines, generous whitespace, white cards with hairline borders and soft shadows. The hero, footer and live map stay as **dark navy islands** (class `theme-dark`) so the brand keeps its cinematic photography and the navy identity, while the body of the site reads like an established freight institution rather than a startup template. Why the switch from all-dark: freight is a trust business, and light editorial layouts (Flexport, Maersk, the FT) signal "institution" more strongly than a dark UI, which reads as "tool". The dark islands preserve warmth and drama where it counts.
 
 ## 2. Color palette
 
-| Token | Hex | Use |
-|---|---|---|
-| `--color-bg` | `#0B1220` | Page background (dark sections, app shell) |
-| `--color-surface` | `#111B2E` | Cards, nav, panels on dark |
-| `--color-surface-2` | `#182540` | Elevated cards, inputs on dark |
-| `--color-light` | `#F7F5F0` | Light section background (warm off-white) |
-| `--color-light-surface` | `#FFFFFF` | Cards on light sections |
-| `--color-text` | `#F4F6FA` | Primary text on dark |
-| `--color-text-muted` | `#A3AEC2` | Muted text on dark (contrast 7.6:1 on bg) |
-| `--color-ink` | `#0B1220` | Primary text on light |
-| `--color-ink-muted` | `#4B5563` | Muted text on light (7.4:1 on light) |
-| `--color-gold` | `#E3B54A` | Primary accent (CTAs, highlights) — 9.9:1 on bg |
-| `--color-gold-deep` | `#B8891F` | Gold hover / on-light accent (4.6:1 on light) |
-| `--color-teal` | `#2DD4BF` | Secondary accent (ocean / status success) |
-| `--color-sky` | `#7DD3FC` | Air freight accent |
-| `--color-border` | `#24324D` | Borders on dark |
-| `--color-border-light` | `#E5E1D8` | Borders on light |
-| `--color-danger` | `#F87171` | Errors |
+Tokens are CSS variables in `src/index.css`. The root scope is light; `.theme-dark` re-points the same tokens to the navy set, so every component works in both without conditional classes.
 
-Contrast checks: `#F4F6FA` on `#0B1220` = 17:1; `#A3AEC2` on `#0B1220` = 7.6:1; `#0B1220` on `#E3B54A` (button text) = 10.5:1; `#4B5563` on `#F7F5F0` = 7.4:1. All ≥ 4.5:1.
+| Token | Light (root) | Dark island (`.theme-dark`) | Use |
+|---|---|---|---|
+| `--color-bg` | `#F7F5F0` | `#0B1220` | Page background |
+| `--color-surface` | `#FFFFFF` | `#111B2E` | Cards, panels, nav |
+| `--color-surface-2` | `#F1EEE6` | `#182540` | Inputs, elevated chips |
+| `--color-light` / `--color-light-surface` | `#FFFFFF` | — | Alternating white sections on the home page |
+| `--color-text` | `#0B1B33` | `#F4F6FA` | Primary text |
+| `--color-text-muted` | `#5B6578` | `#A3AEC2` | Secondary text |
+| `--color-ink` / `--color-ink-muted` | `#0B1B33` / `#5B6578` | same | Text on light sections and on gold |
+| `--color-gold` | `#C99C33` | `#E3B54A` | Primary accent (CTAs, badges, stars) |
+| `--color-gold-deep` | `#9A7420` | `#CFA23A` | Eyebrows, gold text on light, hover |
+| `--color-teal` | `#0E8F7E` | `#2DD4BF` | Ocean / success |
+| `--color-sky` | `#2B6CB0` | `#7DD3FC` | Air freight |
+| `--color-border` | `#E3DED3` | `#24324D` | Hairline borders |
+| `--color-danger` | `#C03A3A` | `#F87171` | Errors |
+
+Contrast checks (light): `#0B1B33` on `#F7F5F0` = 15.6:1; `#5B6578` on `#FFFFFF` = 5.6:1; `#9A7420` on `#FFFFFF` = 4.6:1 (eyebrows); `#0B1220` on `#C99C33` (button text) = 7.2:1. Dark island values unchanged from the original palette (all ≥ 4.5:1).
 
 ## 3. Typography
 

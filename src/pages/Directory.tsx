@@ -9,7 +9,6 @@ import { fadeUp, stagger } from '../lib/motion'
 
 const PAGE = 9
 const priceLabel = (i: number) => (i === 1 ? '$' : i === 2 ? '$$' : '$$$')
-const flags = (codes: string[]) => codes.map((c) => countryByCode(c)?.flag ?? c).join(' ')
 
 /* ---------- card ---------- */
 function PlanBadge({ s }: { s: Shipper }) {
@@ -35,7 +34,7 @@ export function DirectoryCard({ s, quote }: { s: Shipper; quote?: string }) {
         <Rating value={s.rating} count={s.reviews} />
         <span className="ml-auto text-xs font-semibold text-text-muted" title="Price level">{priceLabel(s.priceIndex)}</span>
       </div>
-      <p className="mt-3 text-sm text-text-muted"><span className="mr-1.5" aria-hidden="true">{flags(s.destinations)}</span>{s.destinations.map((d) => countryByCode(d)?.name).filter(Boolean).join(', ')}<span className="text-text-muted/60"> · from {s.hq}</span></p>
+      <p className="mt-3 text-sm text-text-muted">Ships to {s.destinations.map((d) => countryByCode(d)?.name).filter(Boolean).join(', ')}<span className="text-text-muted/60"> · from {s.hq}</span></p>
       {doorish.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{doorish.map((x) => <li key={x} className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-text-muted">{x}</li>)}</ul>}
       <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3 text-center text-xs">
         <div><dt className="text-text-muted">On-time</dt><dd className="font-semibold">{s.onTime}%</dd></div>
@@ -99,7 +98,7 @@ function Wizard({ initial, onClose, onApply }: { initial: Partial<Needs>; onClos
             <ol className="mt-5 flex gap-1.5" aria-label="Progress">{steps.map((s, i) => <li key={s} className={`h-1.5 flex-1 rounded-full ${i <= step ? 'bg-gold' : 'bg-surface-2'}`} aria-current={i === step ? 'step' : undefined}><span className="sr-only">{s}</span></li>)}</ol>
             <p className="mt-2 text-xs text-text-muted">Step {step + 1} of {steps.length} · {steps[step]}</p>
             <div className="mt-5 min-h-[260px]">
-              {step === 0 && <div role="radiogroup" aria-label="Destination" className="grid gap-2 sm:grid-cols-2">{countries.map((c) => <Tile key={c.code} active={n.destination === c.code} onClick={() => setN({ ...n, destination: c.code })} title={`${c.flag} ${c.name}`} body={`Ocean ${c.oceanDays} days · Air ${c.airDays} days`} />)}</div>}
+              {step === 0 && <div role="radiogroup" aria-label="Destination" className="grid gap-2 sm:grid-cols-2">{countries.map((c) => <Tile key={c.code} active={n.destination === c.code} onClick={() => setN({ ...n, destination: c.code })} title={c.name} body={`Ocean ${c.oceanDays} days · Air ${c.airDays} days`} />)}</div>}
               {step === 1 && (
                 <div>
                   <label htmlFor="w-origin" className="label-dark">Where is the cargo now?</label>
@@ -199,7 +198,7 @@ export default function Directory() {
       <fieldset><legend className="label-dark">Destination</legend>
         <div className="grid gap-1">
           <button onClick={() => set({ destination: undefined })} aria-pressed={!dest} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${!dest ? 'bg-gold/15 font-semibold text-gold' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>All countries</span><span className="text-xs opacity-70">{res?.total != null && !dest && !q && active === 0 ? res.total : ''}</span></button>
-          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code })} aria-pressed={dest === c.code} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${dest === c.code ? 'bg-gold/15 font-semibold text-gold' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span><span aria-hidden="true">{c.flag}</span> {c.name}</span><span className="text-xs opacity-70">{facetCount(c.code) ?? ''}</span></button>)}
+          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code })} aria-pressed={dest === c.code} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${dest === c.code ? 'bg-gold/15 font-semibold text-gold' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>{c.name}</span><span className="text-xs opacity-70">{facetCount(c.code) ?? ''}</span></button>)}
         </div>
       </fieldset>
       <div><label htmlFor="f-origin" className="label-dark">Shipping from</label><select id="f-origin" className="input-dark !min-h-10 text-sm" value={origin} onChange={(e) => set({ origin: e.target.value })}><option value="">Anywhere</option>{origins.map((o) => <option key={o}>{o}</option>)}</select></div>
@@ -231,9 +230,9 @@ export default function Directory() {
           </motion.div>
           <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
             <span className="text-text-muted">Popular:</span>
-            {countries.slice(0, 5).map((c) => <button key={c.code} onClick={() => set({ destination: dest === c.code ? undefined : c.code })} aria-pressed={dest === c.code} className={`rounded-full border px-3 py-1 text-xs focus-ring ${dest === c.code ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}><span aria-hidden="true">{c.flag}</span> {c.name}</button>)}
-            <button onClick={() => set({ cargo: cargo === 'vehicle' ? undefined : 'vehicle' })} aria-pressed={cargo === 'vehicle'} className={`rounded-full border px-3 py-1 text-xs focus-ring ${cargo === 'vehicle' ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>🚗 Vehicles</button>
-            <button onClick={() => set({ mode: mode === 'air' ? undefined : 'air' })} aria-pressed={mode === 'air'} className={`rounded-full border px-3 py-1 text-xs focus-ring ${mode === 'air' ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>✈️ Air freight</button>
+            {countries.slice(0, 5).map((c) => <button key={c.code} onClick={() => set({ destination: dest === c.code ? undefined : c.code })} aria-pressed={dest === c.code} className={`rounded-full border px-3 py-1 text-xs focus-ring ${dest === c.code ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>{c.name}</button>)}
+            <button onClick={() => set({ cargo: cargo === 'vehicle' ? undefined : 'vehicle' })} aria-pressed={cargo === 'vehicle'} className={`rounded-full border px-3 py-1 text-xs focus-ring ${cargo === 'vehicle' ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>Vehicles</button>
+            <button onClick={() => set({ mode: mode === 'air' ? undefined : 'air' })} aria-pressed={mode === 'air'} className={`rounded-full border px-3 py-1 text-xs focus-ring ${mode === 'air' ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>Air freight</button>
           </div>
         </div>
       </section>
@@ -246,13 +245,13 @@ export default function Directory() {
               <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gold"><Crown size={14} aria-hidden="true" /> Featured shippers{dest ? ` · ${countryByCode(dest)?.name}` : ''}</p><p className="mt-1 text-sm text-text-muted">Enterprise partners with priority placement. Sponsored.</p></div>
               <Link to="/#pricing" className="text-sm text-text-muted underline-offset-4 hover:text-gold hover:underline focus-ring">Get your company featured →</Link>
             </div>
-            <div className="-mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-2 md:-mx-10 md:px-10 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
+            <div className="no-scrollbar -mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-2 md:-mx-10 md:px-10 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
               {featured.map((s) => (
                 <Link key={s.id} to={`/shippers/${s.id}`} className="group relative w-[300px] shrink-0 snap-start overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-br from-surface to-bg p-5 transition-colors hover:border-gold/60 focus-ring">
                   <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40" style={{ background: s.hue }} aria-hidden="true" />
                   <div className="flex items-center gap-3"><Avatar initials={s.initials} hue={s.hue} size={44} /><div className="min-w-0"><p className="truncate font-heading text-base font-bold">{s.name}</p><p className="truncate text-xs text-text-muted">{s.hq}</p></div></div>
                   <p className="mt-3 line-clamp-2 text-sm text-text-muted">{s.tagline}</p>
-                  <div className="mt-3 flex items-center gap-2 text-xs"><Rating value={s.rating} count={s.reviews} /><span className="ml-auto" aria-hidden="true">{flags(s.destinations)}</span></div>
+                  <div className="mt-3 flex items-center gap-2 text-xs"><Rating value={s.rating} count={s.reviews} /><span className="ml-auto text-text-muted">{s.destinations.length} {s.destinations.length === 1 ? 'country' : 'countries'}</span></div>
                 </Link>
               ))}
             </div>

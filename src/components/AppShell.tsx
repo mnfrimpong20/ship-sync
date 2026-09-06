@@ -45,7 +45,7 @@ export default function AppShell() {
     ? [
         { to: '/dashboard/shipper', label: 'Overview', icon: LayoutDashboard, end: true },
         { to: '/dashboard/shipper?view=leads', label: 'Leads & quotes', icon: Inbox, badge: openLeads },
-        { to: '/dashboard/shipper?view=shipments', label: 'Shipments', icon: Ship, badge: active },
+        { to: '/dashboard/shipments', label: 'Shipments', icon: Ship, badge: active },
         { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders },
         { to: '/dashboard/routes', label: 'Routes', icon: MapPinned },
         ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck } as Item] : []),

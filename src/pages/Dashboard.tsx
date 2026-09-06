@@ -117,7 +117,7 @@ export function CustomerDashboard() {
                               const best = i === 0 && r.status === 'open'
                               return (
                                 <div key={q.id} className={`relative rounded-[var(--radius-md)] border p-4 ${q.status === 'accepted' ? 'border-teal bg-teal/5' : q.status === 'declined' ? 'border-border opacity-50' : best ? 'border-gold' : 'border-border bg-surface-2'}`}>
-                                  {best && <span className="absolute -top-2.5 left-4 rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-ink">Lowest price</span>}
+                                  {best && <span className="absolute -top-2.5 left-4 rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent">Lowest price</span>}
                                   <div className="flex items-start gap-3">
                                     <Avatar initials={s.initials} hue={s.hue} size={40} />
                                     <div className="min-w-0 flex-1">

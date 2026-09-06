@@ -12,7 +12,7 @@ const priceLabel = (i: number) => (i === 1 ? '$' : i === 2 ? '$$' : '$$$')
 
 /* ---------- card ---------- */
 function PlanBadge({ s }: { s: Shipper }) {
-  if (s.plan === 'enterprise') return <span className="inline-flex items-center gap-1 rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-ink"><Crown size={11} aria-hidden="true" /> Featured</span>
+  if (s.plan === 'enterprise') return <span className="inline-flex items-center gap-1 rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent"><Crown size={11} aria-hidden="true" /> Featured</span>
   if (s.plan === 'pro') return <span className="inline-flex items-center gap-1 rounded-full border border-gold/50 px-2 py-0.5 text-[11px] font-semibold text-gold">Pro</span>
   return null
 }
@@ -160,7 +160,7 @@ function Wizard({ initial, onClose, onApply }: { initial: Partial<Needs>; onClos
                   <div className="flex items-start gap-4">
                     <FitRing fit={m.fit} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">{i === 0 && <span className="rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-ink">Best match</span>}<PlanBadge s={m.shipper} /><h3 className="!text-base"><Link to={`/shippers/${m.shipper.id}`} className="hover:text-gold focus-ring">{m.shipper.name}</Link></h3>{m.shipper.verified && <BadgeCheck size={15} className="text-teal" aria-label="Verified" />}</div>
+                      <div className="flex flex-wrap items-center gap-2">{i === 0 && <span className="rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent">Best match</span>}<PlanBadge s={m.shipper} /><h3 className="!text-base"><Link to={`/shippers/${m.shipper.id}`} className="hover:text-gold focus-ring">{m.shipper.name}</Link></h3>{m.shipper.verified && <BadgeCheck size={15} className="text-teal" aria-label="Verified" />}</div>
                       <p className="text-xs text-text-muted">{m.shipper.tagline} · <Star size={11} className="inline text-gold" aria-hidden="true" /> {m.shipper.rating} ({m.shipper.reviews}) · replies ~{m.shipper.responseHours}h · {priceLabel(m.shipper.priceIndex)}</p>
                       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                         {m.reasons.map((r) => <li key={r} className="inline-flex items-center gap-1 text-teal"><Check size={12} aria-hidden="true" /> {r}</li>)}
@@ -277,7 +277,7 @@ export default function Directory() {
         <div className="grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside>
             <div className="lg:sticky lg:top-24">
-              <button onClick={() => setShowFilters((s) => !s)} className="btn-ghost w-full lg:hidden" aria-expanded={showFilters}><Filter size={16} aria-hidden="true" /> Filters {active > 0 && <span className="rounded-full bg-gold px-2 text-xs font-bold text-ink">{active}</span>}</button>
+              <button onClick={() => setShowFilters((s) => !s)} className="btn-ghost w-full lg:hidden" aria-expanded={showFilters}><Filter size={16} aria-hidden="true" /> Filters {active > 0 && <span className="rounded-full bg-gold px-2 text-xs font-bold text-on-accent">{active}</span>}</button>
               <div className={`card-dark mt-3 p-5 lg:mt-0 ${showFilters ? '' : 'hidden lg:block'}`}>{filters}</div>
               <div className="mt-4 hidden rounded-2xl border border-dashed border-border p-4 text-xs text-text-muted lg:block">
                 <p className="font-semibold text-text">Are you a shipper?</p>

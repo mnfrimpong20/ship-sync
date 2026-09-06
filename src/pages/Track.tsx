@@ -138,7 +138,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
             {[...s.events].reverse().map((ev, i, arr) => (
               <motion.li key={ev.status + ev.at} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="relative flex gap-4 pb-6 last:pb-0">
                 {i < arr.length - 1 && <span className="absolute left-[11px] top-6 h-full w-px bg-border" aria-hidden="true" />}
-                <span className={`relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-full ${i === 0 ? 'bg-gold text-ink' : 'bg-surface-2 text-text-muted'}`}><Check size={13} aria-hidden="true" /></span>
+                <span className={`relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-full ${i === 0 ? 'bg-gold text-on-accent' : 'bg-surface-2 text-text-muted'}`}><Check size={13} aria-hidden="true" /></span>
                 <div>
                   <p className={`text-sm font-semibold ${i === 0 ? 'text-text' : 'text-text-muted'}`}>{statusLabels[ev.status]} <span className="font-normal text-text-muted">· {ev.place}</span></p>
                   <p className="text-xs text-text-muted">{fmtDateTime(ev.at)}</p>

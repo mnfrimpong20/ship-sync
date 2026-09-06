@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { AlertTriangle, ArrowLeft, ArrowRight, Boxes, Check, Container as ContainerIcon, ExternalLink, Pencil, Plus, Radar, Ship, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, Boxes, Check, Container as ContainerIcon, ExternalLink, Lock, Pencil, Plus, Radar, Ship, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { cargoLabel, countryByCode, statusLabels, type CargoType } from '../lib/data'
 import { CONTAINER_STAGES, canLoad, cargoCbm, containersApi, isOpen, sizeCbm, sizeLabels, stageBlurb, stageLabels, type Candidate, type ContainerDetail as Detail, type ContainerInput, type ContainerStatus } from '../lib/containers'
@@ -166,7 +166,7 @@ export default function ContainerDetail() {
             <motion.div variants={fadeUp} className="flex flex-wrap gap-2">
               {c.mmsi && <Link to={`/live?vessel=${c.mmsi}`} className="btn-ghost !min-h-10 !px-4 text-sm"><Radar size={15} aria-hidden="true" /> Track vessel</Link>}
               <button onClick={() => { setEditing((e) => !e); setError('') }} className="btn-ghost !min-h-10 !px-4 text-sm"><Pencil size={15} aria-hidden="true" /> Edit details</button>
-              {canLoad(c.status) && <button onClick={() => setLoading((l) => !l)} className="btn-ghost !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Load orders</button>}
+              {canLoad(c.status) ? <button onClick={() => setLoading((l) => !l)} className="btn-ghost !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Load orders</button> : <span className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-dashed border-border px-3 text-xs text-text-muted" title="Orders can only be added or removed before the container sails."><Lock size={13} aria-hidden="true" /> Loading closed{(() => { const e = d.events.find((x) => x.status === 'sailed'); return e ? ` — sailed ${fmtDate(e.at)}` : c.status === 'closed' ? ' — container closed' : '' })()}</span>}
               {next && <button onClick={() => setAdvancing(true)} className="btn-gold !min-h-10 !px-4 text-sm"><ArrowRight size={15} aria-hidden="true" /> Mark {stageLabels[next].toLowerCase()}</button>}
             </motion.div>
           </div>

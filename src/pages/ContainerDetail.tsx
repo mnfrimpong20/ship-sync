@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { AlertTriangle, ArrowLeft, ArrowRight, Boxes, Check, Container as ContainerIcon, ExternalLink, Lock, Pencil, Plus, Radar, Ship, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, Boxes, Check, Container as ContainerIcon, ExternalLink, Lock, Pencil, Plus, Radar, Radio, RefreshCw, Ship, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { cargoLabel, countryByCode, statusLabels, type CargoType } from '../lib/data'
-import { CONTAINER_STAGES, canLoad, cargoCbm, containersApi, isOpen, sizeCbm, sizeLabels, stageBlurb, stageLabels, type Candidate, type ContainerDetail as Detail, type ContainerInput, type ContainerStatus } from '../lib/containers'
+import { CONTAINER_STAGES, canLoad, cargoCbm, containersApi, isOpen, sizeCbm, sizeLabels, stageBlurb, stageLabels, type Candidate, type ContainerDetail as Detail, type ContainerInput, type ContainerStatus, type TrackingProvider, eventTitles } from '../lib/containers'
 import { Empty, Pill, fmtDate, fmtDateTime } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { ContainerForm, StageStepper, stageTone } from './Containers'
@@ -116,6 +116,9 @@ export default function ContainerDetail() {
   const [advancing, setAdvancing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState('')
+  const [provider, setProvider] = useState<TrackingProvider | null>(null)
+  const syncMinutes = 15
+  useEffect(() => { if (ready && user?.role === 'shipper') containersApi.provider().then(setProvider).catch(() => setProvider({ enabled: false, id: null, label: null, simulated: false })) }, [ready, user])
 
   useEffect(() => {
     if (!ready || user?.role !== 'shipper' || user.staffRole === 'driver') return
@@ -143,6 +146,10 @@ export default function ContainerDetail() {
     setBusy(true); setError('')
     try { apply(await containersApi.update(c.id, v), 'Details saved.'); setEditing(false) } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.') } finally { setBusy(false) }
   }
+  const carrierMsg = (r: Detail, fallback: string) => (r.changes && r.changes.length ? `${provider?.label ?? 'Carrier'}: ${r.changes.join(' · ')}.` : fallback)
+  const connect = async () => { setBusy(true); setError(''); try { const r = await containersApi.connect(c.id); apply(r, carrierMsg(r, 'Connected — waiting for the shipping line to publish the first event.')) } catch (e) { setError(e instanceof Error ? e.message : 'Could not connect.') } finally { setBusy(false) } }
+  const syncNow = async () => { setBusy(true); setError(''); try { const r = await containersApi.sync(c.id); apply(r, carrierMsg(r, 'Checked — nothing new from the line.')) } catch (e) { setError(e instanceof Error ? e.message : 'Could not check.') } finally { setBusy(false) } }
+  const disconnect = async () => { setBusy(true); setError(''); try { apply(await containersApi.disconnect(c.id), 'Carrier tracking disconnected.') } catch (e) { setError(e instanceof Error ? e.message : 'Could not disconnect.') } finally { setBusy(false) } }
   const unload = async (sid: string, ref: string) => {
     setBusy(true); setError('')
     try { apply(await containersApi.unload(c.id, sid), `${ref} removed from the container.`) } catch (e) { setError(e instanceof Error ? e.message : 'Could not remove.') } finally { setBusy(false) }
@@ -159,7 +166,7 @@ export default function ContainerDetail() {
             <motion.div variants={fadeUp} className="flex items-center gap-4">
               <span className="grid h-14 w-14 place-items-center rounded-2xl bg-surface-2 text-gold" aria-hidden="true"><ContainerIcon size={26} /></span>
               <div>
-                <div className="flex flex-wrap items-center gap-2"><h1 className="!text-[clamp(1.5rem,3vw,2.1rem)]">{c.ref}</h1><Pill tone={stageTone(c.status)}>{stageLabels[c.status]}</Pill></div>
+                <div className="flex flex-wrap items-center gap-2"><h1 className="!text-[clamp(1.5rem,3vw,2.1rem)]">{c.ref}</h1><Pill tone={stageTone(c.status)}>{stageLabels[c.status]}</Pill>{c.tracking.status === 'live' && <span className="inline-flex items-center gap-1 rounded-full border border-teal/40 bg-teal/10 px-2 py-0.5 text-[11px] font-medium text-teal"><Radio size={11} aria-hidden="true" /> Auto-updating from {c.line || 'carrier'}</span>}</div>
                 <p className="mt-1 text-sm text-text-muted">{sizeLabels[c.size]} · {c.line}{c.number ? ` · ${c.number}` : ''} · {c.originPort || '—'} → {c.destinationPort || dest?.name || c.destination}{c.destinationPort && dest ? `, ${dest.name}` : ''}</p>
               </div>
             </motion.div>
@@ -224,12 +231,20 @@ export default function ContainerDetail() {
               <motion.section variants={fadeUp} className="card-dark p-5" aria-labelledby="events-h">
                 <h2 id="events-h" className="!text-lg">Timeline</h2>
                 <ol className="mt-4 space-y-4">
-                  {[...d.events].sort((a, b) => CONTAINER_STAGES.indexOf(b.status) - CONTAINER_STAGES.indexOf(a.status)).map((e, i) => (
-                    <li key={i} className="flex gap-3">
-                      <span className={`mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full ${i === 0 ? 'bg-gold text-on-accent' : 'bg-surface-2 text-text-muted'}`} aria-hidden="true">{i === 0 ? <Ship size={12} /> : <Check size={12} />}</span>
-                      <div><p className="font-medium">{stageLabels[e.status]}{e.place ? <span className="font-normal text-text-muted"> · {e.place}</span> : null}</p><p className="text-xs text-text-muted">{fmtDateTime(e.at)}{e.by ? ` · ${e.by}` : ''}</p>{e.note && <p className="mt-1 text-sm text-text-muted">{e.note}</p>}</div>
-                    </li>
-                  ))}
+                  {(() => {
+                    // Stage changes are the milestones; carrier notes (details, loaded on vessel…) sit under the stage they happened in.
+                    const sorted = [...d.events].sort((a, b) => CONTAINER_STAGES.indexOf(b.status) - CONTAINER_STAGES.indexOf(a.status) || new Date(b.at).getTime() - new Date(a.at).getTime())
+                    const stageOf = new Set<string>(); const items = sorted.map((e) => { const first = !stageOf.has(e.status) && (e.code === '' || e.code in { GATE_IN: 1, DEPARTED: 1, ARRIVED: 1, DISCHARGED: 1 }); if (first) stageOf.add(e.status); return { e, milestone: first } })
+                    return items.map(({ e, milestone }, i) => (
+                      <li key={i} className={`flex gap-3 ${milestone ? '' : 'pl-1'}`}>
+                        <span className={`mt-1 grid shrink-0 place-items-center rounded-full ${milestone ? 'h-6 w-6' : 'ml-1 h-4 w-4'} ${i === 0 && milestone ? 'bg-gold text-on-accent' : e.source === 'carrier' ? 'bg-teal/15 text-teal' : 'bg-surface-2 text-text-muted'}`} aria-hidden="true">{milestone ? (i === 0 ? <Ship size={12} /> : <Check size={12} />) : <Radio size={9} />}</span>
+                        <div className={milestone ? '' : 'text-sm'}>
+                          <p className={milestone ? 'font-medium' : 'font-medium text-text-muted'}>{milestone ? stageLabels[e.status] : eventTitles[e.code] ?? e.code}{e.place ? <span className="font-normal text-text-muted"> · {e.place}</span> : null}{e.source === 'carrier' && <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-teal/40 px-1.5 text-[10px] font-medium text-teal"><Radio size={9} aria-hidden="true" /> via carrier</span>}</p>
+                          <p className="text-xs text-text-muted">{fmtDateTime(e.at)}{e.by ? ` · ${e.by}` : ''}</p>{e.note && <p className="mt-1 text-sm text-text-muted">{e.note}</p>}
+                        </div>
+                      </li>
+                    ))
+                  })()}
                 </ol>
               </motion.section>
             </div>
@@ -245,6 +260,29 @@ export default function ContainerDetail() {
                 {c.mmsi && <Link to={`/live?vessel=${c.mmsi}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold-deep hover:underline focus-ring"><Radar size={14} aria-hidden="true" /> Open on the live map</Link>}
                 {!c.vesselName && isOpen(c.status) && <p className="mt-3 text-xs text-text-muted">Add the vessel and MMSI once the line confirms — needed before marking it sailed, and it gives every customer live tracking.</p>}
               </section>
+              {provider?.enabled && (
+                <section className={`card-dark p-5 ${c.tracking.status === 'live' ? 'border-teal/40' : ''}`} aria-labelledby="carrier-h">
+                  <div className="flex items-start justify-between gap-2"><h2 id="carrier-h" className="!text-lg">Carrier tracking</h2>{c.tracking.status !== 'off' && <Pill tone={c.tracking.status === 'live' ? 'teal' : c.tracking.status === 'error' ? 'danger' : 'muted'}>{c.tracking.status === 'live' ? 'Live' : c.tracking.status === 'error' ? 'Error' : 'Waiting for the line'}</Pill>}</div>
+                  {c.tracking.status === 'off' ? (
+                    <>
+                      <p className="mt-2 text-sm text-text-muted">Connect this booking to {c.line || 'the shipping line'} and Ship Sync pulls the container number, seal, vessel and voyage as they are assigned, then moves the container through Gated in → Sailed → Arrived on its own — every loaded order and its customer tracking follow.</p>
+                      {provider.simulated && <p className="mt-2 text-xs text-text-muted">This server runs the built-in carrier simulator — a real line or aggregator plugs in with one setting.</p>}
+                      {!c.bookingRef && !c.number && <p className="mt-2 text-xs text-danger">Add the booking reference (Edit details) first.</p>}
+                      {isOpen(c.status) && <button onClick={connect} disabled={busy || (!c.bookingRef && !c.number)} className="btn-gold mt-4 !min-h-10 !px-4 text-sm disabled:opacity-60"><Radio size={15} aria-hidden="true" /> {busy ? 'Connecting…' : `Connect to ${c.line || 'carrier'}`}</button>}
+                    </>
+                  ) : (
+                    <>
+                      <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">{fact('Source', provider.label)}{fact('Booking', c.bookingRef, true)}{fact('Last checked', c.tracking.syncedAt ? fmtDateTime(c.tracking.syncedAt) : 'Not yet')}{fact('Checks every', `${syncMinutes} min`)}</dl>
+                      {c.tracking.status === 'error' && <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">{c.tracking.error}</p>}
+                      {c.tracking.status === 'pending' && <p className="mt-3 text-xs text-text-muted">The line hasn’t published anything for this booking yet — that’s normal for the first few hours. We keep checking.</p>}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button onClick={syncNow} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-sm disabled:opacity-60"><RefreshCw size={14} aria-hidden="true" className={busy ? 'animate-spin' : ''} /> Check now</button>
+                        <button onClick={disconnect} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-sm text-text-muted disabled:opacity-60">Disconnect</button>
+                      </div>
+                    </>
+                  )}
+                </section>
+              )}
               {c.notes && <section className="card-dark p-5" aria-labelledby="notes-h"><h2 id="notes-h" className="!text-lg">Notes</h2><p className="mt-2 whitespace-pre-wrap text-sm text-text-muted">{c.notes}</p></section>}
             </motion.aside>
           </div>

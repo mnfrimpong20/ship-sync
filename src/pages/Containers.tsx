@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Anchor, Boxes, Check, Container as ContainerIcon, Plus, Search, Ship, Waves, X } from 'lucide-react'
+import { Anchor, Boxes, Check, Container as ContainerIcon, Plus, Radio, Search, Ship, Waves, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { countries, countryByCode } from '../lib/data'
 import { CONTAINER_STAGES, SIZES, containersApi, isOpen, sizeLabels, stageLabels, type Container, type ContainerInput, type ContainerSize, type ContainerStatus } from '../lib/containers'
@@ -129,7 +129,7 @@ export default function Containers() {
                   <Link to={`/dashboard/containers/${c.id}`} className={`card-dark block p-5 transition-colors hover:border-gold/40 focus-ring ${!isOpen(c.status) ? 'opacity-70' : ''}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-surface-2 text-gold" aria-hidden="true"><ContainerIcon size={20} /></span><div><p className="font-semibold">{c.ref}{c.number && <span className="ml-2 font-mono text-xs font-normal text-text-muted">{c.number}</span>}</p><p className="text-xs text-text-muted">{sizeLabels[c.size]} · {c.line}{c.bookingRef ? ` · ${c.bookingRef}` : ''}</p></div></div>
-                      <Pill tone={stageTone(c.status)}>{stageLabels[c.status]}</Pill>
+                      <div className="flex flex-col items-end gap-1"><Pill tone={stageTone(c.status)}>{stageLabels[c.status]}</Pill>{c.tracking?.status === 'live' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-teal"><Radio size={10} aria-hidden="true" /> auto-updating</span>}</div>
                     </div>
                     <div className="mt-4"><StageStepper status={c.status} compact /></div>
                     <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm sm:grid-cols-4">

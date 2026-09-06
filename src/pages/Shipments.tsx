@@ -1,13 +1,14 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Filter, Package, Plane, Plus, Radar, Search, Ship, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Container, ChevronLeft, ChevronRight, Download, ExternalLink, Filter, Package, Plane, Plus, Radar, Search, Ship, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { countries, countryByCode, statusLabels, statusOrder, type Mode, type Shipment, type ShipmentStatus } from '../lib/data'
 import { clientsApi, type Client } from '../lib/clients'
 import { Empty, ModeBadge, Pill, fmtDate } from '../components/ui'
 import { ShipmentDetail } from './Track'
 import { fadeUp, stagger } from '../lib/motion'
+import { containersApi, type Container as ContainerRec } from '../lib/containers'
 
 type Bucket = 'all' | 'active' | 'pickup' | 'transit' | 'destination' | 'late' | 'untracked' | 'delivered'
 type Sort = 'newest' | 'eta' | 'status' | 'ref'
@@ -80,6 +81,9 @@ export default function Shipments() {
   const [tracking, setTracking] = useState<string | null>(null)
   const [modal, setModal] = useState(false)
   const [toast, setToast] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
+  const [containers, setContainers] = useState<ContainerRec[]>([])
+  useEffect(() => { if (ready && user?.role === 'shipper' && user.staffRole !== 'driver') containersApi.list().then(setContainers).catch(() => {}) }, [ready, user])
+  const containerOf = (s: Shipment) => (s.containerId ? containers.find((c) => c.id === s.containerId) : undefined)
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
 
   const mine = useMemo(() => shipments.filter((s) => s.shipperId === user?.shipperId), [shipments, user])
@@ -154,7 +158,7 @@ export default function Shipments() {
                           <td className="px-3 py-3">{s.clientId ? <Link to={`/dashboard/clients/${s.clientId}`} className="hover:text-gold-deep focus-ring">{s.customer}</Link> : s.customer}</td>
                           <td className="px-3 py-3"><Pill tone={s.status === 'delivered' ? 'green' : late ? 'danger' : 'teal'}>{statusLabels[s.status]}</Pill><div className="mt-1.5"><Progress status={s.status} /></div></td>
                           <td className="px-3 py-3 tabular-nums">{s.eta ? <span className={late ? 'font-semibold text-danger' : ''}>{fmtDate(s.eta + 'T12:00:00Z')}{late && <span className="block text-[11px] font-normal">past ETA</span>}</span> : '—'}</td>
-                          <td className="px-3 py-3 text-xs">{s.flight || s.vesselName ? <span className="inline-flex items-center gap-1">{s.mode === 'air' ? <Plane size={13} className="text-sky" aria-hidden="true" /> : <Ship size={13} className="text-teal" aria-hidden="true" />}{s.flight ?? s.vesselName}{s.mmsi ? <span className="text-text-muted"> · {s.mmsi}</span> : ''}</span> : s.status !== 'delivered' ? <button onClick={() => { setOpen(s.id); setTracking(s.id) }} className="text-gold-deep hover:underline focus-ring">Add tracking</button> : <span className="text-text-muted">—</span>}</td>
+                          <td className="px-3 py-3 text-xs">{(() => { const c = containerOf(s); return <>{c && <Link to={`/dashboard/containers/${c.id}`} className="mb-1 inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold-deep hover:border-gold focus-ring"><Container size={11} aria-hidden="true" /> {c.ref}</Link>}{c && <br />}{s.flight || s.vesselName ? <span className="inline-flex items-center gap-1">{s.mode === 'air' ? <Plane size={13} className="text-sky" aria-hidden="true" /> : <Ship size={13} className="text-teal" aria-hidden="true" />}{s.flight ?? s.vesselName}{s.mmsi ? <span className="text-text-muted"> · {s.mmsi}</span> : ''}</span> : c ? <span className="text-text-muted">Follows container</span> : s.status !== 'delivered' ? <button onClick={() => { setOpen(s.id); setTracking(s.id) }} className="text-gold-deep hover:underline focus-ring">Add tracking</button> : <span className="text-text-muted">—</span>}</> })()}</td>
                           <td className="px-3 py-3 text-right"><div className="inline-flex gap-1.5">{s.status !== 'delivered' && <button onClick={() => advance(s)} disabled={busy} className="btn-ghost !min-h-8 whitespace-nowrap !px-2.5 text-xs disabled:opacity-60">Next step <ChevronRight size={13} aria-hidden="true" /></button>}<Link to={`/track?ref=${s.ref}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Open tracking page for ${s.ref}`} title="Tracking page"><ExternalLink size={13} /></Link></div></td>
                         </tr>
                         {isOpen && (

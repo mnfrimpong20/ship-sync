@@ -13,6 +13,7 @@
   --color-ink-muted: #5B6578;
   --color-gold: #C99C33;
   --color-gold-deep: #9A7420;
+  --color-on-accent: #0B1220;
   --color-teal: #0E8F7E;
   --color-sky: #2B6CB0;
   --color-border: #E3DED3;
@@ -39,12 +40,47 @@
   --color-text-muted: #A3AEC2;
   --color-gold: #E3B54A;
   --color-gold-deep: #CFA23A;
+  --color-on-accent: #0B1220;
   --color-teal: #2DD4BF;
   --color-sky: #7DD3FC;
   --color-border: #24324D;
   --color-danger: #F87171;
   --shadow-dark: 0 20px 60px -20px rgb(0 0 0 / 0.5);
   color-scheme: dark;
+}
+
+
+/* ---------- Brand themes (switcher in the nav; persisted in localStorage as ss-brand) ----------
+   "ink" is the default above. Each brand re-points the light tokens, then its dark-island tokens. */
+:root[data-brand="forest"] {
+  --color-bg: #F8F6EF; --color-surface: #FFFFFF; --color-surface-2: #F1EFE5; --color-light: #FFFFFF; --color-light-surface: #FFFFFF;
+  --color-text: #14392E; --color-text-muted: #5C6A62; --color-ink: #14392E; --color-ink-muted: #5C6A62;
+  --color-gold: #C9A227; --color-gold-deep: #8F7218; --color-on-accent: #14261E;
+  --color-teal: #3E8E5F; --color-sky: #2F6F9F; --color-border: #E2DFD2; --color-border-light: #E2DFD2; --color-danger: #B83A3A;
+}
+:root[data-brand="forest"] .theme-dark {
+  --color-bg: #0C2A22; --color-surface: #12352C; --color-surface-2: #1A4237; --color-text: #F3F6F2; --color-text-muted: #A9BDB2;
+  --color-gold: #E2BE4A; --color-gold-deep: #D1AD3A; --color-on-accent: #0C2A22; --color-teal: #5CC29A; --color-sky: #8FCBE8; --color-border: #244F43; --color-danger: #F58A8A;
+}
+:root[data-brand="slate"] {
+  --color-bg: #F4F6F8; --color-surface: #FFFFFF; --color-surface-2: #EDF0F4; --color-light: #FFFFFF; --color-light-surface: #FFFFFF;
+  --color-text: #1F2933; --color-text-muted: #5F6B7A; --color-ink: #1F2933; --color-ink-muted: #5F6B7A;
+  --color-gold: #0F8A6B; --color-gold-deep: #0B6B52; --color-on-accent: #FFFFFF;
+  --color-teal: #0F8A6B; --color-sky: #2F6FD6; --color-border: #DDE3EA; --color-border-light: #DDE3EA; --color-danger: #C0392B;
+}
+:root[data-brand="slate"] .theme-dark {
+  --color-bg: #101820; --color-surface: #17212B; --color-surface-2: #1F2B37; --color-text: #F2F5F8; --color-text-muted: #9AA8B8;
+  --color-gold: #34D399; --color-gold-deep: #2BBD86; --color-on-accent: #06281C; --color-teal: #34D399; --color-sky: #7CB3FF; --color-border: #2A3744; --color-danger: #F87171;
+}
+:root[data-brand="cobalt"] {
+  --color-bg: #FBF8F1; --color-surface: #FFFFFF; --color-surface-2: #F3EFE5; --color-light: #FFFFFF; --color-light-surface: #FFFFFF;
+  --color-text: #0B1B33; --color-text-muted: #5B6578; --color-ink: #0B1B33; --color-ink-muted: #5B6578;
+  --color-gold: #1F4FB8; --color-gold-deep: #173E93; --color-on-accent: #FFFFFF;
+  --color-teal: #0E8F7E; --color-sky: #1F4FB8; --color-border: #E6E0D3; --color-border-light: #E6E0D3; --color-danger: #C0392B;
+}
+:root[data-brand="cobalt"] .theme-dark {
+  --color-bg: #0A1F4A; --color-surface: #102A5E; --color-surface-2: #17346E; --color-text: #F4F6FA; --color-text-muted: #A9B6CC;
+  --color-gold: #8FB4FF; --color-gold-deep: #A9C4FF; --color-on-accent: #0A1F4A; --color-teal: #2DD4BF; --color-sky: #8FB4FF; --color-border: #24427F; --color-danger: #F87171;
 }
 
 html { scroll-behavior: smooth; }
@@ -66,7 +102,7 @@ h3 { font-size: 1.375rem; line-height: 1.25; font-weight: 600; }
 @utility eyebrow { @apply text-xs font-semibold uppercase tracking-[0.14em] text-gold-deep; }
 @utility focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-bg; }
 @utility btn { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 text-[15px] font-semibold transition-colors duration-200 focus-ring; }
-@utility btn-gold { @apply btn bg-gold text-[#0B1220] hover:bg-gold-deep hover:text-white; }
+@utility btn-gold { @apply btn bg-gold text-on-accent hover:bg-gold-deep; }
 @utility btn-ghost { @apply btn border border-border bg-transparent text-text hover:border-text hover:bg-surface; }
 @utility btn-light { @apply btn border border-border-light bg-light-surface text-ink hover:border-gold-deep hover:text-gold-deep; }
 @utility card-dark { @apply rounded-[var(--radius-lg)] border border-border bg-surface shadow-[var(--shadow-dark)]; }

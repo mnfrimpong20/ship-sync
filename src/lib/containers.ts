@@ -21,12 +21,16 @@ export const sizeLabels: Record<ContainerSize, string> = { '20ft': '20ft standar
 export const sizeCbm: Record<ContainerSize, number> = { '20ft': 33, '40ft': 67, '40hc': 76, reefer: 60 }
 export const cargoCbm: Record<string, number> = { barrels: 1.2, boxes: 0.8, pallets: 2.2, vehicle: 14, container20: 33, container40: 67, commercial: 4 }
 
-export interface Container { id: string; ref: string; number: string; size: ContainerSize; line: string; bookingRef: string; seal: string; vesselName: string; mmsi: string; voyage: string; originPort: string; destination: string; destinationPort: string; cutoffDate: string | null; etd: string | null; eta: string | null; status: ContainerStatus; notes: string; createdAt: string; loaded?: number }
-export type ContainerInput = Partial<Omit<Container, 'id' | 'ref' | 'status' | 'createdAt' | 'loaded'>>
-export interface ContainerEvent { status: ContainerStatus; at: string; place: string; note: string; by: string }
-export interface ContainerDetail { container: Container; events: ContainerEvent[]; shipments: (Shipment & { clientName: string | null })[]; cascaded?: number }
+export interface Container { id: string; ref: string; number: string; size: ContainerSize; line: string; bookingRef: string; seal: string; vesselName: string; mmsi: string; voyage: string; originPort: string; destination: string; destinationPort: string; cutoffDate: string | null; etd: string | null; eta: string | null; status: ContainerStatus; notes: string; createdAt: string; loaded?: number; imo: string; tracking: { provider: string; status: TrackingStatus; subscribedAt: string | null; syncedAt: string | null; error: string } }
+export type TrackingStatus = 'off' | 'pending' | 'live' | 'error'
+export interface TrackingProvider { enabled: boolean; id: string | null; label: string | null; simulated: boolean }
+export type ContainerInput = Partial<Omit<Container, 'id' | 'ref' | 'status' | 'createdAt' | 'loaded' | 'imo' | 'tracking'>>
+export interface ContainerEvent { status: ContainerStatus; at: string; place: string; note: string; by: string; source: 'manual' | 'carrier'; code: string }
+export interface ContainerDetail { container: Container; events: ContainerEvent[]; shipments: (Shipment & { clientName: string | null })[]; cascaded?: number; changes?: string[] }
 export interface Candidate { id: string; ref: string; origin: string; destination: string; cargo: string; description: string; status: ShipmentStatus; customer: string; clientName: string | null; eta: string; sameLane: boolean }
 
+/** Carrier events that don't change the stage still show on the timeline under these titles. */
+export const eventTitles: Record<string, string> = { CONNECTED: 'Carrier tracking connected', DISCONNECTED: 'Carrier tracking disconnected', DETAILS: 'Details from the shipping line', BOOKED: 'Booking confirmed', GATE_IN: 'Gate in at origin terminal', LOADED: 'Loaded on vessel', DEPARTED: 'Vessel departed', TRANSSHIP: 'Transhipment', ARRIVED: 'Vessel arrived', DISCHARGED: 'Discharged at destination terminal', GATE_OUT: 'Gate out at destination', EMPTY_RETURN: 'Empty container returned' }
 export const isOpen = (s: ContainerStatus) => s !== 'devanned' && s !== 'closed'
 export const canLoad = (s: ContainerStatus) => s === 'booked' || s === 'loading' || s === 'gated_in'
 
@@ -39,4 +43,8 @@ export const containersApi = {
   load: (id: string, shipmentIds: string[]) => api<ContainerDetail>(`/containers/${id}/load`, { json: { shipmentIds } }),
   unload: (id: string, shipmentId: string) => api<ContainerDetail>(`/containers/${id}/unload`, { json: { shipmentId } }),
   advance: (id: string, b: { status: ContainerStatus; at?: string; place?: string; note?: string }) => api<ContainerDetail>(`/containers/${id}/advance`, { json: b }),
+  provider: () => api<TrackingProvider>('/containers/tracking/provider'),
+  connect: (id: string) => api<ContainerDetail>(`/containers/${id}/tracking`, { method: 'POST', json: {} }),
+  sync: (id: string) => api<ContainerDetail>(`/containers/${id}/tracking/sync`, { method: 'POST', json: {} }),
+  disconnect: (id: string) => api<ContainerDetail>(`/containers/${id}/tracking`, { method: 'DELETE' }),
 }

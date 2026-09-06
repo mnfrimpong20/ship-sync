@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Pencil, Plane, PlusCircle, Send, Ship, TrendingUp, X } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Pencil, Plane, PlusCircle, Send, Ship, X } from 'lucide-react'
 import { cargoLabel, countryByCode, statusLabels, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
 import { Avatar, Empty, ModeBadge, Pill, Rating, fmtDate, money } from '../components/ui'
 import { ShipmentDetail } from './Track'
 import ProfileEditor from '../components/ProfileEditor'
 import { fadeUp, stagger } from '../lib/motion'
+import ShipperOverview from '../components/ShipperOverview'
 
 function Stat({ icon: Icon, label, value, hint }: { icon: typeof Inbox; label: string; value: string | number; hint?: string }) {
   return (
@@ -204,8 +205,6 @@ export function ShipperDashboard() {
   const leads = requests.filter((r) => r.status === 'open')
   const full = shipperById(me)
   const shipper: Pick<Shipper, 'id' | 'name' | 'hq' | 'plan' | 'onTime' | 'tagline' | 'verified'> = full ?? { id: me, name: user.company ?? 'Your company', hq: '', plan: 'starter', onTime: 0, tagline: '', verified: false }
-  const myQuotes = requests.flatMap((r) => r.quotes.filter((q) => q.shipperId === me).map((q) => ({ q, r })))
-  const won = myQuotes.filter((x) => x.q.status === 'accepted').length
   const myShipments = shipments.filter((s) => s.shipperId === me)
 
   const submitQuote = async (r: QuoteRequest) => {
@@ -239,15 +238,10 @@ export function ShipperDashboard() {
         <p className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-text"><BadgeCheck size={16} className="text-gold" aria-hidden="true" /> Not yet verified. Complete your profile — Ship Sync reviews licence and insurance before granting the badge, which lifts you in matching and reassures customers.</p>
       )}
       {editing && full && <ProfileEditor shipper={full} onDone={(msg) => { setEditing(false); if (msg) setToast(msg); if (view === 'profile') nav('/dashboard/shipper') }} />}
-      {view === 'overview' && <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat icon={Inbox} label="New leads" value={leads.filter((r) => !r.quotes.some((q) => q.shipperId === me)).length} hint="Matching your lanes" />
-        <Stat icon={Send} label="Quotes sent" value={myQuotes.length} hint={`${won} won`} />
-        <Stat icon={TrendingUp} label="Win rate" value={myQuotes.length ? `${Math.round((won / myQuotes.length) * 100)}%` : '—'} hint="Last 90 days" />
-        <Stat icon={Ship} label="Active shipments" value={myShipments.filter((s) => s.status !== 'delivered').length} hint={`${shipper.onTime}% on-time`} />
-      </div>}
+      {view === 'overview' && !editing && <ShipperOverview firstName={user.name.split(' ')[0]} />}
 
       <div className="mt-10 grid gap-8 lg:grid-cols-12">
-        {view !== 'shipments' && view !== 'profile' && <section className={view === 'leads' ? 'lg:col-span-12' : 'lg:col-span-7'} aria-labelledby="leads-h">
+        {view === 'leads' && <section className="lg:col-span-12" aria-labelledby="leads-h">
           <h2 id="leads-h" className="!text-xl">Shipment requests for your lanes</h2>
           <p className="mt-1 text-sm text-text-muted">Reply fast — customers see response time on your profile.</p>
           <div className="mt-4 space-y-3">
@@ -285,7 +279,7 @@ export function ShipperDashboard() {
           </div>
         </section>}
 
-        {view !== 'leads' && view !== 'profile' && <section className={view === 'shipments' ? 'lg:col-span-12' : 'lg:col-span-5'} aria-labelledby="ship-h">
+        {view === 'shipments' && <section className="lg:col-span-12" aria-labelledby="ship-h">
           <h2 id="ship-h" className="!text-xl">Your shipments</h2>
           <p className="mt-1 text-sm text-text-muted">Update status to keep customers’ tracking pages current.</p>
           <ul className="mt-4 space-y-3">

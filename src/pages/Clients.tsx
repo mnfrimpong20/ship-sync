@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { AlertCircle, Bell, Check, ChevronRight, Mail, MessageCircle, Phone, Plus, Search, Users, Wallet, X } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -45,11 +45,12 @@ export function ClientForm({ initial = blank, onSave, onCancel, busy, error }: {
 export default function Clients() {
   const { ready, user } = useStore()
   const nav = useNavigate()
+  const [sp] = useSearchParams()
   const [clients, setClients] = useState<Client[] | null>(null)
   const [reminders, setReminders] = useState<Activity[]>([])
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<'active' | 'archived' | 'marketplace' | 'manual' | 'owing'>('active')
-  const [adding, setAdding] = useState(false)
+  const [filter, setFilter] = useState<'active' | 'archived' | 'marketplace' | 'manual' | 'owing'>(() => (['active', 'archived', 'marketplace', 'manual', 'owing'].includes(sp.get('filter') ?? '') ? (sp.get('filter') as 'owing') : 'active'))
+  const [adding, setAdding] = useState(sp.get('new') === '1')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 

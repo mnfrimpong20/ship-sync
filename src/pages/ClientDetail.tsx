@@ -162,7 +162,7 @@ function Overview({ d, busy, run, reload }: Common) {
 /* ---------------- Shipments: history + book directly ---------------- */
 function Shipments({ d, busy, run, reload, advance }: Common & { advance: (id: string) => Promise<void> }) {
   const c = d.client
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(() => new URLSearchParams(location.hash.split('?')[1] ?? '').get('book') === '1')
   const def = d.consignees.find((k) => k.isDefault) ?? d.consignees[0]
   const [f, setF] = useState<BookingInput>({ mode: 'ocean', origin: c.city || origins[0], destination: (def?.country ?? 'GH'), cargo: 'barrels', description: '', eta: plusDays(35), consigneeId: def?.id, note: '' })
   return (

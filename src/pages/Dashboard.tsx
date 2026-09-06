@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Pencil, Plane, PlusCircle, Send, Ship, X } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Pencil, PlusCircle, Send, Ship, X } from 'lucide-react'
 import { cargoLabel, countryByCode, statusLabels, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
 import { Avatar, Empty, ModeBadge, Pill, Rating, fmtDate, money } from '../components/ui'
@@ -184,15 +184,13 @@ function ShipmentsTab() {
 
 /* ================= SHIPPER ================= */
 export function ShipperDashboard() {
-  const { ready, user, requests, shipments, sendQuote, advanceShipment, shipperById, setTransit } = useStore()
+  const { ready, user, requests, sendQuote, shipperById } = useStore()
   const [sp] = useSearchParams()
   const nav = useNavigate()
   const view = (sp.get('view') as 'leads' | 'shipments' | 'profile' | null) ?? 'overview'
   const [quoting, setQuoting] = useState<string | null>(null)
-  const [transitFor, setTransitFor] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   useEffect(() => { setEditing(view === 'profile') }, [view])
-  const [tf, setTf] = useState({ vesselName: '', mmsi: '', flight: '' })
   const [form, setForm] = useState({ price: '', transit: '', notes: '' })
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
@@ -205,7 +203,6 @@ export function ShipperDashboard() {
   const leads = requests.filter((r) => r.status === 'open')
   const full = shipperById(me)
   const shipper: Pick<Shipper, 'id' | 'name' | 'hq' | 'plan' | 'onTime' | 'tagline' | 'verified'> = full ?? { id: me, name: user.company ?? 'Your company', hq: '', plan: 'starter', onTime: 0, tagline: '', verified: false }
-  const myShipments = shipments.filter((s) => s.shipperId === me)
 
   const submitQuote = async (r: QuoteRequest) => {
     const price = Number(form.price), transit = Number(form.transit)
@@ -217,21 +214,9 @@ export function ShipperDashboard() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not send the quote.') }
     finally { setBusy(false) }
   }
-  const saveTransit = async (id: string, mode: 'air' | 'ocean') => {
-    setBusy(true); setError('')
-    try {
-      await setTransit(id, mode === 'air' ? { flight: tf.flight } : { vesselName: tf.vesselName, mmsi: tf.mmsi })
-      setTransitFor(null); setTf({ vesselName: '', mmsi: '', flight: '' }); setToast('Tracking details saved — customers now see the live position.')
-    } catch (err) { setError(err instanceof Error ? err.message : 'Could not save tracking details.') }
-    finally { setBusy(false) }
-  }
-  const advance = async (id: string, ref: string) => {
-    setBusy(true); setError('')
-    try { await advanceShipment(id); setToast(`${ref} updated.`) } catch (err) { setError(err instanceof Error ? err.message : 'Could not update the shipment.') } finally { setBusy(false) }
-  }
 
   return (
-    <Layout title={view === 'leads' ? 'Leads & quotes' : view === 'shipments' ? 'Shipments' : view === 'profile' ? 'Company profile' : shipper.name} sub={view === 'overview' ? `${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan` : shipper.name} cta={<div className="flex flex-wrap gap-2">{view !== 'profile' && <button onClick={() => setEditing((e) => !e)} className="btn-ghost" aria-expanded={editing}><Pencil size={16} aria-hidden="true" /> Edit profile</button>}<Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link></div>}>
+    <Layout title={view === 'leads' ? 'Leads & quotes' : view === 'shipments' ? 'Shipments' : view === 'profile' ? 'Company profile' : shipper.name} sub={view === 'overview' ? `${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan` : shipper.name} cta={view === 'overview' || view === 'profile' ? <div className="flex flex-wrap gap-2">{view !== 'profile' && <button onClick={() => setEditing((e) => !e)} className="btn-ghost" aria-expanded={editing}><Pencil size={16} aria-hidden="true" /> Edit profile</button>}<Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link></div> : undefined}>
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
       {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
       {!shipper.verified && !editing && (
@@ -279,50 +264,7 @@ export function ShipperDashboard() {
           </div>
         </section>}
 
-        {view === 'shipments' && <section className="lg:col-span-12" aria-labelledby="ship-h">
-          <h2 id="ship-h" className="!text-xl">Your shipments</h2>
-          <p className="mt-1 text-sm text-text-muted">Update status to keep customers’ tracking pages current.</p>
-          <ul className="mt-4 space-y-3">
-            {myShipments.length === 0 && <li><Empty title="No shipments yet" body="Accepted quotes become shipments you can update here." /></li>}
-            {myShipments.map((s) => {
-              const d = countryByCode(s.destination)!
-              return (
-                <li key={s.id} className="card-dark p-4">
-                  <div className="flex items-center justify-between"><p className="font-mono text-xs text-gold">{s.ref}</p><ModeBadge mode={s.mode} /></div>
-                  <p className="mt-1 text-sm font-semibold text-text">{s.origin} → {d.flag} {d.name}</p>
-                  <p className="text-xs text-text-muted">{s.description} · {s.clientId ? <Link to={`/dashboard/clients/${s.clientId}`} className="text-gold hover:underline focus-ring rounded">{s.customer}</Link> : s.customer}</p>
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill>
-                    {s.status !== 'delivered' && <button onClick={() => advance(s.id, s.ref)} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60">Mark next step <ChevronRight size={14} aria-hidden="true" /></button>}
-                  </div>
-                  {s.status !== 'delivered' && (
-                    <div className="mt-3 border-t border-border pt-3">
-                      {transitFor === s.id ? (
-                        <form onSubmit={(e) => { e.preventDefault(); saveTransit(s.id, s.mode) }} className="grid gap-2">
-                          {s.mode === 'air' ? (
-                            <div><label htmlFor={`fl-${s.id}`} className="label-dark">Flight callsign (ICAO)</label><input id={`fl-${s.id}`} className="input-dark !min-h-10 uppercase" placeholder="e.g. CLX775" value={tf.flight} onChange={(e) => setTf({ ...tf, flight: e.target.value })} required /></div>
-                          ) : (
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              <div><label htmlFor={`vn-${s.id}`} className="label-dark">Vessel name</label><input id={`vn-${s.id}`} className="input-dark !min-h-10" placeholder="e.g. MSC Alessia" value={tf.vesselName} onChange={(e) => setTf({ ...tf, vesselName: e.target.value })} /></div>
-                              <div><label htmlFor={`mm-${s.id}`} className="label-dark">MMSI (9 digits)</label><input id={`mm-${s.id}`} className="input-dark !min-h-10 font-mono" placeholder="e.g. 636019825" inputMode="numeric" value={tf.mmsi} onChange={(e) => setTf({ ...tf, mmsi: e.target.value.replace(/\D/g, '').slice(0, 9) })} /></div>
-                            </div>
-                          )}
-                          <p className="text-[11px] text-text-muted">{s.mode === 'air' ? 'Find the ICAO callsign on the airway bill or flightradar24 (e.g. British Airways 75 = BAW75).' : 'The MMSI is on the bill of lading or any vessel-tracking site. It enables live AIS position on the customer’s tracking page.'}</p>
-                          <div className="flex justify-end gap-2"><button type="button" onClick={() => setTransitFor(null)} className="btn-ghost !min-h-9 !px-3 text-xs">Cancel</button><button disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60">Save</button></div>
-                        </form>
-                      ) : (
-                        <button onClick={() => { setTransitFor(s.id); setTf({ vesselName: s.vesselName ?? '', mmsi: s.mmsi ?? '', flight: s.flight ?? '' }) }} className="flex min-h-9 w-full items-center gap-2 text-left text-xs text-text-muted hover:text-gold focus-ring rounded">
-                          {s.mode === 'air' ? <Plane size={14} aria-hidden="true" /> : <Ship size={14} aria-hidden="true" />}
-                          {s.flight || s.vesselName ? <>{s.flight ?? s.vesselName}{s.mmsi ? ` · MMSI ${s.mmsi}` : ''} <span className="text-gold">Edit</span></> : <span>Add {s.mode === 'air' ? 'flight number' : 'vessel & MMSI'} for live tracking</span>}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </section>}
+        {view === 'shipments' && <Navigate to="/dashboard/shipments" replace />}
       </div>
     </Layout>
   )

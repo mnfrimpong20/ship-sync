@@ -13,7 +13,7 @@ export default function Hero() {
   const [mode, setMode] = useState<Mode | 'either'>('either')
 
   return (
-    <section className="relative overflow-hidden bg-bg text-text">
+    <section className="theme-dark relative overflow-hidden bg-bg text-text">
       {/* backdrop: cycling video, then brand glows, grid and route arcs on top */}
       <HeroVideo />
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">

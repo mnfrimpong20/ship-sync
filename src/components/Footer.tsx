@@ -10,7 +10,7 @@ const cols = [
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border bg-bg text-text">
+    <footer className="theme-dark border-t border-border bg-bg text-text">
       <div className="container-fluid grid gap-10 py-16 md:grid-cols-12">
         <div className="md:col-span-4">
           <Logo />

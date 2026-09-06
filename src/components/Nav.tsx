@@ -35,7 +35,7 @@ export default function Nav() {
   const dash = user?.role === 'shipper' ? '/dashboard/shipper' : '/dashboard'
 
   return (
-    <header className={`sticky top-0 z-50 transition-colors duration-300 ${scrolled || !marketing ? 'border-b border-border bg-bg/85 backdrop-blur-xl' : 'bg-transparent'}`}>
+    <header className={`sticky top-0 z-50 border-b transition-colors duration-300 ${scrolled || !marketing ? 'border-border bg-bg/90 backdrop-blur-xl' : 'border-border/60 bg-bg'}`}>
       {marketing && <motion.div className="absolute inset-x-0 top-0 h-0.5 origin-left bg-gold" style={{ scaleX: progress }} aria-hidden="true" />}
       <div className="container-fluid flex h-[72px] items-center justify-between gap-6">
         <Logo />

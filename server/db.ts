@@ -347,6 +347,7 @@ alter table containers add column if not exists tracking_status text not null de
 alter table containers add column if not exists tracking_subscribed_at timestamptz;
 alter table containers add column if not exists tracking_synced_at timestamptz;
 alter table containers add column if not exists tracking_error text not null default '';
+alter table containers add column if not exists tracking_state text not null default '{}';
 alter table container_events add column if not exists source text not null default 'manual';
 alter table container_events add column if not exists code text not null default '';
 

@@ -9,18 +9,19 @@
  *   dcsa  — a line's DCSA Track & Trace v2 endpoint (Maersk, MSC, CMA CGM, Hapag-Lloyd, ONE… publish this shape).
  *           CARRIER_API_URL = base URL of the T&T API (e.g. https://api.cma-cgm.com/tracking/v2),
  *           CARRIER_API_KEY + CARRIER_API_KEY_HEADER (default "apikey"; CMA CGM uses "KeyId", Maersk "Consumer-Key").
- *           Aggregators (Vizion, Terminal49, Shipsgo…) each need a small adapter of their own — same interface.
+ *   terminal49 — the Terminal49 aggregator (api.terminal49.com/v2): set TERMINAL49_API_KEY. One key covers every
+ *           major line; we open a tracking request per booking, then read the shipment, its container and transport
+ *           events. Vessel positions come with an MMSI, so live tracking lights up without any lookup.
+ *   Other aggregators (Vizion, Shipsgo…) would be one more adapter behind the same interface.
+ * When CARRIER_TRACKING_PROVIDER is unset the server picks terminal49 if TERMINAL49_API_KEY is present, else mock.
  */
 
 export type MilestoneCode = 'BOOKED' | 'GATE_IN' | 'LOADED' | 'DEPARTED' | 'TRANSSHIP' | 'ARRIVED' | 'DISCHARGED' | 'GATE_OUT' | 'EMPTY_RETURN'
 export interface CarrierEvent { code: MilestoneCode; at: string; place: string; vesselName?: string; voyage?: string; note?: string }
-export interface CarrierSnapshot {
-  containers: { number: string; seal?: string }[]
-  vesselName?: string; imo?: string; mmsi?: string; voyage?: string
-  etd?: string; eta?: string
-  events: CarrierEvent[]
-}
-export interface CarrierQuery { bookingRef: string; line: string; containerNumber?: string; subscribedAt: Date }
+/** `state` is whatever the adapter asked us to remember for this container last time (ids at the provider, etc.). */
+export interface CarrierQuery { bookingRef: string; line: string; containerNumber?: string; subscribedAt: Date; ref: string; state: Record<string, any> }
+/** Return null while the provider has nothing yet; set `state` to persist provider-side ids between polls. */
+export interface CarrierSnapshot { containers: { number: string; seal?: string }[]; vesselName?: string; imo?: string; mmsi?: string; voyage?: string; etd?: string; eta?: string; events: CarrierEvent[]; state?: Record<string, any> }
 export interface CarrierAdapter { id: string; label: string; lookup(q: CarrierQuery): Promise<CarrierSnapshot | null> }
 
 export const milestoneLabels: Record<MilestoneCode, string> = {
@@ -103,10 +104,89 @@ export function parseDcsa(events: Any[]): CarrierSnapshot {
   return out
 }
 
+
+/* ---------------------------------------------------------------- Terminal49 (aggregator) */
+const T49 = 'https://api.terminal49.com/v2'
+/** Standard Carrier Alpha Codes for the lines shippers type in. Unknown names fall back to Terminal49's auto-detect. */
+const SCAC: [RegExp, string][] = [[/maersk/i, 'MAEU'], [/\bmsc\b|mediterranean/i, 'MSCU'], [/cma|cgm/i, 'CMDU'], [/hapag|lloyd/i, 'HLCU'], [/\bone\b|ocean network/i, 'ONEY'], [/evergreen/i, 'EGLV'], [/cosco/i, 'COSU'], [/oocl/i, 'OOLU'], [/yang ?ming/i, 'YMLU'], [/zim/i, 'ZIMU'], [/hmm|hyundai/i, 'HDMU'], [/grimaldi/i, 'GRIU'], [/pil|pacific international/i, 'PCIU'], [/arkas/i, 'ARKU'], [/safmarine/i, 'SAFM'], [/sealand/i, 'SEJJ'], [/hamburg s/i, 'SUDU']]
+export const scacFor = (line: string) => SCAC.find(([re]) => re.test(line))?.[1] ?? null
+const t49Events: Record<string, MilestoneCode> = {
+  'container.transport.full_in': 'GATE_IN', 'container.transport.vessel_loaded': 'LOADED', 'container.transport.vessel_departed': 'DEPARTED',
+  'container.transport.transshipment_arrived': 'TRANSSHIP', 'container.transport.transshipment_discharged': 'TRANSSHIP', 'container.transport.transshipment_loaded': 'TRANSSHIP', 'container.transport.transshipment_departed': 'TRANSSHIP',
+  'container.transport.feeder_arrived': 'TRANSSHIP', 'container.transport.feeder_discharged': 'TRANSSHIP', 'container.transport.feeder_loaded': 'TRANSSHIP', 'container.transport.feeder_departed': 'TRANSSHIP',
+  'container.transport.vessel_arrived': 'ARRIVED', 'container.transport.vessel_berthed': 'ARRIVED', 'container.transport.vessel_discharged': 'DISCHARGED', 'container.transport.full_out': 'GATE_OUT', 'container.transport.empty_in': 'EMPTY_RETURN',
+}
+const terminal49: CarrierAdapter = {
+  id: 'terminal49', label: 'Terminal49',
+  async lookup(q) {
+    const key = process.env.TERMINAL49_API_KEY || ''
+    if (!key) throw new Error('TERMINAL49_API_KEY is not set.')
+    const base = (process.env.TERMINAL49_API_URL || T49).replace(/\/$/, '')
+    const call = async (path: string, init?: RequestInit) => {
+      const res = await fetch(base + path, { ...init, headers: { authorization: `Token ${key}`, accept: 'application/json', 'content-type': 'application/vnd.api+json', ...(init?.headers ?? {}) } })
+      const body = (await res.json().catch(() => ({}))) as Any
+      if (res.status === 429) throw new Error('Terminal49 rate limit hit — will retry on the next poll.')
+      if (!res.ok && res.status !== 422) throw new Error(`Terminal49 ${res.status}: ${body?.errors?.[0]?.detail || body?.errors?.[0]?.title || res.statusText}`)
+      return { status: res.status, body }
+    }
+    const state: Record<string, any> = { ...q.state }
+    // 1. Open a tracking request once (by container number if we have it — that's the most reliable — else by booking number).
+    if (!state.trackingRequestId && !state.shipmentId) {
+      const scac = scacFor(q.line)
+      const attributes: Any = { request_type: q.containerNumber ? 'container' : 'booking_number', request_number: q.containerNumber || q.bookingRef, ref_numbers: [q.ref], ...(scac ? { scac } : { auto_detect_vocc_scac: true }) }
+      const { status, body } = await call('/tracking_requests', { method: 'POST', body: JSON.stringify({ data: { type: 'tracking_request', attributes } }) })
+      if (status === 422) {
+        // Usually "already being tracked" — find the existing shipment instead.
+        const found = q.containerNumber ? await call(`/containers?filter[number]=${encodeURIComponent(q.containerNumber)}&include=shipment`) : await call(`/shipments?number=${encodeURIComponent(q.bookingRef)}`)
+        const row = found.body?.data?.[0]
+        if (!row) throw new Error(`Terminal49: ${body?.errors?.[0]?.detail || 'could not open a tracking request'}`)
+        if (row.type === 'container') { state.containerId = row.id; state.shipmentId = row.relationships?.shipment?.data?.id } else state.shipmentId = row.id
+      } else {
+        state.trackingRequestId = body.data.id
+        const tracked = body.data.relationships?.tracked_object?.data; if (tracked?.type === 'shipment') state.shipmentId = tracked.id
+      }
+    }
+    // 2. Wait for the line's manifest to land at Terminal49.
+    if (!state.shipmentId) {
+      const { body } = await call(`/tracking_requests/${state.trackingRequestId}`)
+      const a = body.data?.attributes ?? {}; const tracked = body.data?.relationships?.tracked_object?.data
+      if (a.status === 'failed' || a.status === 'tracking_stopped') throw new Error(`Terminal49 could not track this booking (${a.failed_reason || a.status}). Check the booking reference and shipping line.`)
+      if (tracked?.type === 'shipment') state.shipmentId = tracked.id
+      else return { containers: [], events: [], state }
+    }
+    // 3. Shipment + containers.
+    const { body: sh } = await call(`/shipments/${state.shipmentId}?include=containers`)
+    const a = sh.data?.attributes ?? {}
+    const boxes: Any[] = (sh.included ?? []).filter((x: Any) => x.type === 'container')
+    const mine = boxes.find((b) => q.containerNumber && b.attributes?.number === q.containerNumber) ?? boxes.find((b) => b.id === state.containerId) ?? boxes[0]
+    if (mine) state.containerId = mine.id
+    const out: CarrierSnapshot = {
+      containers: boxes.map((b) => ({ number: b.attributes?.number, seal: b.attributes?.seal_number || undefined })).sort((x) => (mine && x.number === mine.attributes?.number ? -1 : 1)),
+      vesselName: a.pod_vessel_name || undefined, imo: a.pod_vessel_imo ? String(a.pod_vessel_imo) : undefined, voyage: a.pod_voyage_number || undefined,
+      etd: (a.pol_atd_at || a.pol_etd_at || '').slice(0, 10) || undefined, eta: (a.pod_ata_at || a.pod_eta_at || '').slice(0, 10) || undefined,
+      events: [], state,
+    }
+    // 4. Milestones for our box, with the vessel (name, IMO, MMSI) alongside.
+    if (mine) {
+      const { body: ev } = await call(`/containers/${mine.id}/transport_events?include=vessel&page[size]=100`)
+      const vessels = new Map<string, Any>((ev.included ?? []).filter((x: Any) => x.type === 'vessel').map((v: Any) => [v.id, v.attributes ?? {}]))
+      for (const e of ev.data ?? []) {
+        const at = e.attributes?.timestamp; const code = t49Events[e.attributes?.event]; if (!code || !at) continue
+        const v = vessels.get(e.relationships?.vessel?.data?.id)
+        if (v && (code === 'DEPARTED' || code === 'LOADED')) { out.vesselName = v.name || out.vesselName; if (v.imo) out.imo = String(v.imo); if (v.mmsi) out.mmsi = String(v.mmsi) }
+        out.events.push({ code, at, place: e.attributes?.location_locode || '', vesselName: v?.name, voyage: e.attributes?.voyage_number || undefined, note: e.attributes?.data_source ? `source: ${e.attributes.data_source}` : undefined })
+      }
+      out.events.sort((x, y) => x.at.localeCompare(y.at))
+      if (!out.mmsi) { const v = [...vessels.values()].find((x) => x.name === out.vesselName || (out.imo && String(x.imo) === out.imo)); if (v?.mmsi) out.mmsi = String(v.mmsi) }
+    }
+    return out
+  },
+}
+
 /* ---------------------------------------------------------------- registry */
-const adapters: Record<string, CarrierAdapter> = { mock, dcsa }
+const adapters: Record<string, CarrierAdapter> = { mock, dcsa, terminal49 }
 export function carrierAdapter(): CarrierAdapter | null {
-  const id = (process.env.CARRIER_TRACKING_PROVIDER || 'mock').toLowerCase()
+  const id = (process.env.CARRIER_TRACKING_PROVIDER || (process.env.TERMINAL49_API_KEY ? 'terminal49' : 'mock')).toLowerCase()
   if (id === 'off' || id === 'none' || id === 'false') return null
   const a = adapters[id]; if (!a) { console.warn(`[carriers] unknown CARRIER_TRACKING_PROVIDER "${id}" — tracking off`); return null }
   return a

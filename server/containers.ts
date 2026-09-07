@@ -83,8 +83,10 @@ export async function syncContainer(db: Db, c: Row): Promise<string[]> {
   const adapter = carrierAdapter(); if (!adapter) return []
   const changes: string[] = []
   try {
-    const snap = await adapter.lookup({ bookingRef: c.booking_ref, line: c.line, containerNumber: c.number || undefined, subscribedAt: c.tracking_subscribed_at ? new Date(c.tracking_subscribed_at) : new Date() })
-    if (!snap) { await db.query(`update containers set tracking_status = 'pending', tracking_synced_at = now(), tracking_error = '' where id = $1`, [c.id]); return [] }
+    const prevState = (() => { try { return typeof c.tracking_state === 'string' ? JSON.parse(c.tracking_state || '{}') : c.tracking_state ?? {} } catch { return {} } })()
+    const snap = await adapter.lookup({ bookingRef: c.booking_ref, line: c.line, containerNumber: c.number || undefined, subscribedAt: c.tracking_subscribed_at ? new Date(c.tracking_subscribed_at) : new Date(), ref: c.ref, state: prevState })
+    if (snap?.state && JSON.stringify(snap.state) !== JSON.stringify(prevState)) { await db.query('update containers set tracking_state = $2 where id = $1', [c.id, JSON.stringify(snap.state)]); c.tracking_state = JSON.stringify(snap.state) }
+    if (!snap || (!snap.containers.length && !snap.events.length && !snap.vesselName)) { await db.query(`update containers set tracking_status = 'pending', tracking_synced_at = now(), tracking_error = '' where id = $1`, [c.id]); return [] }
     const patch: Record<string, string> = {}
     const box = snap.containers[0]
     if (box?.number && !c.number) { patch.number = box.number; changes.push(`Container ${box.number} assigned`) }
@@ -92,8 +94,10 @@ export async function syncContainer(db: Db, c: Row): Promise<string[]> {
     if (snap.vesselName && snap.vesselName !== c.vessel_name) { patch.vessel_name = snap.vesselName; changes.push(`Vessel ${snap.vesselName}`) }
     if (snap.imo && snap.imo !== c.imo) patch.imo = snap.imo
     if (snap.voyage && !c.voyage) patch.voyage = snap.voyage
-    if (snap.etd && !c.etd) patch.etd = snap.etd
-    if (snap.eta && !c.eta) patch.eta = snap.eta
+    // The line's schedule is authoritative for ETD/ETA; a changed ETA is worth telling the office about.
+    const day = (v: unknown) => (v == null ? '' : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10))
+    if (snap.etd && snap.etd !== day(c.etd)) patch.etd = snap.etd
+    if (snap.eta && snap.eta !== day(c.eta)) { patch.eta = snap.eta; if (c.eta) changes.push(`ETA now ${snap.eta}`) }
     const mmsi = snap.mmsi || ais.resolve(snap.imo || patch.imo || c.imo, snap.vesselName || c.vessel_name)
     if (mmsi && mmsi !== c.mmsi) { patch.mmsi = mmsi; changes.push(`MMSI ${mmsi} — live tracking on`) }
     if (Object.keys(patch).length) {

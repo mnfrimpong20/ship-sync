@@ -21,6 +21,7 @@ import RoutePlanner from './pages/RoutePlanner'
 import MyRuns from './pages/MyRuns'
 import Shipments from './pages/Shipments'
 import Leads from './pages/Leads'
+import Labels from './pages/Labels'
 import Containers from './pages/Containers'
 import ContainerDetail from './pages/ContainerDetail'
 import Join from './pages/Join'
@@ -94,6 +95,7 @@ export default function App() {
               <Route path="/dashboard/runs" element={<MyRuns />} />
               <Route path="/admin" element={<Admin />} />
             </Route>
+            <Route path="/dashboard/labels" element={<Labels />} />
           </Routes>
         </HashRouter>
       </StoreProvider>

@@ -35,6 +35,7 @@ export async function getDb(): Promise<Db> {
   await seedHistoryDemo(db)
   await seedOpenLeads(db)
   await seedContainerDemo(db)
+  await seedRunsDemo(db)
   return db
 }
 
@@ -546,6 +547,27 @@ async function seedOpenLeads(d: Db) {
       [rid, `SS-L${String(l.i).padStart(4, '0')}`, uid_, created, l.origin, l.mode, l.cargo, l.qty, l.kg, l.desc, l.pickup, l.delivery, l.ins, dateOnly(addDays(6 + l.i * 3)), l.name, l.email])
     if (l.competing) await d.query(`insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes,sent_at,status) values ($1,$2,'atlantic-bridge',$3,32,$4,'Bi-weekly sailing.',$5,$6,'sent') on conflict (request_id, shipper_id) do nothing`, [`q_lead_${l.i}`, rid, l.cargo === 'vehicle' ? 1650 : 720, dateOnly(addDays(14)), JSON.stringify(['Ocean freight', 'Port handling']), new Date(created.getTime() + 2 * 3600000)])
   }
+}
+
+/** Demo runs for Gold Coast: a pickup run today with Kwesi, a delivery run tomorrow still needing a driver, and one finished last week. Idempotent. */
+async function seedRunsDemo(d: Db) {
+  const { rows } = await d.query<{ n: string }>(`select count(*)::text as n from runs where id like 'run_demo_%'`)
+  if (Number(rows[0].n) > 0) return
+  const sid = 'gold-coast-freight'
+  await d.query(`insert into runs (id,shipper_id,name,kind,run_date,driver_id,vehicle_id,start_label,start_lat,start_lon,status,distance_km,notes,created_at) values
+    ('run_demo_1',$1,'Houston pickups — Tue','pickup',$2,'st_demo_kwesi','vh_demo_1','Gold Coast yard, Houston',29.7604,-95.3698,'in_progress',64.2,'Collect the RAV4 last — needs the flatbed ramp.',$5),
+    ('run_demo_2',$1,'Accra & Tema deliveries','delivery',$3,null,null,'Tema warehouse',5.6698,-0.0166,'planned',38.5,'Call consignees the evening before.',$6),
+    ('run_demo_3',$1,'Katy & Sugar Land pickups','pickup',$4,'st_demo_kwesi','vh_demo_1','Gold Coast yard, Houston',29.7604,-95.3698,'done',51.0,'',$7)`,
+    [sid, dateOnly(addDays(0)), dateOnly(addDays(1)), dateOnly(addDays(-6)), addDays(-1), addDays(-2), addDays(-8)])
+  await d.query(`insert into run_stops (id,run_id,seq,shipment_id,label,address,lat,lon,contact,phone,status,done_at) values
+    ('stp_demo_1','run_demo_1',0,'s_demo_wait_2','Abena Owusu — 4 barrels','2210 Oak Lawn Ave, Dallas, TX',32.8028,-96.8103,'Abena Owusu','+1 214 555 0142','done',$1),
+    ('stp_demo_2','run_demo_1',1,'s_demo_wait_1','Kofi Mensah — 2019 RAV4','1850 Katy Fwy, Katy, TX',29.7858,-95.8245,'Kofi Mensah','+1 713 555 0188','pending',null),
+    ('stp_demo_3','run_demo_2',0,'s_demo_deliv','Yaw Mensah — 3 barrels','Community 4, Tema',5.6698,-0.0166,'Yaw Mensah','+233 24 555 0101','pending',null),
+    ('stp_demo_4','run_demo_2',1,null,'Efua Mensah — 4 barrels (hold at warehouse)','Osu, Accra',5.5560,-0.1969,'Efua Mensah','+233 20 555 0177','pending',null),
+    ('stp_demo_5','run_demo_3',0,'s_demo_pick','Kofi Mensah — brake parts','1850 Katy Fwy, Katy, TX',29.7858,-95.8245,'Kofi Mensah','+1 713 555 0188','done',$2),
+    ('stp_demo_6','run_demo_3',1,null,'Sugar Land — pallets (walk-in)','Sugar Land, TX',29.6197,-95.6349,'','','done',$3)
+    on conflict (id) do nothing`, [addDays(0), addDays(-6), addDays(-6)])
+  await d.query(`update vehicles set status = 'on_run' where id = 'vh_demo_1' and status = 'available'`)
 }
 
 /** Two demo containers for Gold Coast: one on the water with two orders loaded, one just booked. Idempotent. */

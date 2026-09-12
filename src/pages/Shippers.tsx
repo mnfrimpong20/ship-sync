@@ -5,6 +5,7 @@ import { cargoLabel, countryByCode } from '../lib/data'
 import { useStore } from '../lib/store'
 import { fadeUp, stagger } from '../lib/motion'
 import { Avatar, Empty, ModeBadge, Rating } from '../components/ui'
+import { ShippingBackdrop } from '../components/ShippingBackdrop'
 
 export function ShipperProfile() {
   const { id } = useParams()
@@ -20,10 +21,11 @@ export function ShipperProfile() {
     { n: 'Rita A.', d: 'Jun 2026', r: 4, t: 'Good price and reliable. Pickup was a day late but they called ahead and made up the time.' },
   ]
   return (
-    <div className="bg-bg text-text">
-      <div className="container-x py-10 md:py-16">
+    <div className="relative bg-bg text-text">
+      <ShippingBackdrop />
+      <div className="container-x relative py-10 md:py-16">
         <Link to="/shippers" className="inline-flex min-h-10 items-center gap-1.5 text-sm text-text-muted hover:text-gold focus-ring rounded"><ArrowLeft size={16} aria-hidden="true" /> All shippers</Link>
-        <motion.div initial="hidden" animate="show" variants={stagger} className="mt-6 grid gap-8 lg:grid-cols-12">
+        <motion.div initial="hidden" animate="show" variants={stagger} className="mt-28 grid gap-8 md:mt-36 lg:grid-cols-12">
           <div className="lg:col-span-8">
             <motion.div variants={fadeUp} className="card-dark p-6 md:p-8">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-start">

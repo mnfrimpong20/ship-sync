@@ -151,7 +151,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const track = useCallback<Store['track']>(async (ref) => {
-    try { const r = await api<{ shipment: Shipment; pieces?: Shipment['pieces'] }>(`/track/${encodeURIComponent(ref.trim())}`); return { ...r.shipment, pieces: r.pieces } } catch (e) { if (e instanceof ApiError && e.status === 404) return null; throw e }
+    try { const r = await api<{ shipment: Shipment; pieces?: Shipment['pieces']; pod?: Shipment['pod'] }>(`/track/${encodeURIComponent(ref.trim())}`); return { ...r.shipment, pieces: r.pieces, pod: r.pod } } catch (e) { if (e instanceof ApiError && e.status === 404) return null; throw e }
   }, [])
 
   const position = useCallback<Store['position']>(async (ref) => {

@@ -14,6 +14,7 @@ import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { pieceOut } from './labels'
+import { notifyShipmentStatus } from './notify'
 import { countryByCode, statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
 
 type Row = Record<string, any>
@@ -72,12 +73,13 @@ export function mountScans(r: Router, d: Deps) {
       pieces: pieces.map(pieceOut), counts,
     }
   }
-  const raise = async (db: Db, s: Row, target: ShipmentStatus, place: string, note: string) => {
+  const raise = async (db: Db, s: Row, target: ShipmentStatus, place: string, note: string, extra?: { photo?: boolean; receivedBy?: string }) => {
     if (statusOrder.indexOf(target) <= statusOrder.indexOf(s.status as ShipmentStatus)) return false
     await db.query('update shipments set status = $2 where id = $1', [s.id, target])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, target, place, note])
     if (s.client_id) await db.query(`insert into client_activities (id,client_id,shipper_id,type,body) values ($1,$2,$3,'system',$4)`, [uid(), s.client_id, s.shipper_id, `${s.ref} moved to “${statusLabels[target]}” — ${note}`])
     s.status = target
+    await notifyShipmentStatus(db, s, target, note, extra)
     return true
   }
 
@@ -118,7 +120,7 @@ export function mountScans(r: Router, d: Deps) {
 
     const place = b.place || (b.kind === 'loading' ? container?.origin_port || s.origin : b.kind === 'devanning' ? container?.destination_port || countryByCode(s.destination)?.name || s.destination : b.kind === 'delivery' ? (s.consignee_id ? (await db.query<Row>('select city from client_consignees where id = $1', [s.consignee_id])).rows[0]?.city : '') || countryByCode(s.destination)?.name || s.destination : '')
     const scanId = 'sc_' + uid()
-    await db.query('insert into scans (id,piece_id,shipment_id,kind,place,note,by_name,by_staff_id,lat,lon,photo) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)', [scanId, piece.id, s.id, b.kind, place, b.note, who, null, b.lat ?? null, b.lon ?? null, b.photo ?? null])
+    await db.query('insert into scans (id,piece_id,shipment_id,kind,place,note,by_name,by_staff_id,lat,lon,photo,received_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [scanId, piece.id, s.id, b.kind, place, b.note, who, null, b.lat ?? null, b.lon ?? null, b.photo ?? null, b.receivedBy || ''])
     if (nextStatus && !already) await db.query('update pieces set status = $2, last_scan_at = now(), last_scan_kind = $3, last_scan_place = $4, last_scan_by = $5 where id = $1', [piece.id, nextStatus, b.kind, place, who])
     else await db.query('update pieces set last_scan_at = now(), last_scan_kind = $2, last_scan_place = $3, last_scan_by = $4 where id = $1', [piece.id, b.kind, place, who])
     if (already) warnings.push(`Piece ${piece.seq} was already ${piece.status} — scan recorded, nothing changed.`)
@@ -140,7 +142,7 @@ export function mountScans(r: Router, d: Deps) {
       await event(`${label} received at the destination warehouse by ${who}${dev === n ? ' — all pieces received' : ` (${dev} of ${n})`}${noteTail}.`)
     } else if (b.kind === 'delivery') {
       const del = pieces.filter((p) => p.status === 'delivered').length
-      if (del === n && (await raise(db, s, 'delivered', place, `All ${n === 1 ? 'pieces' : `${n} pieces`} delivered${b.receivedBy ? ` to ${b.receivedBy}` : ''} by ${who}.`))) moved = 'delivered'
+      if (del === n && (await raise(db, s, 'delivered', place, `All ${n === 1 ? 'pieces' : `${n} pieces`} delivered${b.receivedBy ? ` to ${b.receivedBy}` : ''} by ${who}.`, { photo: Boolean(b.photo), receivedBy: b.receivedBy || undefined }))) moved = 'delivered'
       await event(`${label} handed over${b.receivedBy ? ` to ${b.receivedBy}` : ''} by ${who}${b.photo ? ' (photo on file)' : ''}${del === n ? ' — all pieces delivered' : ` (${del} of ${n})`}${noteTail}.`)
       if (del === n) {
         // Tick the stop on whichever open delivery run carries this shipment (the driver's or the one given).
@@ -171,4 +173,11 @@ export function mountScans(r: Router, d: Deps) {
 export async function piecesForTracking(db: Db, shipmentId: string) {
   const { rows } = await db.query<Row>('select seq, status, last_scan_at, last_scan_kind, last_scan_place from pieces where shipment_id = $1 order by seq', [shipmentId])
   return rows.map((p) => ({ seq: Number(p.seq), status: p.status, lastScanAt: ISO(p.last_scan_at), lastScanKind: p.last_scan_kind, lastScanPlace: p.last_scan_place }))
+}
+
+/** Proof of delivery for the public tracking page: the last delivery scan with who received it and the photo, if one was taken. */
+export async function proofOfDelivery(db: Db, shipmentId: string) {
+  const { rows } = await db.query<Row>(`select at, place, by_name, received_by, photo from scans where shipment_id = $1 and kind = 'delivery' order by (photo is not null) desc, at desc limit 1`, [shipmentId])
+  const r = rows[0]; if (!r) return null
+  return { at: ISO(r.at), place: r.place, by: r.by_name, receivedBy: r.received_by || '', photo: r.photo || null }
 }

@@ -5,6 +5,7 @@ import type { ApiUser } from './api'
 import { countryByCode, statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
 import { carrierAdapter, milestoneLabels, type CarrierEvent, type MilestoneCode } from './carriers'
 import { ais } from './live'
+import { notifyShipmentStatus, notifyShipperStaff } from './notify'
 
 type Row = Record<string, any>
 interface Deps {
@@ -53,6 +54,7 @@ async function raise(db: Db, s: Row, target: ShipmentStatus, place: string, note
     await db.query('update shipments set status = $2 where id = $1', [s.id, target])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, target, place, note])
     if (s.client_id) await db.query(`insert into client_activities (id,client_id,shipper_id,type,body) values ($1,$2,$3,'system',$4)`, [uid(), s.client_id, s.shipper_id, `${s.ref} moved to “${statusLabels[target]}” — ${note}`])
+    await notifyShipmentStatus(db, { ...s, vessel_name: extra?.vessel || s.vessel_name }, target, note)
   }
   if (extra && (extra.vessel || extra.mmsi)) await db.query('update shipments set vessel_name = coalesce(nullif($2, \'\'), vessel_name), mmsi = coalesce(nullif($3, \'\'), mmsi), departed_at = coalesce(departed_at, case when $4 then now() else null end) where id = $1', [s.id, extra.vessel ?? '', extra.mmsi ?? '', target === 'in_transit'])
 }
@@ -123,6 +125,7 @@ export async function syncContainer(db: Db, c: Row): Promise<string[]> {
       }
     }
     await db.query(`update containers set tracking_status = 'live', tracking_synced_at = now(), tracking_error = '' where id = $1`, [c.id])
+    if (changes.length) await notifyShipperStaff(db, c.shipper_id, { kind: 'container_update', title: `${c.ref}${c.number ? ` (${c.number})` : ''}: ${changes[0]}${changes.length > 1 ? ` +${changes.length - 1} more` : ''}`, body: `${adapter.label} update — ${changes.join(' · ')}.`, link: `/dashboard/containers/${c.id}` }, ['owner', 'dispatcher', 'agent'])
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     await db.query(`update containers set tracking_status = 'error', tracking_synced_at = now(), tracking_error = $2 where id = $1`, [c.id, msg.slice(0, 300)])

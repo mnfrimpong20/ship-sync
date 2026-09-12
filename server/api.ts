@@ -12,7 +12,8 @@ import { mountDirectory } from './directory'
 import { mountInsights } from './insights'
 import { mountContainers } from './containers'
 import { mountLabels } from './labels'
-import { mountScans, piecesForTracking } from './scans'
+import { mountScans, piecesForTracking, proofOfDelivery } from './scans'
+import { mountNotifications, notify, notifyShipmentStatus, notifyShipperStaff } from './notify'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'driver' }
@@ -184,6 +185,17 @@ async function demoAutoQuotes(db: Db, req: Row) {
     await db.query('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes) values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict do nothing',
       [uid(), req.id, m.shipper.id, price, transit, new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), `${m.shipper.tagline}. ${req.delivery ? 'Door delivery included.' : 'Consignee collects at port/airport.'} Duty and destination taxes payable by consignee.`, JSON.stringify(includes)])
   }
+  if (matches.length) await notify(db, { userId: req.user_id, kind: 'quote_received', title: `${matches.length} quote${matches.length === 1 ? '' : 's'} for ${req.ref}`, body: `${matches.map((m) => m.shipper.name).join(', ')} ${matches.length === 1 ? 'has' : 'have'} priced your ${req.origin} → ${req.destination} request. Compare and accept the one you like.`, link: '/dashboard', dedupe: `rq:${req.id}:demo-quotes` })
+}
+
+/** Shippers whose lanes match a fresh request hear about it as a lead (unless they already auto-quoted it). */
+async function notifyNewLead(db: Db, req: Row) {
+  const { rows: quoted } = await db.query<Row>('select shipper_id from quotes where request_id = $1', [req.id])
+  const done = new Set(quoted.map((q) => q.shipper_id))
+  const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })).filter((m) => !done.has(m.shipper.id))
+  for (const m of matches) {
+    await notifyShipperStaff(db, m.shipper.id, { kind: 'new_lead', title: `New lead: ${req.quantity} × ${req.cargo} to ${req.destination}`, body: `${req.contact_name} wants to ship from ${req.origin} (${req.mode === 'either' ? 'air or ocean' : req.mode}), ready ${String(req.ready_date).slice(0, 10)}. Send a quote before the competition does.`, link: '/dashboard/leads', dedupe: `lead:${req.id}` }, ['owner', 'dispatcher', 'agent'])
+  }
 }
 
 /* ---------------- loaders ---------------- */
@@ -329,6 +341,7 @@ export function apiRouter() {
     )
     const { rows } = await db.query<Row>('select * from requests where id = $1', [id])
     if (DEMO_AUTO_QUOTES) await demoAutoQuotes(db, rows[0])
+    await notifyNewLead(db, rows[0])
     const [request] = await loadRequests(db, 'id = $1', [id])
     res.status(201).json({ request, user })
   }))
@@ -343,6 +356,7 @@ export function apiRouter() {
     if (rows[0].status !== 'open') throw new HttpError(409, 'This request is no longer open.')
     await db.query('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes) values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict (request_id, shipper_id) do update set price = excluded.price, transit_days = excluded.transit_days, valid_until = excluded.valid_until, notes = excluded.notes, includes = excluded.includes, sent_at = now()',
       [uid(), req.params.id, user.shipperId, body.price, body.transitDays, body.validUntil ?? new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), body.notes, JSON.stringify(body.includes)])
+    await notify(db, { userId: rows[0].user_id, kind: 'quote_received', title: `${user.company ?? 'A shipper'} quoted $${body.price.toLocaleString()} on ${rows[0].ref}`, body: `${body.transitDays} days transit${body.includes.length ? ` · ${body.includes.join(', ')}` : ''}. Open your dashboard to compare and accept.`, link: '/dashboard', dedupe: `rq:${rows[0].id}:q:${user.shipperId}:${Date.now()}` })
     const [request] = await loadRequests(db, 'id = $1', [req.params.id])
     res.status(201).json({ request: { ...request, quotes: request.quotes.filter((x) => x.shipperId === user.shipperId), competingQuotes: request.quotes.filter((x) => x.shipperId !== user.shipperId).length } })
   }))
@@ -367,6 +381,8 @@ export function apiRouter() {
       [sid, r0.ref, r0.id, q.shipper_id, user.id, mode, r0.origin, r0.destination, r0.cargo, r0.description || `${r0.quantity} × ${r0.cargo}`, 'booked', new Date(Date.now() + (q.transit_days + 4) * 86400000).toISOString().slice(0, 10), r0.contact_name])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, 'booked', r0.origin, `Booking confirmed with ${shipper.name}. Quote accepted at $${q.price}.`])
     await attachShipmentToClient(db, q.shipper_id, user.id, sid, r0.contact_name, r0.contact_email)
+    await notify(db, { userId: user.id, kind: 'booking_confirmed', title: `Booking confirmed — ${r0.ref}`, body: `${shipper.name} will handle your ${r0.origin} → ${r0.destination} shipment for $${Number(q.price).toLocaleString()}. Track it any time with reference ${r0.ref}.`, link: `/track?ref=${r0.ref}`, dedupe: `ship:${sid}:booked` })
+    await notifyShipperStaff(db, q.shipper_id, { kind: 'quote_accepted', title: `${r0.contact_name} accepted your quote — ${r0.ref}`, body: `$${Number(q.price).toLocaleString()} · ${r0.quantity} × ${r0.cargo} · ${r0.origin} → ${r0.destination}. The order is now booked; arrange pickup or drop-off.`, link: '/dashboard/shipments', dedupe: `ship:${sid}:accepted` }, ['owner', 'dispatcher', 'agent'])
     const [shipment] = await loadShipments(db, 'id = $1', [sid])
     const [request] = await loadRequests(db, 'id = $1', [q.request_id])
     res.status(201).json({ shipment, request })
@@ -392,6 +408,7 @@ export function apiRouter() {
     if (next === 'in_transit') { await db.query('update shipments set departed_at = coalesce(departed_at, now()) where id = $1', [s.id]) }
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, next, idx < 3 ? s.origin : s.destination, note])
     await logShipmentActivity(db, s.id, `${s.ref} moved to “${statusLabels[next]}”${note ? ` — ${note}` : '.'}`)
+    await notifyShipmentStatus(db, s, next, note ?? undefined)
     const [shipment] = await loadShipments(db, 'id = $1', [s.id])
     res.json({ shipment })
   }))
@@ -422,6 +439,7 @@ export function apiRouter() {
   mountContainers(r, { getDb, requireUser, HttpError, wrap, loadShipments })
   mountLabels(r, { getDb, requireUser, HttpError, wrap })
   mountScans(r, { getDb, requireUser, HttpError, wrap })
+  mountNotifications(r, { getDb, requireUser, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.
@@ -452,7 +470,7 @@ export function apiRouter() {
     const db = await getDb()
     const [shipment] = await loadShipments(db, 'upper(ref) = upper($1)', [req.params.ref])
     if (!shipment) throw new HttpError(404, 'We couldn’t find a shipment with that reference.')
-    res.json({ shipment, pieces: await piecesForTracking(db, shipment.id) })
+    res.json({ shipment, pieces: await piecesForTracking(db, shipment.id), pod: shipment.status === 'delivered' ? await proofOfDelivery(db, shipment.id) : null })
   }))
 
   // errors

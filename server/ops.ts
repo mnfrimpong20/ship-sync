@@ -10,6 +10,7 @@ import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { countryByCode, statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
 import { distanceKm } from '../src/lib/geo'
+import { notifyShipmentStatus } from './notify'
 
 type Row = Record<string, any>
 export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'driver'
@@ -329,5 +330,6 @@ export function mountOps(r: Router, d: Deps) {
     await db.query('update shipments set status = $2 where id = $1', [s.id, target])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, target, statusOrder.indexOf(target) < 3 ? s.origin : (countryByCode(s.destination)?.name ?? s.destination), note])
     if (s.client_id) await db.query(`insert into client_activities (id,client_id,shipper_id,type,body) values ($1,$2,$3,'system',$4)`, [uid(), s.client_id, s.shipper_id, `${s.ref} moved to “${statusLabels[target]}” — ${note}`])
+    await notifyShipmentStatus(db, s, target, note)
   }
 }

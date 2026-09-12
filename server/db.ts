@@ -382,6 +382,33 @@ create table if not exists scans (
 );
 create index if not exists idx_pieces_shipment on pieces(shipment_id);
 create index if not exists idx_scans_shipment on scans(shipment_id);
+create table if not exists notifications (
+  id text primary key,
+  user_id text not null references users(id) on delete cascade,
+  kind text not null,
+  title text not null,
+  body text not null default '',
+  link text not null default '',
+  at timestamptz not null default now(),
+  read_at timestamptz,
+  dedupe text not null default '',
+  email_status text not null default 'pending',
+  email_to text not null default '',
+  email_subject text not null default '',
+  email_html text not null default '',
+  attempts int not null default 0,
+  last_error text not null default ''
+);
+create index if not exists idx_notifications_user on notifications(user_id, at desc);
+create unique index if not exists idx_notifications_dedupe on notifications(dedupe) where dedupe <> '';
+create table if not exists notification_prefs (
+  user_id text primary key references users(id) on delete cascade,
+  email boolean not null default true,
+  muted jsonb not null default '[]',
+  updated_at timestamptz not null default now()
+);
+alter table invoices add column if not exists overdue_notified_at timestamptz;
+alter table scans add column if not exists received_by text not null default '';
 
 `
 

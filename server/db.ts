@@ -352,6 +352,36 @@ alter table containers add column if not exists tracking_error text not null def
 alter table containers add column if not exists tracking_state text not null default '{}';
 alter table container_events add column if not exists source text not null default 'manual';
 alter table container_events add column if not exists code text not null default '';
+create table if not exists pieces (
+  id text primary key,
+  shipment_id text not null references shipments(id) on delete cascade,
+  seq int not null,
+  label_code text unique not null,
+  status text not null default 'labelled',
+  printed_at timestamptz,
+  last_scan_at timestamptz,
+  last_scan_kind text not null default '',
+  last_scan_place text not null default '',
+  last_scan_by text not null default '',
+  created_at timestamptz not null default now(),
+  unique (shipment_id, seq)
+);
+create table if not exists scans (
+  id text primary key,
+  piece_id text not null references pieces(id) on delete cascade,
+  shipment_id text not null references shipments(id) on delete cascade,
+  kind text not null,
+  at timestamptz not null default now(),
+  place text not null default '',
+  note text not null default '',
+  by_name text not null default '',
+  by_staff_id text,
+  lat double precision,
+  lon double precision,
+  photo text
+);
+create index if not exists idx_pieces_shipment on pieces(shipment_id);
+create index if not exists idx_scans_shipment on scans(shipment_id);
 
 `
 

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, Bell, Check, ChevronRight, Ellipsis, FileText, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Printer, Ship, Star, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Ban, Bell, Check, ChevronDown, ChevronRight, Ellipsis, FileText, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Printer, RotateCcw, Search, Send, Ship, Star, Trash2, Wallet, X } from 'lucide-react'
 import { cargoLabel, cargoTypes, countries, countryByCode, origins, statusLabels, type CargoType, type Mode } from '../lib/data'
 import { useStore } from '../lib/store'
 import { activityLabel, clientsApi, paymentMethods, type Activity, type ActivityType, type BookingInput, type ClientDetail as Detail, type Consignee, type ConsigneeInput, type Invoice, type InvoiceItem } from '../lib/clients'
@@ -210,6 +210,28 @@ function Shipments({ d, busy, run, reload, advance }: Common & { advance: (id: s
 }
 
 /* ---------------- Invoices & payments ---------------- */
+type InvFilter = 'all' | 'outstanding' | 'overdue' | 'paid' | 'draft' | 'void'
+const invOverdue = (inv: Invoice) => inv.status === 'sent' && !!inv.dueAt && inv.dueAt < today()
+/** One word for where the money stands — the status column shows this, not the raw DB state. */
+const invState = (inv: Invoice): { label: string; tone: 'gold' | 'teal' | 'green' | 'muted' | 'danger' | 'sky' } =>
+  inv.status === 'void' ? { label: 'Void', tone: 'muted' } : inv.status === 'paid' ? { label: 'Paid', tone: 'green' } : inv.status === 'draft' ? { label: 'Draft', tone: 'sky' } : invOverdue(inv) ? { label: 'Overdue', tone: 'danger' } : inv.paid > 0 ? { label: 'Partly paid', tone: 'teal' } : { label: 'Sent', tone: 'gold' }
+const daysFrom = (d: string) => Math.round((new Date(d + 'T12:00:00Z').getTime() - Date.now()) / 86400000)
+
+function VoidModal({ inv, busy, onClose, onConfirm }: { inv: Invoice; busy: boolean; onClose: () => void; onConfirm: (reason: string) => void }) {
+  const [reason, setReason] = useState('')
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [onClose])
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="void-h" className="card-dark w-full max-w-md p-6">
+        <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-danger/10 text-danger" aria-hidden="true"><Ban size={18} /></span><div><h2 id="void-h" className="!text-lg">Void {inv.number}?</h2><p className="mt-1 text-sm text-text-muted">The invoice stays on record marked <strong>Void</strong> but stops counting toward what this client owes. It can be restored later from the same menu.</p></div></div>
+        {inv.paid > 0 && <p role="alert" className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger"><strong>{money(inv.paid)}</strong> has been recorded as paid on this invoice. Voiding does not refund or move that money — if the customer overpaid, agree a refund or credit with them separately.</p>}
+        <div className="mt-4"><label htmlFor="void-reason" className="label-dark">Reason <span className="font-normal text-text-muted">(optional, kept on the invoice)</span></label><input id="void-reason" autoFocus className="input-dark !min-h-10 text-sm" placeholder="Issued in error, replaced by INV-…, cancelled shipment" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+        <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-ghost !min-h-10 !px-4 text-sm">Keep invoice</button><button onClick={() => onConfirm(reason)} disabled={busy} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-danger px-4 text-sm font-semibold text-white hover:opacity-90 focus-ring disabled:opacity-60"><Ban size={14} aria-hidden="true" /> {busy ? 'Voiding…' : 'Void invoice'}</button></div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 function Invoices({ d, busy, run, reload }: Common) {
   const c = d.client
   const [open, setOpen] = useState(false)
@@ -217,22 +239,55 @@ function Invoices({ d, busy, run, reload }: Common) {
   const [meta, setMeta] = useState({ shipmentId: '', tax: 0, dueAt: plusDays(14), notes: 'Duty and destination charges payable by consignee.', status: 'sent' as 'draft' | 'sent' })
   const [payFor, setPayFor] = useState<string | null>(null)
   const [pay, setPay] = useState({ amount: '', method: 'bank', at: today(), note: '' })
+  const [filter, setFilter] = useState<InvFilter>('all')
+  const [q, setQ] = useState('')
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [menu, setMenu] = useState<string | null>(null)
+  const [voiding, setVoiding] = useState<Invoice | null>(null)
+  useEffect(() => { if (!menu) return; const k = () => setMenu(null); window.addEventListener('click', k); return () => window.removeEventListener('click', k) }, [menu])
   const subtotal = Math.round(items.reduce((n, i) => n + (Number(i.qty) || 0) * (Number(i.unit) || 0), 0))
   const submit = () => run(async () => {
     await clientsApi.createInvoice(c.id, { shipmentId: meta.shipmentId || undefined, items: items.filter((i) => i.description.trim()).map((i) => ({ description: i.description.trim(), qty: Number(i.qty), unit: Math.round(Number(i.unit)) })), tax: Math.round(meta.tax), dueAt: meta.dueAt, notes: meta.notes, status: meta.status })
     await reload(); setOpen(false); setItems([{ description: '', qty: 1, unit: 0 }])
   }, 'Invoice created.')
-  const tone = (s: Invoice['status']) => (s === 'paid' ? 'green' : s === 'sent' ? 'gold' : s === 'void' ? 'muted' : 'teal')
+
+  const live = d.invoices.filter((i) => i.status !== 'void')
+  const stats = {
+    outstanding: live.reduce((n, i) => n + i.balance, 0), outstandingN: live.filter((i) => i.balance > 0).length,
+    overdue: live.filter(invOverdue).reduce((n, i) => n + i.balance, 0), overdueN: live.filter(invOverdue).length,
+    paid: live.reduce((n, i) => n + i.paid, 0), paidN: live.filter((i) => i.status === 'paid').length,
+    drafts: d.invoices.filter((i) => i.status === 'draft').length, voided: d.invoices.filter((i) => i.status === 'void').length,
+  }
+  const ql = q.trim().toLowerCase()
+  const rows = d.invoices.filter((inv) => {
+    const sh = d.shipments.find((s) => s.id === inv.shipmentId)
+    const f = filter === 'all' ? true : filter === 'outstanding' ? inv.status !== 'void' && inv.balance > 0 : filter === 'overdue' ? invOverdue(inv) : filter === 'paid' ? inv.status === 'paid' : filter === 'draft' ? inv.status === 'draft' : inv.status === 'void'
+    return f && (!ql || [inv.number, sh?.ref ?? '', ...inv.items.map((i) => i.description), inv.notes].join(' ').toLowerCase().includes(ql))
+  })
+  const chip = (f: InvFilter, label: string, n: number) => <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f} className={`rounded-full border px-3 py-1.5 text-xs focus-ring ${filter === f ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{label} <span className="tabular-nums opacity-70">{n}</span></button>
+  const setStatus = (inv: Invoice, status: 'sent' | 'draft' | 'void', msg: string, reason?: string) => run(async () => { await clientsApi.updateInvoice(inv.id, { status, reason }); await reload() }, msg)
+
   return (
     <div className="mt-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-text-muted">Issue invoices per shipment, record what's been paid, and print or share the invoice.</p>
-        <button onClick={() => setOpen((o) => !o)} className="btn-gold !min-h-10 !px-4 text-sm" aria-expanded={open}><Plus size={15} aria-hidden="true" /> New invoice</button>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <button onClick={() => setFilter('outstanding')} aria-pressed={filter === 'outstanding'} className={`card-dark p-4 text-left transition-colors hover:border-gold/40 focus-ring ${filter === 'outstanding' ? '!border-gold' : ''}`}><div className="flex items-center justify-between"><p className="text-xs text-text-muted">Outstanding</p><Wallet size={14} className="text-gold-deep" aria-hidden="true" /></div><p className="mt-1 font-heading text-2xl font-bold tabular-nums">{money(stats.outstanding)}</p><p className="text-[11px] text-text-muted">{stats.outstandingN} invoice{stats.outstandingN === 1 ? '' : 's'} awaiting payment</p></button>
+        <button onClick={() => setFilter('overdue')} aria-pressed={filter === 'overdue'} className={`card-dark p-4 text-left transition-colors hover:border-gold/40 focus-ring ${filter === 'overdue' ? '!border-gold' : ''} ${stats.overdueN ? 'border-l-4 border-l-danger' : ''}`}><div className="flex items-center justify-between"><p className="text-xs text-text-muted">Overdue</p><AlertTriangle size={14} className={stats.overdueN ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" /></div><p className="mt-1 font-heading text-2xl font-bold tabular-nums">{money(stats.overdue)}</p><p className="text-[11px] text-text-muted">{stats.overdueN ? `${stats.overdueN} past due — worth a reminder` : 'Nothing past due'}</p></button>
+        <button onClick={() => setFilter('paid')} aria-pressed={filter === 'paid'} className={`card-dark p-4 text-left transition-colors hover:border-gold/40 focus-ring ${filter === 'paid' ? '!border-gold' : ''}`}><div className="flex items-center justify-between"><p className="text-xs text-text-muted">Collected</p><Check size={14} className="text-gold-deep" aria-hidden="true" /></div><p className="mt-1 font-heading text-2xl font-bold tabular-nums">{money(stats.paid)}</p><p className="text-[11px] text-text-muted">{stats.paidN} paid in full</p></button>
+        <button onClick={() => setFilter(stats.drafts ? 'draft' : 'void')} aria-pressed={filter === 'draft' || filter === 'void'} className={`card-dark p-4 text-left transition-colors hover:border-gold/40 focus-ring ${filter === 'draft' || filter === 'void' ? '!border-gold' : ''}`}><div className="flex items-center justify-between"><p className="text-xs text-text-muted">Drafts & void</p><FileText size={14} className="text-gold-deep" aria-hidden="true" /></div><p className="mt-1 font-heading text-2xl font-bold tabular-nums">{stats.drafts + stats.voided}</p><p className="text-[11px] text-text-muted">{stats.drafts} draft{stats.drafts === 1 ? '' : 's'} · {stats.voided} void</p></button>
       </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        {chip('all', 'All', d.invoices.length)}{chip('outstanding', 'Outstanding', stats.outstandingN)}{chip('overdue', 'Overdue', stats.overdueN)}{chip('paid', 'Paid', stats.paidN)}{stats.drafts > 0 && chip('draft', 'Drafts', stats.drafts)}{stats.voided > 0 && chip('void', 'Void', stats.voided)}
+        <span className="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
+        <div className="relative min-w-[200px] flex-1"><Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" /><input aria-label="Search invoices" className="input-dark !min-h-9 !pl-8 text-sm" placeholder="Search number, shipment, line item…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+        <button onClick={() => setOpen((o) => !o)} className="btn-gold !min-h-9 !px-4 text-sm" aria-expanded={open}><Plus size={14} aria-hidden="true" /> New invoice</button>
+      </div>
+
       <AnimatePresence>
         {open && (
           <motion.form initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} onSubmit={(e) => { e.preventDefault(); submit() }} className="mt-4 card-dark p-5">
-            <div className="grid gap-3 md:grid-cols-3">
+            <h3 className="!text-base">New invoice for {c.name}</h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
               <div><label className="label-dark" htmlFor="i-ship">For shipment</label><select id="i-ship" className="input-dark !min-h-10" value={meta.shipmentId} onChange={(e) => setMeta({ ...meta, shipmentId: e.target.value })}><option value="">— not tied to a shipment —</option>{d.shipments.map((s) => <option key={s.id} value={s.id}>{s.ref} · {s.description.slice(0, 40)}</option>)}</select></div>
               <div><label className="label-dark" htmlFor="i-due">Due</label><input id="i-due" type="date" className="input-dark !min-h-10" value={meta.dueAt} onChange={(e) => setMeta({ ...meta, dueAt: e.target.value })} /></div>
               <div><label className="label-dark" htmlFor="i-status">Send as</label><select id="i-status" className="input-dark !min-h-10" value={meta.status} onChange={(e) => setMeta({ ...meta, status: e.target.value as 'draft' | 'sent' })}><option value="sent">Sent (final)</option><option value="draft">Draft</option></select></div>
@@ -256,43 +311,84 @@ function Invoices({ d, busy, run, reload }: Common) {
           </motion.form>
         )}
       </AnimatePresence>
-      <ul className="mt-4 space-y-2">
-        {d.invoices.length === 0 && <li className="card-dark p-8 text-center text-sm text-text-muted">No invoices yet.</li>}
-        {d.invoices.map((inv) => {
-          const sh = d.shipments.find((s) => s.id === inv.shipmentId)
-          const overdue = inv.status === 'sent' && inv.dueAt && new Date(inv.dueAt).getTime() < Date.now()
-          return (
-            <li key={inv.id} className="card-dark p-4">
-              <div className="flex flex-wrap items-center gap-4">
-                <span className="grid h-10 w-10 place-items-center rounded-lg bg-gold/15 text-gold"><FileText size={18} aria-hidden="true" /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-2 font-semibold text-text">{inv.number}<Pill tone={tone(inv.status)}>{inv.status}</Pill>{overdue && <Pill tone="gold">Overdue</Pill>}</p>
-                  <p className="text-xs text-text-muted">Issued {fmtDate(inv.issuedAt)}{inv.dueAt ? ` · due ${fmtDate(inv.dueAt)}` : ''}{sh ? ` · ${sh.ref}` : ''} · {inv.items.length} line{inv.items.length === 1 ? '' : 's'}</p>
-                </div>
-                <div className="text-right"><p className="font-heading text-xl font-bold">{money(inv.total)}</p><p className={`text-xs ${inv.balance ? 'text-gold' : 'text-text-muted'}`}>{inv.status === 'void' ? 'Void' : inv.balance ? `${money(inv.balance)} outstanding` : 'Paid in full'}</p></div>
-                <div className="flex flex-wrap gap-1">
-                  <Link to={`/dashboard/invoices/${inv.id}`} className="btn-ghost !min-h-9 !px-3 text-xs"><Printer size={13} aria-hidden="true" /> View / print</Link>
-                  {inv.status !== 'void' && inv.balance > 0 && <button onClick={() => { setPayFor(payFor === inv.id ? null : inv.id); setPay({ amount: String(inv.balance), method: 'bank', at: today(), note: '' }) }} className="btn-gold !min-h-9 !px-3 text-xs">Record payment</button>}
-                  {inv.status === 'draft' && <button onClick={() => run(async () => { await clientsApi.updateInvoice(inv.id, { status: 'sent' }); await reload() }, 'Marked as sent.')} className="btn-ghost !min-h-9 !px-3 text-xs">Mark sent</button>}
-                  {inv.status !== 'void' && <button onClick={() => run(async () => { await clientsApi.updateInvoice(inv.id, { status: 'void' }); await reload() }, 'Invoice voided.')} className="btn-ghost !min-h-9 !px-2 text-xs text-text-muted" title="Void invoice"><Ellipsis size={14} aria-hidden="true" /><span className="sr-only">Void</span></button>}
-                </div>
-              </div>
-              {inv.payments.length > 0 && <ul className="mt-3 flex flex-wrap gap-2 text-xs text-text-muted">{inv.payments.map((p) => <li key={p.id} className="rounded-full border border-border px-2 py-0.5">{money(p.amount)} · {paymentMethods.find(([k]) => k === p.method)?.[1] ?? p.method} · {fmtDate(p.at)}{p.note ? ` · ${p.note}` : ''}</li>)}</ul>}
-              <AnimatePresence>
-                {payFor === inv.id && (
-                  <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} onSubmit={(e) => { e.preventDefault(); run(async () => { await clientsApi.addPayment(inv.id, { amount: Math.round(Number(pay.amount)), method: pay.method, at: pay.at, note: pay.note }); await reload(); setPayFor(null) }, 'Payment recorded.') }} className="mt-3 grid gap-2 overflow-hidden border-t border-border pt-3 sm:grid-cols-4">
-                    <div><label className="label-dark" htmlFor={`p-amt-${inv.id}`}>Amount (USD)</label><input id={`p-amt-${inv.id}`} type="number" min={1} required className="input-dark !min-h-9 text-sm" value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} /></div>
-                    <div><label className="label-dark" htmlFor={`p-m-${inv.id}`}>Method</label><select id={`p-m-${inv.id}`} className="input-dark !min-h-9 text-sm" value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}>{paymentMethods.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
-                    <div><label className="label-dark" htmlFor={`p-d-${inv.id}`}>Date</label><input id={`p-d-${inv.id}`} type="date" className="input-dark !min-h-9 text-sm" value={pay.at} onChange={(e) => setPay({ ...pay, at: e.target.value })} /></div>
-                    <div><label className="label-dark" htmlFor={`p-n-${inv.id}`}>Note</label><input id={`p-n-${inv.id}`} className="input-dark !min-h-9 text-sm" placeholder="Deposit, balance…" value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} /></div>
-                    <div className="sm:col-span-4 flex justify-end gap-2"><button type="button" onClick={() => setPayFor(null)} className="btn-ghost !min-h-8 !px-3 text-xs">Cancel</button><button disabled={busy} className="btn-gold !min-h-8 !px-3 text-xs disabled:opacity-60">Save payment</button></div>
-                  </motion.form>
-                )}
-              </AnimatePresence>
-            </li>
-          )
-        })}
-      </ul>
+
+      <div className="card-dark mt-4 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm">
+            <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="w-8 px-3 py-3" /><th className="px-3 py-3">Invoice</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Issued</th><th className="px-3 py-3">Due</th><th className="px-3 py-3 text-right">Total</th><th className="px-3 py-3 text-right">Paid</th><th className="px-3 py-3 text-right">Balance</th><th className="px-3 py-3 text-right">Actions</th></tr></thead>
+            <tbody>
+              {rows.length === 0 && <tr><td colSpan={9} className="px-3 py-10 text-center text-sm text-text-muted">{d.invoices.length ? 'No invoices match this filter.' : 'No invoices yet — create the first one from a shipment.'}</td></tr>}
+              {rows.map((inv) => {
+                const sh = d.shipments.find((s) => s.id === inv.shipmentId); const st = invState(inv); const isOpen = expanded === inv.id; const due = inv.dueAt ? daysFrom(inv.dueAt) : null; const voided = inv.status === 'void'
+                return (
+                  <Fragment key={inv.id}>
+                    <tr className={`border-b border-border/70 align-top transition-colors hover:bg-surface-2/60 ${isOpen ? 'bg-surface-2/40' : ''} ${voided ? 'opacity-60' : ''}`}>
+                      <td className="px-3 py-3"><button onClick={() => setExpanded(isOpen ? null : inv.id)} className="grid h-7 w-7 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text focus-ring" aria-expanded={isOpen} aria-label={`${isOpen ? 'Hide' : 'Show'} ${inv.number}`}><ChevronDown size={15} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} /></button></td>
+                      <td className="px-3 py-3"><Link to={`/dashboard/invoices/${inv.id}`} className={`font-semibold hover:text-gold-deep focus-ring ${voided ? 'line-through' : ''}`}>{inv.number}</Link><p className="text-xs text-text-muted">{sh ? <>{sh.ref} · </> : null}{inv.items.length} line{inv.items.length === 1 ? '' : 's'}{inv.items[0] ? ` · ${inv.items[0].description}` : ''}</p></td>
+                      <td className="whitespace-nowrap px-3 py-3"><Pill tone={st.tone}>{st.label}</Pill></td>
+                      <td className="whitespace-nowrap px-3 py-3 tabular-nums">{fmtDate(inv.issuedAt)}</td>
+                      <td className="whitespace-nowrap px-3 py-3 tabular-nums">{inv.dueAt ? <><p>{fmtDate(inv.dueAt)}</p>{!voided && inv.status !== 'paid' && due !== null && <p className={`text-[11px] ${due < 0 ? 'font-semibold text-danger' : 'text-text-muted'}`}>{due < 0 ? `${-due}d overdue` : due === 0 ? 'due today' : `in ${due}d`}</p>}</> : <span className="text-text-muted">—</span>}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums">{money(inv.total)}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-text-muted">{inv.paid ? money(inv.paid) : '—'}</td>
+                      <td className={`whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums ${voided ? 'text-text-muted' : inv.balance > 0 ? (invOverdue(inv) ? 'text-danger' : 'text-gold-deep') : 'text-teal'}`}>{voided ? '—' : inv.balance > 0 ? money(inv.balance) : 'Settled'}</td>
+                      <td className="px-3 py-3 text-right">
+                        <div className="relative inline-flex items-center gap-1.5">
+                          {!voided && inv.balance > 0 && <button onClick={() => { setExpanded(inv.id); setPayFor(payFor === inv.id ? null : inv.id); setPay({ amount: String(inv.balance), method: 'bank', at: today(), note: '' }) }} className="btn-gold !min-h-8 whitespace-nowrap !px-2.5 text-xs">Record payment</button>}
+                          <Link to={`/dashboard/invoices/${inv.id}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`View or print ${inv.number}`} title="View / print"><Printer size={13} /></Link>
+                          <button onClick={(e) => { e.stopPropagation(); setMenu(menu === inv.id ? null : inv.id) }} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-haspopup="menu" aria-expanded={menu === inv.id} aria-label={`More actions for ${inv.number}`}><Ellipsis size={14} /></button>
+                          {menu === inv.id && (
+                            <div role="menu" onClick={(e) => e.stopPropagation()} className="absolute right-0 top-9 z-20 w-56 overflow-hidden rounded-xl border border-border bg-surface py-1 text-left text-sm shadow-xl">
+                              <Link role="menuitem" to={`/dashboard/invoices/${inv.id}`} className="flex items-center gap-2 px-3 py-2 hover:bg-surface-2"><Printer size={14} aria-hidden="true" /> View / print / share</Link>
+                              {inv.status === 'draft' && <button role="menuitem" onClick={() => { setMenu(null); setStatus(inv, 'sent', `${inv.number} marked as sent.`) }} className="flex w-full items-center gap-2 px-3 py-2 hover:bg-surface-2"><Send size={14} aria-hidden="true" /> Mark as sent</button>}
+                              {inv.status === 'sent' && inv.paid === 0 && <button role="menuitem" onClick={() => { setMenu(null); setStatus(inv, 'draft', `${inv.number} moved back to draft.`) }} className="flex w-full items-center gap-2 px-3 py-2 hover:bg-surface-2"><FileText size={14} aria-hidden="true" /> Move back to draft</button>}
+                              {sh && <Link role="menuitem" to={`/dashboard/shipments?q=${sh.ref}&b=all`} className="flex items-center gap-2 px-3 py-2 hover:bg-surface-2"><Ship size={14} aria-hidden="true" /> Open shipment {sh.ref}</Link>}
+                              <div className="my-1 border-t border-border" />
+                              {voided
+                                ? <button role="menuitem" onClick={() => { setMenu(null); setStatus(inv, 'sent', `${inv.number} restored.`) }} className="flex w-full items-center gap-2 px-3 py-2 hover:bg-surface-2"><RotateCcw size={14} aria-hidden="true" /> Restore invoice</button>
+                                : <button role="menuitem" onClick={() => { setMenu(null); setVoiding(inv) }} className="flex w-full items-center gap-2 px-3 py-2 text-danger hover:bg-danger/10"><Ban size={14} aria-hidden="true" /> Void invoice…</button>}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr className="border-b border-border/70 bg-surface-2/30"><td /><td colSpan={8} className="px-3 pb-5 pt-2">
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+                          <div className="rounded-xl border border-border bg-surface p-4">
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">Line items</p>
+                            <table className="w-full text-sm"><tbody>{inv.items.map((it, i) => <tr key={i} className="border-b border-border/60 last:border-0"><td className="py-1.5 pr-2">{it.description}</td><td className="py-1.5 pr-2 text-right tabular-nums text-text-muted">{it.qty} × {money(it.unit)}</td><td className="py-1.5 text-right tabular-nums">{money(Math.round(it.qty * it.unit))}</td></tr>)}</tbody>
+                              <tfoot><tr><td colSpan={2} className="pt-2 text-right text-xs text-text-muted">Subtotal</td><td className="pt-2 text-right tabular-nums">{money(inv.subtotal)}</td></tr>{inv.tax > 0 && <tr><td colSpan={2} className="text-right text-xs text-text-muted">Tax / fees</td><td className="text-right tabular-nums">{money(inv.tax)}</td></tr>}<tr><td colSpan={2} className="pt-1 text-right text-xs font-semibold uppercase tracking-wider text-text-muted">Total</td><td className="pt-1 text-right font-semibold tabular-nums">{money(inv.total)}</td></tr></tfoot></table>
+                            {inv.notes && <p className="mt-3 whitespace-pre-wrap border-t border-border pt-3 text-xs text-text-muted">{inv.notes}</p>}
+                          </div>
+                          <div className="rounded-xl border border-border bg-surface p-4">
+                            <div className="flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Payments</p><span className="text-xs tabular-nums text-text-muted">{money(inv.paid)} of {money(inv.total)}</span></div>
+                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border"><div className={`h-full ${inv.balance === 0 ? 'bg-teal' : 'bg-gold'}`} style={{ width: `${inv.total ? Math.min(100, (inv.paid / inv.total) * 100) : 0}%` }} /></div>
+                            {inv.payments.length === 0 ? <p className="mt-3 text-xs text-text-muted">No payments recorded yet.</p> : <ul className="mt-3 space-y-1.5 text-xs">{inv.payments.map((p) => <li key={p.id} className="flex items-center justify-between gap-2"><span className="text-text-muted">{fmtDate(p.at)} · {paymentMethods.find(([k]) => k === p.method)?.[1] ?? p.method}{p.note ? ` · ${p.note}` : ''}</span><span className="font-semibold tabular-nums">{money(p.amount)}</span></li>)}</ul>}
+                            {!voided && inv.balance > 0 && payFor !== inv.id && <button onClick={() => { setPayFor(inv.id); setPay({ amount: String(inv.balance), method: 'bank', at: today(), note: '' }) }} className="btn-ghost mt-3 !min-h-9 w-full text-xs"><Plus size={13} aria-hidden="true" /> Record a payment</button>}
+                            <AnimatePresence>
+                              {payFor === inv.id && (
+                                <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} onSubmit={(e) => { e.preventDefault(); run(async () => { await clientsApi.addPayment(inv.id, { amount: Math.round(Number(pay.amount)), method: pay.method, at: pay.at, note: pay.note }); await reload(); setPayFor(null) }, 'Payment recorded.') }} className="mt-3 grid gap-2 overflow-hidden border-t border-border pt-3 sm:grid-cols-2">
+                                  <div><label className="label-dark" htmlFor={`p-amt-${inv.id}`}>Amount (USD)</label><input id={`p-amt-${inv.id}`} type="number" min={1} required className="input-dark !min-h-9 text-sm tabular-nums" value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} /></div>
+                                  <div><label className="label-dark" htmlFor={`p-m-${inv.id}`}>Method</label><select id={`p-m-${inv.id}`} className="input-dark !min-h-9 text-sm" value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}>{paymentMethods.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+                                  <div><label className="label-dark" htmlFor={`p-d-${inv.id}`}>Date</label><input id={`p-d-${inv.id}`} type="date" className="input-dark !min-h-9 text-sm" value={pay.at} onChange={(e) => setPay({ ...pay, at: e.target.value })} /></div>
+                                  <div><label className="label-dark" htmlFor={`p-n-${inv.id}`}>Note</label><input id={`p-n-${inv.id}`} className="input-dark !min-h-9 text-sm" placeholder="Deposit, balance…" value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} /></div>
+                                  <div className="flex justify-end gap-2 sm:col-span-2"><button type="button" onClick={() => setPayFor(null)} className="btn-ghost !min-h-8 !px-3 text-xs">Cancel</button><button disabled={busy} className="btn-gold !min-h-8 !px-3 text-xs disabled:opacity-60">Save payment</button></div>
+                                </motion.form>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        </div>
+                      </td></tr>
+                    )}
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="border-t border-border px-4 py-3 text-xs text-text-muted">{rows.length} of {d.invoices.length} invoice{d.invoices.length === 1 ? '' : 's'} · void invoices are kept for the record but excluded from totals</div>
+      </div>
+      <AnimatePresence>{voiding && <VoidModal inv={voiding} busy={busy} onClose={() => setVoiding(null)} onConfirm={(reason) => { const inv = voiding; setVoiding(null); setStatus(inv, 'void', `${inv.number} voided.`, reason || undefined) }} />}</AnimatePresence>
     </div>
   )
 }

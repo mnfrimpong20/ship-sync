@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Bell, ChevronDown, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, X } from 'lucide-react'
+import { BellRing, ChevronDown, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, X } from 'lucide-react'
 import { Logo } from './ui'
 import ThemeSwitcher from './ThemeSwitcher'
+import { NotificationBell } from './NotificationBell'
 import { useStore } from '../lib/store'
 import { clientsApi } from '../lib/clients'
 
@@ -60,6 +61,7 @@ export default function AppShell() {
         { to: '/quote', label: 'New request', icon: PlusCircle },
       ]
   const tools: Item[] = [
+    { to: '/dashboard/notifications', label: 'Notifications', icon: BellRing },
     ...(isShipper ? [{ to: '/dashboard/scan', label: 'Scan a sticker', icon: ScanLine } as Item] : []),
     ...(isDriver ? [] : [{ to: '/live', label: 'Live map', icon: Radar } as Item]),
     { to: '/track', label: 'Track a shipment', icon: Search },
@@ -121,7 +123,7 @@ export default function AppShell() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeSwitcher compact />
-            {isShipper && <Link to="/dashboard/clients" className="relative grid h-10 w-10 place-items-center rounded-lg text-text-muted hover:text-text focus-ring" aria-label={`${dueReminders} follow-ups due`}><Bell size={18} />{dueReminders > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-gold" />}</Link>}
+            <NotificationBell />
             <div className="relative">
               <button onClick={() => setMenu((m) => !m)} className="btn-ghost !min-h-10 !px-3 text-sm" aria-expanded={menu} aria-haspopup="menu">
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-gold text-[11px] font-bold text-on-accent">{user.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}</span>

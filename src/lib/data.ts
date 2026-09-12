@@ -117,6 +117,7 @@ export interface Shipment {
   flight?: string
   departedAt?: string
   clientId?: string
+  requestId?: string
   containerId?: string
   consigneeId?: string
 }

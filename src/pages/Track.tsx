@@ -103,6 +103,23 @@ function LivePanel({ s }: { s: Shipment }) {
 
 
 /** One box per sticker on the customer's page — "3 of 4 loaded" answers the question before anyone rings the office. */
+function ProofOfDelivery({ pod }: { pod: NonNullable<Shipment['pod']> }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="mt-6 rounded-xl border border-teal/30 bg-teal/[0.06] p-4" aria-label="Proof of delivery" data-testid="pod">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-teal">Proof of delivery</p>
+          <p className="mt-1 text-sm">{pod.receivedBy ? <>Received by <strong>{pod.receivedBy}</strong></> : 'Handed over'}{pod.by ? ` · delivered by ${pod.by}` : ''}{pod.place ? ` · ${pod.place}` : ''}</p>
+          {pod.at && <p className="mt-0.5 text-xs text-text-muted">{fmtDateTime(pod.at)}</p>}
+        </div>
+        {pod.photo && <button onClick={() => setOpen((o) => !o)} className="btn-ghost !min-h-9 !px-3 text-xs">{open ? 'Hide photo' : 'View photo'}</button>}
+      </div>
+      {pod.photo && open && <img src={pod.photo} alt="Proof of delivery" className="mt-3 max-h-96 w-auto rounded-lg border border-border" />}
+    </section>
+  )
+}
+
 function PiecesStrip({ pieces }: { pieces: NonNullable<Shipment['pieces']> }) {
   const [sp] = useSearchParams()
   const hi = Number(sp.get('p') ?? 0)
@@ -152,6 +169,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
           </div>
 
           {s.pieces && s.pieces.length > 0 && <PiecesStrip pieces={s.pieces} />}
+          {s.pod && <ProofOfDelivery pod={s.pod} />}
 
           <LivePanel s={s} />
 

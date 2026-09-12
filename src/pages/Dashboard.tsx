@@ -265,6 +265,7 @@ export function ShipperDashboard() {
         </section>}
 
         {view === 'shipments' && <Navigate to="/dashboard/shipments" replace />}
+        {view === 'leads' && <Navigate to="/dashboard/leads" replace />}
       </div>
     </Layout>
   )

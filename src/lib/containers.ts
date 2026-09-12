@@ -26,7 +26,7 @@ export type TrackingStatus = 'off' | 'pending' | 'live' | 'error'
 export interface TrackingProvider { enabled: boolean; id: string | null; label: string | null; simulated: boolean }
 export type ContainerInput = Partial<Omit<Container, 'id' | 'ref' | 'status' | 'createdAt' | 'loaded' | 'imo' | 'tracking'>>
 export interface ContainerEvent { status: ContainerStatus; at: string; place: string; note: string; by: string; source: 'manual' | 'carrier'; code: string }
-export interface ContainerDetail { container: Container; events: ContainerEvent[]; shipments: (Shipment & { clientName: string | null })[]; cascaded?: number; changes?: string[] }
+export interface ContainerDetail { container: Container; events: ContainerEvent[]; shipments: (Shipment & { clientName: string | null; pieces?: { total: number; loaded: number; devanned: number } | null })[]; cascaded?: number; changes?: string[] }
 export interface Candidate { id: string; ref: string; origin: string; destination: string; cargo: string; description: string; status: ShipmentStatus; customer: string; clientName: string | null; eta: string; sameLane: boolean }
 
 /** Carrier events that don't change the stage still show on the timeline under these titles. */

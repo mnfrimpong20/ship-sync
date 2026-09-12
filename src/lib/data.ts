@@ -118,6 +118,8 @@ export interface Shipment {
   departedAt?: string
   clientId?: string
   requestId?: string
+  /** Public piece list (from /track): one sticker per barrel/box. */
+  pieces?: { seq: number; status: 'labelled' | 'loaded' | 'devanned' | 'delivered'; lastScanAt: string | null; lastScanKind: string; lastScanPlace: string }[]
   containerId?: string
   consigneeId?: string
 }

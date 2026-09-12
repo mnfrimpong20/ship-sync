@@ -12,6 +12,7 @@ import { mountDirectory } from './directory'
 import { mountInsights } from './insights'
 import { mountContainers } from './containers'
 import { mountLabels } from './labels'
+import { mountScans, piecesForTracking } from './scans'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'driver' }
@@ -420,6 +421,7 @@ export function apiRouter() {
   mountInsights(r, { getDb, requireUser, HttpError, wrap })
   mountContainers(r, { getDb, requireUser, HttpError, wrap, loadShipments })
   mountLabels(r, { getDb, requireUser, HttpError, wrap })
+  mountScans(r, { getDb, requireUser, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.
@@ -450,7 +452,7 @@ export function apiRouter() {
     const db = await getDb()
     const [shipment] = await loadShipments(db, 'upper(ref) = upper($1)', [req.params.ref])
     if (!shipment) throw new HttpError(404, 'We couldn’t find a shipment with that reference.')
-    res.json({ shipment })
+    res.json({ shipment, pieces: await piecesForTracking(db, shipment.id) })
   }))
 
   // errors

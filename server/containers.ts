@@ -171,7 +171,9 @@ export function mountContainers(r: Router, d: Deps) {
     const shipments = await loadShipments(db, 'container_id = $1', [id])
     const { rows: clients } = await db.query<Row>('select id, name from clients where shipper_id = $1', [sid])
     const cname = new Map(clients.map((x) => [x.id, x.name]))
-    return { container: containerOut(c), events: ev.map(eventOut), shipments: shipments.map((s) => ({ ...s, clientName: s.clientId ? cname.get(s.clientId) ?? null : null })) }
+    const { rows: pc } = await db.query<Row>(`select shipment_id, count(*)::int as total, sum(case when status in ('loaded','devanned','delivered') then 1 else 0 end)::int as loaded, sum(case when status in ('devanned','delivered') then 1 else 0 end)::int as devanned from pieces where shipment_id = any($1::text[]) group by shipment_id`, [shipments.map((s) => s.id)])
+    const pieces = new Map(pc.map((x) => [x.shipment_id, { total: x.total, loaded: x.loaded, devanned: x.devanned }]))
+    return { container: containerOut(c), events: ev.map(eventOut), shipments: shipments.map((s) => ({ ...s, clientName: s.clientId ? cname.get(s.clientId) ?? null : null, pieces: pieces.get(s.id) ?? null })) }
   }
   r.get('/containers', wrap(async (req, res) => {
     const db = await getDb(); const { sid } = await access(db, req)

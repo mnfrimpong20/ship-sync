@@ -35,7 +35,7 @@ export const clientsApi = {
   remindersDue: () => api<{ reminders: Activity[] }>('/clients/reminders/due').then((r) => r.reminders),
   book: (id: string, b: BookingInput) => api<{ shipment: Shipment }>(`/clients/${id}/shipments`, { json: b }).then((r) => r.shipment),
   createInvoice: (id: string, i: InvoiceInput) => api<{ invoice: Invoice }>(`/clients/${id}/invoices`, { json: i }).then((r) => r.invoice),
-  updateInvoice: (id: string, p: { status?: 'draft' | 'sent' | 'void'; dueAt?: string | null; notes?: string }) => api<{ invoice: Invoice }>(`/invoices/${id}`, { method: 'PATCH', json: p }).then((r) => r.invoice),
+  updateInvoice: (id: string, p: { status?: 'draft' | 'sent' | 'void'; dueAt?: string | null; notes?: string; reason?: string }) => api<{ invoice: Invoice }>(`/invoices/${id}`, { method: 'PATCH', json: p }).then((r) => r.invoice),
   addPayment: (id: string, p: { amount: number; method: string; at?: string; note?: string }) => api<{ invoice: Invoice }>(`/invoices/${id}/payments`, { json: p }).then((r) => r.invoice),
   invoice: (id: string) => api<{ invoice: Invoice; client: Client; shipper: { id: string; name: string; hq: string; initials: string; hue: string }; shipment: Shipment | null }>(`/invoices/${id}`),
 }

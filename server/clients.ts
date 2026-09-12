@@ -72,7 +72,7 @@ const zInvoice = z.object({
   issuedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), dueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   notes: z.string().trim().max(1000).default(''), status: z.enum(['draft', 'sent']).default('draft'),
 })
-const zInvoicePatch = z.object({ status: z.enum(['draft', 'sent', 'void']).optional(), dueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), notes: z.string().trim().max(1000).optional() })
+const zInvoicePatch = z.object({ status: z.enum(['draft', 'sent', 'void']).optional(), dueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), notes: z.string().trim().max(1000).optional(), reason: z.string().trim().max(300).optional() })
 const zPayment = z.object({ amount: z.number().int().min(1).max(10_000_000), method: z.enum(['bank', 'cash', 'card', 'mobile_money', 'other']).default('bank'), at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), note: z.string().trim().max(200).default('') })
 
 /** Marketplace customers become clients automatically the moment they book with this shipper. Idempotent; runs on each list. */
@@ -280,8 +280,16 @@ export function mountClients(r: Router, d: Deps) {
     const inv = rows[0]; if (!inv) throw new HttpError(404, 'Invoice not found.')
     const b = zInvoicePatch.parse(req.body)
     if (inv.status === 'paid' && b.status && b.status !== 'void') throw new HttpError(409, 'A paid invoice can only be voided.')
-    await db.query('update invoices set status = $2, due_at = $3, notes = $4 where id = $1', [inv.id, b.status ?? inv.status, b.dueAt === undefined ? inv.due_at : b.dueAt, b.notes ?? inv.notes])
-    if (b.status && b.status !== inv.status) await act(db, inv.client_id, shipperId, 'system', `Invoice ${inv.number} marked ${b.status}.`)
+    let status: string = b.status ?? inv.status
+    // Restoring a voided invoice: land on paid / sent / draft according to what was actually paid, never on a stale status.
+    if (inv.status === 'void' && b.status && b.status !== 'void') {
+      const { rows: sum } = await db.query<{ s: string }>('select coalesce(sum(amount),0)::text as s from payments where invoice_id = $1', [inv.id])
+      status = Number(sum[0].s) >= Number(inv.total) ? 'paid' : Number(sum[0].s) > 0 ? 'sent' : b.status
+    }
+    let notes: string = b.notes ?? inv.notes
+    if (b.status === 'void' && inv.status !== 'void' && b.reason) notes = `${notes ? notes + '\n' : ''}Voided: ${b.reason}`
+    await db.query('update invoices set status = $2, due_at = $3, notes = $4 where id = $1', [inv.id, status, b.dueAt === undefined ? inv.due_at : b.dueAt, notes])
+    if (status !== inv.status) await act(db, inv.client_id, shipperId, 'system', status === 'void' ? `Invoice ${inv.number} voided${b.reason ? ` — ${b.reason}` : ''}.` : inv.status === 'void' ? `Invoice ${inv.number} restored (${status}).` : `Invoice ${inv.number} marked ${status}.`)
     const [invoice] = await loadInvoices(db, 'id = $1', [inv.id])
     res.json({ invoice })
   }))

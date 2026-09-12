@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { AlertCircle, Bell, Check, ChevronRight, Mail, MessageCircle, Phone, Plus, Search, Users, Wallet, X } from 'lucide-react'
+import { AlertCircle, Bell, Check, ChevronLeft, ChevronRight, Mail, MessageCircle, Phone, Plus, Search, Users, Wallet, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { clientsApi, type Activity, type Client, type ClientInput } from '../lib/clients'
 import { Empty, Pill, fmtDate, money } from '../components/ui'
@@ -51,6 +51,9 @@ export default function Clients() {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<'active' | 'archived' | 'marketplace' | 'manual' | 'owing'>(() => (['active', 'archived', 'marketplace', 'manual', 'owing'].includes(sp.get('filter') ?? '') ? (sp.get('filter') as 'owing') : 'active'))
   const [adding, setAdding] = useState(sp.get('new') === '1')
+  const [sort, setSort] = useState<'name' | 'recent' | 'owing' | 'shipments' | 'followup'>('recent')
+  const [page, setPage] = useState(1)
+  const PAGE = 12
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -71,8 +74,18 @@ export default function Clients() {
       if (filter === 'owing' && (c.invoiced ?? 0) - (c.paid ?? 0) <= 0) return false
       if (!s) return true
       return [c.name, c.company, c.email, c.phone, c.city, ...c.tags].join(' ').toLowerCase().includes(s)
+    }).sort((a, b) => {
+      const owe = (c: Client) => Math.max(0, (c.invoiced ?? 0) - (c.paid ?? 0))
+      if (sort === 'name') return a.name.localeCompare(b.name)
+      if (sort === 'owing') return owe(b) - owe(a) || a.name.localeCompare(b.name)
+      if (sort === 'shipments') return (b.shipmentCount ?? 0) - (a.shipmentCount ?? 0) || a.name.localeCompare(b.name)
+      if (sort === 'followup') return (a.nextReminderAt ?? '9999').localeCompare(b.nextReminderAt ?? '9999') || a.name.localeCompare(b.name)
+      return (b.updatedAt ?? b.createdAt ?? '').localeCompare(a.updatedAt ?? a.createdAt ?? '')
     })
-  }, [clients, q, filter])
+  }, [clients, q, filter, sort])
+  useEffect(() => { setPage(1) }, [q, filter, sort])
+  const pages = Math.max(1, Math.ceil(list.length / PAGE)); const cur = Math.min(page, pages)
+  const rows = list.slice((cur - 1) * PAGE, cur * PAGE)
 
   if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading…</div></div>
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/clients" replace />
@@ -134,11 +147,12 @@ export default function Clients() {
             {([['active', 'Active'], ['marketplace', 'Via Ship Sync'], ['manual', 'Own clients'], ['owing', 'Owing'], ['archived', 'Archived']] as const).map(([k, label]) => (
               <button key={k} onClick={() => setFilter(k)} aria-pressed={filter === k} className={`rounded-full border px-3 py-1.5 text-sm focus-ring ${filter === k ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>{label}</button>
             ))}
+            <select aria-label="Sort clients" className="input-dark !min-h-10 !w-auto text-sm sm:ml-auto" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}><option value="recent">Recently active</option><option value="name">Name A–Z</option><option value="owing">Most owing</option><option value="shipments">Most shipments</option><option value="followup">Next follow-up</option></select>
           </motion.div>
 
           <motion.ul variants={fadeUp} className="mt-4 space-y-2" aria-label="Clients">
             {clients && list.length === 0 && <li><Empty title={clients.length ? 'No clients match' : 'No clients yet'} body={clients.length ? 'Try another search or filter.' : 'Add your first client, or they’ll appear here automatically when a customer books you through Ship Sync.'} action={!clients.length ? <button onClick={() => setAdding(true)} className="btn-gold">Add client</button> : undefined} /></li>}
-            {list.map((c) => {
+            {rows.map((c) => {
               const owing = Math.max(0, (c.invoiced ?? 0) - (c.paid ?? 0))
               const remindDue = c.nextReminderAt ? new Date(c.nextReminderAt).getTime() < Date.now() : false
               return (
@@ -161,6 +175,12 @@ export default function Clients() {
               )
             })}
           </motion.ul>
+          {clients && list.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-1 text-xs text-text-muted">
+              <span>Showing {(cur - 1) * PAGE + 1}–{Math.min(cur * PAGE, list.length)} of {list.length} client{list.length === 1 ? '' : 's'}</span>
+              {pages > 1 && <nav className="flex items-center gap-1" aria-label="Pagination"><button onClick={() => setPage(cur - 1)} disabled={cur <= 1} className="grid h-8 w-8 place-items-center rounded-md border border-border disabled:opacity-40 focus-ring" aria-label="Previous page"><ChevronLeft size={14} /></button>{Array.from({ length: pages }, (_, i) => i + 1).filter((n) => n === 1 || n === pages || Math.abs(n - cur) <= 1).map((n, i, arr) => <span key={n} className="contents">{i > 0 && arr[i - 1] !== n - 1 && <span className="px-1">…</span>}<button onClick={() => setPage(n)} aria-current={n === cur ? 'page' : undefined} className={`h-8 min-w-8 rounded-md border px-2 focus-ring ${n === cur ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border'}`}>{n}</button></span>)}<button onClick={() => setPage(cur + 1)} disabled={cur >= pages} className="grid h-8 w-8 place-items-center rounded-md border border-border disabled:opacity-40 focus-ring" aria-label="Next page"><ChevronRight size={14} /></button></nav>}
+            </div>
+          )}
         </motion.div>
       </div>
     </div>

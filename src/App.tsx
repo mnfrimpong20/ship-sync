@@ -22,6 +22,7 @@ import MyRuns from './pages/MyRuns'
 import Shipments from './pages/Shipments'
 import Leads from './pages/Leads'
 import Labels from './pages/Labels'
+import Scan from './pages/Scan'
 import Containers from './pages/Containers'
 import ContainerDetail from './pages/ContainerDetail'
 import Join from './pages/Join'
@@ -93,6 +94,7 @@ export default function App() {
               <Route path="/dashboard/routes" element={<RunsList />} />
               <Route path="/dashboard/routes/:id" element={<RoutePlanner />} />
               <Route path="/dashboard/runs" element={<MyRuns />} />
+              <Route path="/dashboard/scan" element={<Scan />} />
               <Route path="/admin" element={<Admin />} />
             </Route>
             <Route path="/dashboard/labels" element={<Labels />} />

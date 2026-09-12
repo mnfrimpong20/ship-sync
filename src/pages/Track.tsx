@@ -101,6 +101,25 @@ function LivePanel({ s }: { s: Shipment }) {
   )
 }
 
+
+/** One box per sticker on the customer's page — "3 of 4 loaded" answers the question before anyone rings the office. */
+function PiecesStrip({ pieces }: { pieces: NonNullable<Shipment['pieces']> }) {
+  const [sp] = useSearchParams()
+  const hi = Number(sp.get('p') ?? 0)
+  const label = { labelled: 'At the yard', loaded: 'In the container', devanned: 'At the destination warehouse', delivered: 'Delivered' } as const
+  const tone = { labelled: 'bg-surface-2 text-text-muted', loaded: 'bg-gold/30 text-text', devanned: 'bg-sky/30 text-text', delivered: 'bg-teal text-white' } as const
+  const n = (st: keyof typeof label) => pieces.filter((p) => p.status === st).length
+  const summary = [n('delivered') ? `${n('delivered')} delivered` : '', n('devanned') ? `${n('devanned')} at the warehouse` : '', n('loaded') ? `${n('loaded')} in the container` : '', n('labelled') ? `${n('labelled')} at the yard` : ''].filter(Boolean).join(' · ')
+  const focus = pieces.find((p) => p.seq === hi)
+  return (
+    <div className="mt-6 rounded-xl border border-border bg-surface-2/40 p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wider text-text-muted">{pieces.length} piece{pieces.length === 1 ? '' : 's'} in this shipment</p><p className="text-xs text-text-muted">{summary}</p></div>
+      <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Pieces">{pieces.map((p) => <li key={p.seq} title={`Piece ${p.seq}: ${label[p.status]}${p.lastScanPlace ? ` · ${p.lastScanPlace}` : ''}`} className={`grid h-8 min-w-8 place-items-center rounded-lg px-2 text-xs font-semibold ${tone[p.status]} ${p.seq === hi ? 'ring-2 ring-gold ring-offset-2 ring-offset-bg' : ''}`}>{p.seq}</li>)}</ul>
+      {focus && <p className="mt-2 text-sm">You scanned <strong>piece {focus.seq}</strong> — {label[focus.status].toLowerCase()}{focus.lastScanPlace ? ` at ${focus.lastScanPlace}` : ''}{focus.lastScanAt ? `, last seen ${fmtDateTime(focus.lastScanAt)}` : ''}.</p>}
+    </div>
+  )
+}
+
 export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: boolean }) {
   const { shipperById } = useStore()
   const shipper = shipperById(s.shipperId) ?? { id: s.shipperId, name: 'Shipper', hq: '', initials: 'SS', hue: '#E3B54A' }
@@ -131,6 +150,8 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
               {statusOrder.map((st, i) => <li key={st} className={`${i <= idx ? 'text-text' : ''} ${i > 3 ? 'hidden md:block' : ''}`}>{statusLabels[st]}</li>)}
             </ol>
           </div>
+
+          {s.pieces && s.pieces.length > 0 && <PiecesStrip pieces={s.pieces} />}
 
           <LivePanel s={s} />
 

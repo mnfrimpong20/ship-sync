@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { MapPinned } from 'lucide-react'
+import { MapPinned, ScanLine } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { opsApi, type Run } from '../lib/ops'
 import { Empty } from '../components/ui'
@@ -33,6 +33,10 @@ export default function MyRuns() {
           <motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">Hi {user.name.split(' ')[0]}</motion.h1>
           <motion.p variants={fadeUp} className="mt-1 text-text-muted">{active.length ? `You have a run in progress.` : upcoming.some((r) => r.date === today) ? 'You have a run planned for today.' : 'Nothing on the road right now.'}</motion.p>
           {error && <p role="alert" className="mt-6 text-sm text-danger">{error}</p>}
+          <motion.div variants={fadeUp} className="mt-6 flex flex-wrap gap-2">
+            <Link to={`/dashboard/scan?kind=delivery${active[0] ? `&run=${active[0].id}` : ''}`} className="btn-gold !min-h-11 !px-5 text-sm"><ScanLine size={16} aria-hidden="true" /> Scan a delivery</Link>
+            <Link to="/dashboard/scan?kind=check" className="btn-ghost !min-h-11 !px-4 text-sm">Check a piece</Link>
+          </motion.div>
           {active.length > 0 && <motion.section variants={fadeUp} className="mt-8" aria-label="In progress"><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold">In progress</p><ul className="space-y-2">{active.map((r) => <li key={r.id}><RunRow r={r} to={`/dashboard/routes/${r.id}`} /></li>)}</ul></motion.section>}
           <motion.section variants={fadeUp} className="mt-8" aria-label="Upcoming">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">Upcoming</p>

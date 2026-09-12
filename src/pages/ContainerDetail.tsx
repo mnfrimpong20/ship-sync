@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { AlertTriangle, ArrowLeft, ArrowRight, Boxes, Check, Container as ContainerIcon, ExternalLink, Lock, Pencil, Plus, Radar, Radio, RefreshCw, Ship, Tag, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, Boxes, Check, Container as ContainerIcon, ExternalLink, Lock, Pencil, Plus, Radar, Radio, RefreshCw, ScanLine, Ship, Tag, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { cargoLabel, countryByCode, statusLabels, type CargoType } from '../lib/data'
 import { CONTAINER_STAGES, canLoad, cargoCbm, containersApi, isOpen, sizeCbm, sizeLabels, stageBlurb, stageLabels, type Candidate, type ContainerDetail as Detail, type ContainerInput, type ContainerStatus, type TrackingProvider, eventTitles } from '../lib/containers'
@@ -174,6 +174,7 @@ export default function ContainerDetail() {
               {d.shipments.length > 0 && <Link to={`/dashboard/labels?shipments=${d.shipments.map((s) => s.id).join(',')}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Piece stickers for every loaded order"><Tag size={15} aria-hidden="true" /> Print labels</Link>}
               {c.mmsi && <Link to={`/live?vessel=${c.mmsi}`} className="btn-ghost !min-h-10 !px-4 text-sm"><Radar size={15} aria-hidden="true" /> Track vessel</Link>}
               <button onClick={() => { setEditing((e) => !e); setError('') }} className="btn-ghost !min-h-10 !px-4 text-sm"><Pencil size={15} aria-hidden="true" /> Edit details</button>
+              {canLoad(c.status) && <Link to={`/dashboard/scan?kind=loading&container=${c.id}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Scan piece stickers as they go in"><ScanLine size={15} aria-hidden="true" /> Scan to load</Link>}
               {canLoad(c.status) ? <button onClick={() => setLoading((l) => !l)} className="btn-ghost !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Load orders</button> : <span className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-dashed border-border px-3 text-xs text-text-muted" title="Orders can only be added or removed before the container sails."><Lock size={13} aria-hidden="true" /> Loading closed{(() => { const e = d.events.find((x) => x.status === 'sailed'); return e ? ` — sailed ${fmtDate(e.at)}` : c.status === 'closed' ? ' — container closed' : '' })()}</span>}
               {next && <button onClick={() => setAdvancing(true)} className="btn-gold !min-h-10 !px-4 text-sm"><ArrowRight size={15} aria-hidden="true" /> Mark {stageLabels[next].toLowerCase()}</button>}
             </motion.div>
@@ -211,13 +212,13 @@ export default function ContainerDetail() {
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[640px] text-sm">
-                      <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="px-4 py-2.5">Order</th><th className="px-4 py-2.5">Cargo</th><th className="px-4 py-2.5">Customer</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">ETA</th><th className="px-4 py-2.5 text-right">Actions</th></tr></thead>
+                      <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="px-4 py-2.5">Order</th><th className="px-4 py-2.5">Cargo</th><th className="px-4 py-2.5">Pieces</th><th className="px-4 py-2.5">Customer</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">ETA</th><th className="px-4 py-2.5 text-right">Actions</th></tr></thead>
                       <tbody>
                         {d.shipments.map((s) => (
                           <tr key={s.id} className="border-b border-border/70 align-top">
                             <td className="px-4 py-3"><Link to={`/track?ref=${s.ref}`} className="font-mono text-xs text-gold-deep hover:underline focus-ring">{s.ref}</Link><p className="mt-0.5 text-xs text-text-muted">{s.origin} → {countryByCode(s.destination)?.name ?? s.destination}</p></td>
                             <td className="max-w-[240px] px-4 py-3"><p className="truncate" title={s.description}>{s.description || '—'}</p><p className="text-xs text-text-muted">{cargoLabel(s.cargo)} · ~{cargoCbm[s.cargo] ?? 2} cbm</p></td>
-                            <td className="px-4 py-3">{s.clientId ? <Link to={`/dashboard/clients/${s.clientId}`} className="hover:text-gold-deep focus-ring">{s.clientName ?? s.customer}</Link> : s.customer}</td>
+                            <td className="whitespace-nowrap px-4 py-3">{s.pieces ? (() => { const out = ['arrived', 'customs', 'devanned', 'closed'].includes(c.status); const n = out ? s.pieces.devanned : s.pieces.loaded; return <div className="flex items-center gap-2"><span className="tabular-nums text-xs">{n}/{s.pieces.total} {out ? 'out' : 'in'}</span><span className="h-1.5 w-14 overflow-hidden rounded-full bg-border" aria-hidden="true"><span className={`block h-full ${n === s.pieces.total ? 'bg-teal' : 'bg-gold'}`} style={{ width: `${(n / Math.max(1, s.pieces.total)) * 100}%` }} /></span></div> })() : <Link to={`/dashboard/labels?shipments=${s.id}`} className="text-xs text-gold-deep hover:underline">No labels yet</Link>}</td><td className="px-4 py-3">{s.clientId ? <Link to={`/dashboard/clients/${s.clientId}`} className="hover:text-gold-deep focus-ring">{s.clientName ?? s.customer}</Link> : s.customer}</td>
                             <td className="px-4 py-3"><Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill></td>
                             <td className="px-4 py-3 tabular-nums">{s.eta ? fmtDate(s.eta + 'T12:00:00Z') : '—'}</td>
                             <td className="px-4 py-3 text-right"><div className="inline-flex gap-1.5">{canLoad(c.status) && <button onClick={() => unload(s.id, s.ref)} disabled={busy} className="btn-ghost !min-h-8 !px-2.5 text-xs disabled:opacity-60">Remove</button>}<Link to={`/track?ref=${s.ref}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Open tracking page for ${s.ref}`}><ExternalLink size={13} /></Link></div></td>

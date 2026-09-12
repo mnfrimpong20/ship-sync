@@ -38,7 +38,7 @@ const requestOut = (r: Row, quotes: Row[]) => ({
 })
 const shipmentOut = (r: Row, events: Row[]) => ({
   id: r.id, ref: r.ref, shipperId: r.shipper_id, mode: r.mode, origin: r.origin, destination: r.destination, cargo: r.cargo, description: r.description, status: r.status, eta: DATE(r.eta), customer: r.customer,
-  vesselName: r.vessel_name ?? undefined, mmsi: r.mmsi ?? undefined, flight: r.flight ?? undefined, departedAt: r.departed_at ? ISO(r.departed_at) : undefined, clientId: r.client_id ?? undefined, consigneeId: r.consignee_id ?? undefined, containerId: r.container_id ?? undefined,
+  vesselName: r.vessel_name ?? undefined, mmsi: r.mmsi ?? undefined, flight: r.flight ?? undefined, departedAt: r.departed_at ? ISO(r.departed_at) : undefined, clientId: r.client_id ?? undefined, consigneeId: r.consignee_id ?? undefined, containerId: r.container_id ?? undefined, requestId: r.request_id ?? undefined,
   events: events.map((e) => ({ status: e.status, at: ISO(e.at), place: e.place, note: e.note ?? undefined })),
 })
 

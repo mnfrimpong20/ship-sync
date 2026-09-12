@@ -33,6 +33,7 @@ export async function getDb(): Promise<Db> {
   await seedOpsDemo(db)
   await seedDirectoryDemo(db)
   await seedHistoryDemo(db)
+  await seedOpenLeads(db)
   await seedContainerDemo(db)
   return db
 }
@@ -524,6 +525,26 @@ async function seedHistoryDemo(d: Db) {
         if (h.paidDays) await d.query('insert into payments (id,invoice_id,amount,method,at,note) values ($1,$2,$3,\'bank\',$4,\'Paid in full\')', [`pay_hist_${h.i}`, iid, h.invoice, dateOnly(addDays(h.days + h.paidDays))])
       }
     }
+  }
+}
+
+/** Open requests (no Gold Coast quote yet) — one fresh, one waiting a while with a competing quote, one air-or-ocean. */
+async function seedOpenLeads(d: Db) {
+  const { rows } = await d.query<{ n: string }>(`select count(*)::text as n from requests where id like 'rq_lead_%'`)
+  if (Number(rows[0].n) > 0) return
+  const hash = await bcrypt.hash(DEMO_PASSWORD, 10)
+  const leads = [
+    { i: 1, hours: -3, origin: 'Houston, TX', cargo: 'barrels', qty: 6, kg: 540, desc: '6 barrels — provisions and clothing for family in Takoradi.', mode: 'ocean', pickup: true, delivery: true, ins: false, name: 'Ama Darko', email: 'ama.darko@example.com', competing: false },
+    { i: 2, hours: -31, origin: 'Dallas, TX', cargo: 'vehicle', qty: 1, kg: 1900, desc: '2021 Honda CR-V, clean title. Needs pre-shipment inspection and duty estimate.', mode: 'ocean', pickup: true, delivery: false, ins: true, name: 'Yaw Asante', email: 'yaw.asante@example.com', competing: true },
+    { i: 3, hours: -9, origin: 'Atlanta, GA', cargo: 'boxes', qty: 14, kg: 210, desc: 'Laptops and textbooks for a school in Kumasi — time-sensitive for term start.', mode: 'either', pickup: false, delivery: true, ins: true, name: 'Bright Futures Foundation', email: 'logistics@brightfutures.example.org', competing: true },
+  ]
+  for (const l of leads) {
+    const uid_ = `u_lead_${l.i}`; const rid = `rq_lead_${l.i}`
+    await d.query('insert into users (id,email,name,password_hash,role,shipper_id) values ($1,$2,$3,$4,\'customer\',null) on conflict (email) do nothing', [uid_, l.email, l.name, hash])
+    const created = new Date(Date.now() + l.hours * 3600000)
+    await d.query(`insert into requests (id,ref,user_id,created_at,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,status) values ($1,$2,$3,$4,$5,'GH',$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'+1 555 0177','open') on conflict (id) do nothing`,
+      [rid, `SS-L${String(l.i).padStart(4, '0')}`, uid_, created, l.origin, l.mode, l.cargo, l.qty, l.kg, l.desc, l.pickup, l.delivery, l.ins, dateOnly(addDays(6 + l.i * 3)), l.name, l.email])
+    if (l.competing) await d.query(`insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes,sent_at,status) values ($1,$2,'atlantic-bridge',$3,32,$4,'Bi-weekly sailing.',$5,$6,'sent') on conflict (request_id, shipper_id) do nothing`, [`q_lead_${l.i}`, rid, l.cargo === 'vehicle' ? 1650 : 720, dateOnly(addDays(14)), JSON.stringify(['Ocean freight', 'Port handling']), new Date(created.getTime() + 2 * 3600000)])
   }
 }
 

@@ -138,8 +138,8 @@ export default function ShipperOverview({ firstName }: { firstName: string }) {
       </motion.section>
       <motion.div variants={fadeUp} className="card-dark grid grid-cols-2 divide-x divide-border md:grid-cols-5">
         {[
-          { l: 'New leads on your lanes', v: k.leads.value, h: k.leads.hint, i: Inbox, to: '/dashboard/shipper?view=leads' },
-          { l: 'Avg first reply', v: k.response.value == null ? '—' : `${k.response.value}h`, h: k.response.hint, i: Clock, to: '/dashboard/shipper?view=leads' },
+          { l: 'New leads on your lanes', v: k.leads.value, h: k.leads.hint, i: Inbox, to: '/dashboard/leads' },
+          { l: 'Avg first reply', v: k.response.value == null ? '—' : `${k.response.value}h`, h: k.response.hint, i: Clock, to: '/dashboard/leads' },
           { l: 'Delivered · 30 days', v: k.delivered.value, h: k.delivered.hint, i: Package, to: '/dashboard/shipments' },
           { l: 'Collected · 30 days', v: money(k.collected.value ?? 0), h: k.collected.delta != null ? `${k.collected.delta > 0 ? '+' : ''}${k.collected.delta}% vs last 30d` : k.collected.hint, i: Wallet, to: '/dashboard/clients?filter=owing' },
           { l: 'Active clients', v: k.clients.value, h: k.clients.hint, i: Users, to: '/dashboard/clients' },

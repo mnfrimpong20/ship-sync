@@ -44,7 +44,7 @@ export default function AppShell() {
     : isShipper
     ? [
         { to: '/dashboard/shipper', label: 'Overview', icon: LayoutDashboard, end: true },
-        { to: '/dashboard/shipper?view=leads', label: 'Leads & quotes', icon: Inbox, badge: openLeads },
+        { to: '/dashboard/leads', label: 'Leads & quotes', icon: Inbox, badge: openLeads },
         { to: '/dashboard/shipments', label: 'Shipments', icon: Ship, badge: active },
         { to: '/dashboard/containers', label: 'Containers', icon: Container },
         { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders },

@@ -5,7 +5,10 @@ import type { ReactNode } from 'react'
 import { fadeUp, stagger, viewport } from '../lib/motion'
 import { countryByCode, type Mode, type Shipper } from '../lib/data'
 
-export function Logo({ light = true, className = '' }: { light?: boolean; className?: string }) {
+/** Tagline under the wordmark. One place to change it. */
+export const TAGLINE = 'End-to-end logistics to Africa'
+
+export function Logo({ light = true, className = '', tagline = true }: { light?: boolean; className?: string; tagline?: boolean }) {
   return (
     <Link to="/" className={`inline-flex items-center gap-2.5 focus-ring rounded-md ${className}`} aria-label="Ship Sync home">
       <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true">
@@ -13,7 +16,10 @@ export function Logo({ light = true, className = '' }: { light?: boolean; classN
         <path d="M7 20h18l-2 4H9z" fill={light ? 'var(--color-on-accent)' : 'var(--color-gold)'} />
         <path d="M11 18V9h4l6 6v3" fill="none" stroke={light ? 'var(--color-on-accent)' : 'var(--color-gold)'} strokeWidth="2.2" strokeLinejoin="round" />
       </svg>
-      <span className={`font-heading text-[1.35rem] font-bold tracking-tight ${light ? 'text-text' : 'text-ink'}`}>Ship<span className={light ? 'text-gold' : 'text-gold-deep'}>Sync</span></span>
+      <span className="flex flex-col leading-none">
+        <span className={`font-heading text-[1.35rem] font-bold tracking-tight ${light ? 'text-text' : 'text-ink'}`}>Ship<span className={light ? 'text-gold' : 'text-gold-deep'}>Sync</span></span>
+        {tagline && <span className={`mt-1 text-[9.5px] font-semibold uppercase tracking-[0.16em] ${light ? 'text-text-muted' : 'text-ink/70'}`}>{TAGLINE}</span>}
+      </span>
     </Link>
   )
 }

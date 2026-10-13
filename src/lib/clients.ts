@@ -16,6 +16,7 @@ export interface Payment { id: string; amount: number; method: string; at: strin
 export interface Invoice {
   id: string; clientId: string; shipmentId?: string; number: string; status: 'draft' | 'sent' | 'paid' | 'void'; currency: string
   items: InvoiceItem[]; subtotal: number; tax: number; total: number; paid: number; balance: number; issuedAt: string; dueAt: string | null; notes: string; createdAt: string; payments: Payment[]
+  payToken?: string | null; sentAt?: string | null; remindersSent?: { kind: string; at: string; channel: string }[]; lastReminderAt?: string | null
 }
 export interface ClientDetail { client: Client; consignees: Consignee[]; activities: Activity[]; shipments: Shipment[]; invoices: Invoice[] }
 export interface BookingInput { mode: Mode; origin: string; destination: string; cargo: CargoType; description: string; eta: string; consigneeId?: string; note?: string }

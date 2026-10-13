@@ -14,6 +14,7 @@ import { PickupCard } from '../components/PickupCard'
 import { RecipientPanel } from '../components/RecipientPanel'
 import { DutyCard } from '../components/Duty'
 import { InsuranceCard } from '../components/InsuranceCard'
+import { PaymentCard } from '../components/PaymentCard'
 
 type Bucket = 'all' | 'active' | 'pickup' | 'transit' | 'destination' | 'late' | 'untracked' | 'delivered'
 type Sort = 'newest' | 'eta' | 'status' | 'ref'
@@ -174,6 +175,7 @@ export default function Shipments() {
                                 <DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} />
                               </div>
                               <div className="space-y-4">
+                                <PaymentCard shipmentId={s.id} />
                                 <PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} />
                                 <RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} />
                                 <InsuranceCard shipmentId={s.id} cargo={s.cargo} />

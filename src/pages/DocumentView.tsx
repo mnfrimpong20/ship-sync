@@ -98,8 +98,24 @@ function InsuranceCertificate({ p }: { p: DocPayload & { policy?: { certificateN
   )
 }
 
+function Receipt({ p }: { p: DocPayload & { receipt?: { id: string; number: string; items: { description: string; amountUsd: number }[]; amountUsd: number; method: string; paidAt: string; payer: string; escrow: string } } }) {
+  const r = p.receipt!
+  const usd2 = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n)
+  return (
+    <Sheet title="Payment receipt" number={r.number} p={p} foot={<>Payment collected by Ship Sync on behalf of {p.shipper.name}. {r.escrow} Reference {r.id}.</>}>
+      <section className="mt-6 grid gap-6 sm:grid-cols-2">
+        <Party label="Received from" lines={[r.payer, p.sender.company, p.sender.email, p.sender.phone]} />
+        <Party label="For" lines={[`Shipment ${p.shipment.ref}`, `${p.shipment.origin} → ${p.shipment.destinationName} (${p.shipment.mode === 'air' ? 'air' : 'ocean'})`, p.shipment.cargoLabel, `Carrier / forwarder: ${p.shipper.name}`]} />
+      </section>
+      <table className="mt-6 w-full text-sm"><thead><tr className="border-b border-slate-300 text-left text-xs uppercase tracking-wider text-slate-500"><th className="pb-2 font-semibold">Description</th><th className="pb-2 text-right font-semibold">Amount</th></tr></thead><tbody>{r.items.map((i, k) => <tr key={k} className="border-b border-slate-100"><td className="py-2">{i.description}</td><td className="py-2 text-right tabular-nums">{usd2(i.amountUsd)}</td></tr>)}</tbody><tfoot><tr><td className="pt-3 text-right font-semibold">Total paid</td><td className="pt-3 text-right text-base font-bold tabular-nums">{usd2(r.amountUsd)}</td></tr></tfoot></table>
+      <section className="mt-6 rounded-lg bg-slate-50 p-4"><Facts rows={[['Paid on', fmtDateTime(r.paidAt)], ['Method', r.method === 'card' ? 'Card (Stripe)' : r.method], ['Status', 'Paid — held in escrow by Ship Sync'], ['Receipt', r.number]]} /></section>
+    </Sheet>
+  )
+}
+
 export function GeneratedDoc({ kind, p }: { kind: string; p: DocPayload }) {
   if (kind === 'insurance' && (p as { policy?: unknown }).policy) return <InsuranceCertificate p={p} />
+  if (kind === 'receipt' && (p as { receipt?: unknown }).receipt) return <Receipt p={p} />
   if (kind === 'packing_list') return <PackingList p={p} />
   if (kind === 'commercial_invoice') return <CommercialInvoice p={p} />
   if (kind === 'proof_of_delivery') return <ProofOfDeliveryDoc p={p} />

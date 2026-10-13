@@ -7,6 +7,7 @@ import { useStore, type AdminShipper } from '../lib/store'
 import { Avatar, Pill, Rating, fmtDate } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { AdminInsurance } from '../components/AdminInsurance'
+import { AdminPayments } from '../components/AdminPayments'
 
 /** Ship Sync staff: review shipper listings and grant / revoke the verified badge. */
 export default function Admin() {
@@ -86,6 +87,7 @@ export default function Admin() {
             ))}
             {rows && list.length === 0 && <li className="card-dark p-8 text-center text-sm text-text-muted">Nothing here.</li>}
           </motion.ul>
+          <AdminPayments />
           <AdminInsurance />
         </motion.div>
       </div>

@@ -27,6 +27,7 @@ import Notifications from './pages/Notifications'
 import Rates from './pages/Rates'
 import DocumentView from './pages/DocumentView'
 import Pickups from './pages/Pickups'
+import Receive from './pages/Receive'
 import Containers from './pages/Containers'
 import ContainerDetail from './pages/ContainerDetail'
 import Join from './pages/Join'
@@ -107,6 +108,7 @@ export default function App() {
               <Route path="/admin" element={<Admin />} />
             </Route>
             <Route path="/dashboard/labels" element={<Labels />} />
+            <Route path="/r/:token" element={<Receive />} />
           </Routes>
         </HashRouter>
       </StoreProvider>

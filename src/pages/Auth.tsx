@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Building2, Check, Loader2, User } from 'lucide-react'
-import { useStore, type Role } from '../lib/store'
+import { Building2, Check, Loader2, MailCheck, User } from 'lucide-react'
+import { api, useStore, type Role } from '../lib/store'
 import { fadeUp, stagger } from '../lib/motion'
+import { useSiteConfig } from '../lib/site'
 
 function Shell({ title, sub, children, aside }: { title: string; sub: string; children: React.ReactNode; aside: React.ReactNode }) {
   return (
@@ -30,11 +31,15 @@ function RoleToggle({ role, setRole }: { role: Role; setRole: (r: Role) => void 
   )
 }
 
-const DemoNote = ({ role }: { role: Role }) => (
+const DemoNote = ({ role }: { role: Role }) => {
+  const cfg = useSiteConfig()
+  if (cfg?.demoHidden) return null
+  return (
   <p className="mt-4 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">
     Try a demo account — {role === 'shipper' ? <><span className="font-mono text-text">ops@atlanticbridge.demo</span> (Atlantic Bridge Logistics)</> : <span className="font-mono text-text">demo@shipsync.demo</span>}, password <span className="font-mono text-text">shipsync</span>.
   </p>
-)
+  )
+}
 
 export function Login() {
   const [sp] = useSearchParams()
@@ -60,7 +65,7 @@ export function Login() {
       <form onSubmit={submit} className="grid gap-4" noValidate>
         <RoleToggle role={role} setRole={setRole} />
         <div><label htmlFor="email" className="label-dark">Email</label><input id="email" type="email" className="input-dark" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder={role === 'shipper' ? 'ops@yourcompany.com' : 'you@example.com'} /></div>
-        <div><label htmlFor="pw" className="label-dark">Password</label><input id="pw" type="password" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" /></div>
+        <div><div className="flex items-baseline justify-between"><label htmlFor="pw" className="label-dark">Password</label><Link to="/forgot" className="text-xs text-gold hover:underline">Forgot password?</Link></div><input id="pw" type="password" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" /></div>
         {err && <p role="alert" className="text-sm text-danger">{err}</p>}
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Signing in</> : 'Sign in'}</motion.button>
         <p className="text-center text-sm text-text-muted">New here? <Link to={`/signup?role=${role}`} className="text-gold hover:underline">Create an account</Link></p>
@@ -118,5 +123,69 @@ function Aside({ shipper = false }: { shipper?: boolean }) {
       <ul className="mt-4 space-y-3">{items.map((i) => <li key={i} className="flex gap-3 text-text"><span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gold/15 text-gold"><Check size={14} aria-hidden="true" /></span>{i}</li>)}</ul>
       <blockquote className="mt-6 border-t border-border pt-5 text-sm text-text-muted">“{shipper ? 'Listing on Ship Sync replaced our Facebook-group lead hunting.' : 'Four quotes in a day, picked one, cleared Tema in nine days.'}”<footer className="mt-2 text-xs">— {shipper ? 'Kwame Asante, Atlantic Bridge Logistics' : 'Abena Owusu, Houston → Accra'}</footer></blockquote>
     </div>
+  )
+}
+
+export function ForgotPassword() {
+  const [email, setEmail] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [sent, setSent] = useState(false)
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!/^\S+@\S+\.\S+$/.test(email)) return setErr('Enter a valid email address.')
+    setErr(''); setBusy(true)
+    try { await api('/auth/forgot', { json: { email } }); setSent(true) } catch (err) { setErr(err instanceof Error ? err.message : 'Could not send the email.') } finally { setBusy(false) }
+  }
+  return (
+    <Shell title="Reset your password" sub="Enter the email you signed up with and we’ll send a link that works for one hour." aside={<Aside />}>
+      {sent ? (
+        <div className="grid gap-3 text-center" data-testid="forgot-sent">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-gold/15 text-gold"><MailCheck size={22} aria-hidden="true" /></span>
+          <p className="font-semibold">Check your inbox</p>
+          <p className="text-sm text-text-muted">If an account exists for <span className="font-mono text-text">{email}</span>, a reset link is on its way. It expires in an hour — check spam if it hasn’t arrived in a few minutes.</p>
+          <p className="text-sm text-text-muted"><Link to="/login" className="text-gold hover:underline">Back to sign in</Link></p>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="grid gap-4" noValidate>
+          <div><label htmlFor="femail" className="label-dark">Email</label><input id="femail" type="email" className="input-dark" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" /></div>
+          {err && <p role="alert" className="text-sm text-danger">{err}</p>}
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Sending</> : 'Email me a reset link'}</motion.button>
+          <p className="text-center text-sm text-text-muted">Remembered it? <Link to="/login" className="text-gold hover:underline">Sign in</Link></p>
+        </form>
+      )}
+    </Shell>
+  )
+}
+
+export function ResetPassword() {
+  const [sp] = useSearchParams()
+  const nav = useNavigate()
+  const { resetPassword } = useStore()
+  const token = sp.get('token') || ''
+  const [pw, setPw] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (pw.length < 8) return setErr('Password must be at least 8 characters.')
+    if (pw !== pw2) return setErr('The two passwords don’t match.')
+    setErr(''); setBusy(true)
+    try { const u = await resetPassword(token, pw); nav(u.role === 'shipper' ? '/dashboard/shipper' : '/dashboard') } catch (err) { setErr(err instanceof Error ? err.message : 'Could not reset the password.'); setBusy(false) }
+  }
+  return (
+    <Shell title="Choose a new password" sub="You’ll be signed in here and signed out everywhere else." aside={<Aside />}>
+      {!token ? (
+        <p className="text-sm text-text-muted">This link is missing its token. <Link to="/forgot" className="text-gold hover:underline">Request a new reset link</Link>.</p>
+      ) : (
+        <form onSubmit={submit} className="grid gap-4" noValidate>
+          <div><label htmlFor="rpw" className="label-dark">New password</label><input id="rpw" type="password" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /><p className="mt-1 text-xs text-text-muted">At least 8 characters.</p></div>
+          <div><label htmlFor="rpw2" className="label-dark">Repeat password</label><input id="rpw2" type="password" className="input-dark" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></div>
+          {err && <p role="alert" className="text-sm text-danger">{err} {/expired|used/i.test(err) && <Link to="/forgot" className="text-gold hover:underline">Request a new link</Link>}</p>}
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Saving</> : 'Save new password'}</motion.button>
+        </form>
+      )}
+    </Shell>
   )
 }

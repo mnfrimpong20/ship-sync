@@ -11,11 +11,12 @@ import { StatCard } from '../components/board'
 /* ================= public directory ================= */
 export function BrokerCard({ b, cargo }: { b: Broker; cargo?: CargoType }) {
   return (
-    <div className="card-dark min-w-0 p-5" data-testid="broker-card">
+    <div className="card-dark flex h-full min-w-0 flex-col p-5" data-testid="broker-card">
       <div className="flex items-start gap-3"><Avatar initials={b.initials} hue={b.hue} size={44} /><div className="min-w-0 flex-1"><p className="font-semibold">{b.name}{b.verified && <BadgeCheck size={14} className="ml-1 inline text-teal" aria-label="Verified" />}</p><p className="truncate text-xs text-text-muted">{b.company || 'Independent agent'} · {b.ports.join(', ')}</p><div className="mt-1 flex items-center gap-2 text-xs"><Rating value={b.rating} /><span className="text-text-muted">{b.reviews} reviews · ~{b.responseHours}h reply</span></div></div></div>
-      <p className="mt-3 text-sm text-text-muted">{b.about}</p>
+      <p className="mt-3 line-clamp-3 text-sm text-text-muted">{b.about}</p>
       {b.specialties.length > 0 && <ul className="mt-2 flex flex-wrap gap-1.5">{b.specialties.map((s) => <li key={s}><Pill tone="muted">{s}</Pill></li>)}</ul>}
-      <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">{(cargo ? [cargo] : (['barrels', 'vehicle', 'container20'] as CargoType[])).map((c) => <div key={c}><dt className="text-text-muted">{cargoTypes.find((x) => x.id === c)?.label}</dt><dd className="font-semibold tabular-nums">{b.fees[c] != null ? money(b.fees[c]!) : '—'}</dd></div>)}</dl>
+      <div className="flex-1" />
+      <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3 text-xs">{(cargo ? [cargo] : (['barrels', 'vehicle', 'container20'] as CargoType[])).map((c) => <div key={c}><dt className="text-text-muted">{cargoTypes.find((x) => x.id === c)?.label}</dt><dd className="font-semibold tabular-nums">{b.fees[c] != null ? money(b.fees[c]!) : '—'}</dd></div>)}</dl>
       <p className="mt-2 text-[11px] text-text-muted">{b.licenceAuthority}{b.licenceNo ? ` · ${b.licenceNo}` : ''}{b.dutyAdvance ? ' · can advance duty' : ''}</p>
     </div>
   )

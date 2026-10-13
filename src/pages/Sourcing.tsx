@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { BadgeCheck, Camera, Check, ClipboardCheck, CreditCard, Factory, FileText, FlaskConical, Globe2, Handshake, MessageSquare, PackageCheck, Paperclip, Printer, Repeat, Search, Ship, ShieldCheck, Smartphone, Sparkles, Trash2, UserCheck, Wallet } from 'lucide-react'
-import { sourcingApi, stepLabels, tierLabels, STEPS, FIND_STEPS, SOURCING_SHIPPER, cny, usd2, type Detail, type Job, type Quote, type QuoteInput, type RequestInput, type SFile, type Supplier, type SupplierInput, type StepInput, type Tier, type Settings, type Stage, type QcItem, type OpenContainer, type Earning, type QcReport, type Audit, type Reference, type PriceBreak, type TodayItem, QC_ITEMS } from '../lib/sourcing'
+import { sourcingApi, stepLabels, tierLabels, STEPS, FIND_STEPS, SOURCING_SHIPPER, cny, usd2, type Detail, type Job, type Quote, type QuoteInput, type RequestInput, type SFile, type Supplier, type SupplierInput, type StepInput, type Tier, type Settings, type Stage, type QcItem, type OpenContainer, type Earning, type QcReport, type Audit, type Reference, type PriceBreak, type TodayItem, type Pricing, type SupplierLink, type SupplierUpdate, QC_ITEMS } from '../lib/sourcing'
 import { countries } from '../lib/data'
 import { useStore } from '../lib/store'
 import { Empty, Pill, fmtDate, fmtDateTime, money } from '../components/ui'
@@ -44,11 +44,34 @@ export default function SourcingPage() {
             {[[Search, 'Tell us what you need', 'Describe the product, quantity, target price and where it’s going. Paste supplier links if you have them.'], [Factory, 'We find & price it', 'Your agent shortlists factories and returns a landed-cost quote: factory price, our fee, inspection, freight, insurance and duty.'], [ShieldCheck, 'Pay in stages, in escrow', `Accept a quote and pay the deposit (fee + inspection + ${p ? Math.round(p.depositPct * 100) : 30}% of the goods). The balance is only due after you approve the inspection photos.`], [Ship, 'We ship it', 'Goods are received at our China warehouse, exported and tracked like any Ship Sync shipment — all the way to your door if you choose.']].map(([I, t, b], i) => { const Icon = I as typeof Search; return <li key={i} className="card-dark p-5"><span className="grid h-8 w-8 place-items-center rounded-full bg-gold/15 text-gold"><Icon size={16} aria-hidden="true" /></span><p className="mt-3 font-semibold">{i + 1}. {t as string}</p><p className="mt-1 text-sm text-text-muted">{b as string}</p></li> })}
           </ol>
         </section>
+        {p && <WorkedExamples p={p} />}
         {p && <section className="mx-auto mt-12 max-w-3xl card-dark p-6 text-sm" data-testid="pricing"><p className="eyebrow mb-2">Transparent pricing</p>
           <ul className="grid gap-2 sm:grid-cols-2"><li><span className="text-text-muted">Sourcing & buying fee</span><br /><strong>{Math.round(p.servicePct * 100)}% of factory price</strong>, min {money(p.minFeeUsd)}</li><li><span className="text-text-muted">Supplier search only</span><br /><strong>{money(p.findFeeUsd)}</strong> flat per request</li><li><span className="text-text-muted">Quality inspection</span><br /><strong>{money(p.inspectionUsd)}</strong> per order, photos included</li><li><span className="text-text-muted">China warehouse & export</span><br /><strong>{money(p.handlingUsd)}</strong> per order</li></ul>
           <p className="mt-4 text-xs text-text-muted">Freight, insurance and duty are quoted per order at the same rates as the rest of Ship Sync. Factory prices are converted at ¥{p.cnyPerUsd} per US dollar. {p.note}</p></section>}
       </div>
     </div>
+  )
+}
+
+/** Three real-looking orders priced with the live formula, so the numbers always match what a quote would say. */
+function WorkedExamples({ p }: { p: Pricing }) {
+  const ex = [
+    { title: '500 solar lanterns → Kumasi', spec: 'USB-charging, 5 W panel, boxed', unitCny: 28.5, qty: 500, freight: 420, insurance: 25, mode: 'ocean', days: '~45 days door to door' },
+    { title: '1,000 stainless bottles → Accra', spec: '750 ml, laser logo, 24 per carton', unitCny: 28, qty: 1000, freight: 950, insurance: 40, mode: 'ocean', days: '~40 days to port' },
+    { title: '200 LED head torches → Lagos', spec: '1200 lm, USB-C, retail box — by air', unitCny: 19.5, qty: 200, freight: 380, insurance: 15, mode: 'air', days: '~10 days by air' },
+  ]
+  const rows = ex.map((e) => { const factory = (e.unitCny * e.qty) / p.cnyPerUsd; const fee = Math.max(p.minFeeUsd, factory * p.servicePct); const total = factory + fee + p.inspectionUsd + p.handlingUsd + e.freight + e.insurance; return { ...e, factory, fee, total, deposit: fee + p.inspectionUsd + factory * p.depositPct } })
+  return (
+    <section className="mx-auto mt-14 max-w-5xl" data-testid="worked-examples">
+      <p className="eyebrow mb-2 text-center">What it actually costs</p>
+      <h2 className="text-center !text-2xl">Three real orders, priced the way we price yours</h2>
+      <div className="mt-6 grid gap-4 md:grid-cols-3">{rows.map((r) => (
+        <div key={r.title} className="card-dark flex flex-col p-5 text-sm"><p className="font-semibold">{r.title}</p><p className="text-xs text-text-muted">{r.spec} · {r.days}</p>
+          <dl className="mt-3 grid grid-cols-[1fr_auto] gap-y-1 text-xs"><dt className="text-text-muted">Factory ({cny(r.unitCny)} × {r.qty.toLocaleString()})</dt><dd className="tabular-nums">{usd2(r.factory)}</dd><dt className="text-text-muted">Ship Sync fee</dt><dd className="tabular-nums">{usd2(r.fee)}</dd><dt className="text-text-muted">Inspection + China handling</dt><dd className="tabular-nums">{usd2(p.inspectionUsd + p.handlingUsd)}</dd><dt className="text-text-muted">{r.mode === 'air' ? 'Air' : 'Ocean'} freight + insurance</dt><dd className="tabular-nums">{usd2(r.freight + r.insurance)}</dd><dt className="mt-1 border-t border-border pt-1 font-semibold">Landed total</dt><dd className="mt-1 border-t border-border pt-1 font-semibold tabular-nums">{usd2(r.total)}</dd></dl>
+          <p className="mt-2 text-xs text-text-muted">≈ {usd2(r.total / r.qty)} per unit landed · deposit {usd2(r.deposit)}, balance after inspection</p>
+          <div className="flex-1" /><Link to="/sourcing/new?tier=order" className="btn-ghost mt-4 !min-h-9 text-sm">Start one like this</Link></div>))}</div>
+      <p className="mt-3 text-center text-xs text-text-muted">Illustrative orders priced with today's rates (¥{p.cnyPerUsd}/$, {Math.round(p.servicePct * 100)}% fee, min {money(p.minFeeUsd)}). Duty and delivery to the door are quoted separately.</p>
+    </section>
   )
 }
 
@@ -170,6 +193,7 @@ export function SourcingJob() {
         <aside className="space-y-4">
           <PayCard d={d} team={team} busy={busy} onPay={() => act(async () => { const r = await sourcingApi.checkout(j.id); window.location.assign(r.url) }, '', 'pay')} onRecord={(m, n) => act(() => sourcingApi.record(j.id, m, n), 'Payment recorded.', 'record')} />
           {team && !closed && <TeamActions d={d} busy={busy} onStep={(b) => act(() => sourcingApi.step(j.id, b), 'Updated — the customer has been told.', 'step')} onAssign={(a) => act(() => sourcingApi.assign(j.id, a), 'Reassigned.', 'assign')} />}
+          {team && j.acceptedQuoteId && <SupplierLinkCard jobId={j.id} refKey={d.job.status} />}
           {!team && !closed && ['requested', 'assigned', 'sourcing', 'quoted'].includes(j.status) && <button className="btn-ghost w-full text-danger" disabled={!!busy} onClick={() => { const r = prompt('Why are you cancelling? (optional)') ?? ''; void act(() => sourcingApi.cancel(j.id, r), 'Request cancelled.', 'cancel') }}>Cancel request</button>}
           {!closed && ['delivered', 'shipped'].includes(j.status) && <button className="btn-gold w-full" disabled={!!busy} onClick={() => act(() => sourcingApi.close(j.id), 'Closed — thank you!', 'close')} data-testid="close-job">Mark as complete</button>}
           {!team && j.acceptedQuoteId && ['shipped', 'delivered', 'closed'].includes(j.status) && <RepeatCard d={d} busy={busy} act={act} />}
@@ -280,6 +304,33 @@ function TeamActions({ d, busy, onStep, onAssign }: { d: Detail; busy: string; o
           <div className="flex justify-end gap-2"><button type="button" className="btn-ghost !min-h-9 text-xs" onClick={() => setF(null)}>Back</button><button className="btn-gold !min-h-9 text-xs" disabled={!!busy} data-testid="step-save">Save</button></div>
         </form>
       )}
+    </section>
+  )
+}
+
+/** Agent: the factory's private link (send it on WeChat) and what the factory has posted through it. */
+function SupplierLinkCard({ jobId, refKey }: { jobId: string; refKey: string }) {
+  const [link, setLink] = useState<SupplierLink | null>(null); const [updates, setUpdates] = useState<SupplierUpdate[]>([]); const [busy, setBusy] = useState(false); const [copied, setCopied] = useState(false); const [err, setErr] = useState('')
+  const load = () => sourcingApi.supplierLink(jobId).then((r) => { setLink(r.link); setUpdates(r.updates) }).catch(() => {})
+  useEffect(() => { load() }, [jobId, refKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const create = async () => { setBusy(true); setErr(''); try { const r = await sourcingApi.createSupplierLink(jobId); setLink(r.link) } catch (e) { setErr(e instanceof Error ? e.message : 'Failed.') } finally { setBusy(false) } }
+  const revoke = async () => { setBusy(true); try { await sourcingApi.revokeSupplierLink(jobId); setLink(null) } finally { setBusy(false) } }
+  const copy = async () => { if (!link) return; try { await navigator.clipboard.writeText(link.url); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { /* ignore */ } }
+  const labels: Record<SupplierUpdate['kind'], string> = { confirm: 'Confirmed the order', progress: 'Progress', ready: 'Goods ready', delay: 'Delay', note: 'Note' }
+  return (
+    <section className="card-dark p-4 text-sm" data-testid="supplier-link-card">
+      <p className="eyebrow mb-2">Factory link</p>
+      {err && <p role="alert" className="mb-2 text-xs text-danger">{err}</p>}
+      {link ? (
+        <>
+          <p className="text-xs text-text-muted">Send this on WeChat. The factory confirms the PO, posts progress and photos, and moves the ready date — all of it lands on the timeline and pings you.</p>
+          <div className="mt-2 flex items-center gap-2"><input readOnly className="input-dark !min-h-9 flex-1 font-mono text-[11px]" value={link.url} data-testid="supplier-link-url" onFocus={(e) => e.currentTarget.select()} /><button className="btn-gold !min-h-9 text-xs" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button></div>
+          <p className="mt-1 text-[11px] text-text-muted">Created {fmtDate(link.createdAt)}{link.lastSeenAt ? ` · factory last opened it ${fmtDateTime(link.lastSeenAt)}` : ' · not opened yet'} · <button className="underline hover:text-danger" onClick={revoke} disabled={busy}>revoke</button></p>
+        </>
+      ) : (
+        <><p className="text-xs text-text-muted">Give the factory a private page for this PO: confirm, progress %, photos, ready date, delays.</p><button className="btn-gold mt-2 !min-h-9 text-xs" onClick={create} disabled={busy} data-testid="create-supplier-link"><Factory size={14} aria-hidden="true" /> Create factory link</button></>
+      )}
+      {updates.length > 0 && <ul className="mt-3 divide-y divide-border" aria-label="Factory updates">{updates.slice(0, 6).map((u) => <li key={u.id} className="py-1.5 text-xs"><span className={`font-semibold ${u.kind === 'delay' ? 'text-danger' : ''}`}>{labels[u.kind]}</span>{u.pct != null ? ` · ${u.pct}%` : ''}{u.readyBy ? ` · ready ${fmtDate(u.readyBy)}` : ''}{u.body ? ` — ${u.body}` : ''}<span className="text-text-muted"> · {u.by}, {fmtDateTime(u.at)}</span></li>)}</ul>}
     </section>
   )
 }

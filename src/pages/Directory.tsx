@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ArrowRight, BadgeCheck, Check, ChevronLeft, ChevronRight, Clock, Compass, Crown, Filter, Plane, Search, Ship, ShieldCheck, Sparkles, Star, TrendingUp, X, Zap } from 'lucide-react'
+import { useStore } from '../lib/store'
 import { cargoLabel, cargoTypes, countries, countryByCode, origins, type CargoType, type Shipper } from '../lib/data'
 import { directoryApi, isFeatured, priorityOptions, sortLabels, urgencyOptions, type DirectorySort, type Match, type Needs, type Recommendation, type SearchResult } from '../lib/directory'
 import { Avatar, Empty, ModeBadge, Rating } from '../components/ui'
@@ -260,6 +261,7 @@ export default function Directory() {
         </div>
       </section>
 
+      <RecentlyViewed />
       {/* featured */}
       {featured.length > 0 && (
         <section className="border-b border-border bg-surface/40" aria-label="Featured shippers">
@@ -328,5 +330,19 @@ export default function Directory() {
 
       <AnimatePresence>{wizard && <Wizard initial={{ destination: dest, origin, mode, cargo: (cargo as CargoType) || '' }} onClose={() => setWizard(false)} onApply={(n) => { setWizard(false); set({ destination: n.destination, origin: n.origin || undefined, mode: n.mode === 'either' ? undefined : n.mode, cargo: n.cargo || undefined, verified: n.verifiedOnly ? '1' : undefined, q: undefined }); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />}</AnimatePresence>
     </div>
+  )
+}
+
+/** Shippers this visitor opened recently (per-browser, no account needed). */
+function RecentlyViewed() {
+  const { shipperById } = useStore()
+  const [ids, setIds] = useState<string[]>([])
+  useEffect(() => { try { setIds(JSON.parse(localStorage.getItem('ss-recent-shippers') ?? '[]')) } catch { /* ignore */ } }, [])
+  const list = ids.map((id) => shipperById(id)).filter((s): s is NonNullable<typeof s> => !!s)
+  if (list.length === 0) return null
+  return (
+    <section className="border-b border-border" aria-label="Recently viewed" data-testid="recently-viewed">
+      <div className="container-fluid flex flex-wrap items-center gap-2 py-3 text-sm"><span className="mr-1 text-xs font-semibold uppercase tracking-wider text-text-muted">Recently viewed</span>{list.map((s) => <Link key={s.id} to={`/shippers/${s.id}`} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs hover:border-gold hover:text-gold"><Avatar initials={s.initials} hue={s.hue} size={18} />{s.name}</Link>)}</div>
+    </section>
   )
 }

@@ -9,7 +9,7 @@ import { fadeUp, stagger } from '../lib/motion'
 import { Chip, Confirm, Expander, Pager, SearchBox, StatCard, Th, thead, trow, usePaged } from '../components/board'
 
 const initialsOf = (n: string) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
-const roleTone: Record<StaffRole, 'gold' | 'teal' | 'sky' | 'muted'> = { owner: 'gold', dispatcher: 'teal', agent: 'sky', driver: 'muted' }
+const roleTone: Record<StaffRole, 'gold' | 'teal' | 'sky' | 'muted' | 'green'> = { owner: 'gold', dispatcher: 'teal', agent: 'sky', finance: 'green', warehouse: 'muted', driver: 'muted' }
 
 function CopyLink({ token }: { token: string }) {
   const [copied, setCopied] = useState(false)
@@ -63,7 +63,7 @@ export default function Team() {
   const counts = { active: all.filter((s) => s.status === 'active').length, invited: all.filter((s) => s.status === 'invited').length, inactive: all.filter((s) => s.status === 'inactive').length, drivers: all.filter((s) => s.status === 'active' && s.role === 'driver').length }
   const list = useMemo(() => {
     const ql = q.trim().toLowerCase()
-    const order: Record<StaffRole, number> = { owner: 0, dispatcher: 1, agent: 2, driver: 3 }
+    const order: Record<StaffRole, number> = { owner: 0, dispatcher: 1, agent: 2, finance: 3, warehouse: 4, driver: 5 }
     return all.filter((s) => (filter === 'all' ? s.status !== 'inactive' : s.status === filter) && (!role || s.role === role) && (!base || s.base === base) && (!ql || [s.name, s.email, s.phone, s.city, roleLabels[s.role]].join(' ').toLowerCase().includes(ql)))
       .sort((a, b) => (a.status === 'invited' ? 1 : 0) - (b.status === 'invited' ? 1 : 0) || order[a.role] - order[b.role] || a.name.localeCompare(b.name))
   }, [all, filter, role, base, q])
@@ -111,7 +111,7 @@ export default function Team() {
             {showRoles && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-6 card-dark p-5">
                 <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><ShieldCheck size={14} className="text-gold" aria-hidden="true" /> What each role can do</p>
-                <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{(Object.keys(roleLabels) as StaffRole[]).map((r) => <div key={r}><dt className="flex items-center gap-2 text-sm font-semibold"><Pill tone={roleTone[r]}>{roleLabels[r]}</Pill></dt><dd className="mt-1 text-sm text-text-muted">{roleBlurb[r]}</dd></div>)}</dl>
+                <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{(Object.keys(roleLabels) as StaffRole[]).map((r) => <div key={r}><dt className="flex items-center gap-2 text-sm font-semibold"><Pill tone={roleTone[r]}>{roleLabels[r]}</Pill></dt><dd className="mt-1 text-sm text-text-muted">{roleBlurb[r]}</dd></div>)}</dl>
                 <p className="mt-3 text-xs text-text-muted">Permissions are enforced by the server, not just hidden in the menu. Deactivating someone signs them out immediately.</p>
               </motion.div>
             )}

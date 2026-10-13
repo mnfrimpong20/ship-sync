@@ -157,6 +157,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
             <div className="flex flex-col items-end gap-2">
               <Pill tone={s.status === 'delivered' ? 'green' : s.status === 'customs' ? 'gold' : 'teal'}>{statusLabels[s.status]}</Pill>
               <p className="text-xs text-text-muted">{s.status === 'delivered' ? 'Delivered' : 'ETA'} {fmtDate(s.eta)}</p>
+              <ShareTracking s={s} />
             </div>
           </div>
 
@@ -164,8 +165,9 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
             <div className="relative h-2 overflow-hidden rounded-full bg-surface-2">
               <motion.div className="absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,var(--color-teal),var(--color-gold))]" initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} />
             </div>
-            <ol className="mt-3 grid grid-cols-4 gap-1 text-[11px] text-text-muted md:grid-cols-8">
-              {statusOrder.map((st, i) => <li key={st} className={`${i <= idx ? 'text-text' : ''} ${i > 3 ? 'hidden md:block' : ''}`}>{statusLabels[st]}</li>)}
+            <p className="mt-2 flex justify-between text-[11px] text-text-muted md:hidden"><span className="font-semibold text-text">{statusLabels[statusOrder[idx]]}</span><span>step {idx + 1} of {statusOrder.length}</span></p>
+            <ol className="mt-3 hidden grid-cols-8 gap-1 text-[11px] text-text-muted md:grid">
+              {statusOrder.map((st, i) => <li key={st} className={i <= idx ? 'text-text' : ''}>{statusLabels[st]}</li>)}
             </ol>
           </div>
 
@@ -204,6 +206,20 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
           </div>
         </aside>
       )}
+    </div>
+  )
+}
+
+/** Copy the public tracking link or send it on WhatsApp — how most receivers get it. */
+function ShareTracking({ s }: { s: Shipment }) {
+  const [copied, setCopied] = useState(false)
+  const url = `${location.origin}/#/track?ref=${s.ref}`
+  const text = `Track our shipment ${s.ref} (${s.origin} → ${countryByCode(s.destination)?.name ?? s.destination}) on Ship Sync: ${url}`
+  const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { prompt('Copy this link', url) } }
+  return (
+    <div className="no-print flex gap-1.5" data-testid="share-tracking">
+      <button onClick={copy} className="btn-ghost !min-h-8 !px-2.5 text-xs" aria-live="polite">{copied ? 'Copied' : 'Copy link'}</button>
+      <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer" className="btn-ghost !min-h-8 !px-2.5 text-xs">WhatsApp</a>
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { ArrowLeft, BadgeCheck, Building2, CalendarDays, Check, Clock, MapPin, Star } from 'lucide-react'
@@ -12,6 +13,7 @@ export function ShipperProfile() {
   const { id } = useParams()
   const { ready, shipperById } = useStore()
   const s = shipperById(id ?? '')
+  useEffect(() => { if (!s) return; try { const k = 'ss-recent-shippers'; const cur = (JSON.parse(localStorage.getItem(k) ?? '[]') as string[]).filter((x) => x !== s.id); localStorage.setItem(k, JSON.stringify([s.id, ...cur].slice(0, 6))) } catch { /* storage blocked */ } }, [s])
   if (!s && !ready) return <div className="container-x py-20 text-center text-text-muted">Loading profile…</div>
   if (!s) return (
     <div className="container-x py-20 text-text"><Empty title="Shipper not found" body="This profile may have been removed or the link is wrong." action={<Link to="/shippers" className="btn-gold">Back to directory</Link>} /></div>
@@ -73,7 +75,7 @@ export function ShipperProfile() {
 
           <aside className="lg:col-span-4">
             <motion.div variants={fadeUp} className="card-dark sticky top-24 p-6">
-              <h2 className="!text-lg">Get a quote from {s.name.split(' ')[0]}</h2>
+              <h2 className="!text-lg">Get a quote from {s.name}</h2>
               <p className="mt-1 text-sm text-text-muted">Post your shipment — this shipper is notified first, and you’ll still see competing quotes.</p>
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}><Link to={`/quote?shipper=${s.id}&destination=${s.destinations[0]}&origin=${encodeURIComponent(s.origins[0])}`} className="btn-gold mt-5 w-full">Request a quote</Link></motion.div>
               <dl className="mt-5 space-y-2 border-t border-border pt-5 text-sm">

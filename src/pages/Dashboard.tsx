@@ -92,7 +92,7 @@ export function CustomerDashboard() {
 
       <div className="mt-8 flex gap-1 overflow-x-auto border-b border-border" role="tablist">
         {(['requests', 'shipments', 'groupage', 'sourcing', 'invoices'] as const).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium capitalize focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : t === 'shipments' ? 'Shipments' : t === 'groupage' ? 'Shared barrels' : t === 'sourcing' ? 'China sourcing' : 'Invoices'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : t === 'shipments' ? 'Shipments' : t === 'groupage' ? 'Shared barrels' : t === 'sourcing' ? 'China sourcing' : 'Invoices'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
         ))}
       </div>
 
@@ -127,6 +127,7 @@ export function CustomerDashboard() {
                           <p className="mt-4 flex items-center gap-2 rounded-lg bg-surface-2 p-4 text-sm text-text-muted"><Clock size={16} aria-hidden="true" /> Shippers usually reply within 24 hours. We’ll email you at {r.contact.email}.</p>
                         ) : (
                           <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            <div className="no-print flex justify-end md:col-span-2"><button onClick={() => window.print()} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="print-quotes">Print / save quotes as PDF</button></div>
                             {[...r.quotes].sort((a, b) => a.price - b.price).map((q, i) => {
                               const s = shipperById(q.shipperId) ?? { id: q.shipperId, name: 'Shipper', initials: 'SS', hue: '#E3B54A', rating: 0, reviews: 0, verified: false }
                               const best = i === 0 && r.status === 'open'

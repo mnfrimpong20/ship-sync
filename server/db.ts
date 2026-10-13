@@ -489,6 +489,7 @@ create table if not exists pickup_requests (
 );
 create index if not exists idx_pickups_shipper on pickup_requests(shipper_id, pickup_date);
 alter table shipments add column if not exists recipient_token text unique;
+alter table shipments add column if not exists duty jsonb;
 alter table shippers add column if not exists recipient_sms boolean not null default true;
 create table if not exists recipient_messages (
   id text primary key,

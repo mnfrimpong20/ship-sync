@@ -13,7 +13,9 @@ import { DutyCard } from '../components/Duty'
 import { InsuranceCard } from '../components/InsuranceCard'
 import { PaymentCard } from '../components/PaymentCard'
 import { VehicleCard } from '../components/VehicleCard'
+import { CustomsCard } from '../components/CustomsCard'
 import { groupageApi, unitsLabel, type Spot } from '../lib/groupage'
+import { collectionsApi, type InvoiceFull } from '../lib/collections'
 import ProfileEditor from '../components/ProfileEditor'
 import { fadeUp, stagger } from '../lib/motion'
 import ShipperOverview from '../components/ShipperOverview'
@@ -48,8 +50,8 @@ function Layout({ title, sub, children, cta }: { title: string; sub: string; chi
 export function CustomerDashboard() {
   const { ready, user, requests, shipments, acceptQuote, shipperById } = useStore()
   const [sp, setSp] = useSearchParams()
-  type Tab = 'requests' | 'shipments' | 'groupage'
-  const asTab = (t: string | null): Tab => (t === 'shipments' || t === 'groupage' ? t : 'requests')
+  type Tab = 'requests' | 'shipments' | 'groupage' | 'invoices'
+  const asTab = (t: string | null): Tab => (t === 'shipments' || t === 'groupage' || t === 'invoices' ? t : 'requests')
   const [tab, setTabState] = useState<Tab>(asTab(sp.get('tab')))
   const setTab = (t: Tab) => { setTabState(t); setSp(t === 'requests' ? {} : { tab: t }, { replace: true }) }
   useEffect(() => { setTabState(asTab(sp.get('tab'))) }, [sp])
@@ -87,8 +89,8 @@ export function CustomerDashboard() {
       </div>
 
       <div className="mt-8 flex gap-1 border-b border-border" role="tablist">
-        {(['requests', 'shipments', 'groupage'] as const).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 px-4 text-sm font-medium capitalize focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : t === 'shipments' ? 'Shipments' : 'Shared barrels'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
+        {(['requests', 'shipments', 'groupage', 'invoices'] as const).map((t) => (
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 px-4 text-sm font-medium capitalize focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : t === 'shipments' ? 'Shipments' : t === 'groupage' ? 'Shared barrels' : 'Invoices'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
         ))}
       </div>
 
@@ -162,7 +164,34 @@ export function CustomerDashboard() {
 
       {tab === 'shipments' && <ShipmentsTab />}
       {tab === 'groupage' && <GroupageTab />}
+      {tab === 'invoices' && <InvoicesTab />}
     </Layout>
+  )
+}
+
+/** Invoices raised on the customer by their shippers, with pay links. */
+function InvoicesTab() {
+  const [d, setD] = useState<Awaited<ReturnType<typeof collectionsApi.mine>> | null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => { collectionsApi.mine().then(setD).catch((e) => setError(e instanceof Error ? e.message : 'Could not load.')) }, [])
+  const usd = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: Number.isInteger(n) ? 0 : 2 }).format(n)
+  return (
+    <div className="mt-6" data-testid="invoices-tab">
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      {d && d.totals.outstanding > 0 && <p className={`mb-4 rounded-lg border px-4 py-2.5 text-sm ${d.totals.overdue > 0 ? 'border-danger/40 bg-danger/10' : 'border-gold/40 bg-gold/10'}`}><strong>{usd(d.totals.outstanding)}</strong> outstanding{d.totals.overdue > 0 ? ` · ${usd(d.totals.overdue)} overdue` : ''}. Pay by card in a minute — the money is protected by Ship Sync.</p>}
+      {d === null && !error && <p className="text-sm text-text-muted">Loading…</p>}
+      {d && d.invoices.length === 0 && <Empty title="No invoices" body="When a shipper invoices you it shows up here with a secure pay link." />}
+      <ul className="grid gap-3 md:grid-cols-2">
+        {d?.invoices.map((inv: InvoiceFull) => (
+          <li key={inv.id} className={`card-dark min-w-0 p-5 ${inv.status === 'paid' ? 'opacity-80' : ''}`} data-testid="my-invoice">
+            <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="font-mono text-xs text-text-muted">{inv.number}</p><p className="truncate font-semibold">{inv.shipper.name}</p>{inv.shipmentRef && <p className="text-xs text-text-muted">Shipment {inv.shipmentRef}</p>}</div><Pill tone={inv.status === 'paid' ? 'green' : inv.overdue ? 'danger' : 'gold'}>{inv.status === 'paid' ? 'Paid' : inv.overdue ? 'Overdue' : 'Due'}</Pill></div>
+            <p className="mt-3 text-2xl font-bold tabular-nums">{usd(inv.status === 'paid' ? inv.total : inv.balance)}</p>
+            <p className="text-xs text-text-muted">{inv.status === 'paid' ? 'Paid in full' : inv.dueAt ? `Due ${fmtDate(inv.dueAt)}` : 'No due date'}{inv.paid > 0 && inv.status !== 'paid' ? ` · ${usd(inv.paid)} already paid` : ''}</p>
+            <div className="mt-3 flex gap-2">{inv.payToken && <Link to={`/pay/${inv.payToken}`} className={inv.status === 'paid' ? 'btn-ghost !min-h-9 !px-3 text-sm' : 'btn-gold !min-h-9 !px-4 text-sm'}>{inv.status === 'paid' ? 'View invoice' : 'View & pay'}</Link>}</div>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -223,7 +252,7 @@ function ShipmentsTab() {
           )
         })}
       </ul>
-      <div className="min-w-0 lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}{s && <div className="mt-6 space-y-4"><PaymentCard shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}<PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /><DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} /></div>}</div>
+      <div className="min-w-0 lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}{s && <div className="mt-6 space-y-4"><PaymentCard shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}<PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><CustomsCard shipmentId={s.id} destination={s.destination} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /><DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} /></div>}</div>
     </div>
   )
 }

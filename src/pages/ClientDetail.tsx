@@ -6,6 +6,7 @@ import { cargoLabel, cargoTypes, countries, countryByCode, origins, statusLabels
 import { useStore } from '../lib/store'
 import { activityLabel, clientsApi, paymentMethods, type Activity, type ActivityType, type BookingInput, type ClientDetail as Detail, type Consignee, type ConsigneeInput, type Invoice, type InvoiceItem } from '../lib/clients'
 import { ClientAvatar, ClientForm, waLink } from './Clients'
+import { collectionsApi } from '../lib/collections'
 import { ModeBadge, Pill, fmtDate, fmtDateTime, money } from '../components/ui'
 
 type Tab = 'overview' | 'shipments' | 'invoices' | 'activity'
@@ -333,6 +334,7 @@ function Invoices({ d, busy, run, reload }: Common) {
                       <td className={`whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums ${voided ? 'text-text-muted' : inv.balance > 0 ? (invOverdue(inv) ? 'text-danger' : 'text-gold-deep') : 'text-teal'}`}>{voided ? '—' : inv.balance > 0 ? money(inv.balance) : 'Settled'}</td>
                       <td className="px-3 py-3 text-right">
                         <div className="relative inline-flex items-center gap-1.5">
+                          {!voided && inv.balance > 0 && inv.status !== 'draft' && <button onClick={() => run(async () => { await collectionsApi.send(inv.id, inv.sentAt ? (invOverdue(inv) ? 'overdue' : 'reminder') : 'invoice'); await reload() }, inv.sentAt ? 'Reminder sent.' : 'Invoice sent with a pay link.')} className="btn-ghost !min-h-8 whitespace-nowrap !px-2.5 text-xs" data-testid="client-send-invoice"><Send size={12} aria-hidden="true" /> {inv.sentAt ? 'Remind' : 'Send'}</button>}
                           {!voided && inv.balance > 0 && <button onClick={() => { setExpanded(inv.id); setPayFor(payFor === inv.id ? null : inv.id); setPay({ amount: String(inv.balance), method: 'bank', at: today(), note: '' }) }} className="btn-gold !min-h-8 whitespace-nowrap !px-2.5 text-xs">Record payment</button>}
                           <Link to={`/dashboard/invoices/${inv.id}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`View or print ${inv.number}`} title="View / print"><Printer size={13} /></Link>
                           <button onClick={(e) => { e.stopPropagation(); setMenu(menu === inv.id ? null : inv.id) }} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-haspopup="menu" aria-expanded={menu === inv.id} aria-label={`More actions for ${inv.number}`}><Ellipsis size={14} /></button>

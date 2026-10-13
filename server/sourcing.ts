@@ -160,10 +160,11 @@ const PLATFORMS: [RegExp, string][] = [[/1688\.com/, '1688'], [/alibaba\.com/, '
 const CNY_PLATFORMS = ['1688', 'taobao', 'tmall']
 const decodeEntities = (t: string) => t.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))).replace(/\s+/g, ' ').trim()
 const meta = (html: string, name: string) => { const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']*)["']`, 'i')) ?? html.match(new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${name}["']`, 'i')); return m ? decodeEntities(m[1]) : '' }
+const ld_has_offer = (html: string) => /application\/ld\+json/i.test(html) && /"offers"/.test(html)
 /** Best-effort parse of a product page: open-graph, JSON-LD offers, and the usual price / MOQ markers. */
 export function parseProductPage(url: string, html: string) {
   const platform = PLATFORMS.find(([re]) => re.test(url))?.[1] ?? 'web'
-  const u = new URL(url); const productId = (u.pathname.match(/(?:offer|product|item|dp|p|detail)\/?[_-]?(\d{6,})/i)?.[1]) ?? (u.searchParams.get('id') ?? u.searchParams.get('offerId') ?? '')
+  const u = new URL(url); const productId = (u.pathname.match(/(?:offer|product|item|dp|p|detail)\/?[_-]?(\d{6,})/i)?.[1]) ?? (u.pathname.match(/[_/-](\d{8,})(?:\.html?)?$/i)?.[1]) ?? (u.searchParams.get('id') ?? u.searchParams.get('offerId') ?? '')
   let title = meta(html, 'og:title') || decodeEntities((html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? '')); title = title.replace(/\s*[-|–]\s*(1688\.com|阿里巴巴|Alibaba\.com|AliExpress|Taobao|淘宝网|Amazon\.com|Made-in-China\.com).*$/i, '').slice(0, 200)
   const description = (meta(html, 'og:description') || meta(html, 'description')).slice(0, 1500)
   const image = meta(html, 'og:image') || (html.match(/"(?:imageUrl|mainImage|image)"\s*:\s*"(https?:[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/i)?.[1] ?? '')
@@ -548,6 +549,7 @@ export function mountSourcing(r: Router, d: Deps) {
     const priceCny = p.price == null ? null : p.currency === 'CNY' ? r2(p.price) : r2(p.price * cfg.cnyPerUsd); const priceUsd = p.price == null ? null : p.currency === 'USD' ? r2(p.price) : r2(p.price / cfg.cnyPerUsd)
     const wall = /\b(log ?in|sign ?in|verify|captcha|robot|access denied|unusual traffic)\b|登录|验证/i.test(p.title) || (html.length < 4000 && /log ?in|sign ?in|登录/i.test(html) && !p.price)
     if (wall) { p.title = ''; p.description = ''; p.image = ''; p.price = null }
+    if (fetched && !p.title && p.price != null && !ld_has_offer(html)) p.price = null // a bare number on a bot-check page is not a price
     const blocked = fetched && (wall || (!p.title && !p.price))
     res.set('Cache-Control', 'no-store')
     res.json({ reference: { url: url.href, platform: p.platform, productId: p.productId, title: p.title, image: p.image, priceCny, priceUsd, moq: p.moq }, description: p.description, fetched, blocked, hint: !fetched ? `${p.platform === 'web' ? 'That site' : p.platform} didn't let us read the page — we saved the link; your agent will open it in China.` : blocked ? `${p.platform} showed us a login wall; the link is saved and your agent will check the listing directly.` : p.price == null ? 'We found the listing but not a clear price — your agent will confirm it with the factory.' : `Reference price from ${p.platform} — factory quotes are usually lower for bulk and include our inspection.` })

@@ -10,6 +10,7 @@ import { AdminInsurance } from '../components/AdminInsurance'
 import { AdminPayments } from '../components/AdminPayments'
 import { AdminBrokers } from './Brokers'
 import { AdminDisputes } from './Reviews'
+import { AdminSourcing } from './Sourcing'
 
 /** Ship Sync staff: review shipper listings and grant / revoke the verified badge. */
 export default function Admin() {
@@ -92,6 +93,7 @@ export default function Admin() {
           <AdminDisputes />
           <AdminPayments />
           <AdminBrokers />
+          <AdminSourcing />
           <AdminInsurance />
         </motion.div>
       </div>

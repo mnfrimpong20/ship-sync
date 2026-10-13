@@ -10,6 +10,7 @@ import { DocumentsPanel } from '../components/DocumentsPanel'
 import { PickupCard } from '../components/PickupCard'
 import { RecipientPanel } from '../components/RecipientPanel'
 import { DutyCard } from '../components/Duty'
+import { SourcingTab } from './Sourcing'
 import { InsuranceCard } from '../components/InsuranceCard'
 import { PaymentCard } from '../components/PaymentCard'
 import { VehicleCard } from '../components/VehicleCard'
@@ -51,8 +52,8 @@ function Layout({ title, sub, children, cta }: { title: string; sub: string; chi
 export function CustomerDashboard() {
   const { ready, user, requests, shipments, acceptQuote, shipperById } = useStore()
   const [sp, setSp] = useSearchParams()
-  type Tab = 'requests' | 'shipments' | 'groupage' | 'invoices'
-  const asTab = (t: string | null): Tab => (t === 'shipments' || t === 'groupage' || t === 'invoices' ? t : 'requests')
+  type Tab = 'requests' | 'shipments' | 'groupage' | 'invoices' | 'sourcing'
+  const asTab = (t: string | null): Tab => (t === 'shipments' || t === 'groupage' || t === 'invoices' || t === 'sourcing' ? t : 'requests')
   const [tab, setTabState] = useState<Tab>(asTab(sp.get('tab')))
   const setTab = (t: Tab) => { setTabState(t); setSp(t === 'requests' ? {} : { tab: t }, { replace: true }) }
   useEffect(() => { setTabState(asTab(sp.get('tab'))) }, [sp])
@@ -90,8 +91,8 @@ export function CustomerDashboard() {
       </div>
 
       <div className="mt-8 flex gap-1 overflow-x-auto border-b border-border" role="tablist">
-        {(['requests', 'shipments', 'groupage', 'invoices'] as const).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium capitalize focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : t === 'shipments' ? 'Shipments' : t === 'groupage' ? 'Shared barrels' : 'Invoices'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
+        {(['requests', 'shipments', 'groupage', 'sourcing', 'invoices'] as const).map((t) => (
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium capitalize focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : t === 'shipments' ? 'Shipments' : t === 'groupage' ? 'Shared barrels' : t === 'sourcing' ? 'China sourcing' : 'Invoices'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
         ))}
       </div>
 
@@ -166,6 +167,7 @@ export function CustomerDashboard() {
       {tab === 'shipments' && <ShipmentsTab />}
       {tab === 'groupage' && <GroupageTab />}
       {tab === 'invoices' && <InvoicesTab />}
+      {tab === 'sourcing' && <SourcingTab />}
     </Layout>
   )
 }

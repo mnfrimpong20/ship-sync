@@ -18,7 +18,7 @@ export function Logo({ light = true, className = '', tagline = true }: { light?:
       </svg>
       <span className="flex flex-col leading-none">
         <span className={`font-heading text-[1.35rem] font-bold tracking-tight ${light ? 'text-text' : 'text-ink'}`}>Ship<span className={light ? 'text-gold' : 'text-gold-deep'}>Sync</span></span>
-        {tagline && <span className={`mt-1 text-[9.5px] font-semibold uppercase tracking-[0.16em] ${light ? 'text-text-muted' : 'text-ink/70'}`}>{TAGLINE}</span>}
+        {tagline && <span className={`mt-1 whitespace-nowrap text-[9.5px] font-semibold uppercase tracking-[0.16em] ${light ? 'text-text-muted' : 'text-ink/70'}`}>{TAGLINE}</span>}
       </span>
     </Link>
   )

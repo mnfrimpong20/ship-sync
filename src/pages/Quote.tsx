@@ -198,6 +198,7 @@ export default function Quote() {
               )}
             </div>
             <p className="mt-4 text-center text-sm text-text-muted">Prefer to browse first? <Link to="/shippers" className="text-gold hover:underline">See the directory</Link></p>
+            {(form.destination === 'GH' || form.destination === 'NG') && <p className="mt-2 text-center text-sm text-text-muted">Wondering about customs? <Link to={`/duty?destination=${form.destination}&goods=${form.cargo === 'vehicle' ? 'vehicle' : 'personal_effects'}`} className="text-gold hover:underline">Estimate duty at {form.destination === 'GH' ? 'Tema' : 'Lagos'}</Link></p>}
           </div>
         </aside>
       </div>

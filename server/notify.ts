@@ -25,14 +25,14 @@ interface Deps {
   wrap: (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) => void
 }
 
-export const NOTIFY_KINDS = ['quote_received', 'booking_confirmed', 'shipment_status', 'document', 'pickup', 'quote_accepted', 'new_lead', 'container_update', 'invoice_overdue', 'system'] as const
+export const NOTIFY_KINDS = ['quote_received', 'booking_confirmed', 'shipment_status', 'document', 'pickup', 'insurance', 'quote_accepted', 'new_lead', 'container_update', 'invoice_overdue', 'system'] as const
 export type NotifyKind = (typeof NOTIFY_KINDS)[number]
 export const kindLabels: Record<NotifyKind, string> = {
   quote_received: 'New quotes', booking_confirmed: 'Booking confirmations', shipment_status: 'Shipment progress', quote_accepted: 'Quotes accepted',
-  document: 'Documents added to a shipment', pickup: 'Pickup bookings', new_lead: 'New leads on your lanes', container_update: 'Container updates from the line', invoice_overdue: 'Overdue invoices', system: 'Account',
+  document: 'Documents added to a shipment', pickup: 'Pickup bookings', insurance: 'Insurance & claims', new_lead: 'New leads on your lanes', container_update: 'Container updates from the line', invoice_overdue: 'Overdue invoices', system: 'Account',
 }
 /** Which kinds each side can receive — drives the preferences page. */
-export const kindsFor = (role: 'customer' | 'shipper'): NotifyKind[] => (role === 'customer' ? ['quote_received', 'booking_confirmed', 'pickup', 'shipment_status', 'document'] : ['new_lead', 'quote_accepted', 'pickup', 'shipment_status', 'document', 'container_update', 'invoice_overdue'])
+export const kindsFor = (role: 'customer' | 'shipper'): NotifyKind[] => (role === 'customer' ? ['quote_received', 'booking_confirmed', 'pickup', 'shipment_status', 'document', 'insurance'] : ['new_lead', 'quote_accepted', 'pickup', 'shipment_status', 'document', 'insurance', 'container_update', 'invoice_overdue'])
 
 export interface NotifyInput {
   userId: string

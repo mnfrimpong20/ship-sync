@@ -490,6 +490,35 @@ create table if not exists pickup_requests (
 create index if not exists idx_pickups_shipper on pickup_requests(shipper_id, pickup_date);
 alter table shipments add column if not exists recipient_token text unique;
 alter table shipments add column if not exists duty jsonb;
+create table if not exists settings (
+  id text primary key,
+  value jsonb not null,
+  updated_at timestamptz not null default now()
+);
+create table if not exists insurance_policies (
+  id text primary key,
+  shipment_id text not null references shipments(id) on delete cascade,
+  shipper_id text not null references shippers(id) on delete cascade,
+  user_id text references users(id) on delete set null,
+  certificate_no text unique not null,
+  provider text not null default '',
+  coverage text not null default '',
+  declared_value_usd numeric not null,
+  rate numeric not null,
+  premium_usd numeric not null,
+  commission_usd numeric not null default 0,
+  deductible_usd numeric not null default 0,
+  status text not null default 'active',
+  payment_status text not null default 'due',
+  starts_at timestamptz not null default now(),
+  ends_at timestamptz,
+  collected_at timestamptz,
+  document_id text,
+  bought_by text not null default '',
+  claim jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_insurance_shipment on insurance_policies(shipment_id);
 alter table shippers add column if not exists recipient_sms boolean not null default true;
 create table if not exists recipient_messages (
   id text primary key,

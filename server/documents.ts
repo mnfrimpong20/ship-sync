@@ -45,7 +45,7 @@ export const docOut = (d: Row) => ({
 })
 
 /** Everything a packing list / invoice / POD needs, gathered once. */
-async function shipmentContext(db: Db, s: Row) {
+export async function shipmentContext(db: Db, s: Row) {
   const { rows: shipper } = await db.query<Row>('select name, hq, tagline from shippers where id = $1', [s.shipper_id])
   const { rows: client } = s.client_id ? await db.query<Row>('select * from clients where id = $1', [s.client_id]) : { rows: [] as Row[] }
   const { rows: cons } = s.consignee_id ? await db.query<Row>('select * from client_consignees where id = $1', [s.consignee_id]) : s.client_id ? await db.query<Row>('select * from client_consignees where client_id = $1 and is_default order by id limit 1', [s.client_id]) : { rows: [] as Row[] }

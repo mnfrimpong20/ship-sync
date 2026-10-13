@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Download, ExternalLink, Filter, Inbox, Mail, Phone, Search, Send, Trophy, Users, X, XCircle } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Download, ExternalLink, Filter, Inbox, Mail, Phone, Search, Send, Tag, Trophy, Users, X, XCircle } from 'lucide-react'
 import { useStore, type Quote, type QuoteRequest } from '../lib/store'
 import { cargoLabel, countries, countryByCode, type CargoType, type Mode } from '../lib/data'
 import { Empty, ModeBadge, Pill, fmtDate, fmtDateTime, money } from '../components/ui'
@@ -30,7 +30,8 @@ const daysUntil = (d: string) => Math.ceil((new Date(d + 'T12:00:00Z').getTime()
 function QuoteForm({ r, onDone, onCancel }: { r: QuoteRequest; onDone: (msg: string) => void; onCancel: () => void }) {
   const { sendQuote, user, shipperById } = useStore()
   const tagline = user?.shipperId ? shipperById(user.shipperId)?.tagline ?? '' : ''
-  const [form, setForm] = useState({ price: '', transit: r.mode === 'air' ? '7' : '30', notes: '', valid: '14' })
+  const sg = r.suggested ?? null
+  const [form, setForm] = useState({ price: sg ? String(sg.price) : '', transit: sg ? String(sg.transitDays) : r.mode === 'air' ? '7' : '30', notes: sg?.notes ?? '', valid: '14' })
   const [busy, setBusy] = useState(false); const [error, setError] = useState('')
   const includes = [r.pickup ? 'Pickup' : 'Drop-off at warehouse', r.mode === 'air' ? 'Air freight' : 'Ocean freight', r.delivery ? 'Door delivery' : 'Port handling', ...(r.insurance ? ['All-risk insurance'] : [])]
   const submit = async (e: React.FormEvent) => {
@@ -41,6 +42,12 @@ function QuoteForm({ r, onDone, onCancel }: { r: QuoteRequest; onDone: (msg: str
   return (
     <form onSubmit={submit} className="grid gap-3" aria-label={`Quote for ${r.ref}`}>
       {error && <p role="alert" className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
+      {sg && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs" data-testid="suggested-quote">
+          <span><Tag size={12} className="mr-1 inline text-gold" aria-hidden="true" /><strong>{money(sg.price)}</strong> · {sg.transitDays} days from your rate card{sg.breakdown.minApplied ? ' (minimum charge)' : ''}{sg.breakdown.pickup || sg.breakdown.delivery || sg.breakdown.insurance ? ` — freight ${money(sg.breakdown.base)}${sg.breakdown.pickup ? ` + pickup ${money(sg.breakdown.pickup)}` : ''}${sg.breakdown.delivery ? ` + door ${money(sg.breakdown.delivery)}` : ''}${sg.breakdown.insurance ? ` + insurance ${money(sg.breakdown.insurance)}` : ''}` : ''}</span>
+          {String(sg.price) !== form.price && <button type="button" onClick={() => setForm({ ...form, price: String(sg.price), transit: String(sg.transitDays), notes: form.notes || sg.notes })} className="btn-ghost !min-h-7 !px-2 text-[11px]">Use suggested</button>}
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div><label htmlFor={`p-${r.id}`} className="label-dark">Total price (USD)</label><input id={`p-${r.id}`} type="number" min={1} required autoFocus className="input-dark !min-h-10 tabular-nums" placeholder="590" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
         <div><label htmlFor={`t-${r.id}`} className="label-dark">Transit (days)</label><input id={`t-${r.id}`} type="number" min={1} required className="input-dark !min-h-10 tabular-nums" value={form.transit} onChange={(e) => setForm({ ...form, transit: e.target.value })} /></div>

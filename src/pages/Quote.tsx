@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Plane, Ship } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Plane, Ship, Zap } from 'lucide-react'
 import { cargoTypes, countries, countryByCode, origins, type CargoType, type Mode } from '../lib/data'
 import { useStore, type Match, type NewRequest } from '../lib/store'
 import { Avatar, ModeBadge, Rating, money } from '../components/ui'
@@ -36,7 +36,7 @@ export default function Quote() {
       matchShippers(form).then((m) => { if (live) { setMatches(m); setMatching(false) } }).catch(() => { if (live) setMatching(false) })
     }, 200)
     return () => { live = false; clearTimeout(t) }
-  }, [form.origin, form.destination, form.mode, form.cargo, matchShippers])
+  }, [form.origin, form.destination, form.mode, form.cargo, form.quantity, form.weightKg, form.pickup, form.delivery, form.insurance, matchShippers])
   useEffect(() => { if (user) setForm((f) => ({ ...f, contact: { ...f.contact, name: f.contact.name || user.name, email: f.contact.email || user.email } })) }, [user])
   const preferred = sp.get('shipper') ? shipperById(sp.get('shipper')!) : undefined
   const cg = useCongestion()
@@ -182,6 +182,7 @@ export default function Quote() {
                         <p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{m.shipper.name}{m.shipper.verified && <BadgeCheck size={14} className="text-gold" aria-label="Verified" />}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">{m.shipper.modes.map((md) => <ModeBadge key={md} mode={md} />)}<Rating value={m.shipper.rating} /></div>
                         <p className="mt-1 text-xs text-text-muted">{m.reasons.slice(0, 2).join(' · ')}</p>
+                        {m.estimate && <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-gold/10 px-2 py-0.5 text-xs font-semibold text-gold" data-testid="match-estimate">{m.estimate.instant ? <Zap size={11} aria-hidden="true" /> : null}{money(m.estimate.price)} · {m.estimate.transitDays} days{m.estimate.instant ? ' · instant quote' : ' · published rate'}</p>}
                       </div>
                     </motion.li>
                   ))}
@@ -193,7 +194,7 @@ export default function Quote() {
                 </p>
               )}
               {matches.length > 0 && (
-                <p className="mt-4 border-t border-border pt-4 text-xs text-text-muted">Estimated range for {money(estimate(form).lo)}–{money(estimate(form).hi)} based on recent quotes on this lane. Final prices come from shippers.</p>
+                <p className="mt-4 border-t border-border pt-4 text-xs text-text-muted">{matches.some((m) => m.estimate?.instant) ? `${matches.filter((m) => m.estimate?.instant).length} of these will quote instantly when you submit. ` : ''}Estimated range {money(estimate(form).lo)}–{money(estimate(form).hi)} based on recent quotes on this lane. Final prices come from shippers.</p>
               )}
             </div>
             <p className="mt-4 text-center text-sm text-text-muted">Prefer to browse first? <Link to="/shippers" className="text-gold hover:underline">See the directory</Link></p>

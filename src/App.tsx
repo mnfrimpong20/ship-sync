@@ -40,7 +40,7 @@ import Warehouse from './pages/Warehouse'
 import LanesPage, { ShipperLanes } from './pages/Lanes'
 import ReviewsPage from './pages/Reviews'
 import BrandedPage, { BrandEditor } from './pages/WhiteLabel'
-import SourcingPage, { SourcingNew, SourcingJob, SourcingBoard, SuppliersPage } from './pages/Sourcing'
+import SourcingPage, { SourcingNew, SourcingJob, SourcingBoard, SuppliersPage, QcReportPage } from './pages/Sourcing'
 import Containers from './pages/Containers'
 import ContainerDetail from './pages/ContainerDetail'
 import Join from './pages/Join'
@@ -125,6 +125,8 @@ export default function App() {
               <Route path="/dashboard/sourcing/:id" element={<SourcingJob />} />
               <Route path="/dashboard/suppliers" element={<SuppliersPage />} />
               <Route path="/sourcing/:id" element={<SourcingJob />} />
+              <Route path="/sourcing/:id/qc" element={<QcReportPage />} />
+              <Route path="/dashboard/sourcing/:id/qc" element={<QcReportPage />} />
               <Route path="/dashboard/containers" element={<Containers />} />
               <Route path="/dashboard/containers/:id" element={<ContainerDetail />} />
               <Route path="/dashboard/clients" element={<Clients />} />

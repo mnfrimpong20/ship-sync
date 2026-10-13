@@ -12,6 +12,8 @@ import { RecipientPanel } from '../components/RecipientPanel'
 import { DutyCard } from '../components/Duty'
 import { InsuranceCard } from '../components/InsuranceCard'
 import { PaymentCard } from '../components/PaymentCard'
+import { VehicleCard } from '../components/VehicleCard'
+import { groupageApi, unitsLabel, type Spot } from '../lib/groupage'
 import ProfileEditor from '../components/ProfileEditor'
 import { fadeUp, stagger } from '../lib/motion'
 import ShipperOverview from '../components/ShipperOverview'
@@ -46,9 +48,11 @@ function Layout({ title, sub, children, cta }: { title: string; sub: string; chi
 export function CustomerDashboard() {
   const { ready, user, requests, shipments, acceptQuote, shipperById } = useStore()
   const [sp, setSp] = useSearchParams()
-  const [tab, setTabState] = useState<'requests' | 'shipments'>(sp.get('tab') === 'shipments' ? 'shipments' : 'requests')
-  const setTab = (t: 'requests' | 'shipments') => { setTabState(t); setSp(t === 'requests' ? {} : { tab: t }, { replace: true }) }
-  useEffect(() => { const t = sp.get('tab'); setTabState(t === 'shipments' ? 'shipments' : 'requests') }, [sp])
+  type Tab = 'requests' | 'shipments' | 'groupage'
+  const asTab = (t: string | null): Tab => (t === 'shipments' || t === 'groupage' ? t : 'requests')
+  const [tab, setTabState] = useState<Tab>(asTab(sp.get('tab')))
+  const setTab = (t: Tab) => { setTabState(t); setSp(t === 'requests' ? {} : { tab: t }, { replace: true }) }
+  useEffect(() => { setTabState(asTab(sp.get('tab'))) }, [sp])
   const [openReq, setOpenReq] = useState<string | null>(sp.get('request'))
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
@@ -83,8 +87,8 @@ export function CustomerDashboard() {
       </div>
 
       <div className="mt-8 flex gap-1 border-b border-border" role="tablist">
-        {(['requests', 'shipments'] as const).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 px-4 text-sm font-medium capitalize focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : 'Shipments'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
+        {(['requests', 'shipments', 'groupage'] as const).map((t) => (
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 px-4 text-sm font-medium capitalize focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : t === 'shipments' ? 'Shipments' : 'Shared barrels'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
         ))}
       </div>
 
@@ -157,7 +161,42 @@ export function CustomerDashboard() {
       )}
 
       {tab === 'shipments' && <ShipmentsTab />}
+      {tab === 'groupage' && <GroupageTab />}
     </Layout>
+  )
+}
+
+/** The customer's reservations in shared barrels / containers, and the shipments they became. */
+function GroupageTab() {
+  const [spots, setSpots] = useState<Spot[] | null>(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState('')
+  const load = () => groupageApi.mine().then(setSpots).catch((e) => setError(e instanceof Error ? e.message : 'Could not load.'))
+  useEffect(() => { void load() }, [])
+  const cancel = async (s: Spot) => { setBusy(s.id); try { await groupageApi.cancelSpot(s.id); await load() } catch (e) { setError(e instanceof Error ? e.message : 'Could not cancel.') } finally { setBusy('') } }
+  const g = (s: Spot) => s.groupage!
+  return (
+    <div className="mt-6" data-testid="groupage-tab">
+      <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-text-muted">Space you reserved in shared barrels and containers. Reservations become shipments when the shipper closes the slot.</p><Link to="/groupage" className="btn-gold !min-h-9 !px-4 text-sm">Find a slot</Link></div>
+      {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
+      {spots === null && !error && <p className="mt-6 text-sm text-text-muted">Loading…</p>}
+      {spots && spots.length === 0 && <div className="mt-6"><Empty title="No shared-slot reservations" body="Sending less than a barrel? Reserve the space you need in a shipper's shared barrel or container and pay only for that." action={<Link to="/groupage" className="btn-gold">Browse open slots</Link>} /></div>}
+      <ul className="mt-4 grid gap-3 md:grid-cols-2">
+        {spots?.map((s) => (
+          <li key={s.id} className={`card-dark min-w-0 p-5 ${s.status === 'cancelled' ? 'opacity-60' : ''}`} data-testid="my-spot">
+            <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate font-semibold">{g(s).title}</p><p className="text-xs text-text-muted">{g(s).shipperName} · {g(s).origin} → {g(s).destination}</p></div><Pill tone={s.status === 'booked' ? 'green' : s.status === 'cancelled' ? 'muted' : 'gold'}>{s.status === 'booked' ? 'Booked' : s.status === 'cancelled' ? 'Cancelled' : 'Reserved'}</Pill></div>
+            <p className="mt-2 text-sm">{unitsLabel({ unit: g(s).kind === 'barrel' ? 'bag or box' : 'barrel', unitPlural: g(s).kind === 'barrel' ? 'bags / boxes' : 'barrels' }, s.units)} · <strong className="tabular-nums">{money(s.amountUsd)}</strong></p>
+            <p className="mt-1 truncate text-xs text-text-muted">{s.description}</p>
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-gold" style={{ width: `${g(s).fillPct}%` }} /></div>
+            <p className="mt-1 text-[11px] text-text-muted">{g(s).fillPct}% filled · closes {g(s).closesAt ? fmtDate(g(s).closesAt + 'T12:00:00Z') : '—'} · sails {g(s).departsAt ? fmtDate(g(s).departsAt + 'T12:00:00Z') : '—'}</p>
+            <div className="mt-3 flex gap-2">
+              {s.shipmentId && <Link to={`/dashboard?tab=shipments&s=${s.shipmentId}`} className="btn-gold !min-h-8 !px-3 text-xs">Open shipment {s.shipmentRef}</Link>}
+              {s.status === 'reserved' && <button onClick={() => cancel(s)} disabled={busy === s.id} className="btn-ghost !min-h-8 !px-3 text-xs text-danger disabled:opacity-60">Cancel reservation</button>}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -184,7 +223,7 @@ function ShipmentsTab() {
           )
         })}
       </ul>
-      <div className="min-w-0 lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}{s && <div className="mt-6 space-y-4"><PaymentCard shipmentId={s.id} /><PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /><DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} /></div>}</div>
+      <div className="min-w-0 lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}{s && <div className="mt-6 space-y-4"><PaymentCard shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}<PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /><DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} /></div>}</div>
     </div>
   )
 }

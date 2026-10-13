@@ -6,6 +6,7 @@ import { cargoTypes, countries, countryByCode, origins, type CargoType, type Mod
 import { useStore, type Match, type NewRequest } from '../lib/store'
 import { Avatar, ModeBadge, Rating, money } from '../components/ui'
 import { ease } from '../lib/motion'
+import { RequestVehicleFields } from '../components/VehicleCard'
 import { congestionLabel, useCongestion } from '../lib/useCongestion'
 
 type Form = NewRequest
@@ -117,6 +118,7 @@ export default function Quote() {
                       <div><label htmlFor="qty" className="label-dark">Quantity</label><input id="qty" type="number" min={1} className="input-dark" value={form.quantity} onChange={(e) => set('quantity', Number(e.target.value))} aria-invalid={!!errors.quantity} />{errors.quantity && <p className="mt-1 text-xs text-danger">{errors.quantity}</p>}</div>
                       <div><label htmlFor="wt" className="label-dark">Approx. total weight (kg, optional)</label><input id="wt" type="number" min={0} className="input-dark" value={form.weightKg ?? ''} onChange={(e) => set('weightKg', e.target.value ? Number(e.target.value) : undefined)} placeholder="e.g. 380" /></div>
                     </div>
+                    {form.cargo === 'vehicle' && <RequestVehicleFields value={form.vehicle ?? { vin: '', year: null, make: '', model: '', running: true, method: 'roro', titleStatus: 'clean' }} onChange={(v) => set('vehicle', v)} />}
                     <div><label htmlFor="desc" className="label-dark">Describe the shipment</label><textarea id="desc" rows={3} className="input-dark py-2.5" placeholder="e.g. 4 sealed barrels — clothing, provisions, small appliances. Deliver to Kumasi." value={form.description} onChange={(e) => set('description', e.target.value)} /></div>
                   </div>
                 )}
@@ -197,6 +199,7 @@ export default function Quote() {
                 <p className="mt-4 border-t border-border pt-4 text-xs text-text-muted">{matches.some((m) => m.estimate?.instant) ? `${matches.filter((m) => m.estimate?.instant).length} of these will quote instantly when you submit. ` : ''}Estimated range {money(estimate(form).lo)}–{money(estimate(form).hi)} based on recent quotes on this lane. Final prices come from shippers.</p>
               )}
             </div>
+            {form.mode !== 'air' && (form.cargo === 'boxes' || form.cargo === 'barrels') && <p className="mt-4 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-center text-sm">Sending less than a barrel? <Link to={`/groupage?destination=${form.destination}`} className="font-semibold text-gold hover:underline">Reserve space in a shared barrel or container →</Link></p>}
             <p className="mt-4 text-center text-sm text-text-muted">Prefer to browse first? <Link to="/shippers" className="text-gold hover:underline">See the directory</Link></p>
             {(form.destination === 'GH' || form.destination === 'NG') && <p className="mt-2 text-center text-sm text-text-muted">Wondering about customs? <Link to={`/duty?destination=${form.destination}&goods=${form.cargo === 'vehicle' ? 'vehicle' : 'personal_effects'}`} className="text-gold hover:underline">Estimate duty at {form.destination === 'GH' ? 'Tema' : 'Lagos'}</Link></p>}
           </div>

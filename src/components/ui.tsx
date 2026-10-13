@@ -6,7 +6,7 @@ import { fadeUp, stagger, viewport } from '../lib/motion'
 import { countryByCode, type Mode, type Shipper } from '../lib/data'
 
 /** Tagline under the wordmark. One place to change it. */
-export const TAGLINE = 'End-to-end logistics to Africa'
+export const TAGLINE = 'Air · Ocean · Door delivery'
 
 export function Logo({ light = true, className = '', tagline = true }: { light?: boolean; className?: string; tagline?: boolean }) {
   return (

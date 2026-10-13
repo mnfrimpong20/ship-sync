@@ -10,6 +10,7 @@ import { ShipmentDetail } from './Track'
 import { fadeUp, stagger } from '../lib/motion'
 import { containersApi, type Container as ContainerRec } from '../lib/containers'
 import { DocumentsPanel } from '../components/DocumentsPanel'
+import { PickupCard } from '../components/PickupCard'
 
 type Bucket = 'all' | 'active' | 'pickup' | 'transit' | 'destination' | 'late' | 'untracked' | 'delivered'
 type Sort = 'newest' | 'eta' | 'status' | 'ref'
@@ -170,6 +171,7 @@ export default function Shipments() {
                                 <DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} />
                               </div>
                               <div className="space-y-4">
+                                <PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} />
                                 {s.status !== 'delivered' && <div className="rounded-xl border border-border bg-surface p-4"><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">Live tracking</p>{tracking === s.id ? <TrackingForm s={s} onDone={(m) => { setTracking(null); setToast(m) }} /> : <button onClick={() => setTracking(s.id)} className="btn-ghost !min-h-9 w-full text-xs">{s.flight || s.vesselName ? 'Edit tracking details' : `Add ${s.mode === 'air' ? 'flight' : 'vessel & MMSI'}`}</button>}</div>}
                                 <div className="rounded-xl border border-border bg-surface p-4 text-xs text-text-muted"><p className="mb-1 font-semibold uppercase tracking-wider">Links</p><ul className="space-y-1"><li><Link to={`/track?ref=${s.ref}`} className="text-gold-deep hover:underline">Customer tracking page ↗</Link></li><li><Link to={`/dashboard/labels?shipments=${s.id}`} className="text-gold-deep hover:underline">Print piece labels (stickers)</Link></li>{s.clientId && <li><Link to={`/dashboard/clients/${s.clientId}?tab=shipments`} className="text-gold-deep hover:underline">Client record — {s.customer}</Link></li>}{s.clientId && <li><Link to={`/dashboard/clients/${s.clientId}?tab=invoices`} className="text-gold-deep hover:underline">Invoices for this client</Link></li>}{(s.mmsi || s.flight) && <li><Link to={s.mmsi ? `/live?vessel=${s.mmsi}` : `/live?flight=${s.flight}`} className="text-gold-deep hover:underline">Show on live map</Link></li>}</ul></div>
                               </div>

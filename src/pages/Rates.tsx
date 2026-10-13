@@ -175,7 +175,7 @@ export default function Rates() {
           {!editing && error && <p role="alert" className="mt-6 text-sm text-danger">{error}</p>}
 
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <div>
+            <div className="min-w-0">
               <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2">
                 <Chip active={filter === 'all'} onClick={() => setFilter('all')} count={active.length}>Active</Chip>
                 <Chip active={filter === 'paused'} onClick={() => setFilter('paused')} count={all.length - active.length}>Paused</Chip>

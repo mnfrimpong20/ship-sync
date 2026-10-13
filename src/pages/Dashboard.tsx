@@ -7,6 +7,7 @@ import { useStore, type QuoteRequest } from '../lib/store'
 import { Avatar, Empty, ModeBadge, Pill, Rating, fmtDate, money } from '../components/ui'
 import { ShipmentDetail } from './Track'
 import { DocumentsPanel } from '../components/DocumentsPanel'
+import { PickupCard } from '../components/PickupCard'
 import ProfileEditor from '../components/ProfileEditor'
 import { fadeUp, stagger } from '../lib/motion'
 import ShipperOverview from '../components/ShipperOverview'
@@ -179,7 +180,7 @@ function ShipmentsTab() {
           )
         })}
       </ul>
-      <div className="min-w-0 lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}{s && <div className="mt-6"><DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} /></div>}</div>
+      <div className="min-w-0 lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}{s && <div className="mt-6 space-y-4"><PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /><DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} /></div>}</div>
     </div>
   )
 }

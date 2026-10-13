@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { sampleShipments, shippers as seedShippers } from '../src/lib/data'
 import { extraShippers } from './seedShippers'
 import { seedRatesDemo } from './rates'
+import { seedPickupsDemo } from './pickups'
 
 /** Minimal query interface satisfied by both `pg` and PGlite. */
 export interface Db {
@@ -38,6 +39,7 @@ export async function getDb(): Promise<Db> {
   await seedContainerDemo(db)
   await seedRunsDemo(db)
   await seedRatesDemo(db)
+  await seedPickupsDemo(db)
   return db
 }
 
@@ -453,6 +455,39 @@ create table if not exists documents (
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_documents_shipment on documents(shipment_id);
+alter table shippers add column if not exists pickup_lead_days int not null default 1;
+create table if not exists pickup_windows (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  weekday int not null,
+  start_time text not null,
+  end_time text not null,
+  area text not null default '',
+  capacity int not null default 6,
+  active boolean not null default true
+);
+create table if not exists pickup_requests (
+  id text primary key,
+  shipment_id text not null references shipments(id) on delete cascade,
+  shipper_id text not null references shippers(id) on delete cascade,
+  user_id text references users(id) on delete set null,
+  pickup_date date not null,
+  window_start text not null,
+  window_end text not null,
+  address text not null,
+  city text not null default '',
+  contact_name text not null default '',
+  contact_phone text not null default '',
+  notes text not null default '',
+  status text not null default 'requested',
+  status_note text not null default '',
+  by_role text not null default 'customer',
+  run_id text references runs(id) on delete set null,
+  stop_id text references run_stops(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_pickups_shipper on pickup_requests(shipper_id, pickup_date);
 
 `
 

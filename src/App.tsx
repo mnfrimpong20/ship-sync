@@ -32,6 +32,9 @@ import Duty from './pages/Duty'
 import Payments from './pages/Payments'
 import GroupagePage from './pages/Groupage'
 import GroupageManage from './pages/GroupageManage'
+import Pay from './pages/Pay'
+import Collections from './pages/Collections'
+import BrokersPage, { BrokerPortal } from './pages/Brokers'
 import Containers from './pages/Containers'
 import ContainerDetail from './pages/ContainerDetail'
 import Join from './pages/Join'
@@ -83,11 +86,13 @@ export default function App() {
               <Route path="/track" element={<Track />} />
               <Route path="/duty" element={<Duty />} />
               <Route path="/groupage" element={<GroupagePage />} />
+              <Route path="/brokers" element={<BrokersPage />} />
               <Route path="/live" element={<Live />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/join" element={<Join />} />
               <Route path="/doc/:token" element={<DocumentView shared />} />
+              <Route path="/pay/:token" element={<Pay />} />
               <Route path="*" element={<Home />} />
             </Route>
             {/* The signed-in application lives in its own shell, apart from the marketing site. */}
@@ -100,6 +105,7 @@ export default function App() {
               <Route path="/dashboard/pickups" element={<Pickups />} />
               <Route path="/dashboard/payments" element={<Payments />} />
               <Route path="/dashboard/groupage" element={<GroupageManage />} />
+              <Route path="/dashboard/collections" element={<Collections />} />
               <Route path="/dashboard/containers" element={<Containers />} />
               <Route path="/dashboard/containers/:id" element={<ContainerDetail />} />
               <Route path="/dashboard/clients" element={<Clients />} />
@@ -117,6 +123,7 @@ export default function App() {
             </Route>
             <Route path="/dashboard/labels" element={<Labels />} />
             <Route path="/r/:token" element={<Receive />} />
+            <Route path="/broker/:token" element={<BrokerPortal />} />
           </Routes>
         </HashRouter>
       </StoreProvider>

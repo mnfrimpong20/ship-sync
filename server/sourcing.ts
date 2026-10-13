@@ -50,12 +50,25 @@ export const stepLabels: Record<Step | 'cancelled', string> = {
   balance_paid: 'Balance paid', received_cn: 'Received at our China warehouse', shipped: 'Shipped', delivered: 'Delivered', closed: 'Closed', cancelled: 'Cancelled',
 }
 /** Who may move a job into each step. */
+/** Standard inspection checklist; agents mark each item pass / fail / n/a. */
+export const QC_ITEMS = [
+  { id: 'quantity', label: 'Quantity matches the PO' }, { id: 'packaging', label: 'Export packaging & carton strength' }, { id: 'labeling', label: 'Labels, barcodes & shipping marks' }, { id: 'appearance', label: 'Appearance, finish & colour' },
+  { id: 'function', label: 'Function / performance test' }, { id: 'dimensions', label: 'Dimensions & weight' }, { id: 'safety', label: 'Safety marks & certificates (CE, CCC, RoHS…)' }, { id: 'damage', label: 'No damage, moisture or mould' },
+] as const
+/** ISO 2859-1 general inspection level II, normal — sample size for a lot (the usual buyer's AQL table). */
+export function aqlSample(lot: number) {
+  const t: [number, number][] = [[8, 2], [15, 3], [25, 5], [50, 8], [90, 13], [150, 20], [280, 32], [500, 50], [1200, 80], [3200, 125], [10000, 200], [35000, 315], [150000, 500], [500000, 800]]
+  const n = t.find(([max]) => lot <= max)?.[1] ?? 1250
+  // Acceptance numbers at AQL 2.5 (major) / 4.0 (minor) for that sample size.
+  const acc: Record<number, [number, number]> = { 2: [0, 0], 3: [0, 0], 5: [0, 0], 8: [0, 1], 13: [1, 1], 20: [1, 2], 32: [2, 3], 50: [3, 5], 80: [5, 7], 125: [7, 10], 200: [10, 14], 315: [14, 21], 500: [21, 21], 800: [21, 21], 1250: [21, 21] }
+  return { sampleSize: Math.min(n, lot), acceptMajor: acc[n]?.[0] ?? 21, acceptMinor: acc[n]?.[1] ?? 21 }
+}
 const STEP_BY: Record<Step, ('agent' | 'customer' | 'system')[]> = {
   requested: ['system'], assigned: ['system'], sourcing: ['agent'], quoted: ['system'], deposit_paid: ['system'], ordered: ['agent'], in_production: ['agent'], inspected: ['agent'], balance_paid: ['system'], received_cn: ['agent'], shipped: ['agent'], delivered: ['agent', 'system'], closed: ['customer', 'agent', 'system'],
 }
 
-export interface SourcingSettings { enabled: boolean; servicePct: number; minFeeUsd: number; findFeeUsd: number; depositPct: number; inspectionUsd: number; handlingUsd: number; cnyPerUsd: number; note: string }
-export const DEFAULT_SOURCING: SourcingSettings = { enabled: true, servicePct: 0.07, minFeeUsd: 150, findFeeUsd: 95, depositPct: 0.3, inspectionUsd: 120, handlingUsd: 80, cnyPerUsd: Number(process.env.CNY_PER_USD) || 7.2, note: 'Ship Sync buys in its own name and holds your money in escrow — the factory is only paid once your order is confirmed, and the balance only after you approve the inspection photos.' }
+export interface SourcingSettings { enabled: boolean; servicePct: number; minFeeUsd: number; findFeeUsd: number; depositPct: number; inspectionUsd: number; handlingUsd: number; cnyPerUsd: number; note: string; agentCommissionPct: number; sampleHandlingUsd: number }
+export const DEFAULT_SOURCING: SourcingSettings = { enabled: true, servicePct: 0.07, minFeeUsd: 150, findFeeUsd: 95, depositPct: 0.3, inspectionUsd: 120, handlingUsd: 80, cnyPerUsd: Number(process.env.CNY_PER_USD) || 7.2, agentCommissionPct: 0.2, sampleHandlingUsd: 25, note: 'Ship Sync buys in its own name and holds your money in escrow — the factory is only paid once your order is confirmed, and the balance only after you approve the inspection photos.' }
 export async function sourcingSettings(db: Db): Promise<SourcingSettings> {
   const { rows } = await db.query<Row>(`select value from settings where id = 'sourcing'`)
   const v = (J(rows[0]?.value) ?? {}) as Partial<SourcingSettings>
@@ -65,7 +78,7 @@ export async function sourcingSettings(db: Db): Promise<SourcingSettings> {
 /* ------------------------------------------------------------------ output */
 export const supplierOut = (s: Row, full = false) => ({
   id: s.id, name: full ? s.name : s.name_public ?? s.name, city: s.city, province: s.province, products: (J(s.products) ?? []) as string[], verified: !!s.verified, rating: Number(s.rating ?? 0), jobs: Number(s.n_jobs ?? 0), notes: full ? s.notes : '',
-  contact: full ? s.contact : '', wechat: full ? s.wechat : '', phone: full ? s.phone : '', website: full ? s.website : '', storefront: full ? s.storefront : '', active: !!s.active, createdAt: ISO(s.created_at),
+  contact: full ? s.contact : '', wechat: full ? s.wechat : '', phone: full ? s.phone : '', website: full ? s.website : '', storefront: full ? s.storefront : '', active: !!s.active, createdAt: ISO(s.created_at), lastAudit: s.last_audit ? { date: String((J(s.last_audit) as Row).audit_date).slice(0, 10), score: Number((J(s.last_audit) as Row).score), result: (J(s.last_audit) as Row).result, auditor: (J(s.last_audit) as Row).auditor } : null,
 })
 export const quoteOut = (q: Row, revealSupplier: boolean) => ({
   id: q.id, sourcingId: q.sourcing_id, supplierId: q.supplier_id, supplier: q.sup_name ? supplierOut({ id: q.supplier_id, name: q.sup_name, name_public: revealSupplier ? q.sup_name : `Factory ${maskCode(String(q.supplier_id))}`, city: q.sup_city, province: q.sup_province, products: q.sup_products, verified: q.sup_verified, rating: q.sup_rating, contact: q.sup_contact, wechat: q.sup_wechat, phone: q.sup_phone, website: q.sup_website, storefront: q.sup_storefront, active: true, notes: '' }, revealSupplier) : null,
@@ -79,15 +92,15 @@ export const jobOut = (j: Row, viewer: 'customer' | 'agent' | 'admin' | 'public'
     destination: j.destination, destinationName: countryByCode(j.destination)?.name ?? j.destination, destinationCity: j.destination_city, mode: j.mode, deadline: j.deadline ? String(j.deadline).slice(0, 10) : null,
     customer: viewer === 'public' ? undefined : { id: j.user_id, name: j.contact_name, email: viewer === 'customer' ? j.contact_email : j.contact_email, phone: j.contact_phone, company: j.company ?? '' },
     status: j.status as Step | 'cancelled', statusLabel: stepLabels[j.status as Step] ?? j.status, agent: j.agent_user_id ? { id: j.agent_user_id, name: j.agent_name ?? 'Sourcing agent', city: j.agent_city ?? '' } : null,
-    acceptedQuoteId: j.accepted_quote_id ?? null, po: (J(j.po) ?? null) as Row | null, qc: (J(j.qc) ?? null) as Row | null, shipmentId: j.shipment_id ?? null, shipmentRef: j.s_ref ?? null, shipmentStatus: j.s_status ?? null,
+    acceptedQuoteId: j.accepted_quote_id ?? null, po: (J(j.po) ?? null) as Row | null, qc: (J(j.qc) ?? null) as Row | null, sample: (J(j.sample) ?? null) as Row | null, receipt: (J(j.receipt) ?? null) as Row | null, containerId: j.s_container ?? null, containerRef: j.c_ref ?? null, shipmentId: j.shipment_id ?? null, shipmentRef: j.s_ref ?? null, shipmentStatus: j.s_status ?? null,
     supplierRevealed: viewer !== 'customer' || paid, timeline: (J(j.timeline) ?? []) as { at: string; status: string; note: string; by: string }[], createdAt: ISO(j.created_at), updatedAt: ISO(j.updated_at), closedAt: ISO(j.closed_at),
   }
 }
-const paymentStage = (p: Row) => ({ ...paymentOut(p), stage: p.stage as 'fee' | 'deposit' | 'balance', sourcingId: p.sourcing_id })
+const paymentStage = (p: Row) => ({ ...paymentOut(p), stage: p.stage as 'fee' | 'deposit' | 'balance' | 'sample', sourcingId: p.sourcing_id })
 
-const JOB_SELECT = `select j.*, u.name as agent_name, st.city as agent_city, s.ref as s_ref, s.status as s_status from sourcing_requests j left join users u on u.id = j.agent_user_id left join staff st on st.user_id = j.agent_user_id and st.shipper_id = '${SOURCING_SHIPPER}' left join shipments s on s.id = j.shipment_id`
+const JOB_SELECT = `select j.*, u.name as agent_name, st.city as agent_city, s.ref as s_ref, s.status as s_status, s.container_id as s_container, c.ref as c_ref from sourcing_requests j left join users u on u.id = j.agent_user_id left join staff st on st.user_id = j.agent_user_id and st.shipper_id = '${SOURCING_SHIPPER}' left join shipments s on s.id = j.shipment_id left join containers c on c.id = s.container_id`
 const QUOTE_SELECT = `select q.*, sp.name as sup_name, sp.city as sup_city, sp.province as sup_province, sp.products as sup_products, sp.verified as sup_verified, sp.rating as sup_rating, sp.contact as sup_contact, sp.wechat as sup_wechat, sp.phone as sup_phone, sp.website as sup_website, sp.storefront as sup_storefront from sourcing_quotes q left join suppliers sp on sp.id = q.supplier_id`
-const SUP_SELECT = `select sp.*, (select count(*) from sourcing_quotes q where q.supplier_id = sp.id and q.status = 'accepted')::int as n_jobs from suppliers sp`
+const SUP_SELECT = `select sp.*, (select count(*) from sourcing_quotes q where q.supplier_id = sp.id and q.status = 'accepted')::int as n_jobs, (select row_to_json(a) from (select audit_date, score, result, auditor from supplier_audits a where a.supplier_id = sp.id order by audit_date desc limit 1) a) as last_audit from suppliers sp`
 const PAY_SELECT = `select p.*, sh.name as shipper_name from escrow_payments p join shippers sh on sh.id = p.shipper_id`
 
 /* ------------------------------------------------------------------ validation */
@@ -109,13 +122,21 @@ const zQuote = z.object({
 const zStep = z.object({
   status: z.enum([...STEPS, 'cancelled']), note: z.string().trim().max(600).default(''),
   po: z.object({ number: z.string().trim().max(40).default(''), leadDays: z.number().int().min(0).max(365).optional(), readyBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), incoterm: z.enum(['EXW', 'FOB', 'CIF', 'DDP']).default('FOB'), factoryPaidCny: z.number().min(0).optional() }).optional(),
-  qc: z.object({ result: z.enum(['pass', 'rework', 'fail']), checked: z.number().int().min(0).max(1_000_000).default(0), defects: z.number().int().min(0).max(1_000_000).default(0), notes: z.string().trim().max(1500).default('') }).optional(),
+  qc: z.object({ result: z.enum(['pass', 'rework', 'fail']), checked: z.number().int().min(0).max(1_000_000).default(0), defects: z.number().int().min(0).max(1_000_000).default(0), notes: z.string().trim().max(1500).default(''), items: z.array(z.object({ id: z.string().min(1).max(30), result: z.enum(['pass', 'fail', 'na']), note: z.string().trim().max(300).default('') })).max(20).optional() }).optional(),
   ship: z.object({ mode: z.enum(['ocean', 'air']), originCity: z.string().trim().max(60).default('Guangzhou'), cargo: z.enum(['boxes', 'pallets', 'container20', 'container40', 'commercial']).default('commercial'), eta: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), vesselName: z.string().trim().max(60).optional(), flight: z.string().trim().max(20).optional(), description: z.string().trim().max(300).optional() }).optional(),
   refund: z.boolean().optional(),
+  receipt: z.object({ cartons: z.number().int().min(0).max(100_000).default(0), grossKg: z.number().min(0).max(1_000_000).default(0), cbm: z.number().min(0).max(10_000).default(0), marks: z.string().trim().max(120).default(''), siteId: z.string().optional() }).optional(),
+  containerId: z.string().optional(),
 })
+const zQcItems = z.object({ items: z.array(z.object({ id: z.string().min(1).max(30), result: z.enum(['pass', 'fail', 'na']), note: z.string().trim().max(300).default('') })).max(20).default([]), sampleSize: z.number().int().min(0).max(1_000_000).optional() })
+const zSampleReq = z.object({ note: z.string().trim().max(500).default(''), address: z.string().trim().max(300).default('') })
+const zSampleQuote = z.object({ costUsd: z.number().min(0).max(5000), note: z.string().trim().max(300).default('') })
+const zSampleShip = z.object({ courier: z.string().trim().min(2).max(40), tracking: z.string().trim().max(60).default(''), note: z.string().trim().max(300).default('') })
+const zSampleFeedback = z.object({ result: z.enum(['approved', 'rejected']), note: z.string().trim().max(600).default('') })
+const zAudit = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), score: z.number().int().min(0).max(100), result: z.enum(['pass', 'conditional', 'fail']), findings: z.string().trim().max(2000).default(''), categories: z.record(z.string(), z.number().int().min(0).max(10)).optional() })
 const zMessage = z.object({ body: z.string().trim().min(1).max(2000) })
 const zFile = z.object({ kind: z.enum(['photo', 'document', 'qc']).default('photo'), title: z.string().trim().min(1).max(120), mime: z.string().regex(/^(image\/(png|jpeg|webp)|application\/pdf)$/), data: z.string().min(10).max(4_200_000) })
-const zSettings = z.object({ enabled: z.boolean().optional(), servicePct: z.number().min(0).max(0.5).optional(), minFeeUsd: z.number().min(0).max(10_000).optional(), findFeeUsd: z.number().min(0).max(10_000).optional(), depositPct: z.number().min(0.05).max(1).optional(), inspectionUsd: z.number().min(0).max(10_000).optional(), handlingUsd: z.number().min(0).max(10_000).optional(), cnyPerUsd: z.number().min(1).max(20).optional(), note: z.string().trim().max(500).optional() })
+const zSettings = z.object({ enabled: z.boolean().optional(), servicePct: z.number().min(0).max(0.5).optional(), minFeeUsd: z.number().min(0).max(10_000).optional(), findFeeUsd: z.number().min(0).max(10_000).optional(), depositPct: z.number().min(0.05).max(1).optional(), inspectionUsd: z.number().min(0).max(10_000).optional(), handlingUsd: z.number().min(0).max(10_000).optional(), cnyPerUsd: z.number().min(1).max(20).optional(), note: z.string().trim().max(500).optional(), agentCommissionPct: z.number().min(0).max(1).optional(), sampleHandlingUsd: z.number().min(0).max(1000).optional() })
 const zAssign = z.object({ agentUserId: z.string().min(1).nullable() })
 
 /* ------------------------------------------------------------------ shared helpers (also used by payments) */
@@ -137,6 +158,15 @@ async function releaseStage(db: Db, job: Row, stage: 'fee' | 'deposit' | 'balanc
   await db.query(`update escrow_payments set status = 'released', released_at = now(), release_reason = $3 where sourcing_id = $1 and stage = $2 and status = 'held' and not coalesce(hold, false)`, [job.id, stage, reason])
 }
 
+/** Agent commission on a completed job: a share of the service fee, paid out by admin. */
+async function earnCommission(db: Db, job: Row, feeUsd: number) {
+  if (!job.agent_user_id || !(feeUsd > 0)) return
+  const cfg = await sourcingSettings(db); const amount = r2(feeUsd * cfg.agentCommissionPct); if (!(amount > 0)) return
+  const { rows } = await db.query('select 1 from agent_earnings where sourcing_id = $1', [job.id]); if (rows.length) return
+  await db.query(`insert into agent_earnings (id,sourcing_id,agent_user_id,amount_usd,status,note) values ($1,$2,$3,$4,'earned',$5)`, ['ae_' + uid(), job.id, job.agent_user_id, amount, `${Math.round(cfg.agentCommissionPct * 100)}% of the $${feeUsd.toLocaleString()} service fee on ${job.ref}`])
+  await notify(db, { userId: job.agent_user_id, kind: 'sourcing', title: `Commission earned on ${job.ref}: $${amount.toLocaleString()}`, body: 'It will be included in your next payout.', link: '/dashboard/sourcing?view=earnings', dedupe: `src:${job.id}:commission` })
+}
+
 /** Hook from payments.markPaid: a sourcing stage was paid → move the job on. */
 export async function onSourcingPaid(db: Db, p: Row) {
   const job = await jobById(db, p.sourcing_id); if (!job) return
@@ -144,12 +174,18 @@ export async function onSourcingPaid(db: Db, p: Row) {
   if (p.stage === 'fee') {
     await pushTimeline(db, job, 'closed', `Sourcing fee $${amount.toLocaleString()} paid — supplier contacts unlocked.`, job.contact_name)
     await releaseStage(db, job, 'fee', 'sourcing:fee')
+    await earnCommission(db, job, amount)
     await tellCustomer(db, job, `Supplier contacts unlocked — ${job.ref}`, `Thanks — your $${amount.toLocaleString()} sourcing fee is received. Factory names and contacts are now on your request. Want us to handle the order too? Reply on the request and your agent will upgrade it.`, `src:${job.id}:fee`)
     await tellAgents(db, job, `${job.ref}: sourcing fee paid`, `${job.contact_name} paid $${amount.toLocaleString()} for the shortlist on "${job.title}".`, `src:${job.id}:fee:a`)
   } else if (p.stage === 'deposit') {
     await pushTimeline(db, job, 'deposit_paid', `Deposit $${amount.toLocaleString()} paid — held in escrow until the factory order is confirmed.`, job.contact_name)
     await tellCustomer(db, job, `Deposit received — ${job.ref}`, `$${amount.toLocaleString()} is held by Ship Sync. Your agent will now place the order with the factory in Ship Sync's name and confirm the production schedule.`, `src:${job.id}:dep`)
     await tellAgents(db, job, `${job.ref}: deposit paid — place the order`, `${job.contact_name} paid $${amount.toLocaleString()}. Place the PO with the factory and record the number, lead time and ready date.`, `src:${job.id}:dep:a`)
+  } else if (p.stage === 'sample') {
+    const sample = { ...(J(job.sample) ?? {}), status: 'paid', paidAt: new Date().toISOString() }
+    await db.query('update sourcing_requests set sample = $2, updated_at = now() where id = $1', [job.id, JSON.stringify(sample)])
+    await tellCustomer(db, job, `Sample paid — ${job.ref}`, `$${amount.toLocaleString()} received. Your agent will order the sample and courier it to you with a tracking number.`, `src:${job.id}:sample:paid`)
+    await tellAgents(db, job, `${job.ref}: sample paid — order it`, `${job.contact_name} paid $${amount.toLocaleString()} for a sample. Order it from the factory and courier it with tracking.`, `src:${job.id}:sample:paid:a`)
   } else if (p.stage === 'balance') {
     await pushTimeline(db, job, 'balance_paid', `Balance $${amount.toLocaleString()} paid.`, job.contact_name)
     await tellCustomer(db, job, `Balance received — ${job.ref}`, `$${amount.toLocaleString()} received. Your goods are being released to our China warehouse and booked onto the next sailing or flight.`, `src:${job.id}:bal`)
@@ -185,8 +221,10 @@ export function mountSourcing(r: Router, d: Deps) {
   const acceptedQuote = async (db: Db, job: Row) => (job.accepted_quote_id ? (await db.query<Row>(`${QUOTE_SELECT} where q.id = $1`, [job.accepted_quote_id])).rows[0] ?? null : null)
   /** What's payable right now (stage + amount), or null. */
   const due = async (db: Db, job: Row, cfg: SourcingSettings) => {
-    const q = await acceptedQuote(db, job); if (!q) return null
     const paid = (await paymentsFor(db, job.id)).filter((p) => ['held', 'released', 'paid_out', 'direct'].includes(p.status)).map((p) => p.stage as string)
+    const sample = J(job.sample) as Row | null
+    if (sample?.status === 'quoted' && !paid.includes('sample')) return { stage: 'sample' as const, amountUsd: r2(Number(sample.costUsd)), items: [{ description: `Sample of "${job.title}" incl. factory charge, handling and courier — ${job.ref}`, amountUsd: r2(Number(sample.costUsd)), kind: 'sourcing' }] }
+    const q = await acceptedQuote(db, job); if (!q) return null
     if (job.tier === 'find') return job.status === 'quoted' && !paid.includes('fee') ? { stage: 'fee' as const, amountUsd: r2(Number(q.service_fee_usd) || cfg.findFeeUsd), items: [{ description: `Sourcing fee — supplier shortlist for "${job.title}" (${job.ref})`, amountUsd: r2(Number(q.service_fee_usd) || cfg.findFeeUsd), kind: 'sourcing' }] } : null
     if (job.status === 'quoted' && !paid.includes('deposit')) return { stage: 'deposit' as const, amountUsd: Number(q.deposit_usd), items: [{ description: `Sourcing service fee — ${job.ref}`, amountUsd: Number(q.service_fee_usd), kind: 'sourcing' }, { description: `Quality inspection in China`, amountUsd: Number(q.inspection_usd), kind: 'sourcing' }, { description: `Factory deposit (${Math.round(cfg.depositPct * 100)}% of $${Number(q.factory_usd).toLocaleString()})`, amountUsd: r2(Number(q.deposit_usd) - Number(q.service_fee_usd) - Number(q.inspection_usd)), kind: 'sourcing' }] }
     if (job.status === 'inspected' && (J(job.qc)?.result === 'pass') && !paid.includes('balance')) {
@@ -203,7 +241,7 @@ export function mountSourcing(r: Router, d: Deps) {
     const out = jobOut(job, viewer); const quotes = await quotesFor(db, job.id); const payments = await paymentsFor(db, job.id)
     const { rows: msgs } = await db.query<Row>(`select * from sourcing_messages where sourcing_id = $1 order by created_at desc limit 100`, [job.id])
     const { rows: files } = await db.query<Row>(`select id, kind, title, mime, size, uploaded_by, uploaded_by_role, created_at from sourcing_files where sourcing_id = $1 order by created_at desc`, [job.id])
-    const d = ['quoted', 'inspected'].includes(job.status) ? await due(db, job, cfg) : null
+    const d = !['closed', 'cancelled'].includes(job.status) ? await due(db, job, cfg) : null
     return {
       job: out, quotes: quotes.map((q) => quoteOut(q, out.supplierRevealed)), payments: payments.map(paymentStage),
       messages: msgs.reverse().map((m) => ({ id: m.id, author: m.author, role: m.role, body: m.body, at: ISO(m.created_at), mine: false })),
@@ -406,10 +444,16 @@ export function mountSourcing(r: Router, d: Deps) {
     if (b.status === 'inspected') {
       if (!b.qc) throw new HttpError(400, 'Record the inspection result.')
       if (!['ordered', 'in_production'].includes(job.status)) throw new HttpError(409, 'Inspect after the order is placed.')
-      extra.qc = JSON.stringify({ ...b.qc, at: new Date().toISOString(), by: u.name }); note = note || `Inspection ${b.qc.result}${b.qc.checked ? ` — ${b.qc.checked} checked, ${b.qc.defects} defects` : ''}.${b.qc.notes ? ` ${b.qc.notes}` : ''}`
+      extra.qc = JSON.stringify({ ...b.qc, items: b.qc.items ?? (J(job.qc)?.items ?? []), aql: aqlSample(Number(job.quantity)), at: new Date().toISOString(), by: u.name }); note = note || `Inspection ${b.qc.result}${b.qc.checked ? ` — ${b.qc.checked} checked, ${b.qc.defects} defects` : ''}.${b.qc.notes ? ` ${b.qc.notes}` : ''}`
       if (b.qc.result !== 'pass') { await pushTimeline(db, job, 'in_production', note, u.name, extra); await tellCustomer(db, job, `Inspection: ${b.qc.result} — ${job.ref}`, `${u.name} inspected the goods: ${b.qc.result}. ${b.qc.notes || 'The factory has been asked to fix the issues before anything ships.'}`, `src:${job.id}:qc:${Date.now()}`); return res.json(await detail(db, await jobById(db, job.id), u.admin ? 'admin' : 'agent')) }
     }
-    if (b.status === 'received_cn' && !['balance_paid'].includes(job.status)) throw new HttpError(409, 'Collect the goods once the balance is paid.')
+    if (b.status === 'received_cn') {
+      if (!['balance_paid'].includes(job.status)) throw new HttpError(409, 'Collect the goods once the balance is paid.')
+      const { rows: sites } = await db.query<Row>(`select * from sites where shipper_id = $1 and kind = 'origin' and active order by created_at limit 1`, [SOURCING_SHIPPER])
+      const site = b.receipt?.siteId ? (await db.query<Row>('select * from sites where id = $1 and shipper_id = $2', [b.receipt.siteId, SOURCING_SHIPPER])).rows[0] : sites[0]
+      const rc = { cartons: b.receipt?.cartons ?? 0, grossKg: b.receipt?.grossKg ?? 0, cbm: b.receipt?.cbm ?? 0, marks: b.receipt?.marks || job.ref, siteId: site?.id ?? null, siteName: site?.name ?? 'China warehouse', receivedAt: new Date().toISOString(), by: u.name }
+      extra.receipt = JSON.stringify(rc); note = note || `Received at ${rc.siteName}: ${rc.cartons} carton${rc.cartons === 1 ? '' : 's'}${rc.grossKg ? `, ${rc.grossKg} kg` : ''}${rc.cbm ? `, ${rc.cbm} m³` : ''}. Marks: ${rc.marks}.`
+    }
     if (b.status === 'shipped') {
       if (!['balance_paid', 'received_cn'].includes(job.status)) throw new HttpError(409, 'Ship after the balance is paid.')
       if (!b.ship) throw new HttpError(400, 'Enter the shipment details (mode, ETA).')
@@ -420,7 +464,18 @@ export function mountSourcing(r: Router, d: Deps) {
       await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, 'in_transit', `${b.ship.originCity || 'Guangzhou'}, CN`, `Departed China — sourced order ${job.ref}${q ? ` from ${q.sup_name}` : ''}. ${b.note || ''}`.trim()])
       if (job.user_id) await attachShipmentToClient(db, SOURCING_SHIPPER, job.user_id, sid, job.contact_name, job.contact_email)
       extra.shipment_id = sid; note = note || `Shipped ${b.ship.mode === 'air' ? 'by air' : 'by sea'} from ${b.ship.originCity || 'Guangzhou'} — ${ref}, ETA ${b.ship.eta}.`
+      // Consolidation: drop the order into one of our open containers; its stage decides the shipment status.
+      if (b.containerId && b.ship.mode === 'ocean') {
+        const { rows: cs } = await db.query<Row>(`select * from containers where id = $1 and shipper_id = $2 and status in ('booked','loading','gated_in')`, [b.containerId, SOURCING_SHIPPER]); const c = cs[0]
+        if (!c) throw new HttpError(409, 'That container is not open for loading.')
+        const st = c.status === 'gated_in' ? 'at_origin_port' : 'picked_up'
+        await db.query('update shipments set container_id = $2, status = $3, departed_at = null, vessel_name = coalesce(nullif($4, \'\'), vessel_name), eta = coalesce($5, eta) where id = $1', [sid, c.id, st, c.vessel_name ?? '', c.eta ?? null])
+        await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, st, c.origin_port || `${b.ship.originCity || 'Guangzhou'}, CN`, `Loaded into container ${c.ref}${c.number ? ` (${c.number})` : ''} by ${u.name}.`])
+        if (c.status === 'booked') { await db.query(`update containers set status = 'loading' where id = $1`, [c.id]); await db.query(`insert into container_events (container_id,status,place,note,by_name) values ($1,'loading',$2,'First orders loaded.',$3)`, [c.id, c.origin_port || '', u.name]) }
+        note = `${note} Consolidated in container ${c.ref}${c.number ? ` (${c.number})` : ''}${c.eta ? `, ETA ${String(c.eta).slice(0, 10)}` : ''}.`
+      }
       await releaseStage(db, job, 'balance', 'sourcing:shipped')
+      const q2 = await acceptedQuote(db, job); if (q2) await earnCommission(db, job, Number(q2.service_fee_usd))
     }
     await pushTimeline(db, job, b.status, note, u.name, extra)
     const fresh = await jobById(db, job.id)
@@ -430,6 +485,97 @@ export function mountSourcing(r: Router, d: Deps) {
     }
     await tellCustomer(db, fresh, `${stepLabels[b.status]} — ${job.ref}`, bodies[b.status] ?? note, `src:${job.id}:${b.status}`)
     res.json(await detail(db, fresh, u.admin ? 'admin' : 'agent'))
+  }))
+
+  /* ---- samples ---- */
+  r.post('/sourcing/:id/sample', wrap(async (req, res) => {
+    const db = await getDb(); const { job, owner, u } = await access(db, req, String(req.params.id)); if (!owner) throw new HttpError(403, 'Customers request samples.')
+    if (!['assigned', 'sourcing', 'quoted'].includes(job.status)) throw new HttpError(409, 'Samples are requested before the order is placed.')
+    const cur = J(job.sample) as Row | null; if (cur && !['rejected', 'approved'].includes(cur.status)) throw new HttpError(409, 'A sample is already in progress.')
+    const b = zSampleReq.parse(req.body)
+    const sample = { status: 'requested', note: b.note, address: b.address, requestedAt: new Date().toISOString(), history: [...(cur?.history ?? []), ...(cur ? [{ ...cur, history: undefined }] : [])] }
+    await db.query('update sourcing_requests set sample = $2, updated_at = now() where id = $1', [job.id, JSON.stringify(sample)])
+    await tellAgents(db, job, `${job.ref}: ${u.name} wants a sample`, `${b.note || 'No notes.'} Quote the sample cost (factory charge + courier) on the request.`, `src:${job.id}:sample:req:${Date.now()}`)
+    res.json(await detail(db, await jobById(db, job.id), 'customer'))
+  }))
+  r.post('/sourcing/:id/sample/quote', wrap(async (req, res) => {
+    const db = await getDb(); const { job, agent, u } = await access(db, req, String(req.params.id)); if (!agent) throw new HttpError(403, 'Team only.')
+    const cur = J(job.sample) as Row | null; if (!cur || cur.status !== 'requested') throw new HttpError(409, 'No sample request to quote.')
+    const b = zSampleQuote.parse(req.body); const cfg = await sourcingSettings(db)
+    const sample = { ...cur, status: 'quoted', costUsd: r2(b.costUsd + cfg.sampleHandlingUsd), factoryUsd: b.costUsd, handlingUsd: cfg.sampleHandlingUsd, quoteNote: b.note, quotedAt: new Date().toISOString(), quotedBy: u.name }
+    await db.query('update sourcing_requests set sample = $2, updated_at = now() where id = $1', [job.id, JSON.stringify(sample)])
+    await tellCustomer(db, job, `Sample quote — ${job.ref}`, `${u.name} can send you a sample for $${sample.costUsd.toLocaleString()} (factory + courier, incl. $${cfg.sampleHandlingUsd} handling). ${b.note} Pay from the request and it ships within a few days.`, `src:${job.id}:sample:quote:${Date.now()}`)
+    res.json(await detail(db, await jobById(db, job.id), u.admin ? 'admin' : 'agent'))
+  }))
+  r.post('/sourcing/:id/sample/ship', wrap(async (req, res) => {
+    const db = await getDb(); const { job, agent, u } = await access(db, req, String(req.params.id)); if (!agent) throw new HttpError(403, 'Team only.')
+    const cur = J(job.sample) as Row | null; if (!cur || cur.status !== 'paid') throw new HttpError(409, 'The sample is shipped once it is paid.')
+    const b = zSampleShip.parse(req.body)
+    const sample = { ...cur, status: 'shipped', courier: b.courier, tracking: b.tracking, shipNote: b.note, shippedAt: new Date().toISOString(), shippedBy: u.name }
+    await db.query('update sourcing_requests set sample = $2, updated_at = now() where id = $1', [job.id, JSON.stringify(sample)])
+    await db.query(`update escrow_payments set status = 'released', released_at = now(), release_reason = 'sourcing:sample' where sourcing_id = $1 and stage = 'sample' and status = 'held'`, [job.id])
+    await tellCustomer(db, job, `Sample on its way — ${job.ref}`, `${b.courier}${b.tracking ? ` ${b.tracking}` : ''}. ${b.note} Tell us what you think once it arrives — approve it to move ahead with the order.`, `src:${job.id}:sample:ship`)
+    res.json(await detail(db, await jobById(db, job.id), u.admin ? 'admin' : 'agent'))
+  }))
+  r.post('/sourcing/:id/sample/feedback', wrap(async (req, res) => {
+    const db = await getDb(); const { job, owner, u } = await access(db, req, String(req.params.id)); if (!owner) throw new HttpError(403, 'Customers approve samples.')
+    const cur = J(job.sample) as Row | null; if (!cur || cur.status !== 'shipped') throw new HttpError(409, 'Wait for the sample to arrive.')
+    const b = zSampleFeedback.parse(req.body)
+    const sample = { ...cur, status: b.result, feedback: b.note, feedbackAt: new Date().toISOString() }
+    await db.query('update sourcing_requests set sample = $2, updated_at = now() where id = $1', [job.id, JSON.stringify(sample)])
+    await tellAgents(db, job, `${job.ref}: sample ${b.result} by ${u.name}`, b.note || (b.result === 'approved' ? 'Go ahead with the order.' : 'Find another option.'), `src:${job.id}:sample:fb:${Date.now()}`)
+    res.json(await detail(db, await jobById(db, job.id), 'customer'))
+  }))
+
+  /* ---- QC checklist & report ---- */
+  r.put('/sourcing/:id/qc/checklist', wrap(async (req, res) => {
+    const db = await getDb(); const { job, agent, u } = await access(db, req, String(req.params.id)); if (!agent) throw new HttpError(403, 'Team only.')
+    if (!['ordered', 'in_production', 'inspected'].includes(job.status)) throw new HttpError(409, 'The checklist is filled during production.')
+    const b = zQcItems.parse(req.body); const cur = (J(job.qc) ?? {}) as Row
+    const qc = { ...cur, items: b.items, sampleSize: b.sampleSize ?? cur.sampleSize ?? aqlSample(Number(job.quantity)).sampleSize, aql: aqlSample(Number(job.quantity)), draftBy: u.name, draftAt: new Date().toISOString() }
+    await db.query('update sourcing_requests set qc = $2, updated_at = now() where id = $1', [job.id, JSON.stringify(qc)])
+    res.json(await detail(db, await jobById(db, job.id), u.admin ? 'admin' : 'agent'))
+  }))
+  r.get('/sourcing/:id/qc-report', wrap(async (req, res) => {
+    const db = await getDb(); const { job, viewer } = await access(db, req, String(req.params.id))
+    const qc = J(job.qc) as Row | null; const q = await acceptedQuote(db, job)
+    const { rows: photos } = await db.query<Row>(`select id, title, mime, uploaded_by, created_at from sourcing_files where sourcing_id = $1 and kind = 'qc' order by created_at`, [job.id])
+    res.set('Cache-Control', 'no-store')
+    res.json({ job: jobOut(job, viewer), qc, checklist: QC_ITEMS.map((i) => ({ ...i, ...(qc?.items ?? []).find((x: Row) => x.id === i.id) })), aql: aqlSample(Number(job.quantity)), supplier: q && (viewer !== 'customer' || jobOut(job, viewer).supplierRevealed) ? { name: q.sup_name, city: q.sup_city } : null, po: J(job.po), photos: photos.map((p) => ({ id: p.id, title: p.title, by: p.uploaded_by, at: ISO(p.created_at), url: `/api/sourcing/${job.id}/files/${p.id}` })) })
+  }))
+
+  /* ---- consolidation: our open containers ---- */
+  r.get('/sourcing/containers/open', wrap(async (req, res) => {
+    const db = await getDb(); await agentOnly(db, req)
+    const { rows } = await db.query<Row>(`select c.*, (select count(*) from shipments s where s.container_id = c.id)::int as loaded from containers c where c.shipper_id = $1 and c.status in ('booked','loading','gated_in') order by c.cutoff_date nulls last, c.created_at desc`, [SOURCING_SHIPPER])
+    res.set('Cache-Control', 'no-store'); res.json({ containers: rows.map((c) => ({ id: c.id, ref: c.ref, number: c.number, size: c.size, line: c.line, destination: c.destination, destinationPort: c.destination_port, originPort: c.origin_port, status: c.status, cutoffDate: c.cutoff_date ? String(c.cutoff_date).slice(0, 10) : null, etd: c.etd ? String(c.etd).slice(0, 10) : null, eta: c.eta ? String(c.eta).slice(0, 10) : null, loaded: Number(c.loaded) })) })
+  }))
+
+  /* ---- agent earnings ---- */
+  r.get('/sourcing/team/earnings', wrap(async (req, res) => {
+    const db = await getDb(); const u = await agentOnly(db, req)
+    const { rows } = await db.query<Row>(`select e.*, j.ref, j.title, u.name as agent_name from agent_earnings e join sourcing_requests j on j.id = e.sourcing_id join users u on u.id = e.agent_user_id ${u.admin ? '' : 'where e.agent_user_id = $1'} order by e.earned_at desc limit 300`, u.admin ? [] : [u.id])
+    const out = rows.map((e) => ({ id: e.id, sourcingId: e.sourcing_id, ref: e.ref, title: e.title, agentId: e.agent_user_id, agentName: e.agent_name, amountUsd: Number(e.amount_usd), status: e.status as 'earned' | 'paid', note: e.note, earnedAt: ISO(e.earned_at), paidAt: ISO(e.paid_at) }))
+    res.set('Cache-Control', 'no-store'); res.json({ earnings: out, totals: { earnedUsd: r2(out.filter((e) => e.status === 'earned').reduce((n, e) => n + e.amountUsd, 0)), paidUsd: r2(out.filter((e) => e.status === 'paid').reduce((n, e) => n + e.amountUsd, 0)) }, isAdmin: u.admin })
+  }))
+  r.post('/admin/sourcing/earnings/:id/paid', wrap(async (req, res) => {
+    const db = await getDb(); const u = await requireAdmin(db, req); const b = z.object({ reference: z.string().trim().max(80).default('') }).parse(req.body ?? {})
+    const { rows } = await db.query<Row>(`update agent_earnings set status = 'paid', paid_at = now(), note = note || $2 where id = $1 and status = 'earned' returning *`, [req.params.id, b.reference ? ` · paid ${b.reference}` : ` · paid by ${u.name}`]); if (!rows[0]) throw new HttpError(404, 'Nothing to mark paid.')
+    res.json({ ok: true })
+  }))
+
+  /* ---- supplier audits ---- */
+  r.post('/suppliers/:id/audits', wrap(async (req, res) => {
+    const db = await getDb(); const u = await agentOnly(db, req); const { rows } = await db.query<Row>('select * from suppliers where id = $1', [req.params.id]); if (!rows[0]) throw new HttpError(404, 'Supplier not found.')
+    const b = zAudit.parse(req.body); const id = 'aud_' + uid()
+    await db.query(`insert into supplier_audits (id,supplier_id,auditor,audit_date,score,result,findings,categories) values ($1,$2,$3,$4,$5,$6,$7,$8)`, [id, rows[0].id, u.name, b.date, b.score, b.result, b.findings, JSON.stringify(b.categories ?? {})])
+    await db.query(`update suppliers set verified = $2, rating = case when $3 > 0 then round(($3 / 20.0)::numeric, 1) else rating end where id = $1`, [rows[0].id, b.result === 'pass', b.score])
+    res.status(201).json({ supplier: supplierOut((await db.query<Row>(`${SUP_SELECT} where sp.id = $1`, [rows[0].id])).rows[0], true), audit: { id, auditor: u.name, date: b.date, score: b.score, result: b.result, findings: b.findings, categories: b.categories ?? {} } })
+  }))
+  r.get('/suppliers/:id/audits', wrap(async (req, res) => {
+    const db = await getDb(); await agentOnly(db, req)
+    const { rows } = await db.query<Row>('select * from supplier_audits where supplier_id = $1 order by audit_date desc', [req.params.id])
+    res.json({ audits: rows.map((a) => ({ id: a.id, auditor: a.auditor, date: String(a.audit_date).slice(0, 10), score: Number(a.score), result: a.result, findings: a.findings, categories: J(a.categories) ?? {}, at: ISO(a.created_at) })) })
   }))
 
   /* ---- suppliers (team) ---- */
@@ -471,6 +617,7 @@ export async function seedSourcingDemo(db: Db) {
     await db.query(`insert into users (id,email,name,password_hash,role,shipper_id) values ('u_cn_wei','china@shipsync.demo','Wei Zhang',$1,'shipper',$2) on conflict (email) do nothing`, [hash, SOURCING_SHIPPER])
     await db.query(`insert into staff (id,shipper_id,user_id,name,email,phone,role,status,base,city) values ('stf_cn_wei',$1,'u_cn_wei','Wei Zhang','china@shipsync.demo','+86 20 8888 0101','owner','active','origin','Guangzhou') on conflict (id) do nothing`, [SOURCING_SHIPPER])
   }
+  await db.query(`insert into sites (id,shipper_id,name,kind,address,city,country,free_days,rate_usd,vehicle_rate_usd,hours,active) values ('site_cn_gz',$1,'Guangzhou consolidation warehouse','origin','Huangpu District, Guangzhou','Guangzhou','CN',14,0.8,20,'Mon–Sat 9:00–18:00',true) on conflict (id) do nothing`, [SOURCING_SHIPPER])
   const { rows } = await db.query('select 1 from suppliers limit 1'); if (rows.length) return
   const list: [string, string, string, string, string[], string, string, string, string, string, boolean, number][] = [
     ['sup_demo_1', 'Guangzhou Huaxin Household Co.', 'Guangzhou', 'Guangdong', ['Kitchenware', 'Plastic housewares', 'Storage'], 'Ms. Lin Mei', 'linmei-hx', '+86 136 0000 1101', 'huaxin-house.example.cn', 'https://huaxin.1688.com', true, 4.8],

@@ -956,6 +956,29 @@ create table if not exists sourcing_files (
 );
 alter table escrow_payments add column if not exists sourcing_id text;
 alter table escrow_payments add column if not exists stage text;
+alter table sourcing_requests add column if not exists sample jsonb;
+alter table sourcing_requests add column if not exists receipt jsonb;
+create table if not exists agent_earnings (
+  id text primary key,
+  sourcing_id text not null references sourcing_requests(id) on delete cascade,
+  agent_user_id text not null,
+  amount_usd numeric not null default 0,
+  status text not null default 'earned',
+  note text not null default '',
+  earned_at timestamptz not null default now(),
+  paid_at timestamptz
+);
+create table if not exists supplier_audits (
+  id text primary key,
+  supplier_id text not null references suppliers(id) on delete cascade,
+  auditor text not null default '',
+  audit_date date not null,
+  score int not null default 0,
+  result text not null default 'pass',
+  findings text not null default '',
+  categories jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
 
 `
 

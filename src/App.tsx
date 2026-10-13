@@ -26,6 +26,7 @@ import Scan from './pages/Scan'
 import Notifications from './pages/Notifications'
 import Rates from './pages/Rates'
 import DocumentView from './pages/DocumentView'
+import Pickups from './pages/Pickups'
 import Containers from './pages/Containers'
 import ContainerDetail from './pages/ContainerDetail'
 import Join from './pages/Join'
@@ -89,6 +90,7 @@ export default function App() {
               <Route path="/dashboard/shipments" element={<Shipments />} />
               <Route path="/dashboard/leads" element={<Leads />} />
               <Route path="/dashboard/rates" element={<Rates />} />
+              <Route path="/dashboard/pickups" element={<Pickups />} />
               <Route path="/dashboard/containers" element={<Containers />} />
               <Route path="/dashboard/containers/:id" element={<ContainerDetail />} />
               <Route path="/dashboard/clients" element={<Clients />} />

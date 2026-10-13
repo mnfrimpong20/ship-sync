@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Anchor, BarChart3, Factory, Globe2, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X } from 'lucide-react'
+import { Anchor, BarChart3, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X } from 'lucide-react'
 import { Logo } from './ui'
 import ThemeSwitcher from './ThemeSwitcher'
 import { NotificationBell } from './NotificationBell'
@@ -47,7 +47,7 @@ export default function AppShell() {
     : isShipper
     ? [
         { to: '/dashboard/shipper', label: 'Overview', icon: LayoutDashboard, end: true },
-        ...(sourcingTeam ? [{ to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2 } as Item, { to: '/dashboard/suppliers', label: 'Suppliers', icon: Factory } as Item] : []),
+        ...(sourcingTeam ? [{ to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2 } as Item, { to: '/dashboard/sourcing/today', label: 'Today (phone)', icon: Smartphone } as Item, { to: '/dashboard/suppliers', label: 'Suppliers', icon: Factory } as Item] : []),
         { to: '/dashboard/leads', label: 'Leads & quotes', icon: Inbox, badge: openLeads },
         { to: '/dashboard/rates', label: 'Rate cards', icon: Tags },
         { to: '/dashboard/lanes', label: 'Lane intelligence', icon: BarChart3 },

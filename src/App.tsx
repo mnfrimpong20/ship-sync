@@ -30,6 +30,8 @@ import Pickups from './pages/Pickups'
 import Receive from './pages/Receive'
 import Duty from './pages/Duty'
 import Payments from './pages/Payments'
+import GroupagePage from './pages/Groupage'
+import GroupageManage from './pages/GroupageManage'
 import Containers from './pages/Containers'
 import ContainerDetail from './pages/ContainerDetail'
 import Join from './pages/Join'
@@ -80,6 +82,7 @@ export default function App() {
               <Route path="/shippers/:id" element={<ShipperProfile />} />
               <Route path="/track" element={<Track />} />
               <Route path="/duty" element={<Duty />} />
+              <Route path="/groupage" element={<GroupagePage />} />
               <Route path="/live" element={<Live />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
@@ -96,6 +99,7 @@ export default function App() {
               <Route path="/dashboard/rates" element={<Rates />} />
               <Route path="/dashboard/pickups" element={<Pickups />} />
               <Route path="/dashboard/payments" element={<Payments />} />
+              <Route path="/dashboard/groupage" element={<GroupageManage />} />
               <Route path="/dashboard/containers" element={<Containers />} />
               <Route path="/dashboard/containers/:id" element={<ContainerDetail />} />
               <Route path="/dashboard/clients" element={<Clients />} />

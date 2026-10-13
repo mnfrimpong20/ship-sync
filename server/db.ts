@@ -968,6 +968,25 @@ alter table sourcing_requests add column if not exists recurring jsonb;
 alter table sourcing_requests add column if not exists parent_id text;
 alter table sourcing_quotes add column if not exists tiers jsonb;
 alter table sourcing_quotes add column if not exists base_price_cny numeric;
+create table if not exists company_documents (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  kind text not null,
+  title text not null,
+  mime text not null,
+  size int not null default 0,
+  data text not null,
+  note text not null default '',
+  status text not null default 'submitted',
+  review_note text,
+  reviewed_at timestamptz,
+  reviewed_by text,
+  uploaded_by text not null default '',
+  created_at timestamptz not null default now()
+);
+alter table shippers add column if not exists verification_requested_at timestamptz;
+alter table shippers add column if not exists verification_note text;
+alter table shippers add column if not exists onboarding_dismissed_at timestamptz;
 create table if not exists supplier_links (
   token text primary key,
   sourcing_id text not null references sourcing_requests(id) on delete cascade,

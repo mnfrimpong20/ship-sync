@@ -30,6 +30,7 @@ import { mountSite } from './site'
 import { errorRecorder, mountSystem } from './system'
 import { mountBusiness } from './business'
 import { mountSupplierPortal } from './supplierPortal'
+import { mountOnboarding, onVerified } from './onboarding'
 import { mountBooking } from './booking'
 import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
@@ -295,7 +296,7 @@ const zProfile = z.object({
   priceIndex: z.number().int().min(1).max(3),
   responseHours: z.number().int().min(1).max(168),
 })
-const zVerify = z.object({ verified: z.boolean(), plan: z.enum(['starter', 'pro', 'enterprise']).optional() })
+const zVerify = z.object({ verified: z.boolean(), plan: z.enum(['starter', 'pro', 'enterprise']).optional(), note: z.string().trim().max(500).optional() })
 const zQuote = z.object({ price: z.number().int().min(1), transitDays: z.number().int().min(1), notes: z.string().max(2000).default(''), includes: z.array(z.string()).default([]), validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() })
 
 /* ---------------- router ---------------- */
@@ -377,17 +378,20 @@ export function apiRouter() {
     const { rows } = await db.query<Row>(`
       select s.*, u.email as owner_email, u.name as owner_name,
         (select count(*) from quotes q where q.shipper_id = s.id)::int as quote_count,
-        (select count(*) from shipments x where x.shipper_id = s.id)::int as shipment_count
-      from shippers s left join users u on u.shipper_id = s.id order by s.verified asc, s.created_at desc`)
-    res.json({ shippers: rows.map((r) => ({ ...shipperOut(r), owner: r.owner_email ? { email: r.owner_email, name: r.owner_name } : null, quoteCount: r.quote_count, shipmentCount: r.shipment_count })) })
+        (select count(*) from shipments x where x.shipper_id = s.id)::int as shipment_count,
+        (select count(*) from company_documents cd where cd.shipper_id = s.id)::int as doc_count,
+        (select count(*) from company_documents cd where cd.shipper_id = s.id and cd.status = 'submitted')::int as docs_pending
+      from shippers s left join users u on u.id = (select id from users x where x.shipper_id = s.id order by x.created_at limit 1) order by s.verified asc, (s.verification_requested_at is null) asc, s.verification_requested_at desc, s.created_at desc`)
+    res.json({ shippers: rows.map((r) => ({ ...shipperOut(r), owner: r.owner_email ? { email: r.owner_email, name: r.owner_name } : null, quoteCount: r.quote_count, shipmentCount: r.shipment_count, docCount: r.doc_count, docsPending: r.docs_pending, verificationRequestedAt: r.verification_requested_at ? ISO(r.verification_requested_at) : null })) })
   }))
   r.post('/admin/shippers/:id/verify', wrap(async (req, res) => {
     const db = await getDb(); const admin = await requireAdmin(db, req)
     const b = zVerify.parse(req.body)
-    const { rows: ex } = await db.query<Row>('select id from shippers where id = $1', [req.params.id])
+    const { rows: ex } = await db.query<Row>('select id, verified from shippers where id = $1', [req.params.id])
     if (!ex[0]) throw new HttpError(404, 'Shipper not found.')
     await db.query('update shippers set verified = $2, verified_at = case when $2 then now() else null end, verified_by = case when $2 then $3 else null end, plan = coalesce($4, plan) where id = $1', [req.params.id, b.verified, admin.email, b.plan ?? null])
     const { rows } = await db.query<Row>('select * from shippers where id = $1', [req.params.id])
+    if (b.verified !== !!ex[0].verified || b.note) await onVerified(db, String(req.params.id), b.verified, b.note ?? '')
     res.json({ shipper: shipperOut(rows[0]) })
   }))
 
@@ -566,6 +570,7 @@ export function apiRouter() {
   mountSystem(r, { getDb, requireAdmin, HttpError, wrap })
   mountBusiness(r, { getDb, requireAdmin, wrap })
   mountSupplierPortal(r, { getDb, requireUser, HttpError, wrap })
+  mountOnboarding(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

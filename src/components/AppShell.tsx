@@ -120,7 +120,7 @@ export default function AppShell() {
         <header className="no-print sticky top-0 z-40 flex h-16 items-center justify-between gap-4 border-b border-border bg-bg/85 px-4 backdrop-blur-xl md:px-8">
           <div className="flex items-center gap-3">
             <button onClick={() => setOpen(true)} className="grid h-10 w-10 place-items-center rounded-lg text-text focus-ring lg:hidden" aria-label="Open menu"><Menu size={20} /></button>
-            <span className="lg:hidden"><Logo /></span>
+            <span className="lg:hidden"><Logo tagline={false} /></span>
           </div>
           <div className="flex items-center gap-2">
             <ThemeSwitcher compact />

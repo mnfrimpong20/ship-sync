@@ -958,6 +958,11 @@ alter table escrow_payments add column if not exists sourcing_id text;
 alter table escrow_payments add column if not exists stage text;
 alter table sourcing_requests add column if not exists sample jsonb;
 alter table sourcing_requests add column if not exists receipt jsonb;
+alter table sourcing_requests add column if not exists reference jsonb;
+alter table sourcing_requests add column if not exists recurring jsonb;
+alter table sourcing_requests add column if not exists parent_id text;
+alter table sourcing_quotes add column if not exists tiers jsonb;
+alter table sourcing_quotes add column if not exists base_price_cny numeric;
 create table if not exists agent_earnings (
   id text primary key,
   sourcing_id text not null references sourcing_requests(id) on delete cascade,

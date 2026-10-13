@@ -83,7 +83,7 @@ export const supplierOut = (s: Row, full = false) => ({
 export const quoteOut = (q: Row, revealSupplier: boolean) => ({
   id: q.id, sourcingId: q.sourcing_id, supplierId: q.supplier_id, supplier: q.sup_name ? supplierOut({ id: q.supplier_id, name: q.sup_name, name_public: revealSupplier ? q.sup_name : `Factory ${maskCode(String(q.supplier_id))}`, city: q.sup_city, province: q.sup_province, products: q.sup_products, verified: q.sup_verified, rating: q.sup_rating, contact: q.sup_contact, wechat: q.sup_wechat, phone: q.sup_phone, website: q.sup_website, storefront: q.sup_storefront, active: true, notes: '' }, revealSupplier) : null,
   title: q.title, unitPriceCny: Number(q.unit_price_cny), qty: Number(q.qty), moq: Number(q.moq), leadDays: Number(q.lead_days), factoryUsd: Number(q.factory_usd), serviceFeeUsd: Number(q.service_fee_usd), inspectionUsd: Number(q.inspection_usd), handlingUsd: Number(q.handling_usd), freightUsd: Number(q.freight_usd), insuranceUsd: Number(q.insurance_usd), dutyEstUsd: Number(q.duty_est_usd),
-  totalUsd: Number(q.total_usd), depositUsd: Number(q.deposit_usd), balanceUsd: r2(Number(q.total_usd) - Number(q.deposit_usd)), notes: q.notes ?? '', sampleAvailable: !!q.sample_available, status: q.status as 'proposed' | 'accepted' | 'rejected', createdAt: ISO(q.created_at),
+  totalUsd: Number(q.total_usd), depositUsd: Number(q.deposit_usd), balanceUsd: r2(Number(q.total_usd) - Number(q.deposit_usd)), tiers: (J(q.tiers) ?? []) as { minQty: number; unitPriceCny: number }[], notes: q.notes ?? '', sampleAvailable: !!q.sample_available, status: q.status as 'proposed' | 'accepted' | 'rejected', createdAt: ISO(q.created_at),
 })
 export const jobOut = (j: Row, viewer: 'customer' | 'agent' | 'admin' | 'public') => {
   const paid = ['deposit_paid', 'ordered', 'in_production', 'inspected', 'balance_paid', 'received_cn', 'shipped', 'delivered', 'closed'].includes(j.status) || (j.tier === 'find' && j.status === 'closed')
@@ -92,13 +92,13 @@ export const jobOut = (j: Row, viewer: 'customer' | 'agent' | 'admin' | 'public'
     destination: j.destination, destinationName: countryByCode(j.destination)?.name ?? j.destination, destinationCity: j.destination_city, mode: j.mode, deadline: j.deadline ? String(j.deadline).slice(0, 10) : null,
     customer: viewer === 'public' ? undefined : { id: j.user_id, name: j.contact_name, email: viewer === 'customer' ? j.contact_email : j.contact_email, phone: j.contact_phone, company: j.company ?? '' },
     status: j.status as Step | 'cancelled', statusLabel: stepLabels[j.status as Step] ?? j.status, agent: j.agent_user_id ? { id: j.agent_user_id, name: j.agent_name ?? 'Sourcing agent', city: j.agent_city ?? '' } : null,
-    acceptedQuoteId: j.accepted_quote_id ?? null, po: (J(j.po) ?? null) as Row | null, qc: (J(j.qc) ?? null) as Row | null, sample: (J(j.sample) ?? null) as Row | null, receipt: (J(j.receipt) ?? null) as Row | null, containerId: j.s_container ?? null, containerRef: j.c_ref ?? null, shipmentId: j.shipment_id ?? null, shipmentRef: j.s_ref ?? null, shipmentStatus: j.s_status ?? null,
+    acceptedQuoteId: j.accepted_quote_id ?? null, po: (J(j.po) ?? null) as Row | null, qc: (J(j.qc) ?? null) as Row | null, sample: (J(j.sample) ?? null) as Row | null, reference: (J(j.reference) ?? null) as Row | null, recurring: (J(j.recurring) ?? null) as Row | null, parentId: j.parent_id ?? null, parentRef: j.p_ref ?? null, receipt: (J(j.receipt) ?? null) as Row | null, containerId: j.s_container ?? null, containerRef: j.c_ref ?? null, shipmentId: j.shipment_id ?? null, shipmentRef: j.s_ref ?? null, shipmentStatus: j.s_status ?? null,
     supplierRevealed: viewer !== 'customer' || paid, timeline: (J(j.timeline) ?? []) as { at: string; status: string; note: string; by: string }[], createdAt: ISO(j.created_at), updatedAt: ISO(j.updated_at), closedAt: ISO(j.closed_at),
   }
 }
 const paymentStage = (p: Row) => ({ ...paymentOut(p), stage: p.stage as 'fee' | 'deposit' | 'balance' | 'sample', sourcingId: p.sourcing_id })
 
-const JOB_SELECT = `select j.*, u.name as agent_name, st.city as agent_city, s.ref as s_ref, s.status as s_status, s.container_id as s_container, c.ref as c_ref from sourcing_requests j left join users u on u.id = j.agent_user_id left join staff st on st.user_id = j.agent_user_id and st.shipper_id = '${SOURCING_SHIPPER}' left join shipments s on s.id = j.shipment_id left join containers c on c.id = s.container_id`
+const JOB_SELECT = `select j.*, u.name as agent_name, st.city as agent_city, s.ref as s_ref, s.status as s_status, s.container_id as s_container, c.ref as c_ref, pj.ref as p_ref from sourcing_requests j left join sourcing_requests pj on pj.id = j.parent_id left join users u on u.id = j.agent_user_id left join staff st on st.user_id = j.agent_user_id and st.shipper_id = '${SOURCING_SHIPPER}' left join shipments s on s.id = j.shipment_id left join containers c on c.id = s.container_id`
 const QUOTE_SELECT = `select q.*, sp.name as sup_name, sp.city as sup_city, sp.province as sup_province, sp.products as sup_products, sp.verified as sup_verified, sp.rating as sup_rating, sp.contact as sup_contact, sp.wechat as sup_wechat, sp.phone as sup_phone, sp.website as sup_website, sp.storefront as sup_storefront from sourcing_quotes q left join suppliers sp on sp.id = q.supplier_id`
 const SUP_SELECT = `select sp.*, (select count(*) from sourcing_quotes q where q.supplier_id = sp.id and q.status = 'accepted')::int as n_jobs, (select row_to_json(a) from (select audit_date, score, result, auditor from supplier_audits a where a.supplier_id = sp.id order by audit_date desc limit 1) a) as last_audit from suppliers sp`
 const PAY_SELECT = `select p.*, sh.name as shipper_name from escrow_payments p join shippers sh on sh.id = p.shipper_id`
@@ -109,7 +109,10 @@ const zRequest = z.object({
   quantity: z.number().int().min(1).max(10_000_000), unit: z.string().trim().min(1).max(30).default('pcs'), targetPriceUsd: z.number().min(0).max(10_000_000).nullable().optional(),
   destination: z.string().trim().length(2).transform((s) => s.toUpperCase()), destinationCity: z.string().trim().max(60).default(''), mode: z.enum(['ocean', 'air', 'either']).default('either'), deadline: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   contactName: z.string().trim().min(2).max(80), contactEmail: z.string().trim().email(), contactPhone: z.string().trim().max(30).default(''), company: z.string().trim().max(80).default(''),
+  reference: z.object({ url: z.string().url().max(400), platform: z.string().max(20), productId: z.string().max(40).default(''), title: z.string().max(200).default(''), image: z.string().max(600).default(''), priceCny: z.number().min(0).nullable().default(null), priceUsd: z.number().min(0).nullable().default(null), moq: z.number().int().min(0).nullable().default(null) }).nullable().optional(),
 })
+const zTier = z.object({ minQty: z.number().int().min(1).max(10_000_000), unitPriceCny: z.number().min(0.01).max(10_000_000) })
+const zRecurring = z.object({ active: z.boolean(), everyWeeks: z.number().int().min(2).max(26).default(4), nextAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() })
 const zSupplier = z.object({
   name: z.string().trim().min(2).max(100), city: z.string().trim().max(60).default(''), province: z.string().trim().max(60).default(''), products: z.array(z.string().trim().min(2).max(40)).max(12).default([]), contact: z.string().trim().max(80).default(''), wechat: z.string().trim().max(60).default(''), phone: z.string().trim().max(30).default(''),
   website: z.string().trim().max(200).default(''), storefront: z.string().trim().max(300).default(''), notes: z.string().trim().max(1000).default(''), verified: z.boolean().default(false), rating: z.number().min(0).max(5).default(0), active: z.boolean().default(true),
@@ -117,7 +120,7 @@ const zSupplier = z.object({
 const zQuote = z.object({
   supplierId: z.string().min(1), title: z.string().trim().min(2).max(120), unitPriceCny: z.number().min(0.01).max(10_000_000), qty: z.number().int().min(1).max(10_000_000), moq: z.number().int().min(0).max(10_000_000).default(0), leadDays: z.number().int().min(0).max(365),
   freightUsd: z.number().min(0).max(1_000_000).default(0), insuranceUsd: z.number().min(0).max(100_000).default(0), dutyEstUsd: z.number().min(0).max(1_000_000).default(0), inspectionUsd: z.number().min(0).max(10_000).optional(), handlingUsd: z.number().min(0).max(10_000).optional(), serviceFeeUsd: z.number().min(0).max(1_000_000).optional(),
-  notes: z.string().trim().max(1000).default(''), sampleAvailable: z.boolean().default(false),
+  notes: z.string().trim().max(1000).default(''), sampleAvailable: z.boolean().default(false), tiers: z.array(z.object({ minQty: z.number().int().min(1).max(10_000_000), unitPriceCny: z.number().min(0.01).max(10_000_000) })).max(6).default([]),
 })
 const zStep = z.object({
   status: z.enum([...STEPS, 'cancelled']), note: z.string().trim().max(600).default(''),
@@ -138,6 +141,39 @@ const zMessage = z.object({ body: z.string().trim().min(1).max(2000) })
 const zFile = z.object({ kind: z.enum(['photo', 'document', 'qc']).default('photo'), title: z.string().trim().min(1).max(120), mime: z.string().regex(/^(image\/(png|jpeg|webp)|application\/pdf)$/), data: z.string().min(10).max(4_200_000) })
 const zSettings = z.object({ enabled: z.boolean().optional(), servicePct: z.number().min(0).max(0.5).optional(), minFeeUsd: z.number().min(0).max(10_000).optional(), findFeeUsd: z.number().min(0).max(10_000).optional(), depositPct: z.number().min(0.05).max(1).optional(), inspectionUsd: z.number().min(0).max(10_000).optional(), handlingUsd: z.number().min(0).max(10_000).optional(), cnyPerUsd: z.number().min(1).max(20).optional(), note: z.string().trim().max(500).optional(), agentCommissionPct: z.number().min(0).max(1).optional(), sampleHandlingUsd: z.number().min(0).max(1000).optional() })
 const zAssign = z.object({ agentUserId: z.string().min(1).nullable() })
+
+/* ------------------------------------------------------------------ pricing */
+/** Unit price for a quantity: the best matching price break, else the base price. */
+export const tierPrice = (base: number, tiers: { minQty: number; unitPriceCny: number }[], qty: number) => tiers.filter((t) => qty >= t.minQty).sort((a, b) => b.minQty - a.minQty)[0]?.unitPriceCny ?? base
+export function priceOut(tier: Tier, cfg: SourcingSettings, b: { unitPriceCny: number; qty: number; freightUsd?: number; insuranceUsd?: number; dutyEstUsd?: number; inspectionUsd?: number; handlingUsd?: number; serviceFeeUsd?: number }) {
+  const factory = r2((b.unitPriceCny * b.qty) / cfg.cnyPerUsd)
+  const fee = b.serviceFeeUsd ?? (tier === 'find' ? cfg.findFeeUsd : r2(Math.max(cfg.minFeeUsd, factory * cfg.servicePct)))
+  const inspection = tier === 'find' ? 0 : b.inspectionUsd ?? cfg.inspectionUsd; const handling = tier === 'find' ? 0 : b.handlingUsd ?? cfg.handlingUsd
+  const freight = tier === 'find' ? 0 : b.freightUsd ?? 0; const insurance = tier === 'find' ? 0 : b.insuranceUsd ?? 0; const duty = tier === 'door' ? b.dutyEstUsd ?? 0 : 0
+  const total = tier === 'find' ? fee : r2(factory + fee + inspection + handling + freight + insurance + duty)
+  const deposit = tier === 'find' ? fee : r2(fee + inspection + factory * cfg.depositPct)
+  return { factory, fee, inspection, handling, freight, insurance, duty, total, deposit }
+}
+
+/* ------------------------------------------------------------------ link import */
+const PLATFORMS: [RegExp, string][] = [[/1688\.com/, '1688'], [/alibaba\.com/, 'alibaba'], [/aliexpress\.(com|us)/, 'aliexpress'], [/taobao\.com/, 'taobao'], [/tmall\.com/, 'tmall'], [/made-in-china\.com/, 'made-in-china'], [/dhgate\.com/, 'dhgate'], [/amazon\./, 'amazon'], [/temu\.com/, 'temu'], [/shein\.com/, 'shein']]
+const CNY_PLATFORMS = ['1688', 'taobao', 'tmall']
+const decodeEntities = (t: string) => t.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))).replace(/\s+/g, ' ').trim()
+const meta = (html: string, name: string) => { const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']*)["']`, 'i')) ?? html.match(new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${name}["']`, 'i')); return m ? decodeEntities(m[1]) : '' }
+/** Best-effort parse of a product page: open-graph, JSON-LD offers, and the usual price / MOQ markers. */
+export function parseProductPage(url: string, html: string) {
+  const platform = PLATFORMS.find(([re]) => re.test(url))?.[1] ?? 'web'
+  const u = new URL(url); const productId = (u.pathname.match(/(?:offer|product|item|dp|p|detail)\/?[_-]?(\d{6,})/i)?.[1]) ?? (u.searchParams.get('id') ?? u.searchParams.get('offerId') ?? '')
+  let title = meta(html, 'og:title') || decodeEntities((html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? '')); title = title.replace(/\s*[-|–]\s*(1688\.com|阿里巴巴|Alibaba\.com|AliExpress|Taobao|淘宝网|Amazon\.com|Made-in-China\.com).*$/i, '').slice(0, 200)
+  const description = (meta(html, 'og:description') || meta(html, 'description')).slice(0, 1500)
+  const image = meta(html, 'og:image') || (html.match(/"(?:imageUrl|mainImage|image)"\s*:\s*"(https?:[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/i)?.[1] ?? '')
+  let price: number | null = null; let currency = CNY_PLATFORMS.includes(platform) ? 'CNY' : 'USD'
+  const ld = [...html.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => { try { return JSON.parse(m[1]) } catch { return null } }).filter(Boolean)
+  for (const d of ld.flatMap((x) => (Array.isArray(x) ? x : [x]))) { const offer = d?.offers ? (Array.isArray(d.offers) ? d.offers[0] : d.offers) : null; const p = Number(offer?.lowPrice ?? offer?.price); if (offer && p > 0) { price = p; if (offer.priceCurrency) currency = String(offer.priceCurrency).toUpperCase(); break } }
+  if (price == null) { const m = html.match(/(?:"(?:price|lowPrice|minPrice|salePrice|promotionPrice|unitPrice)"\s*:\s*"?)(\d+(?:\.\d+)?)/i) ?? html.match(/[¥￥]\s*(\d+(?:\.\d+)?)/) ?? html.match(/(?:US\s?\$|USD\s?)\s*(\d+(?:\.\d+)?)/i); if (m) { price = Number(m[1]); if (/[¥￥]/.test(m[0])) currency = 'CNY'; if (/US|USD/.test(m[0])) currency = 'USD' } }
+  const moqM = html.match(/(?:起批|起订|Min\.?\s*Order|Minimum order|MOQ)[^\d]{0,20}(\d[\d,]{0,8})/i); const moq = moqM ? Number(moqM[1].replace(/,/g, '')) : null
+  return { platform, productId, title, description, image, price, currency, moq }
+}
 
 /* ------------------------------------------------------------------ shared helpers (also used by payments) */
 async function jobById(db: Db, id: string) { const { rows } = await db.query<Row>(`${JOB_SELECT} where j.id = $1 or j.ref = $1`, [id]); return rows[0] ?? null }
@@ -266,8 +302,9 @@ export function mountSourcing(r: Router, d: Deps) {
     const cfg = await sourcingSettings(db); if (!cfg.enabled) throw new HttpError(409, 'Sourcing requests are paused right now.')
     const b = zRequest.parse(req.body); if (!countryByCode(b.destination)) throw new HttpError(400, 'Pick a destination country we ship to.')
     const id = 'src_' + uid(); const ref = 'SRC-' + makeRef().slice(3)
-    await db.query(`insert into sourcing_requests (id,ref,user_id,tier,title,description,links,quantity,unit,target_price_usd,destination,destination_city,mode,deadline,contact_name,contact_email,contact_phone,company,status,timeline) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'requested',$19)`,
-      [id, ref, u.id, b.tier, b.title, b.description, JSON.stringify(b.links), b.quantity, b.unit, b.targetPriceUsd ?? null, b.destination, b.destinationCity, b.mode, b.deadline ?? null, b.contactName, b.contactEmail, b.contactPhone, b.company, JSON.stringify([{ at: new Date().toISOString(), status: 'requested', note: `${TIERS[b.tier].label} — ${b.quantity} ${b.unit}`, by: b.contactName }])])
+    const links = b.reference && !b.links.includes(b.reference.url) ? [b.reference.url, ...b.links].slice(0, 6) : b.links
+    await db.query(`insert into sourcing_requests (id,ref,user_id,tier,title,description,links,quantity,unit,target_price_usd,destination,destination_city,mode,deadline,contact_name,contact_email,contact_phone,company,status,timeline,reference) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'requested',$19,$20)`,
+      [id, ref, u.id, b.tier, b.title, b.description, JSON.stringify(links), b.quantity, b.unit, b.targetPriceUsd ?? null, b.destination, b.destinationCity, b.mode, b.deadline ?? null, b.contactName, b.contactEmail, b.contactPhone, b.company, JSON.stringify([{ at: new Date().toISOString(), status: 'requested', note: `${TIERS[b.tier].label} — ${b.quantity} ${b.unit}${b.reference ? ` · from ${b.reference.platform}` : ''}`, by: b.contactName }]), b.reference ? JSON.stringify(b.reference) : null])
     const job = await jobById(db, id)
     await tellCustomer(db, job, `Sourcing request received — ${ref}`, `Thanks ${b.contactName.split(' ')[0]}. Our China team will pick up "${b.title}" within one business day and start on supplier options. You'll get a message here as soon as an agent is assigned.`, `src:${id}:new`)
     await notifyShipperStaff(db, SOURCING_SHIPPER, { kind: 'sourcing', title: `New sourcing request ${ref}: ${b.title}`, body: `${TIERS[b.tier].label} · ${b.quantity.toLocaleString()} ${b.unit} → ${countryByCode(b.destination)?.name}${b.targetPriceUsd ? ` · target $${b.targetPriceUsd}` : ''}. Assign an agent.`, link: `/dashboard/sourcing/${id}`, dedupe: `src:${id}:new:a` }, ['owner', 'dispatcher', 'agent'])
@@ -286,10 +323,20 @@ export function mountSourcing(r: Router, d: Deps) {
   r.post('/sourcing/:id/accept', wrap(async (req, res) => {
     const db = await getDb(); const { job, owner, u } = await access(db, req, String(req.params.id)); if (!owner) throw new HttpError(403, 'Only the customer accepts a quote.')
     if (job.status !== 'quoted') throw new HttpError(409, 'There is no open quote to accept.')
-    const b = z.object({ quoteId: z.string().min(1) }).parse(req.body)
-    const { rows } = await db.query<Row>(`${QUOTE_SELECT} where q.id = $1 and q.sourcing_id = $2`, [b.quoteId, job.id]); const q = rows[0]; if (!q) throw new HttpError(404, 'Quote not found.')
+    const b = z.object({ quoteId: z.string().min(1), qty: z.number().int().min(1).max(10_000_000).optional() }).parse(req.body)
+    let { rows } = await db.query<Row>(`${QUOTE_SELECT} where q.id = $1 and q.sourcing_id = $2`, [b.quoteId, job.id]); let q = rows[0]; if (!q) throw new HttpError(404, 'Quote not found.')
+    // Bulk: the customer may take a different quantity — reprice from the breaks and the same freight line.
+    if (b.qty && b.qty !== Number(q.qty)) {
+      if (Number(q.moq) > 0 && b.qty < Number(q.moq)) throw new HttpError(400, `The factory's minimum is ${Number(q.moq).toLocaleString()} ${job.unit}.`)
+      const cfg = await sourcingSettings(db); const tiers = (J(q.tiers) ?? []) as { minQty: number; unitPriceCny: number }[]
+      const unit = tierPrice(Number(q.base_price_cny ?? q.unit_price_cny), tiers, b.qty); const freightScale = b.qty / Number(q.qty)
+      const px = priceOut(job.tier as Tier, cfg, { unitPriceCny: unit, qty: b.qty, freightUsd: r2(Number(q.freight_usd) * freightScale), insuranceUsd: r2(Number(q.insurance_usd) * freightScale), dutyEstUsd: r2(Number(q.duty_est_usd) * freightScale) })
+      await db.query(`update sourcing_quotes set unit_price_cny=$2, qty=$3, factory_usd=$4, service_fee_usd=$5, freight_usd=$6, insurance_usd=$7, duty_est_usd=$8, total_usd=$9, deposit_usd=$10 where id = $1`, [q.id, unit, b.qty, px.factory, px.fee, px.freight, px.insurance, px.duty, px.total, px.deposit])
+      await db.query('update sourcing_requests set quantity = $2 where id = $1', [job.id, b.qty])
+      rows = (await db.query<Row>(`${QUOTE_SELECT} where q.id = $1`, [q.id])).rows; q = rows[0]
+    }
     await db.query(`update sourcing_quotes set status = case when id = $2 then 'accepted' else 'rejected' end where sourcing_id = $1`, [job.id, q.id])
-    const timeline = (J(job.timeline) ?? []) as Row[]; timeline.push({ at: new Date().toISOString(), status: 'quoted', note: `Accepted option "${q.title}" — $${Number(q.total_usd).toLocaleString()} landed.`, by: u.name })
+    const timeline = (J(job.timeline) ?? []) as Row[]; timeline.push({ at: new Date().toISOString(), status: 'quoted', note: `Accepted option "${q.title}"${b.qty ? ` for ${b.qty.toLocaleString()} ${job.unit}` : ''} — $${Number(q.total_usd).toLocaleString()} landed.`, by: u.name })
     await db.query(`update sourcing_requests set accepted_quote_id = $2, timeline = $3, updated_at = now() where id = $1`, [job.id, q.id, JSON.stringify(timeline.slice(-60))])
     await tellAgents(db, job, `${job.ref}: ${u.name} accepted "${q.title}"`, `Waiting on the ${job.tier === 'find' ? 'sourcing fee' : 'deposit'} of $${Number(job.tier === 'find' ? q.service_fee_usd : q.deposit_usd).toLocaleString()}.`, `src:${job.id}:accept:${q.id}`)
     res.json(await detail(db, await jobById(db, job.id), 'customer'))
@@ -398,15 +445,12 @@ export function mountSourcing(r: Router, d: Deps) {
     if (!['assigned', 'sourcing', 'quoted'].includes(job.status)) throw new HttpError(409, 'Quotes can only be added before the customer pays.')
     const b = zQuote.parse(req.body); const cfg = await sourcingSettings(db)
     const { rows: sp } = await db.query<Row>('select * from suppliers where id = $1', [b.supplierId]); if (!sp[0]) throw new HttpError(404, 'Supplier not found.')
-    const factory = r2((b.unitPriceCny * b.qty) / cfg.cnyPerUsd)
-    const fee = b.serviceFeeUsd ?? (job.tier === 'find' ? cfg.findFeeUsd : r2(Math.max(cfg.minFeeUsd, factory * cfg.servicePct)))
-    const inspection = job.tier === 'find' ? 0 : b.inspectionUsd ?? cfg.inspectionUsd; const handling = job.tier === 'find' ? 0 : b.handlingUsd ?? cfg.handlingUsd
-    const freight = job.tier === 'find' ? 0 : b.freightUsd; const insurance = job.tier === 'find' ? 0 : b.insuranceUsd; const duty = job.tier === 'door' ? b.dutyEstUsd : 0
-    const total = job.tier === 'find' ? fee : r2(factory + fee + inspection + handling + freight + insurance + duty)
-    const deposit = job.tier === 'find' ? fee : r2(fee + inspection + factory * cfg.depositPct)
+    const tiers = b.tiers.filter((t) => t.minQty > 1).sort((x, y) => x.minQty - y.minQty)
+    const unit = tierPrice(b.unitPriceCny, tiers, b.qty)
+    const { factory, fee, inspection, handling, freight, insurance, duty, total, deposit } = priceOut(job.tier as Tier, cfg, { ...b, unitPriceCny: unit })
     const id = 'sq_' + uid()
-    await db.query(`insert into sourcing_quotes (id,sourcing_id,supplier_id,title,unit_price_cny,qty,moq,lead_days,factory_usd,service_fee_usd,inspection_usd,handling_usd,freight_usd,insurance_usd,duty_est_usd,total_usd,deposit_usd,notes,sample_available,status,created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'proposed',$20)`,
-      [id, job.id, b.supplierId, b.title, b.unitPriceCny, b.qty, b.moq, b.leadDays, factory, fee, inspection, handling, freight, insurance, duty, total, deposit, b.notes, b.sampleAvailable, u.name])
+    await db.query(`insert into sourcing_quotes (id,sourcing_id,supplier_id,title,unit_price_cny,qty,moq,lead_days,factory_usd,service_fee_usd,inspection_usd,handling_usd,freight_usd,insurance_usd,duty_est_usd,total_usd,deposit_usd,notes,sample_available,status,created_by,tiers,base_price_cny) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'proposed',$20,$21,$22)`,
+      [id, job.id, b.supplierId, b.title, unit, b.qty, b.moq, b.leadDays, factory, fee, inspection, handling, freight, insurance, duty, total, deposit, b.notes, b.sampleAvailable, u.name, JSON.stringify(tiers), b.unitPriceCny])
     const n = (await quotesFor(db, job.id)).length
     await pushTimeline(db, job, 'quoted', `${u.name} added option "${b.title}" — $${total.toLocaleString()} landed${job.tier === 'find' ? '' : ` ($${deposit.toLocaleString()} deposit)`}.`, u.name)
     await tellCustomer(db, job, n === 1 ? `Your supplier options are ready — ${job.ref}` : `New option added — ${job.ref}`, `${u.name} found "${b.title}" from a ${sp[0].city || 'Chinese'} factory: ${b.qty.toLocaleString()} ${job.unit} at ¥${b.unitPriceCny} each, ${b.leadDays} days lead time, $${total.toLocaleString()} landed. Review and accept on your request.`, `src:${job.id}:quote:${id}`)
@@ -487,6 +531,94 @@ export function mountSourcing(r: Router, d: Deps) {
     res.json(await detail(db, fresh, u.admin ? 'admin' : 'agent'))
   }))
 
+  /* ---- link import: pre-fill a request from a 1688 / Alibaba / Taobao / Amazon page ---- */
+  r.get('/sourcing/tools/import', wrap(async (req, res) => {
+    const db = await getDb(); await requireUser(db, req)
+    const raw = typeof req.query.url === 'string' ? req.query.url.trim() : ''; let url: URL
+    try { url = new URL(raw); if (!/^https?:$/.test(url.protocol)) throw new Error() } catch { throw new HttpError(400, 'Paste a full product link, starting with https://') }
+    const platform = PLATFORMS.find(([re]) => re.test(url.hostname))?.[1] ?? 'web'
+    const cfg = await sourcingSettings(db)
+    let html = ''; let fetched = false
+    try {
+      const target = process.env.LINK_IMPORT_PROXY ? `${process.env.LINK_IMPORT_PROXY}${encodeURIComponent(url.href)}` : url.href
+      const r = await fetch(target, { signal: AbortSignal.timeout(9000), redirect: 'follow', headers: { 'user-agent': 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Mobile Safari/537.36', accept: 'text/html,*/*;q=0.8', 'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8' } })
+      if (r.ok) { html = (await r.text()).slice(0, 2_000_000); fetched = true }
+    } catch { /* blocked or slow — fall back to what the link itself tells us */ }
+    const p = html ? parseProductPage(url.href, html) : { platform, productId: (url.pathname.match(/(\d{6,})/)?.[1] ?? url.searchParams.get('id') ?? ''), title: '', description: '', image: '', price: null as number | null, currency: CNY_PLATFORMS.includes(platform) ? 'CNY' : 'USD', moq: null as number | null }
+    const priceCny = p.price == null ? null : p.currency === 'CNY' ? r2(p.price) : r2(p.price * cfg.cnyPerUsd); const priceUsd = p.price == null ? null : p.currency === 'USD' ? r2(p.price) : r2(p.price / cfg.cnyPerUsd)
+    const wall = /\b(log ?in|sign ?in|verify|captcha|robot|access denied|unusual traffic)\b|登录|验证/i.test(p.title) || (html.length < 4000 && /log ?in|sign ?in|登录/i.test(html) && !p.price)
+    if (wall) { p.title = ''; p.description = ''; p.image = ''; p.price = null }
+    const blocked = fetched && (wall || (!p.title && !p.price))
+    res.set('Cache-Control', 'no-store')
+    res.json({ reference: { url: url.href, platform: p.platform, productId: p.productId, title: p.title, image: p.image, priceCny, priceUsd, moq: p.moq }, description: p.description, fetched, blocked, hint: !fetched ? `${p.platform === 'web' ? 'That site' : p.platform} didn't let us read the page — we saved the link; your agent will open it in China.` : blocked ? `${p.platform} showed us a login wall; the link is saved and your agent will check the listing directly.` : p.price == null ? 'We found the listing but not a clear price — your agent will confirm it with the factory.' : `Reference price from ${p.platform} — factory quotes are usually lower for bulk and include our inspection.` })
+  }))
+
+  /* ---- reorders & standing orders ---- */
+  const reorderFrom = async (db: Db, parent: Row, by: string, opts: { quantity?: number; auto?: boolean }) => {
+    const q = await acceptedQuote(db, parent); if (!q) throw new HttpError(409, 'Reorders need a completed order with an accepted quote.')
+    const cfg = await sourcingSettings(db); const qty = opts.quantity ?? Number(parent.quantity)
+    const tiers = (J(q.tiers) ?? []) as { minQty: number; unitPriceCny: number }[]; const unit = tierPrice(Number(q.base_price_cny ?? q.unit_price_cny), tiers, qty); const scale = qty / Number(q.qty)
+    const px = priceOut(parent.tier as Tier, cfg, { unitPriceCny: unit, qty, freightUsd: r2(Number(q.freight_usd) * scale), insuranceUsd: r2(Number(q.insurance_usd) * scale), dutyEstUsd: r2(Number(q.duty_est_usd) * scale) })
+    const id = 'src_' + uid(); const ref = 'SRC-' + makeRef().slice(3); const qid = 'sq_' + uid(); const now = new Date().toISOString()
+    await db.query(`insert into sourcing_requests (id,ref,user_id,tier,title,description,links,quantity,unit,target_price_usd,destination,destination_city,mode,contact_name,contact_email,contact_phone,company,status,agent_user_id,timeline,reference,parent_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'quoted',$18,$19,$20,$21)`,
+      [id, ref, parent.user_id, parent.tier, parent.title, parent.description, parent.links, qty, parent.unit, parent.target_price_usd, parent.destination, parent.destination_city, parent.mode, parent.contact_name, parent.contact_email, parent.contact_phone, parent.company, parent.agent_user_id, JSON.stringify([{ at: now, status: 'requested', note: `${opts.auto ? 'Standing order' : 'Reorder'} of ${parent.ref} — ${qty.toLocaleString()} ${parent.unit}`, by }, ...(parent.agent_user_id ? [{ at: now, status: 'assigned', note: `${parent.agent_name ?? 'Your agent'} keeps this order.`, by: 'Ship Sync' }] : []), { at: now, status: 'quoted', note: `Repeat price from ${q.sup_name}: ¥${unit} × ${qty.toLocaleString()} — $${px.total.toLocaleString()} landed. Accept to pay the deposit; your agent re-confirms with the factory.`, by: 'Ship Sync' }]), parent.reference, parent.id])
+    await db.query(`insert into sourcing_quotes (id,sourcing_id,supplier_id,title,unit_price_cny,qty,moq,lead_days,factory_usd,service_fee_usd,inspection_usd,handling_usd,freight_usd,insurance_usd,duty_est_usd,total_usd,deposit_usd,notes,sample_available,status,created_by,tiers,base_price_cny) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,false,'proposed',$19,$20,$21)`,
+      [qid, id, q.supplier_id, `${q.title} (repeat)`, unit, qty, q.moq, q.lead_days, px.factory, px.fee, px.inspection, px.handling, px.freight, px.insurance, px.duty, px.total, px.deposit, `Same supplier and spec as ${parent.ref}. Price carried over — subject to the factory's re-confirmation.`, 'Ship Sync', JSON.stringify(tiers), q.base_price_cny ?? q.unit_price_cny])
+    const job = await jobById(db, id)
+    await tellCustomer(db, job, `${opts.auto ? 'Standing order placed' : 'Reorder ready'} — ${ref}`, `${qty.toLocaleString()} ${parent.unit} of "${parent.title}" from the same factory at $${px.total.toLocaleString()} landed. Accept the option and pay the $${px.deposit.toLocaleString()} deposit to start production.`, `src:${id}:reorder`)
+    await tellAgents(db, job, `${ref}: ${opts.auto ? 'standing order' : 'reorder'} of ${parent.ref}`, `${parent.contact_name} · ${qty.toLocaleString()} ${parent.unit} · re-confirm ¥${unit} with ${q.sup_name}.`, `src:${id}:reorder:a`)
+    return job
+  }
+  r.post('/sourcing/:id/reorder', wrap(async (req, res) => {
+    const db = await getDb(); const { job, owner, u } = await access(db, req, String(req.params.id)); if (!owner) throw new HttpError(403, 'Customers reorder their own products.')
+    if (!['shipped', 'delivered', 'closed'].includes(job.status)) throw new HttpError(409, 'Reorder once the first order has shipped.')
+    const b = z.object({ quantity: z.number().int().min(1).max(10_000_000).optional() }).parse(req.body ?? {})
+    const made = await reorderFrom(db, job, u.name, { quantity: b.quantity })
+    res.status(201).json(await detail(db, made, 'customer'))
+  }))
+  r.put('/sourcing/:id/recurring', wrap(async (req, res) => {
+    const db = await getDb(); const { job, owner, u } = await access(db, req, String(req.params.id)); if (!owner) throw new HttpError(403, 'Customers manage their standing orders.')
+    if (!job.accepted_quote_id) throw new HttpError(409, 'Set up a standing order once this one has a confirmed price.')
+    const b = zRecurring.parse(req.body); const cur = (J(job.recurring) ?? {}) as Row
+    const nextAt = b.nextAt ?? cur.nextAt ?? new Date(Date.now() + b.everyWeeks * 7 * 86400000).toISOString().slice(0, 10)
+    const rec = { active: b.active, everyWeeks: b.everyWeeks, nextAt, quantity: Number(job.quantity), updatedAt: new Date().toISOString(), by: u.name, placed: cur.placed ?? 0 }
+    await db.query('update sourcing_requests set recurring = $2, updated_at = now() where id = $1', [job.id, JSON.stringify(rec)])
+    if (b.active) await tellAgents(db, job, `${job.ref}: standing order every ${b.everyWeeks} weeks`, `${u.name} wants ${Number(job.quantity).toLocaleString()} ${job.unit} repeated automatically from ${nextAt}.`, `src:${job.id}:recurring:${nextAt}`)
+    res.json(await detail(db, await jobById(db, job.id), 'customer'))
+  }))
+
+  /* ---- agent "today": photo-first mobile feed ---- */
+  r.get('/sourcing/team/today', wrap(async (req, res) => {
+    const db = await getDb(); const u = await agentOnly(db, req)
+    const { rows } = await db.query<Row>(`${JOB_SELECT} where j.status not in ('closed','cancelled') and (j.agent_user_id = $1 or j.agent_user_id is null) order by j.updated_at desc limit 100`, [u.id])
+    const ids = rows.map((j) => j.id)
+    const { rows: msgs } = ids.length ? await db.query<Row>(`select distinct on (sourcing_id) sourcing_id, author, role, body, created_at from sourcing_messages where sourcing_id = any($1::text[]) order by sourcing_id, created_at desc`, [ids]) : { rows: [] as Row[] }
+    const { rows: photos } = ids.length ? await db.query<Row>(`select sourcing_id, count(*)::int as n from sourcing_files where sourcing_id = any($1::text[]) group by sourcing_id`, [ids]) : { rows: [] as Row[] }
+    const action = (j: Row): { label: string; step?: Step; kind: 'step' | 'quote' | 'sample' | 'assign' | 'wait' | 'reply' } => {
+      const sm = J(j.sample) as Row | null
+      if (!j.agent_user_id) return { label: 'Take this request', kind: 'assign' }
+      if (sm?.status === 'requested') return { label: 'Quote the sample', kind: 'sample' }
+      if (sm?.status === 'paid') return { label: 'Ship the sample', kind: 'sample' }
+      switch (j.status) {
+        case 'assigned': return { label: 'Start sourcing', step: 'sourcing', kind: 'step' }
+        case 'sourcing': return { label: 'Add supplier options', kind: 'quote' }
+        case 'quoted': return { label: 'Waiting for the customer', kind: 'wait' }
+        case 'deposit_paid': return { label: 'Place the factory order', step: 'ordered', kind: 'step' }
+        case 'ordered': return { label: 'Photos from the line → In production', step: 'in_production', kind: 'step' }
+        case 'in_production': return { label: 'Inspect & photograph', step: 'inspected', kind: 'step' }
+        case 'inspected': return { label: 'Waiting for the balance', kind: 'wait' }
+        case 'balance_paid': return { label: 'Receive at warehouse', step: 'received_cn', kind: 'step' }
+        case 'received_cn': return { label: 'Ship it', step: 'shipped', kind: 'step' }
+        case 'shipped': return { label: 'In transit', kind: 'wait' }
+        default: return { label: stepLabels[j.status as Step] ?? j.status, kind: 'wait' }
+      }
+    }
+    const items = rows.map((j) => { const m = msgs.find((x) => x.sourcing_id === j.id); const a = action(j); return { ...jobOut(j, u.admin ? 'admin' : 'agent'), action: m && m.role === 'customer' && new Date(m.created_at).getTime() > new Date(j.updated_at).getTime() - 1 && a.kind === 'wait' ? { label: 'Reply to the customer', kind: 'reply' as const } : a, lastMessage: m ? { author: m.author, role: m.role, body: String(m.body).slice(0, 140), at: ISO(m.created_at) } : null, photos: Number(photos.find((x) => x.sourcing_id === j.id)?.n ?? 0) } })
+    const rank = { assign: 0, reply: 1, sample: 2, quote: 3, step: 4, wait: 9 }
+    items.sort((a, b) => rank[a.action.kind] - rank[b.action.kind])
+    res.set('Cache-Control', 'no-store'); res.json({ items, me: u.id, name: u.name })
+  }))
+
   /* ---- samples ---- */
   r.post('/sourcing/:id/sample', wrap(async (req, res) => {
     const db = await getDb(); const { job, owner, u } = await access(db, req, String(req.params.id)); if (!owner) throw new HttpError(403, 'Customers request samples.')
@@ -558,6 +690,7 @@ export function mountSourcing(r: Router, d: Deps) {
     const out = rows.map((e) => ({ id: e.id, sourcingId: e.sourcing_id, ref: e.ref, title: e.title, agentId: e.agent_user_id, agentName: e.agent_name, amountUsd: Number(e.amount_usd), status: e.status as 'earned' | 'paid', note: e.note, earnedAt: ISO(e.earned_at), paidAt: ISO(e.paid_at) }))
     res.set('Cache-Control', 'no-store'); res.json({ earnings: out, totals: { earnedUsd: r2(out.filter((e) => e.status === 'earned').reduce((n, e) => n + e.amountUsd, 0)), paidUsd: r2(out.filter((e) => e.status === 'paid').reduce((n, e) => n + e.amountUsd, 0)) }, isAdmin: u.admin })
   }))
+  r.post('/admin/sourcing/sweep', wrap(async (req, res) => { const db = await getDb(); await requireAdmin(db, req); await sweepStandingOrders(db); res.json({ ok: true }) }))
   r.post('/admin/sourcing/earnings/:id/paid', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireAdmin(db, req); const b = z.object({ reference: z.string().trim().max(80).default('') }).parse(req.body ?? {})
     const { rows } = await db.query<Row>(`update agent_earnings set status = 'paid', paid_at = now(), note = note || $2 where id = $1 and status = 'earned' returning *`, [req.params.id, b.reference ? ` · paid ${b.reference}` : ` · paid by ${u.name}`]); if (!rows[0]) throw new HttpError(404, 'Nothing to mark paid.')
@@ -605,6 +738,35 @@ export function mountSourcing(r: Router, d: Deps) {
     await db.query(`insert into settings (id,value,updated_at) values ('sourcing',$1,now()) on conflict (id) do update set value = $1, updated_at = now()`, [JSON.stringify(next)])
     res.json({ settings: await sourcingSettings(db) })
   }))
+}
+
+/** Standing orders whose next date has arrived become reorders. Runs every 6 hours. */
+export async function sweepStandingOrders(db: Db) {
+  const { rows } = await db.query<Row>(`${JOB_SELECT} where j.recurring is not null and (j.recurring->>'active')::boolean and (j.recurring->>'nextAt')::date <= current_date`)
+  for (const parent of rows) {
+    try {
+      const rec = J(parent.recurring) as Row; const q = await (async () => (parent.accepted_quote_id ? (await db.query<Row>(`${QUOTE_SELECT} where q.id = $1`, [parent.accepted_quote_id])).rows[0] : null))()
+      if (!q) continue
+      // Same logic as the reorder route, kept inline to avoid dragging the router in here.
+      const cfg = await sourcingSettings(db); const qty = Number(rec.quantity ?? parent.quantity); const tiers = (J(q.tiers) ?? []) as { minQty: number; unitPriceCny: number }[]
+      const unit = tierPrice(Number(q.base_price_cny ?? q.unit_price_cny), tiers, qty); const scale = qty / Number(q.qty)
+      const px = priceOut(parent.tier as Tier, cfg, { unitPriceCny: unit, qty, freightUsd: r2(Number(q.freight_usd) * scale), insuranceUsd: r2(Number(q.insurance_usd) * scale), dutyEstUsd: r2(Number(q.duty_est_usd) * scale) })
+      const id = 'src_' + uid(); const ref = 'SRC-' + makeRef().slice(3); const qid = 'sq_' + uid(); const now = new Date().toISOString()
+      await db.query(`insert into sourcing_requests (id,ref,user_id,tier,title,description,links,quantity,unit,target_price_usd,destination,destination_city,mode,contact_name,contact_email,contact_phone,company,status,agent_user_id,timeline,reference,parent_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'quoted',$18,$19,$20,$21)`,
+        [id, ref, parent.user_id, parent.tier, parent.title, parent.description, parent.links, qty, parent.unit, parent.target_price_usd, parent.destination, parent.destination_city, parent.mode, parent.contact_name, parent.contact_email, parent.contact_phone, parent.company, parent.agent_user_id, JSON.stringify([{ at: now, status: 'requested', note: `Standing order of ${parent.ref} — ${qty.toLocaleString()} ${parent.unit}`, by: 'Ship Sync' }, { at: now, status: 'quoted', note: `Repeat price from ${q.sup_name}: ¥${unit} × ${qty.toLocaleString()} — $${px.total.toLocaleString()} landed.`, by: 'Ship Sync' }]), parent.reference, parent.id])
+      await db.query(`insert into sourcing_quotes (id,sourcing_id,supplier_id,title,unit_price_cny,qty,moq,lead_days,factory_usd,service_fee_usd,inspection_usd,handling_usd,freight_usd,insurance_usd,duty_est_usd,total_usd,deposit_usd,notes,sample_available,status,created_by,tiers,base_price_cny) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,false,'proposed','Ship Sync',$19,$20)`,
+        [qid, id, q.supplier_id, `${q.title} (repeat)`, unit, qty, q.moq, q.lead_days, px.factory, px.fee, px.inspection, px.handling, px.freight, px.insurance, px.duty, px.total, px.deposit, `Standing order from ${parent.ref}.`, JSON.stringify(tiers), q.base_price_cny ?? q.unit_price_cny])
+      const next = new Date(new Date(rec.nextAt).getTime() + Number(rec.everyWeeks) * 7 * 86400000).toISOString().slice(0, 10)
+      await db.query('update sourcing_requests set recurring = $2 where id = $1', [parent.id, JSON.stringify({ ...rec, nextAt: next, placed: Number(rec.placed ?? 0) + 1, lastPlacedAt: now, lastChildId: id })])
+      const job = await jobById(db, id)
+      await tellCustomer(db, job, `Standing order placed — ${ref}`, `${qty.toLocaleString()} ${parent.unit} of "${parent.title}" at $${px.total.toLocaleString()} landed. Accept and pay the $${px.deposit.toLocaleString()} deposit to start production, or pause the standing order from ${parent.ref}. Next one: ${next}.`, `src:${id}:standing`)
+      await tellAgents(db, job, `${ref}: standing order of ${parent.ref}`, `${parent.contact_name} · ${qty.toLocaleString()} ${parent.unit} · re-confirm ¥${unit} with ${q.sup_name}.`, `src:${id}:standing:a`)
+    } catch (e) { console.error('[sourcing] standing order', parent.ref, e) }
+  }
+}
+export function startSourcingSweeps(getDb: () => Promise<Db>) {
+  const run = () => getDb().then(sweepStandingOrders).catch((e) => console.error('[sourcing] sweep', e))
+  setTimeout(run, 20_000); setInterval(run, 6 * 3600_000)
 }
 
 /** Platform-owned shipper + a demo agent in Guangzhou + a few suppliers. Idempotent. */

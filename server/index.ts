@@ -12,6 +12,7 @@ import { startRecipientSweeps } from './recipient'
 import { stripeWebhook } from './payments'
 import { startCollectionSweeps } from './collections'
 import { startScheduleSweeps } from './booking'
+import { startSourcingSweeps } from './sourcing'
 import { slugForHost } from './brand'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -28,6 +29,7 @@ async function main() {
   startRecipientSweeps(getDb)
   startCollectionSweeps(getDb)
   startScheduleSweeps(getDb)
+  startSourcingSweeps(getDb)
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', 1)

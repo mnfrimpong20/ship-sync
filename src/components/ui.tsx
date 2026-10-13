@@ -81,16 +81,17 @@ export function ShipperCard({ s, light = false }: { s: Shipper; light?: boolean 
             <span className="truncate">{s.name}</span>
             {s.verified && <BadgeCheck size={18} className="shrink-0 text-gold" aria-label="Verified shipper" />}
           </h3>
-          <p className={`text-sm ${light ? 'text-ink-muted' : 'text-text-muted'}`}>{s.tagline}</p>
+          <p className={`line-clamp-2 min-h-10 text-sm ${light ? 'text-ink-muted' : 'text-text-muted'}`}>{s.tagline}</p>
         </div>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {s.modes.map((m) => <ModeBadge key={m} mode={m} light={light} />)}
         <Rating value={s.rating} count={s.reviews} light={light} />
       </div>
-      <p className={`mt-4 text-sm ${light ? 'text-ink-muted' : 'text-text-muted'}`}>
+      <p className={`mt-4 line-clamp-2 text-sm ${light ? 'text-ink-muted' : 'text-text-muted'}`}>
         Ships to {s.destinations.map((d) => countryByCode(d)?.name).filter(Boolean).join(', ')} · HQ {s.hq}
       </p>
+      <div className="flex-1" />
       <dl className={`mt-4 grid grid-cols-3 gap-2 border-t pt-4 text-center text-xs ${light ? 'border-border-light' : 'border-border'}`}>
         <div><dt className={light ? 'text-ink-muted' : 'text-text-muted'}>On-time</dt><dd className={`font-semibold ${light ? 'text-ink' : 'text-text'}`}>{s.onTime}%</dd></div>
         <div><dt className={light ? 'text-ink-muted' : 'text-text-muted'}>Responds</dt><dd className={`font-semibold ${light ? 'text-ink' : 'text-text'}`}>~{s.responseHours}h</dd></div>

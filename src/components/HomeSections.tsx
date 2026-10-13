@@ -13,6 +13,7 @@ export function Destinations() {
   return (
     <Section id="destinations" light>
       <SectionHeader light eyebrow="Destinations" title="Every major port and airport on the Gulf of Guinea" body="Pick a country to see typical transit times, then request quotes from shippers who run that lane every week." />
+      <p className="mb-3 text-center text-xs text-ink-muted md:hidden">Swipe to see all seven countries →</p>
       <div className="-mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-4 scrollbar-none md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0 lg:grid-cols-4">
         {countries.map((c) => (
           <motion.div key={c.code} variants={fadeUp} whileHover={{ y: -4 }} className="card-light flex w-[260px] shrink-0 snap-start flex-col p-5 md:w-auto">
@@ -183,13 +184,13 @@ const plans = [
 export function Pricing() {
   return (
     <Section id="pricing" light>
-      <SectionHeader light eyebrow="Pricing" title="Free for customers. Simple plans for shippers." body="Customers never pay Ship Sync. Shippers pay a flat monthly fee — no commission on your bookings." />
+      <SectionHeader light eyebrow="Pricing" title="Free for customers. Simple plans for shippers." body="Customers never pay Ship Sync. Shippers pay a flat monthly fee for leads and tools; a small platform fee applies only when a customer pays you through Ship Sync's escrow." />
       <div className="grid gap-6 lg:grid-cols-3">
         {plans.map((p) => (
           <motion.div key={p.name} variants={fadeUp} whileHover={{ y: -4 }} className={`relative flex flex-col rounded-[var(--radius-lg)] border p-7 ${p.highlight ? 'border-gold bg-bg text-text shadow-[var(--shadow-dark)]' : 'card-light'}`}>
             {p.highlight && <span className="absolute -top-3 left-7 rounded-full bg-gold px-3 py-1 text-xs font-bold text-on-accent">{p.tag}</span>}
             <h3 className={p.highlight ? 'text-text' : 'text-ink'}>{p.name}</h3>
-            {!p.highlight && <p className="text-sm text-ink-muted">{p.tag}</p>}
+            <p className={`text-sm ${p.highlight ? 'text-text-muted' : 'text-ink-muted'}`}>{p.highlight ? 'Growing forwarders' : p.tag}</p>
             <p className="mt-4 flex items-baseline gap-1"><span className={`font-heading text-5xl font-bold ${p.highlight ? 'text-gold' : 'text-ink'}`}>${p.price}</span><span className={p.highlight ? 'text-text-muted' : 'text-ink-muted'}>{p.per}</span></p>
             <ul className="mt-6 flex-1 space-y-2.5 text-sm">
               {p.features.map((f) => <li key={f} className={`flex gap-2 ${p.highlight ? 'text-text' : 'text-ink'}`}><Check size={16} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" />{f}</li>)}

@@ -33,7 +33,7 @@ export default function Hero() {
           </motion.p>
           <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-3 sm:flex-row">
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/quote" className="btn-gold w-full sm:w-auto">Get free quotes <ArrowRight size={18} aria-hidden="true" /></Link></motion.div>
-            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/signup?role=shipper" className="btn-ghost w-full sm:w-auto">List your shipping company</Link></motion.div>
+            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/signup?role=shipper" className="btn-ghost w-full !border-white/50 !text-white hover:!border-white hover:!bg-white/10 sm:w-auto">List your shipping company</Link></motion.div>
           </motion.div>
           <motion.ul variants={fadeUp} className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-text-muted">
             <li className="flex items-center gap-2"><BadgeCheck size={16} className="text-gold" aria-hidden="true" /> 120+ verified shippers</li>

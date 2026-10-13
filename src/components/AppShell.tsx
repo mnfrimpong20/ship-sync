@@ -9,7 +9,7 @@ import { useStore } from '../lib/store'
 import { clientsApi } from '../lib/clients'
 import { SOURCING_SHIPPER } from '../lib/sourcing'
 
-interface Item { to: string; label: string; icon: typeof Inbox; end?: boolean; badge?: number }
+interface Item { to: string; label: string; icon: typeof Inbox; end?: boolean; badge?: number; group?: string }
 
 /**
  * The signed-in application: a fixed sidebar with role-specific navigation and a slim top bar, kept visually apart
@@ -47,25 +47,25 @@ export default function AppShell() {
     : isShipper
     ? [
         { to: '/dashboard/shipper', label: 'Overview', icon: LayoutDashboard, end: true },
-        ...(sourcingTeam ? [{ to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2 } as Item, { to: '/dashboard/sourcing/today', label: 'Today (phone)', icon: Smartphone } as Item, { to: '/dashboard/suppliers', label: 'Suppliers', icon: Factory } as Item] : []),
-        { to: '/dashboard/leads', label: 'Leads & quotes', icon: Inbox, badge: openLeads },
-        { to: '/dashboard/rates', label: 'Rate cards', icon: Tags },
-        { to: '/dashboard/lanes', label: 'Lane intelligence', icon: BarChart3 },
-        { to: '/dashboard/groupage', label: 'Fill a barrel', icon: Boxes },
-        { to: '/dashboard/shipments', label: 'Shipments', icon: Ship, badge: active },
-        { to: '/dashboard/containers', label: 'Containers', icon: Container },
-        { to: '/dashboard/sailings', label: 'Book a sailing', icon: Anchor },
-        { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders },
-        { to: '/dashboard/routes', label: 'Routes', icon: MapPinned },
-        { to: '/dashboard/pickups', label: 'Pickups', icon: CalendarCheck },
-        { to: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse },
-        { to: '/dashboard/payments', label: 'Payments', icon: Wallet },
-        { to: '/dashboard/collections', label: 'Collections', icon: Receipt },
-        { to: '/dashboard/reviews', label: 'Reviews', icon: Star },
-        ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck } as Item] : []),
-        { to: '/dashboard/team', label: 'Team', icon: UsersRound },
-        ...(staffRole === 'owner' ? [{ to: '/dashboard/shipper?view=profile', label: 'Company profile', icon: UserCog } as Item] : []),
-        ...(canManage ? [{ to: '/dashboard/brand', label: 'Branded page', icon: Globe } as Item] : []),
+        ...(sourcingTeam ? [{ to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2, group: 'Sourcing' } as Item, { to: '/dashboard/sourcing/today', label: 'Today (phone)', icon: Smartphone, group: 'Sourcing' } as Item, { to: '/dashboard/suppliers', label: 'Suppliers', icon: Factory, group: 'Sourcing' } as Item] : []),
+        { to: '/dashboard/leads', label: 'Leads & quotes', icon: Inbox, badge: openLeads, group: 'Sell' },
+        { to: '/dashboard/rates', label: 'Rate cards', icon: Tags, group: 'Sell' },
+        { to: '/dashboard/lanes', label: 'Lane intelligence', icon: BarChart3, group: 'Sell' },
+        { to: '/dashboard/groupage', label: 'Fill a barrel', icon: Boxes, group: 'Sell' },
+        ...(canManage ? [{ to: '/dashboard/brand', label: 'Branded page', icon: Globe, group: 'Sell' } as Item] : []),
+        { to: '/dashboard/shipments', label: 'Shipments', icon: Ship, badge: active, group: 'Operate' },
+        { to: '/dashboard/containers', label: 'Containers', icon: Container, group: 'Operate' },
+        { to: '/dashboard/sailings', label: 'Book a sailing', icon: Anchor, group: 'Operate' },
+        { to: '/dashboard/pickups', label: 'Pickups', icon: CalendarCheck, group: 'Operate' },
+        { to: '/dashboard/routes', label: 'Routes', icon: MapPinned, group: 'Operate' },
+        { to: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, group: 'Operate' },
+        { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders, group: 'Money' },
+        { to: '/dashboard/payments', label: 'Payments', icon: Wallet, group: 'Money' },
+        { to: '/dashboard/collections', label: 'Collections', icon: Receipt, group: 'Money' },
+        { to: '/dashboard/reviews', label: 'Reviews', icon: Star, group: 'Money' },
+        ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck, group: 'Company' } as Item] : []),
+        { to: '/dashboard/team', label: 'Team', icon: UsersRound, group: 'Company' },
+        ...(staffRole === 'owner' ? [{ to: '/dashboard/shipper?view=profile', label: 'Company profile', icon: UserCog, group: 'Company' } as Item] : []),
       ]
     : [
         { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -110,8 +110,9 @@ export default function AppShell() {
     <div className="flex h-full flex-col">
       <div className="flex h-16 items-center justify-between px-5"><Logo /><button onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-lg text-text-muted lg:hidden focus-ring" aria-label="Close menu"><X size={18} /></button></div>
       <div className="px-4 pb-3"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : 'Customer'}</p>{isShipper && user.staffRole && <p className="text-[11px] text-text-muted/70">{user.staffRole.charAt(0).toUpperCase() + user.staffRole.slice(1)}</p>}</div>
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3" aria-label="Application">
-        <NavItems list={items} />
+      <nav className="flex-1 space-y-5 overflow-y-auto px-3" aria-label="Application">
+        <NavItems list={items.filter((i) => !i.group)} />
+        {Array.from(new Set(items.map((i) => i.group).filter(Boolean))).map((g) => <div key={g}><p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted/70">{g}</p><NavItems list={items.filter((i) => i.group === g)} /></div>)}
         <div><p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted/70">Tools</p><NavItems list={tools} /></div>
       </nav>
       <div className="border-t border-border p-3">

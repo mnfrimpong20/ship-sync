@@ -35,13 +35,14 @@ function Tile({ label, kpi, format = (v) => String(v), spark, icon: Icon, to }: 
     <>
       <div className="flex items-center justify-between"><p className="text-sm text-text-muted">{label}</p><Icon size={17} className="text-gold-deep" aria-hidden="true" /></div>
       <div className="mt-2 flex items-end justify-between gap-3">
-        <div><p className="font-heading text-[2rem] font-bold leading-none tabular-nums">{kpi.value == null ? '—' : format(kpi.value)}</p><p className="mt-1.5 text-xs text-text-muted">{kpi.hint}</p></div>
+        <p className="font-heading text-[2rem] font-bold leading-none tabular-nums">{kpi.value == null ? '—' : format(kpi.value)}</p>
         {spark && <Spark values={spark} />}
       </div>
-      {'delta' in kpi && <div className="mt-2"><Delta d={kpi.delta} /></div>}
+      <p className="mt-2 truncate text-xs text-text-muted" title={kpi.hint}>{kpi.hint}</p>
+      {'delta' in kpi && <div className="mt-1.5"><Delta d={kpi.delta} /></div>}
     </>
   )
-  const cls = 'card-dark block p-5 transition-colors hover:border-gold/40'
+  const cls = 'card-dark block h-full p-5 transition-colors hover:border-gold/40'
   return to ? <Link to={to} className={`${cls} focus-ring`}>{body}</Link> : <div className={cls}>{body}</div>
 }
 

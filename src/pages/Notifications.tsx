@@ -8,6 +8,28 @@ import { kindTone } from '../components/NotificationBell'
 import { Chip, Pager, StatCard, usePaged } from '../components/board'
 import { fmtDateTime } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
+import { recipientApi, type RecipientInfo } from '../lib/recipient'
+
+/** Company-wide switch for automatic SMS / WhatsApp to the person receiving the goods. */
+function ReceiverTexts({ canEdit }: { canEdit: boolean }) {
+  const [s, setS] = useState<NonNullable<RecipientInfo['settings']> | null>(null)
+  const [msg, setMsg] = useState('')
+  useEffect(() => { recipientApi.settings().then(setS).catch(() => {}) }, [])
+  if (!s) return null
+  const toggle = async (enabled: boolean) => { try { setS(await recipientApi.setEnabled(enabled)); setMsg(enabled ? 'Receiver texts on.' : 'Receiver texts off.') } catch (e) { setMsg(e instanceof Error ? e.message : 'Could not save.') } }
+  return (
+    <section className="card-dark p-5" data-testid="receiver-texts">
+      <h2 className="!text-base">Receiver texts</h2>
+      <p className="mt-1 text-xs text-text-muted">Texts the person receiving the goods in Africa when a shipment sails, arrives, goes out for delivery and is delivered — with their receiver link.</p>
+      <label className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-2/40 px-3 py-2.5">
+        <span className="text-sm"><span className="block font-medium">Automatic receiver texts</span><span className="block text-xs text-text-muted">{s.provider === 'off' ? 'No SMS provider configured — texts are logged, not sent' : `via ${s.providerLabel} (${s.channel === 'whatsapp' ? 'WhatsApp' : 'SMS'})`}</span></span>
+        <input type="checkbox" className="h-5 w-5 accent-[var(--color-gold)]" checked={s.enabled} disabled={!canEdit} onChange={(e) => void toggle(e.target.checked)} aria-label="Automatic receiver texts" />
+      </label>
+      {msg && <p role="status" className="mt-2 text-xs text-text-muted">{msg}</p>}
+      {s.provider === 'off' && <p className="mt-2 text-[11px] text-text-muted">To send for real, the administrator adds a provider — Twilio, Termii or Africa’s Talking — to the server settings (see .env.example).</p>}
+    </section>
+  )
+}
 
 type Filter = 'all' | 'unread' | NotifyKind
 
@@ -139,6 +161,7 @@ export default function Notifications() {
               <p className="mt-1 text-xs leading-relaxed text-text-muted">Email isn’t connected on this server yet. The bell and this page keep working; to get emails, the administrator adds <code className="rounded bg-surface-2 px-1">RESEND_API_KEY</code> and <code className="rounded bg-surface-2 px-1">EMAIL_FROM</code> to the server settings.</p>
             )}
           </section>
+          {user.role === 'shipper' && <ReceiverTexts canEdit={user.staffRole === 'owner' || user.staffRole === 'dispatcher'} />}
         </aside>
       </motion.div>
     </motion.div>

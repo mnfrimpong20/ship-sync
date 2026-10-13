@@ -16,17 +16,21 @@ export interface Supplier { id: string; name: string; city: string; province: st
 export type SupplierInput = Omit<Supplier, 'id' | 'jobs' | 'createdAt' | 'lastAudit'>
 export interface Quote {
   id: string; sourcingId: string; supplierId: string; supplier: Supplier | null; title: string; unitPriceCny: number; qty: number; moq: number; leadDays: number; factoryUsd: number; serviceFeeUsd: number; inspectionUsd: number; handlingUsd: number; freightUsd: number; insuranceUsd: number; dutyEstUsd: number
-  totalUsd: number; depositUsd: number; balanceUsd: number; notes: string; sampleAvailable: boolean; status: 'proposed' | 'accepted' | 'rejected'; createdAt: string | null
+  totalUsd: number; depositUsd: number; balanceUsd: number; tiers: PriceBreak[]; notes: string; sampleAvailable: boolean; status: 'proposed' | 'accepted' | 'rejected'; createdAt: string | null
 }
-export interface QuoteInput { supplierId: string; title: string; unitPriceCny: number; qty: number; moq?: number; leadDays: number; freightUsd?: number; insuranceUsd?: number; dutyEstUsd?: number; inspectionUsd?: number; handlingUsd?: number; serviceFeeUsd?: number; notes?: string; sampleAvailable?: boolean }
+export interface QuoteInput { supplierId: string; title: string; unitPriceCny: number; qty: number; moq?: number; leadDays: number; freightUsd?: number; insuranceUsd?: number; dutyEstUsd?: number; inspectionUsd?: number; handlingUsd?: number; serviceFeeUsd?: number; notes?: string; sampleAvailable?: boolean; tiers?: PriceBreak[] }
 export interface Job {
   id: string; ref: string; tier: Tier; tierLabel: string; title: string; description: string; links: string[]; quantity: number; unit: string; targetPriceUsd: number | null; destination: string; destinationName: string; destinationCity: string; mode: 'ocean' | 'air' | 'either'; deadline: string | null
   customer?: { id: string; name: string; email: string; phone: string; company: string }; status: JobStatus; statusLabel: string; agent: { id: string; name: string; city: string } | null
   acceptedQuoteId: string | null; po: { number: string; incoterm: string; leadDays: number; readyBy: string; factoryPaidCny: number | null; supplier: string; placedAt: string; placedBy: string } | null; qc: { result?: 'pass' | 'rework' | 'fail'; checked?: number; defects?: number; notes?: string; at?: string; by?: string; items?: QcItem[]; sampleSize?: number; aql?: Aql } | null
-  sample: Sample | null; receipt: { cartons: number; grossKg: number; cbm: number; marks: string; siteName: string; receivedAt: string; by: string } | null; containerId: string | null; containerRef: string | null
+  sample: Sample | null; reference: Reference | null; recurring: Recurring | null; parentId: string | null; parentRef: string | null; receipt: { cartons: number; grossKg: number; cbm: number; marks: string; siteName: string; receivedAt: string; by: string } | null; containerId: string | null; containerRef: string | null
   shipmentId: string | null; shipmentRef: string | null; shipmentStatus: string | null; supplierRevealed: boolean; timeline: { at: string; status: string; note: string; by: string }[]; createdAt: string | null; updatedAt: string | null; closedAt: string | null
 }
 export type Stage = 'fee' | 'deposit' | 'balance' | 'sample'
+export interface Reference { url: string; platform: string; productId: string; title: string; image: string; priceCny: number | null; priceUsd: number | null; moq: number | null }
+export interface Recurring { active: boolean; everyWeeks: number; nextAt: string; quantity: number; placed: number; lastChildId?: string }
+export interface PriceBreak { minQty: number; unitPriceCny: number }
+export interface TodayItem extends Job { action: { label: string; step?: Step; kind: 'step' | 'quote' | 'sample' | 'assign' | 'wait' | 'reply' }; lastMessage: { author: string; role: string; body: string; at: string } | null; photos: number }
 export interface QcItem { id: string; result: 'pass' | 'fail' | 'na'; note?: string }
 export interface Aql { sampleSize: number; acceptMajor: number; acceptMinor: number }
 export interface Sample { status: 'requested' | 'quoted' | 'paid' | 'shipped' | 'approved' | 'rejected'; note?: string; address?: string; costUsd?: number; factoryUsd?: number; handlingUsd?: number; quoteNote?: string; courier?: string; tracking?: string; shipNote?: string; feedback?: string; requestedAt?: string; quotedAt?: string; shippedAt?: string; feedbackAt?: string }
@@ -39,7 +43,7 @@ export interface SFile { id: string; kind: 'photo' | 'document' | 'qc'; title: s
 export interface Due { stage: Stage; amountUsd: number; items: { description: string; amountUsd: number; kind: string }[] }
 export interface Pricing { servicePct: number; minFeeUsd: number; findFeeUsd: number; depositPct: number; inspectionUsd: number; handlingUsd: number; cnyPerUsd: number; note: string; agentCommissionPct?: number; sampleHandlingUsd?: number }
 export interface Detail { job: Job; quotes: Quote[]; payments: Payment[]; messages: Message[]; files: SFile[]; due: Due | null; canPay: boolean; online: boolean; steps: { id: Step; label: string }[]; settings: Pricing }
-export interface RequestInput { tier: Tier; title: string; description: string; links: string[]; quantity: number; unit: string; targetPriceUsd: number | null; destination: string; destinationCity: string; mode: 'ocean' | 'air' | 'either'; deadline: string | null; contactName: string; contactEmail: string; contactPhone: string; company: string }
+export interface RequestInput { tier: Tier; title: string; description: string; links: string[]; quantity: number; unit: string; targetPriceUsd: number | null; destination: string; destinationCity: string; mode: 'ocean' | 'air' | 'either'; deadline: string | null; contactName: string; contactEmail: string; contactPhone: string; company: string; reference?: Reference | null }
 export interface StepInput { status: JobStatus; note?: string; po?: { number?: string; leadDays?: number; readyBy?: string; incoterm?: 'EXW' | 'FOB' | 'CIF' | 'DDP'; factoryPaidCny?: number }; qc?: { result: 'pass' | 'rework' | 'fail'; checked?: number; defects?: number; notes?: string; items?: QcItem[] }; receipt?: { cartons?: number; grossKg?: number; cbm?: number; marks?: string }; containerId?: string; ship?: { mode: 'ocean' | 'air'; originCity?: string; cargo?: string; eta: string; vesselName?: string; flight?: string; description?: string }; refund?: boolean }
 export interface Settings extends Pricing { enabled: boolean; agentCommissionPct: number; sampleHandlingUsd: number }
 export const QC_ITEMS: { id: string; label: string }[] = [
@@ -56,7 +60,11 @@ export const sourcingApi = {
   create: (b: RequestInput) => api<Detail>('/sourcing', { json: b }),
   mine: () => api<{ requests: Job[] }>('/sourcing/mine').then((r) => r.requests),
   get: (id: string) => api<Detail>(`/sourcing/${id}`),
-  accept: (id: string, quoteId: string) => api<Detail>(`/sourcing/${id}/accept`, { json: { quoteId } }),
+  accept: (id: string, quoteId: string, qty?: number) => api<Detail>(`/sourcing/${id}/accept`, { json: { quoteId, qty } }),
+  importLink: (url: string) => api<{ reference: Reference; description: string; fetched: boolean; blocked: boolean; hint: string }>(`/sourcing/tools/import?url=${encodeURIComponent(url)}`),
+  reorder: (id: string, quantity?: number) => api<Detail>(`/sourcing/${id}/reorder`, { json: { quantity } }),
+  recurring: (id: string, b: { active: boolean; everyWeeks: number; nextAt?: string }) => api<Detail>(`/sourcing/${id}/recurring`, { method: 'PUT', json: b }),
+  today: () => api<{ items: TodayItem[]; me: string; name: string }>('/sourcing/team/today'),
   checkout: (id: string) => api<{ url: string; paymentId: string }>(`/sourcing/${id}/checkout`, { json: {} }),
   verify: (id: string, pid: string) => api<{ payment: Payment }>(`/sourcing/${id}/payments/${pid}/verify`, { json: {} }).then((r) => r.payment),
   record: (id: string, method: string, note: string) => api<Detail>(`/sourcing/${id}/payments/record`, { json: { method, note } }),

@@ -4,3 +4,4 @@ data
 *.local
 .DS_Store
 .env
+undefined/

@@ -1,9 +1,9 @@
 import { api } from './store'
 
-export type DocKind = 'packing_list' | 'commercial_invoice' | 'bill_of_lading' | 'customs' | 'proof_of_delivery' | 'identity' | 'insurance' | 'photo' | 'other'
+export type DocKind = 'packing_list' | 'commercial_invoice' | 'bill_of_lading' | 'customs' | 'proof_of_delivery' | 'identity' | 'insurance' | 'receipt' | 'photo' | 'other'
 export const docKindLabels: Record<DocKind, string> = {
   packing_list: 'Packing list', commercial_invoice: 'Commercial invoice', bill_of_lading: 'Bill of lading / AWB', customs: 'Customs form', proof_of_delivery: 'Proof of delivery',
-  identity: 'ID document', insurance: 'Insurance certificate', photo: 'Photo', other: 'Other',
+  identity: 'ID document', insurance: 'Insurance certificate', receipt: 'Payment receipt', photo: 'Photo', other: 'Other',
 }
 export interface ShipDoc {
   id: string; shipmentId: string; kind: DocKind; title: string; filename: string; mime: string; size: number

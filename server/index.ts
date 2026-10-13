@@ -11,6 +11,8 @@ import { startNotifySweeps } from './notify'
 import { startRecipientSweeps } from './recipient'
 import { stripeWebhook } from './payments'
 import { startCollectionSweeps } from './collections'
+import { startScheduleSweeps } from './booking'
+import { slugForHost } from './brand'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
@@ -25,6 +27,7 @@ async function main() {
   startNotifySweeps(getDb)
   startRecipientSweeps(getDb)
   startCollectionSweeps(getDb)
+  startScheduleSweeps(getDb)
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', 1)
@@ -33,6 +36,8 @@ async function main() {
   app.use(express.json({ limit: '10mb' })) // document uploads and POD photos travel as base64 in JSON
   app.use(cookieParser())
   app.use('/api', apiRouter())
+  // White-label custom domains: a shipper's own host lands on their branded page.
+  app.get('/', async (req, res, next) => { try { const slug = await slugForHost(await getDb(), req.headers.host); if (slug && !req.url.includes('#')) return res.redirect(302, `/#/t/${slug}`) } catch { /* ignore */ } next() })
 
   if (isProd) {
     const dist = path.join(root, 'dist')

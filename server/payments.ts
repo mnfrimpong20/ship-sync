@@ -168,7 +168,7 @@ export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; m
 }
 
 export async function releasePayment(db: Db, p: Row, reason: string) {
-  if (p.status !== 'held') return
+  if (p.status !== 'held' || p.hold) return
   await db.query(`update escrow_payments set status = 'released', released_at = now(), release_reason = $2 where id = $1`, [p.id, reason])
   const { rows: ss } = await db.query<Row>('select * from shipments where id = $1', [p.shipment_id]); const s = ss[0]
   if (s) {
@@ -177,12 +177,34 @@ export async function releasePayment(db: Db, p: Row, reason: string) {
   }
 }
 
+/** Refund a held/released payment in full (amountUsd null) or in part. Partial refunds keep the row held/released with the net reduced. */
+export async function refundPayment(db: Db, p: Row, amountUsd: number | null, reason: string) {
+  const full = amountUsd == null || amountUsd >= Number(p.amount_usd) - 0.005
+  const amt = full ? Number(p.amount_usd) : r2(amountUsd!)
+  if (!(amt > 0)) throw new Error('Refund amount must be positive.')
+  let refundId: string | null = null
+  if (p.provider === 'stripe' && p.provider_payment_intent) { const rf = await stripe<Row>('/refunds', { payment_intent: p.provider_payment_intent, amount: Math.round(amt * 100), metadata: { payment_id: p.id, reason: reason.slice(0, 200) } }); refundId = rf.id ?? null }
+  if (full) {
+    await db.query(`update escrow_payments set status = 'refunded', refunded_at = now(), refund_reason = $2, provider_refund_id = $3, hold = false where id = $1`, [p.id, reason, refundId])
+    if (p.receipt_document_id) await db.query('delete from documents where id = $1', [p.receipt_document_id])
+  } else {
+    const cfg = await getSettings(db); const newAmount = r2(Number(p.amount_usd) - amt); const fee = r2(newAmount * cfg.takeRatePct)
+    await db.query(`update escrow_payments set amount_usd = $2, fee_usd = $3, net_usd = $4, refund_reason = $5, provider_refund_id = coalesce($6, provider_refund_id), hold = false where id = $1`, [p.id, newAmount, fee, r2(newAmount - fee), `Partial refund $${amt}: ${reason}`, refundId])
+  }
+  const { rows: ss } = await db.query<Row>('select * from shipments where id = $1', [p.shipment_id]); const s = ss[0]
+  if (s) {
+    await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, s.origin, `${full ? 'Payment' : 'Partial refund'} of $${amt.toLocaleString()} refunded — ${reason}`])
+    if (s.user_id) await notify(db, { userId: s.user_id, kind: 'payment', title: `Refund issued on ${s.ref}`, body: `$${amt.toLocaleString()} is on its way back to your card (3–10 business days). Reason: ${reason}`, link: `/dashboard?tab=shipments&s=${s.id}`, dedupe: `pay:${p.id}:refund:${Date.now()}` })
+  }
+  return amt
+}
+
 /** Status-change hook: release held funds once the shipment reaches the configured milestone. */
 export async function escrowOnStatus(db: Db, s: Row, status: ShipmentStatus) {
   try {
     const cfg = await getSettings(db)
     if (statusOrder.indexOf(status) < statusOrder.indexOf(cfg.releaseOn)) return
-    const { rows } = await db.query<Row>(`${SELECT} where p.shipment_id = $1 and p.status = 'held'`, [s.id])
+    const { rows } = await db.query<Row>(`${SELECT} where p.shipment_id = $1 and p.status = 'held' and not coalesce(p.hold, false)`, [s.id])
     for (const p of rows) await releasePayment(db, p, `status:${status}`)
   } catch (e) { console.error('[payments] release on status failed', e) }
 }
@@ -307,15 +329,7 @@ export function mountPayments(r: Router, d: Deps) {
     if (!['held', 'released'].includes(p.status)) throw new HttpError(409, 'Only held or released (not yet paid out) funds can be refunded.')
     if (p.status === 'released' && !u.admin) throw new HttpError(409, 'Released funds can only be refunded by Ship Sync — contact support.')
     const b = zRefund.parse(req.body)
-    let refundId: string | null = null
-    if (p.provider === 'stripe' && p.provider_payment_intent) { const rf = await stripe<Row>('/refunds', { payment_intent: p.provider_payment_intent, metadata: { payment_id: p.id, reason: b.reason.slice(0, 200) } }); refundId = rf.id ?? null }
-    await db.query(`update escrow_payments set status = 'refunded', refunded_at = now(), refund_reason = $2, provider_refund_id = $3 where id = $1`, [p.id, b.reason, refundId])
-    if (p.receipt_document_id) await db.query('delete from documents where id = $1', [p.receipt_document_id])
-    const { rows: ss } = await db.query<Row>('select * from shipments where id = $1', [p.shipment_id]); const s = ss[0]
-    if (s) {
-      await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, s.origin, `Payment of $${Number(p.amount_usd).toLocaleString()} refunded — ${b.reason}`])
-      if (s.user_id) await notify(db, { userId: s.user_id, kind: 'payment', title: `Refund issued on ${s.ref}`, body: `$${Number(p.amount_usd).toLocaleString()} is on its way back to your card (3–10 business days). Reason: ${b.reason}`, link: `/dashboard?tab=shipments&s=${s.id}`, dedupe: `pay:${p.id}:refund` })
-    }
+    await refundPayment(db, p, null, b.reason)
     res.json({ payment: paymentOut(await byId(db, p.id)) })
   }))
   r.post('/payments/:id/release', wrap(async (req, res) => {

@@ -11,6 +11,7 @@
  */
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
+import { warehouseOnScan } from './warehouse'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { pieceOut } from './labels'
@@ -43,6 +44,10 @@ const zScan = z.object({
   code: z.string().trim().min(3).max(300), kind: z.enum(['loading', 'devanning', 'delivery', 'check']),
   containerId: z.string().optional(), runId: z.string().optional(), place: z.string().trim().max(120).default(''), note: z.string().trim().max(500).default(''),
   lat: z.number().optional(), lon: z.number().optional(), photo: z.string().max(600_000).optional(), receivedBy: z.string().trim().max(80).default(''),
+  /** Signature PNG data URL captured on the driver's phone at handover. */
+  signature: z.string().max(120_000).regex(/^data:image\/png;base64,/).optional(),
+  /** When the scan really happened (queued offline scans send their original time). */
+  at: z.string().datetime().optional(),
 })
 
 export function mountScans(r: Router, d: Deps) {
@@ -120,7 +125,7 @@ export function mountScans(r: Router, d: Deps) {
 
     const place = b.place || (b.kind === 'loading' ? container?.origin_port || s.origin : b.kind === 'devanning' ? container?.destination_port || countryByCode(s.destination)?.name || s.destination : b.kind === 'delivery' ? (s.consignee_id ? (await db.query<Row>('select city from client_consignees where id = $1', [s.consignee_id])).rows[0]?.city : '') || countryByCode(s.destination)?.name || s.destination : '')
     const scanId = 'sc_' + uid()
-    await db.query('insert into scans (id,piece_id,shipment_id,kind,place,note,by_name,by_staff_id,lat,lon,photo,received_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [scanId, piece.id, s.id, b.kind, place, b.note, who, null, b.lat ?? null, b.lon ?? null, b.photo ?? null, b.receivedBy || ''])
+    await db.query('insert into scans (id,piece_id,shipment_id,kind,place,note,by_name,by_staff_id,lat,lon,photo,received_by,signature,at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,coalesce($14::timestamptz, now()))', [scanId, piece.id, s.id, b.kind, place, b.note, who, null, b.lat ?? null, b.lon ?? null, b.photo ?? null, b.receivedBy || '', b.signature ?? null, b.at ? new Date(b.at) : null])
     if (nextStatus && !already) await db.query('update pieces set status = $2, last_scan_at = now(), last_scan_kind = $3, last_scan_place = $4, last_scan_by = $5 where id = $1', [piece.id, nextStatus, b.kind, place, who])
     else await db.query('update pieces set last_scan_at = now(), last_scan_kind = $2, last_scan_place = $3, last_scan_by = $4 where id = $1', [piece.id, b.kind, place, who])
     if (already) warnings.push(`Piece ${piece.seq} was already ${piece.status} — scan recorded, nothing changed.`)
@@ -157,6 +162,7 @@ export function mountScans(r: Router, d: Deps) {
       await event(`${label} checked by ${who}${noteTail}.`)
     }
     const sum = await summary(db, s)
+    await warehouseOnScan(db, piece, b.kind, u.shipperId!, who)
     const { rows: fresh } = await db.query<Row>('select * from pieces where id = $1', [piece.id])
     res.json({ ok: true, scanId, piece: pieceOut(fresh[0]), ...sum, moved, warnings, place, at: new Date().toISOString() })
   }))
@@ -177,7 +183,7 @@ export async function piecesForTracking(db: Db, shipmentId: string) {
 
 /** Proof of delivery for the public tracking page: the last delivery scan with who received it and the photo, if one was taken. */
 export async function proofOfDelivery(db: Db, shipmentId: string) {
-  const { rows } = await db.query<Row>(`select at, place, by_name, received_by, photo from scans where shipment_id = $1 and kind = 'delivery' order by (photo is not null) desc, at desc limit 1`, [shipmentId])
+  const { rows } = await db.query<Row>(`select at, place, by_name, received_by, photo, signature from scans where shipment_id = $1 and kind = 'delivery' order by (photo is not null) desc, (signature is not null) desc, at desc limit 1`, [shipmentId])
   const r = rows[0]; if (!r) return null
-  return { at: ISO(r.at), place: r.place, by: r.by_name, receivedBy: r.received_by || '', photo: r.photo || null }
+  return { at: ISO(r.at), place: r.place, by: r.by_name, receivedBy: r.received_by || '', photo: r.photo || null, signature: r.signature || null }
 }

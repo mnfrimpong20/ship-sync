@@ -54,7 +54,7 @@ export async function shipmentContext(db: Db, s: Row) {
   const { rows: container } = s.container_id ? await db.query<Row>('select ref, number, seal, vessel_name, voyage, origin_port, destination_port, etd, eta from containers where id = $1', [s.container_id]) : { rows: [] as Row[] }
   const { rows: quote } = s.request_id ? await db.query<Row>(`select price, currency, includes from quotes where request_id = $1 and status = 'accepted' limit 1`, [s.request_id]) : { rows: [] as Row[] }
   const { rows: invoice } = await db.query<Row>(`select number, items, subtotal, tax, total, currency, issued_at, due_at from invoices where shipment_id = $1 and status <> 'void' order by created_at desc limit 1`, [s.id])
-  const { rows: pod } = await db.query<Row>(`select at, place, by_name, received_by, photo, note from scans where shipment_id = $1 and kind = 'delivery' order by (photo is not null) desc, at desc limit 1`, [s.id])
+  const { rows: pod } = await db.query<Row>(`select at, place, by_name, received_by, photo, signature, note from scans where shipment_id = $1 and kind = 'delivery' order by (photo is not null) desc, (signature is not null) desc, at desc limit 1`, [s.id])
   const { rows: delivered } = await db.query<Row>(`select count(*)::int as n from pieces where shipment_id = $1 and status = 'delivered'`, [s.id])
   const dest = countryByCode(s.destination)
   return {
@@ -67,7 +67,7 @@ export async function shipmentContext(db: Db, s: Row) {
     container: container[0] ? { ref: container[0].ref, number: container[0].number, seal: container[0].seal, vesselName: container[0].vessel_name, voyage: container[0].voyage, originPort: container[0].origin_port, destinationPort: container[0].destination_port, etd: ISO(container[0].etd)?.slice(0, 10) ?? null, eta: ISO(container[0].eta)?.slice(0, 10) ?? null } : null,
     quote: quote[0] ? { price: Number(quote[0].price), currency: quote[0].currency, includes: typeof quote[0].includes === 'string' ? JSON.parse(quote[0].includes) : quote[0].includes } : null,
     invoice: invoice[0] ? { number: invoice[0].number, items: typeof invoice[0].items === 'string' ? JSON.parse(invoice[0].items) : invoice[0].items, subtotal: Number(invoice[0].subtotal), tax: Number(invoice[0].tax), total: Number(invoice[0].total), currency: invoice[0].currency, issuedAt: ISO(invoice[0].issued_at)?.slice(0, 10), dueAt: ISO(invoice[0].due_at)?.slice(0, 10) ?? null } : null,
-    pod: pod[0] ? { at: ISO(pod[0].at), place: pod[0].place, by: pod[0].by_name, receivedBy: pod[0].received_by || '', photo: pod[0].photo || null, note: pod[0].note || '', piecesDelivered: delivered[0]?.n ?? 0, piecesTotal: pieces.length } : null,
+    pod: pod[0] ? { at: ISO(pod[0].at), place: pod[0].place, by: pod[0].by_name, receivedBy: pod[0].received_by || '', photo: pod[0].photo || null, signature: pod[0].signature || null, note: pod[0].note || '', piecesDelivered: delivered[0]?.n ?? 0, piecesTotal: pieces.length } : null,
   }
 }
 export type ShipmentContext = Awaited<ReturnType<typeof shipmentContext>>

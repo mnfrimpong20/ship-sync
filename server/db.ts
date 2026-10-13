@@ -8,6 +8,8 @@ import { seedPickupsDemo } from './pickups'
 import { seedPaymentsDemo } from './payments'
 import { seedGroupageDemo } from './groupage'
 import { seedBrokersDemo } from './brokers'
+import { rollSchedule } from './booking'
+import { seedWarehouseDemo } from './warehouse'
 
 /** Minimal query interface satisfied by both `pg` and PGlite. */
 export interface Db {
@@ -46,6 +48,8 @@ export async function getDb(): Promise<Db> {
   await seedPaymentsDemo(db)
   await seedGroupageDemo(db)
   await seedBrokersDemo(db)
+  await rollSchedule(db)
+  await seedWarehouseDemo(db)
   return db
 }
 
@@ -728,6 +732,131 @@ create table if not exists broker_jobs (
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_broker_jobs_shipment on broker_jobs(shipment_id);
+
+create table if not exists sailings (
+  id text primary key,
+  line text not null,
+  service text not null default '',
+  kind text not null default 'container',
+  vessel_name text not null,
+  voyage text not null default '',
+  origin_port text not null,
+  origin_city text not null default '',
+  destination_port text not null,
+  destination text not null,
+  etd date not null,
+  eta date not null,
+  cutoff date not null,
+  transit_days int not null default 30,
+  rates jsonb not null default '{}',
+  space_left int not null default 10,
+  status text not null default 'open',
+  source text not null default 'builtin',
+  notes text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_sailings_etd on sailings(etd);
+create table if not exists carrier_bookings (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  sailing_id text not null references sailings(id),
+  unit text not null,
+  quantity int not null default 1,
+  rate_usd numeric not null default 0,
+  total_usd numeric not null default 0,
+  status text not null default 'requested',
+  booking_ref text not null default '',
+  container_id text,
+  shipment_id text,
+  note text not null default '',
+  carrier_note text not null default '',
+  requested_by text not null default '',
+  created_at timestamptz not null default now(),
+  confirmed_at timestamptz
+);
+
+create table if not exists sites (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  name text not null,
+  kind text not null default 'origin',
+  address text not null default '',
+  city text not null default '',
+  country text not null default 'US',
+  free_days int not null default 7,
+  rate_usd numeric not null default 1.5,
+  vehicle_rate_usd numeric not null default 15,
+  hours text not null default '',
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create table if not exists bins (
+  id text primary key,
+  site_id text not null references sites(id) on delete cascade,
+  code text not null,
+  zone text not null default '',
+  capacity int not null default 8,
+  note text not null default '',
+  unique (site_id, code)
+);
+create table if not exists stock_moves (
+  id text primary key,
+  site_id text not null references sites(id) on delete cascade,
+  piece_id text not null references pieces(id) on delete cascade,
+  shipment_id text not null references shipments(id) on delete cascade,
+  kind text not null,
+  bin_id text,
+  at timestamptz not null default now(),
+  by_name text not null default '',
+  note text not null default ''
+);
+create index if not exists idx_stock_moves_shipment on stock_moves(shipment_id);
+alter table pieces add column if not exists site_id text;
+alter table pieces add column if not exists bin_id text;
+alter table pieces add column if not exists received_at timestamptz;
+alter table pieces add column if not exists released_at timestamptz;
+create index if not exists idx_pieces_site on pieces(site_id);
+
+alter table escrow_payments add column if not exists hold boolean not null default false;
+
+create table if not exists reviews (
+  id text primary key,
+  shipment_id text unique not null references shipments(id) on delete cascade,
+  shipper_id text not null references shippers(id) on delete cascade,
+  user_id text,
+  rating int not null,
+  tags jsonb not null default '[]',
+  body text not null default '',
+  reply text not null default '',
+  replied_at timestamptz,
+  replied_by text,
+  status text not null default 'published',
+  created_at timestamptz not null default now()
+);
+create table if not exists disputes (
+  id text primary key,
+  shipment_id text not null references shipments(id) on delete cascade,
+  shipper_id text not null references shippers(id) on delete cascade,
+  user_id text,
+  opened_by text not null default '',
+  opened_by_role text not null default 'customer',
+  reason text not null,
+  description text not null default '',
+  amount_claimed_usd numeric,
+  status text not null default 'open',
+  messages jsonb not null default '[]',
+  resolution jsonb,
+  payment_id text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table shippers add column if not exists base_rating real;
+alter table shippers add column if not exists base_reviews int;
+
+alter table shippers add column if not exists brand jsonb;
+alter table requests add column if not exists preferred_shipper_id text;
+
+alter table scans add column if not exists signature text;
 
 `
 

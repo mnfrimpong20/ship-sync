@@ -25,6 +25,11 @@ import { mountGroupage } from './groupage'
 import { mountVehicles, vehicleFromRequest, zRequestVehicle } from './vehicles'
 import { mountCollections } from './collections'
 import { mountBrokers } from './brokers'
+import { mountBooking } from './booking'
+import { mountWarehouse } from './warehouse'
+import { mountLanes } from './lanes'
+import { mountReviews } from './reviews'
+import { mountBrand } from './brand'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'driver' }
@@ -48,7 +53,7 @@ const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.
 const requestOut = (r: Row, quotes: Row[]) => ({
   id: r.id, ref: r.ref, userId: r.user_id, createdAt: ISO(r.created_at), origin: r.origin, destination: r.destination, mode: r.mode, cargo: r.cargo, quantity: r.quantity, weightKg: r.weight_kg ?? undefined,
   description: r.description, pickup: r.pickup, delivery: r.delivery, insurance: r.insurance, readyDate: DATE(r.ready_date),
-  contact: { name: r.contact_name, email: r.contact_email, phone: r.contact_phone }, status: r.status, quotes: quotes.map(quoteOut), vehicle: r.vehicle ? J(r.vehicle) : undefined,
+  contact: { name: r.contact_name, email: r.contact_email, phone: r.contact_phone }, status: r.status, quotes: quotes.map(quoteOut), vehicle: r.vehicle ? J(r.vehicle) : undefined, preferredShipperId: r.preferred_shipper_id ?? undefined,
 })
 const shipmentOut = (r: Row, events: Row[]) => ({
   id: r.id, ref: r.ref, shipperId: r.shipper_id, mode: r.mode, origin: r.origin, destination: r.destination, cargo: r.cargo, description: r.description, status: r.status, eta: DATE(r.eta), customer: r.customer,
@@ -250,6 +255,8 @@ const zRequest = zMatch.extend({
   readyDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), contact: z.object({ name: z.string().trim().min(2), email: z.string().trim().email(), phone: z.string().trim().min(7) }),
   password: z.string().min(8).optional(),
   vehicle: zRequestVehicle.optional(),
+  /** White-label: lead goes only to this shipper. */
+  preferredShipperId: z.string().max(80).optional(),
 })
 const zTransit = z.object({
   vesselName: z.string().trim().max(80).optional().or(z.literal('').transform(() => undefined)),
@@ -351,10 +358,10 @@ export function apiRouter() {
     const db = await getDb(); const user = await requireUser(db, req)
     if (user.role === 'customer') return res.json({ requests: await loadRequests(db, 'user_id = $1', [user.id]) })
     // shipper: open requests matching lanes + anything they've quoted
-    const all = await loadRequests(db, `status = 'open' or id in (select request_id from quotes where shipper_id = $1)`, [user.shipperId])
+    const all = await loadRequests(db, `(status = 'open' and (preferred_shipper_id is null or preferred_shipper_id = $1)) or id in (select request_id from quotes where shipper_id = $1)`, [user.shipperId])
     const { rows: me } = await db.query<Row>('select * from shippers where id = $1', [user.shipperId])
     const s = shipperOut(me[0])
-    const mine = all.filter((q) => q.quotes.some((x) => x.shipperId === user.shipperId) || (s.destinations.includes(q.destination) && (q.mode === 'either' || s.modes.includes(q.mode))))
+    const mine = all.filter((q) => q.preferredShipperId === user.shipperId || q.quotes.some((x) => x.shipperId === user.shipperId) || (!q.preferredShipperId && s.destinations.includes(q.destination) && (q.mode === 'either' || s.modes.includes(q.mode))))
     // hide other shippers' prices from competitors — keep only count + own quote
     const out = []
     for (const q of mine) {
@@ -375,14 +382,22 @@ export function apiRouter() {
     if (user.role !== 'customer') throw new HttpError(403, 'Shipper accounts cannot post shipment requests.')
     const id = uid()
     await db.query(
-      `insert into requests (id,ref,user_id,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,vehicle)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
-      [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone, body.cargo === 'vehicle' && body.vehicle ? JSON.stringify(body.vehicle) : null],
+      `insert into requests (id,ref,user_id,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,vehicle,preferred_shipper_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+      [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone, body.cargo === 'vehicle' && body.vehicle ? JSON.stringify(body.vehicle) : null, body.preferredShipperId ?? null],
     )
     const { rows } = await db.query<Row>('select * from requests where id = $1', [id])
-    await instantQuotesFromRates(db, rows[0])
-    if (DEMO_AUTO_QUOTES) await demoAutoQuotes(db, rows[0])
-    await notifyNewLead(db, rows[0])
+    if (body.preferredShipperId) {
+      // White-label lead: only that shipper sees it; price it from their rate cards if they have them.
+      const quoted = await autoQuoteFromRates(db, rows[0], [body.preferredShipperId])
+      const { rows: sh } = await db.query<Row>('select name from shippers where id = $1', [body.preferredShipperId])
+      for (const q of quoted) await notify(db, { userId: user.id, kind: 'quote_received', title: `Your quote from ${sh[0]?.name ?? 'the shipper'}: $${q.price.toLocaleString()} for ${rows[0].ref}`, body: 'Priced instantly from their published rates. Open your dashboard to accept.', link: '/dashboard', dedupe: `rq:${id}:rate:${q.shipperId}` })
+      await notifyShipperStaff(db, body.preferredShipperId, { kind: 'new_lead', title: `${quoted.length ? 'Instant quote sent — ' : 'New lead from your branded page — '}${rows[0].ref}`, body: `${body.contact.name} · ${body.quantity} × ${body.cargo} · ${body.origin} → ${body.destination}${quoted.length ? ` · $${quoted[0].price.toLocaleString()} from your rate card` : '. Send a quote.'}`, link: '/dashboard/leads', dedupe: `lead:${id}` }, ['owner', 'dispatcher', 'agent'])
+    } else {
+      await instantQuotesFromRates(db, rows[0])
+      if (DEMO_AUTO_QUOTES) await demoAutoQuotes(db, rows[0])
+      await notifyNewLead(db, rows[0])
+    }
     const [request] = await loadRequests(db, 'id = $1', [id])
     res.status(201).json({ request, user })
   }))
@@ -494,6 +509,11 @@ export function apiRouter() {
   mountVehicles(r, { getDb, requireUser, HttpError, wrap })
   mountCollections(r, { getDb, requireUser, HttpError, wrap })
   mountBrokers(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  mountBooking(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  mountWarehouse(r, { getDb, requireUser, HttpError, wrap })
+  mountLanes(r, { getDb, requireUser, HttpError, wrap })
+  mountReviews(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  mountBrand(r, { getDb, requireUser, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

@@ -299,7 +299,7 @@ export function ShipperDashboard() {
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
       {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
       {!shipper.verified && !editing && (
-        <p className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-text"><BadgeCheck size={16} className="text-gold" aria-hidden="true" /> Not yet verified. Complete your profile — Ship Sync reviews licence and insurance before granting the badge, which lifts you in matching and reassures customers.</p>
+        <p className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-text"><BadgeCheck size={16} className="text-gold" aria-hidden="true" /> Not yet verified. Upload your registration and insurance under <Link to="/dashboard/verification" className="font-semibold text-gold hover:underline">Verification</Link> — the badge lifts you in matching and reassures customers.</p>
       )}
       {editing && full && <ProfileEditor shipper={full} onDone={(msg) => { setEditing(false); if (msg) setToast(msg); if (view === 'profile') nav('/dashboard/shipper') }} />}
       {view === 'overview' && !editing && <ShipperOverview firstName={user.name.split(' ')[0]} />}

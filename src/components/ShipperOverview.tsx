@@ -15,7 +15,7 @@ function Delta({ d }: { d?: number | null }) {
 }
 
 /** Tiny area sparkline; the last point is emphasised. */
-function Spark({ values, color = 'var(--color-gold)' }: { values: number[]; color?: string }) {
+export function Spark({ values, color = 'var(--color-gold)' }: { values: number[]; color?: string }) {
   const w = 120, h = 34, max = Math.max(1, ...values), n = values.length
   const pts = values.map((v, i) => [n === 1 ? w : (i / (n - 1)) * w, h - 3 - (v / max) * (h - 8)] as const)
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')

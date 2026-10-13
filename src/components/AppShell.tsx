@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, Wallet, X } from 'lucide-react'
+import { Anchor, BarChart3, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X } from 'lucide-react'
 import { Logo } from './ui'
 import ThemeSwitcher from './ThemeSwitcher'
 import { NotificationBell } from './NotificationBell'
@@ -47,17 +47,22 @@ export default function AppShell() {
         { to: '/dashboard/shipper', label: 'Overview', icon: LayoutDashboard, end: true },
         { to: '/dashboard/leads', label: 'Leads & quotes', icon: Inbox, badge: openLeads },
         { to: '/dashboard/rates', label: 'Rate cards', icon: Tags },
+        { to: '/dashboard/lanes', label: 'Lane intelligence', icon: BarChart3 },
         { to: '/dashboard/groupage', label: 'Fill a barrel', icon: Boxes },
         { to: '/dashboard/shipments', label: 'Shipments', icon: Ship, badge: active },
         { to: '/dashboard/containers', label: 'Containers', icon: Container },
+        { to: '/dashboard/sailings', label: 'Book a sailing', icon: Anchor },
         { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders },
         { to: '/dashboard/routes', label: 'Routes', icon: MapPinned },
         { to: '/dashboard/pickups', label: 'Pickups', icon: CalendarCheck },
+        { to: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse },
         { to: '/dashboard/payments', label: 'Payments', icon: Wallet },
         { to: '/dashboard/collections', label: 'Collections', icon: Receipt },
+        { to: '/dashboard/reviews', label: 'Reviews', icon: Star },
         ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck } as Item] : []),
         { to: '/dashboard/team', label: 'Team', icon: UsersRound },
         ...(staffRole === 'owner' ? [{ to: '/dashboard/shipper?view=profile', label: 'Company profile', icon: UserCog } as Item] : []),
+        ...(canManage ? [{ to: '/dashboard/brand', label: 'Branded page', icon: Globe } as Item] : []),
       ]
     : [
         { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },

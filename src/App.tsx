@@ -25,6 +25,7 @@ import Labels from './pages/Labels'
 import Scan from './pages/Scan'
 import Notifications from './pages/Notifications'
 import Rates from './pages/Rates'
+import DocumentView from './pages/DocumentView'
 import Containers from './pages/Containers'
 import ContainerDetail from './pages/ContainerDetail'
 import Join from './pages/Join'
@@ -78,6 +79,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/join" element={<Join />} />
+              <Route path="/doc/:token" element={<DocumentView shared />} />
               <Route path="*" element={<Home />} />
             </Route>
             {/* The signed-in application lives in its own shell, apart from the marketing site. */}
@@ -92,6 +94,7 @@ export default function App() {
               <Route path="/dashboard/clients" element={<Clients />} />
               <Route path="/dashboard/clients/:id" element={<ClientDetailPage />} />
               <Route path="/dashboard/invoices/:id" element={<InvoiceView />} />
+              <Route path="/dashboard/documents/:id" element={<DocumentView />} />
               <Route path="/dashboard/team" element={<Team />} />
               <Route path="/dashboard/fleet" element={<Fleet />} />
               <Route path="/dashboard/routes" element={<RunsList />} />

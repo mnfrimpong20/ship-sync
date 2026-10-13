@@ -4,6 +4,7 @@ import { ArrowLeft, BadgeCheck, Building2, CalendarDays, Check, Clock, MapPin, S
 import { cargoLabel, countryByCode } from '../lib/data'
 import { useStore } from '../lib/store'
 import { fadeUp, stagger } from '../lib/motion'
+import { ShipperReviews } from '../components/ReviewCards'
 import { Avatar, Empty, ModeBadge, Rating } from '../components/ui'
 import { ShippingBackdrop } from '../components/ShippingBackdrop'
 
@@ -66,15 +67,7 @@ export function ShipperProfile() {
             <motion.div variants={fadeUp} className="card-dark mt-6 p-6">
               <h2 className="!text-lg">Recent reviews</h2>
               <p className="mt-1 text-xs text-text-muted">Only customers who booked through Ship Sync can review.</p>
-              <ul className="mt-4 divide-y divide-border">
-                {reviews.map((r) => (
-                  <li key={r.n} className="py-4">
-                    <div className="flex items-center justify-between"><p className="font-semibold text-text">{r.n}</p><span className="text-xs text-text-muted">{r.d}</span></div>
-                    <div className="mt-1 flex gap-0.5" aria-label={`${r.r} stars`}>{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={14} className={i < r.r ? 'fill-gold text-gold' : 'text-border'} aria-hidden="true" />)}</div>
-                    <p className="mt-2 text-sm text-text-muted">{r.t}</p>
-                  </li>
-                ))}
-              </ul>
+              <ShipperReviews shipperId={s.id} fallback={reviews} />
             </motion.div>
           </div>
 

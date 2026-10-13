@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { ArrowDown, ArrowLeft, ArrowUp, Check, Crosshair, Flag, Locate, MapPin, Package, Phone, Play, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Crosshair, Flag, Locate, MapPin, MessageCircle, Navigation as NavIcon, Package, Phone, Play, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { canManageOps, opsApi, runStatusLabels, type Candidate, type Run, type RunKind, type RunStart, type Staff, type StopInput, type Vehicle } from '../lib/ops'
 import RunMap, { type MapStop } from '../components/RunMap'
@@ -220,6 +220,7 @@ export default function RoutePlanner() {
                             <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">{s.label}{rs?.shipmentRef && <Link to={`/track?ref=${rs.shipmentRef}`} className="font-mono text-xs font-normal text-gold hover:underline">{rs.shipmentRef}</Link>}{rs?.shipmentStatus && <span className="text-xs font-normal text-text-muted">{statusLabels[rs.shipmentStatus]}</span>}</p>
                             <p className="text-xs text-text-muted">{full?.address || <span className="italic">No address</span>}{s.lat == null ? <span className="ml-2 text-gold">{(full as Draft | undefined)?.geoState === 'pending' ? '· locating…' : '· not on map — drag a pin or edit the address'}</span> : ''}</p>
                             {(full?.contact || full?.phone) && <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-text-muted">{full.contact && <span>{full.contact}</span>}{full.phone && <a href={`tel:${full.phone}`} className="inline-flex items-center gap-1 hover:text-text"><Phone size={11} aria-hidden="true" /> {full.phone}</a>}</p>}
+                            {!isNew && s.status === 'pending' && (s.lat != null || full?.address || full?.phone) && <div className="mt-1.5 flex flex-wrap gap-1.5" data-testid="stop-actions">{(s.lat != null || full?.address) && <a href={s.lat != null ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}` : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(full?.address ?? '')}`} target="_blank" rel="noreferrer" className="btn-gold !min-h-8 !px-2.5 text-xs"><NavIcon size={12} aria-hidden="true" /> Navigate</a>}{full?.phone && <a href={`tel:${full.phone}`} className="btn-ghost !min-h-8 !px-2.5 text-xs"><Phone size={12} aria-hidden="true" /> Call</a>}{full?.phone && <a href={`https://wa.me/${full.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello${full.contact ? ` ${full.contact}` : ''}, this is your driver from Ship Sync — I'm on my way${rs?.shipmentRef ? ` with ${rs.shipmentRef}` : ''}.`)}`} target="_blank" rel="noreferrer" className="btn-ghost !min-h-8 !px-2.5 text-xs"><MessageCircle size={12} aria-hidden="true" /> WhatsApp</a>}</div>}
                             {rs?.note && <p className="mt-1 text-xs text-text">“{rs.note}”</p>}
                             {rs?.doneAt && <p className="text-[11px] text-text-muted">{s.status === 'done' ? 'Done' : 'Skipped'} {fmtDateTime(rs.doneAt)}</p>}
                           </div>

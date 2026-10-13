@@ -7,7 +7,8 @@ import { useStore } from '../lib/store'
 import { countryByCode, statusLabels } from '../lib/data'
 import { containersApi, isOpen, type Container } from '../lib/containers'
 import { opsApi, type Run } from '../lib/ops'
-import { scanApi, scanKindLabels, scanKindShort, shrinkPhoto, type Lookup, type RecentScan, type ScanKind, type ScanResult } from '../lib/scan'
+import { SCAN_QUEUE_EVENT, scanApi, scanKindLabels, scanKindShort, scanOrQueue, scanQueue, shrinkPhoto, startQueueSync, type Lookup, type RecentScan, type ScanKind, type ScanResult } from '../lib/scan'
+import { SignaturePad } from '../components/SignaturePad'
 import { pieceStatusLabels } from '../lib/labels'
 import { Pill, fmtDateTime } from '../components/ui'
 
@@ -75,7 +76,8 @@ export default function Scan() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [auto, setAuto] = useState(true)
-  const [note, setNote] = useState(''); const [receivedBy, setReceivedBy] = useState(''); const [photo, setPhoto] = useState('')
+  const [note, setNote] = useState(''); const [receivedBy, setReceivedBy] = useState(''); const [photo, setPhoto] = useState(''); const [signature, setSignature] = useState('')
+  const [queued, setQueued] = useState(() => scanQueue.list().length); const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine); const [queuedMsg, setQueuedMsg] = useState('')
   const [manual, setManual] = useState(false)
   const [paused, setPaused] = useState(false)
   const pos = useRef<{ lat: number; lon: number } | null>(null)
@@ -89,12 +91,15 @@ export default function Scan() {
     navigator.geolocation?.getCurrentPosition((p) => { pos.current = { lat: p.coords.latitude, lon: p.coords.longitude } }, () => {}, { maximumAge: 60000, timeout: 5000 })
   }, [ready, user, isDriver, runId])
   useEffect(() => { if (isDriver && kind === 'loading' && !sp.get('kind')) setKind('delivery') }, [isDriver]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { startQueueSync(); const onQ = () => setQueued(scanQueue.list().length); const on = () => setOnline(true), off = () => setOnline(false); window.addEventListener(SCAN_QUEUE_EVENT, onQ); window.addEventListener('online', on); window.addEventListener('offline', off); return () => { window.removeEventListener(SCAN_QUEUE_EVENT, onQ); window.removeEventListener('online', on); window.removeEventListener('offline', off) } }, [])
 
-  const commit = useCallback(async (c: string, k: ScanKind, extra?: { note?: string; receivedBy?: string; photo?: string }) => {
-    setBusy(true); setError('')
+  const commit = useCallback(async (c: string, k: ScanKind, extra?: { note?: string; receivedBy?: string; photo?: string; signature?: string }) => {
+    setBusy(true); setError(''); setQueuedMsg('')
     try {
-      const r = await scanApi.scan({ code: c, kind: k, containerId: k === 'loading' ? containerId || undefined : undefined, runId: runId || undefined, note: extra?.note, receivedBy: extra?.receivedBy, photo: extra?.photo, lat: pos.current?.lat, lon: pos.current?.lon })
-      setResult(r); setLook(null); setNote(''); setReceivedBy(''); setPhoto(''); setCode('')
+      const out = await scanOrQueue({ code: c, kind: k, containerId: k === 'loading' ? containerId || undefined : undefined, runId: runId || undefined, note: extra?.note, receivedBy: extra?.receivedBy, photo: extra?.photo, signature: extra?.signature || undefined, lat: pos.current?.lat, lon: pos.current?.lon })
+      if (out.queued) { setQueuedMsg(`No signal — ${c} saved on this phone and will go up when you're back online.`); setLook(null); setNote(''); setReceivedBy(''); setPhoto(''); setSignature(''); setCode(''); if (navigator.vibrate) navigator.vibrate(40); setPaused(true); setTimeout(() => setPaused(false), 1800); return }
+      const r = out.result
+      setResult(r); setLook(null); setNote(''); setReceivedBy(''); setPhoto(''); setSignature(''); setCode('')
       scanApi.recent().then(setRecent).catch(() => {})
       if (navigator.vibrate) navigator.vibrate(r.warnings.length ? [60, 60, 60] : 40)
       setPaused(true); setTimeout(() => setPaused(false), 1800)
@@ -157,6 +162,7 @@ export default function Scan() {
             </div>
 
             <AnimatePresence mode="wait">
+              {(queued > 0 || !online || queuedMsg) && <motion.div key="queue" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-sm ${online ? 'border-gold/40 bg-gold/10' : 'border-danger/40 bg-danger/10'}`} role="status" data-testid="scan-queue"><span>{!online ? 'Offline — scans are saved on this phone. ' : ''}{queuedMsg || (queued ? `${queued} scan${queued === 1 ? '' : 's'} waiting to sync.` : '')}</span>{queued > 0 && online && <button onClick={() => scanQueue.flush().then((r) => setQueuedMsg(r.sent ? `${r.sent} synced${r.left ? `, ${r.left} still waiting` : ''}.` : 'Could not sync yet.'))} className="btn-ghost !min-h-8 !px-2.5 text-xs">Sync now</button>}</motion.div>}
               {error && <motion.p key="err" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="alert" className="mt-3 flex items-start gap-2 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2.5 text-sm text-danger"><AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" /> {error}</motion.p>}
               {look && !result && (
                 <motion.div key="look" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-3 rounded-2xl border border-gold/50 bg-surface p-4">
@@ -166,11 +172,12 @@ export default function Scan() {
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       <div><label htmlFor="rcv" className="label-dark">Received by</label><input id="rcv" className="input-dark !min-h-10 text-sm" placeholder={look.consignee?.name ?? 'Name of the person'} value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} /></div>
                       <div><label htmlFor="pod" className="label-dark">Proof of delivery photo</label><div className="flex items-center gap-2"><label className="btn-ghost !min-h-10 cursor-pointer !px-3 text-sm"><Camera size={14} aria-hidden="true" /> {photo ? 'Retake' : 'Take photo'}<input id="pod" type="file" accept="image/*" capture="environment" className="sr-only" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setPhoto(await shrinkPhoto(f)) }} /></label>{photo && <img src={photo} alt="Proof of delivery" className="h-10 w-10 rounded-lg object-cover" />}</div></div>
+                      {kind === 'delivery' && <div className="sm:col-span-2"><p className="label-dark">Receiver’s signature <span className="font-normal text-text-muted">(optional)</span></p><SignaturePad value={signature} onChange={setSignature} /></div>}
                       <div className="sm:col-span-2"><label htmlFor="scan-note" className="label-dark">Note</label><input id="scan-note" className="input-dark !min-h-10 text-sm" placeholder="Left with security, gate 3…" value={note} onChange={(e) => setNote(e.target.value)} /></div>
                     </div>
                   )}
                   {kind !== 'delivery' && <div className="mt-3"><label htmlFor="scan-note" className="label-dark">Note (optional)</label><input id="scan-note" className="input-dark !min-h-10 text-sm" placeholder="Damaged corner, resealed…" value={note} onChange={(e) => setNote(e.target.value)} /></div>}
-                  <div className="mt-3 flex justify-end gap-2"><button onClick={() => { setLook(null); setCode('') }} className="btn-ghost !min-h-10 !px-3 text-sm"><X size={14} aria-hidden="true" /> Cancel</button><button onClick={() => commit(code, kind, { note, receivedBy: receivedBy || look.consignee?.name, photo: photo || undefined })} disabled={busy || needsContainer} className="btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60"><Check size={14} aria-hidden="true" /> {busy ? 'Recording…' : kind === 'delivery' ? 'Record delivery' : kind === 'loading' ? 'Record loading' : kind === 'devanning' ? 'Record devanning' : 'Record check'}</button></div>
+                  <div className="mt-3 flex justify-end gap-2"><button onClick={() => { setLook(null); setCode('') }} className="btn-ghost !min-h-10 !px-3 text-sm"><X size={14} aria-hidden="true" /> Cancel</button><button onClick={() => commit(code, kind, { note, receivedBy: receivedBy || look.consignee?.name, photo: photo || undefined, signature })} disabled={busy || needsContainer} className="btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60"><Check size={14} aria-hidden="true" /> {busy ? 'Recording…' : kind === 'delivery' ? 'Record delivery' : kind === 'loading' ? 'Record loading' : kind === 'devanning' ? 'Record devanning' : 'Record check'}</button></div>
                 </motion.div>
               )}
               {result && (

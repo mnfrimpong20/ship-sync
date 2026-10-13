@@ -9,6 +9,7 @@ import { fadeUp, stagger } from '../lib/motion'
 import { AdminInsurance } from '../components/AdminInsurance'
 import { AdminPayments } from '../components/AdminPayments'
 import { AdminBrokers } from './Brokers'
+import { AdminDisputes } from './Reviews'
 
 /** Ship Sync staff: review shipper listings and grant / revoke the verified badge. */
 export default function Admin() {
@@ -88,6 +89,7 @@ export default function Admin() {
             ))}
             {rows && list.length === 0 && <li className="card-dark p-8 text-center text-sm text-text-muted">Nothing here.</li>}
           </motion.ul>
+          <AdminDisputes />
           <AdminPayments />
           <AdminBrokers />
           <AdminInsurance />

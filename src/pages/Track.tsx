@@ -116,6 +116,7 @@ function ProofOfDelivery({ pod }: { pod: NonNullable<Shipment['pod']> }) {
         {pod.photo && <button onClick={() => setOpen((o) => !o)} className="btn-ghost !min-h-9 !px-3 text-xs">{open ? 'Hide photo' : 'View photo'}</button>}
       </div>
       {pod.photo && open && <img src={pod.photo} alt="Proof of delivery" className="mt-3 max-h-96 w-auto rounded-lg border border-border" />}
+      {pod.signature && <img src={pod.signature} alt="Receiver's signature" className="mt-3 h-16 rounded-lg border border-border bg-white" />}
     </section>
   )
 }

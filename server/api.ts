@@ -25,6 +25,7 @@ import { mountGroupage } from './groupage'
 import { mountVehicles, vehicleFromRequest, zRequestVehicle } from './vehicles'
 import { mountCollections } from './collections'
 import { mountBrokers } from './brokers'
+import { mountSourcing } from './sourcing'
 import { mountBooking } from './booking'
 import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
@@ -514,6 +515,7 @@ export function apiRouter() {
   mountLanes(r, { getDb, requireUser, HttpError, wrap })
   mountReviews(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountBrand(r, { getDb, requireUser, HttpError, wrap })
+  mountSourcing(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

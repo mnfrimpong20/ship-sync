@@ -10,6 +10,7 @@ import { seedGroupageDemo } from './groupage'
 import { seedBrokersDemo } from './brokers'
 import { rollSchedule } from './booking'
 import { seedWarehouseDemo } from './warehouse'
+import { seedSourcingDemo } from './sourcing'
 
 /** Minimal query interface satisfied by both `pg` and PGlite. */
 export interface Db {
@@ -50,6 +51,7 @@ export async function getDb(): Promise<Db> {
   await seedBrokersDemo(db)
   await rollSchedule(db)
   await seedWarehouseDemo(db)
+  await seedSourcingDemo(db)
   return db
 }
 
@@ -858,7 +860,105 @@ alter table requests add column if not exists preferred_shipper_id text;
 
 alter table scans add column if not exists signature text;
 
+create table if not exists sourcing_requests (
+  id text primary key,
+  ref text unique not null,
+  user_id text references users(id) on delete set null,
+  tier text not null default 'order',
+  title text not null,
+  description text not null default '',
+  links jsonb not null default '[]',
+  quantity int not null default 1,
+  unit text not null default 'pcs',
+  target_price_usd numeric,
+  destination text not null,
+  destination_city text not null default '',
+  mode text not null default 'either',
+  deadline date,
+  contact_name text not null default '',
+  contact_email text not null default '',
+  contact_phone text not null default '',
+  company text not null default '',
+  status text not null default 'requested',
+  agent_user_id text,
+  accepted_quote_id text,
+  po jsonb,
+  qc jsonb,
+  shipment_id text,
+  timeline jsonb not null default '[]',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  closed_at timestamptz
+);
+create index if not exists idx_sourcing_user on sourcing_requests(user_id, updated_at);
+create table if not exists suppliers (
+  id text primary key,
+  name text not null,
+  city text not null default '',
+  province text not null default '',
+  products jsonb not null default '[]',
+  contact text not null default '',
+  wechat text not null default '',
+  phone text not null default '',
+  website text not null default '',
+  storefront text not null default '',
+  notes text not null default '',
+  verified boolean not null default false,
+  rating real not null default 0,
+  active boolean not null default true,
+  added_by text not null default '',
+  created_at timestamptz not null default now()
+);
+create table if not exists sourcing_quotes (
+  id text primary key,
+  sourcing_id text not null references sourcing_requests(id) on delete cascade,
+  supplier_id text references suppliers(id) on delete set null,
+  title text not null,
+  unit_price_cny numeric not null default 0,
+  qty int not null default 1,
+  moq int not null default 0,
+  lead_days int not null default 0,
+  factory_usd numeric not null default 0,
+  service_fee_usd numeric not null default 0,
+  inspection_usd numeric not null default 0,
+  handling_usd numeric not null default 0,
+  freight_usd numeric not null default 0,
+  insurance_usd numeric not null default 0,
+  duty_est_usd numeric not null default 0,
+  total_usd numeric not null default 0,
+  deposit_usd numeric not null default 0,
+  notes text not null default '',
+  sample_available boolean not null default false,
+  status text not null default 'proposed',
+  created_by text not null default '',
+  created_at timestamptz not null default now()
+);
+create table if not exists sourcing_messages (
+  id text primary key,
+  sourcing_id text not null references sourcing_requests(id) on delete cascade,
+  user_id text,
+  author text not null default '',
+  role text not null default 'customer',
+  body text not null,
+  created_at timestamptz not null default now()
+);
+create table if not exists sourcing_files (
+  id text primary key,
+  sourcing_id text not null references sourcing_requests(id) on delete cascade,
+  kind text not null default 'photo',
+  title text not null,
+  mime text not null,
+  size int not null default 0,
+  data text not null,
+  uploaded_by text not null default '',
+  uploaded_by_role text not null default 'agent',
+  created_at timestamptz not null default now()
+);
+alter table escrow_payments add column if not exists sourcing_id text;
+alter table escrow_payments add column if not exists stage text;
+
 `
+
 
 async function migrate(d: Db) {
   for (const stmt of schema.split(';').map((s) => s.trim()).filter(Boolean)) await d.query(stmt)

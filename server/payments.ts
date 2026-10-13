@@ -21,6 +21,7 @@ import { notify, notifyShipperStaff } from './notify'
 import { shipmentContext } from './documents'
 import { groupageAmount } from './groupage'
 import { onInvoicePaid } from './collections'
+import { onSourcingPaid } from './sourcing'
 import { statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
 
 type Row = Record<string, any>
@@ -133,9 +134,9 @@ export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; m
   if (!['pending'].includes(p.status)) return p
   const cfg = await getSettings(db)
   const amount = Number(p.amount_usd)
-  const fee = opts.direct ? 0 : r2(amount * cfg.takeRatePct)
+  const fee = opts.direct || p.sourcing_id ? 0 : r2(amount * cfg.takeRatePct) // Ship Sync Sourcing is the platform — no take rate on its own jobs
   // No shipment behind the payment (a standalone invoice) → nothing to escrow against; released to the shipper's balance at once.
-  const status: PaymentStatus = opts.direct ? 'direct' : p.shipment_id ? 'held' : 'released'
+  const status: PaymentStatus = opts.direct ? 'direct' : p.shipment_id || p.sourcing_id ? 'held' : 'released'
   await db.query(`update escrow_payments set status = $2, fee_usd = $3, net_usd = $4, provider_payment_intent = coalesce($5, provider_payment_intent), method = coalesce($6, method), paid_at = now(), recorded_by = coalesce($7, recorded_by), released_at = case when $2 = 'released' then now() else released_at end, release_reason = case when $2 = 'released' then 'invoice:no-shipment' else release_reason end where id = $1`, [p.id, status, fee, r2(amount - fee), opts.intent ?? null, opts.method ?? null, opts.by ?? null])
   const { rows: ss } = p.shipment_id ? await db.query<Row>('select * from shipments where id = $1', [p.shipment_id]) : { rows: [] as Row[] }; const s = ss[0]
   const items = J(p.items ?? '[]') as { kind?: string }[]
@@ -164,6 +165,7 @@ export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; m
     if (s.user_id) await notify(db, { userId: s.user_id, kind: 'payment', title: opts.direct ? `Payment recorded on ${s.ref}` : `Payment received — ${s.ref}`, body: opts.direct ? `${p.shipper_name ?? 'The shipper'} recorded your $${amount.toLocaleString()} payment.` : `$${amount.toLocaleString()} is held safely by Ship Sync and will be released to the shipper once your goods are ${cfg.releaseOn === 'delivered' ? 'delivered' : 'on their way'}. Your receipt is in the documents.`, link: `/dashboard?tab=shipments&s=${s.id}`, dedupe: `pay:${p.id}:paid`, emailSubject: `Payment received — ${s.ref}` })
     if (!opts.direct) await notifyShipperStaff(db, s.shipper_id, { kind: 'payment', title: `${s.customer} paid $${amount.toLocaleString()} on ${s.ref}`, body: `Held in escrow. $${r2(amount - fee).toLocaleString()} (after the ${Math.round(cfg.takeRatePct * 100)}% platform fee) is released to your balance when the shipment is ${cfg.releaseOn === 'delivered' ? 'delivered' : 'in transit'}.`, link: '/dashboard/payments', dedupe: `pay:${p.id}:office` }, ['owner', 'dispatcher'])
   }
+  if (p.sourcing_id) await onSourcingPaid(db, { ...p, status })
   return (await db.query<Row>(`${SELECT} where p.id = $1`, [p.id])).rows[0]
 }
 

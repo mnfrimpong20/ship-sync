@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { BadgeCheck, Camera, Check, ClipboardCheck, CreditCard, Factory, FileText, FlaskConical, Globe2, Handshake, MessageSquare, PackageCheck, Paperclip, Printer, Search, Ship, ShieldCheck, Trash2, UserCheck, Wallet } from 'lucide-react'
-import { sourcingApi, stepLabels, tierLabels, STEPS, FIND_STEPS, SOURCING_SHIPPER, cny, usd2, type Detail, type Job, type Quote, type QuoteInput, type RequestInput, type SFile, type Supplier, type SupplierInput, type StepInput, type Tier, type Settings, type Stage, type QcItem, type OpenContainer, type Earning, type QcReport, type Audit, QC_ITEMS } from '../lib/sourcing'
+import { BadgeCheck, Camera, Check, ClipboardCheck, CreditCard, Factory, FileText, FlaskConical, Globe2, Handshake, MessageSquare, PackageCheck, Paperclip, Printer, Repeat, Search, Ship, ShieldCheck, Smartphone, Sparkles, Trash2, UserCheck, Wallet } from 'lucide-react'
+import { sourcingApi, stepLabels, tierLabels, STEPS, FIND_STEPS, SOURCING_SHIPPER, cny, usd2, type Detail, type Job, type Quote, type QuoteInput, type RequestInput, type SFile, type Supplier, type SupplierInput, type StepInput, type Tier, type Settings, type Stage, type QcItem, type OpenContainer, type Earning, type QcReport, type Audit, type Reference, type PriceBreak, type TodayItem, QC_ITEMS } from '../lib/sourcing'
 import { countries } from '../lib/data'
 import { useStore } from '../lib/store'
 import { Empty, Pill, fmtDate, fmtDateTime, money } from '../components/ui'
@@ -57,17 +57,24 @@ export function SourcingNew() {
   const { user, ready } = useStore(); const [sp] = useSearchParams(); const nav = useNavigate()
   const [f, setF] = useState<RequestInput>({ tier: (['find', 'order', 'door'].includes(sp.get('tier') ?? '') ? sp.get('tier') : 'order') as Tier, title: '', description: '', links: [], quantity: 100, unit: 'pcs', targetPriceUsd: null, destination: 'GH', destinationCity: '', mode: 'either', deadline: null, contactName: '', contactEmail: '', contactPhone: '', company: '' })
   const [link, setLink] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState('')
+  const [ref, setRef] = useState<Reference | null>(null); const [importing, setImporting] = useState(false); const [hint, setHint] = useState('')
+  const importLink = async () => {
+    const url = link.trim(); if (!url) return; setImporting(true); setHint(''); setError('')
+    try { const r = await sourcingApi.importLink(url); setRef(r.reference); setHint(r.hint); setF((x) => ({ ...x, title: x.title || r.reference.title, description: x.description || r.description, targetPriceUsd: x.targetPriceUsd ?? r.reference.priceUsd, quantity: r.reference.moq && x.quantity < r.reference.moq ? r.reference.moq : x.quantity, links: x.links.includes(url) ? x.links : [...x.links, url] })); setLink('') } catch (er) { setError(err(er, 'Could not read that link.')) } finally { setImporting(false) }
+  }
   useEffect(() => { if (user) setF((x) => ({ ...x, contactName: x.contactName || user.name, contactEmail: x.contactEmail || user.email })) }, [user])
   if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/sourcing/new${sp.toString() ? `?${sp}` : ''}`)}`} replace />
   if (user.role !== 'customer') return <div className="container-x py-24 text-center text-text-muted">Sourcing requests are filed from a customer account.</div>
-  const submit = async (e: React.FormEvent) => { e.preventDefault(); setBusy(true); setError(''); try { const d = await sourcingApi.create({ ...f, links: link.trim() ? [...f.links, link.trim()] : f.links }); nav(`/sourcing/${d.job.id}`) } catch (er) { setError(err(er, 'Could not send the request.')) } finally { setBusy(false) } }
+  const submit = async (e: React.FormEvent) => { e.preventDefault(); setBusy(true); setError(''); try { const d = await sourcingApi.create({ ...f, links: link.trim() ? [...f.links, link.trim()] : f.links, reference: ref }); nav(`/sourcing/${d.job.id}`) } catch (er) { setError(err(er, 'Could not send the request.')) } finally { setBusy(false) } }
   const set = <K extends keyof RequestInput>(k: K, v: RequestInput[K]) => setF({ ...f, [k]: v })
   return (
     <div className="bg-bg text-text"><div className="container-x max-w-3xl py-10 md:py-14">
       <p className="eyebrow mb-2">Ship Sync Sourcing</p><h1 className="!text-3xl">What should we source for you?</h1>
       <form onSubmit={submit} className="mt-6 grid gap-5" data-testid="sourcing-form">
         <fieldset className="grid gap-2 sm:grid-cols-3"><legend className="mb-1 text-sm font-semibold">Service</legend>{(['find', 'order', 'door'] as Tier[]).map((t) => <label key={t} className={`cursor-pointer rounded-xl border p-3 text-sm ${f.tier === t ? 'border-gold bg-gold/10' : 'border-border'}`}><input type="radio" name="tier" className="mr-2" checked={f.tier === t} onChange={() => set('tier', t)} />{tierLabels[t]}</label>)}</fieldset>
+        <div className="rounded-xl border border-gold/40 bg-gold/5 p-4 text-sm" data-testid="import-box"><p className="font-semibold"><Sparkles size={14} className="mr-1 inline text-gold" aria-hidden="true" /> Have a link? Paste it and we'll fill in the details.</p><div className="mt-2 flex gap-2"><input type="url" className="input-dark flex-1 !min-h-10" placeholder="https://detail.1688.com/offer/… or alibaba.com/product-detail/…" value={link} onChange={(e) => setLink(e.target.value)} data-testid="import-url" /><button type="button" className="btn-gold !min-h-10 text-sm" disabled={importing || !link.trim()} onClick={importLink} data-testid="import-btn">{importing ? 'Reading…' : 'Import'}</button></div>
+          {ref && <div className="mt-3 flex items-start gap-3" data-testid="import-result">{ref.image && <img src={ref.image} alt="" className="h-16 w-16 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />}<div className="text-xs"><p className="font-semibold">{ref.title || 'Listing saved'} <span className="font-normal text-text-muted">· {ref.platform}{ref.productId ? ` #${ref.productId}` : ''}</span></p><p className="text-text-muted">{ref.priceCny != null ? `Listed at ${cny(ref.priceCny)} ≈ ${usd2(ref.priceUsd ?? 0)} per unit` : 'No price found'}{ref.moq ? ` · MOQ ${ref.moq.toLocaleString()}` : ''}</p>{hint && <p className="mt-1 text-text-muted">{hint}</p>}</div></div>}</div>
         <label className="grid gap-1 text-sm"><span className="font-semibold">Product</span><input required minLength={3} className="input-dark" placeholder="e.g. Solar lanterns with USB charging" value={f.title} onChange={(e) => set('title', e.target.value)} data-testid="src-title" /></label>
         <label className="grid gap-1 text-sm"><span className="font-semibold">Details</span><textarea required minLength={10} rows={4} className="input-dark" placeholder="Specs, materials, colours, packaging, certifications, branding… anything the factory needs to quote accurately." value={f.description} onChange={(e) => set('description', e.target.value)} data-testid="src-desc" /></label>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -75,9 +82,9 @@ export function SourcingNew() {
           <label className="grid gap-1 text-sm"><span className="font-semibold">Unit</span><input className="input-dark" value={f.unit} onChange={(e) => set('unit', e.target.value)} placeholder="pcs, sets, cartons" /></label>
           <label className="grid gap-1 text-sm"><span className="font-semibold">Target price (USD / unit)</span><input type="number" min={0} step="0.01" className="input-dark" value={f.targetPriceUsd ?? ''} onChange={(e) => set('targetPriceUsd', e.target.value ? Number(e.target.value) : null)} placeholder="optional" /></label>
         </div>
-        <div className="grid gap-2 text-sm"><span className="font-semibold">Reference links (1688, Alibaba, Taobao, a brand's site)</span>
+        <div className="grid gap-2 text-sm"><span className="font-semibold">More links (optional)</span>
           {f.links.map((l, i) => <div key={i} className="flex items-center gap-2 text-xs"><Paperclip size={12} aria-hidden="true" /><a href={l} target="_blank" rel="noreferrer" className="truncate text-gold hover:underline">{l}</a><button type="button" className="text-text-muted hover:text-danger" aria-label="Remove link" onClick={() => set('links', f.links.filter((_, k) => k !== i))}><Trash2 size={12} /></button></div>)}
-          <div className="flex gap-2"><input type="url" className="input-dark flex-1" placeholder="https://detail.1688.com/…" value={link} onChange={(e) => setLink(e.target.value)} /><button type="button" className="btn-ghost !min-h-10 text-sm" onClick={() => { if (link.trim()) { set('links', [...f.links, link.trim()]); setLink('') } }}>Add</button></div></div>
+          <div className="flex gap-2"><input type="url" className="input-dark flex-1" placeholder="https://…" value={link} onChange={(e) => setLink(e.target.value)} /><button type="button" className="btn-ghost !min-h-10 text-sm" onClick={() => { if (link.trim()) { set('links', [...f.links, link.trim()]); setLink('') } }}>Add</button></div></div>
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="grid gap-1 text-sm"><span className="font-semibold">Ship to</span><select className="input-dark" value={f.destination} onChange={(e) => set('destination', e.target.value)}>{countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select></label>
           <label className="grid gap-1 text-sm"><span className="font-semibold">City</span><input className="input-dark" value={f.destinationCity} onChange={(e) => set('destinationCity', e.target.value)} placeholder="Accra, Kumasi, Lagos…" /></label>
@@ -134,13 +141,15 @@ export function SourcingJob() {
         <div className="min-w-0 space-y-6">
           {j.agent && <div className="card-dark flex items-center gap-3 p-4" data-testid="agent-card"><UserCheck size={18} className="text-teal" aria-hidden="true" /><div className="text-sm"><p className="font-semibold">{j.agent.name} <span className="text-text-muted">· your sourcing agent{j.agent.city ? ` in ${j.agent.city}` : ''}</span></p><p className="text-xs text-text-muted">Message them below — replies usually within a few hours, China time.</p></div></div>}
           {team && !j.agent && !closed && <div className="card-dark flex flex-wrap items-center justify-between gap-3 p-4"><p className="text-sm">No agent yet.</p><button className="btn-gold !min-h-9 text-sm" disabled={!!busy} onClick={() => act(() => sourcingApi.assign(j.id, null), 'You took this request.', 'claim')} data-testid="claim">Take this request</button></div>}
-          <section className="card-dark p-5"><p className="eyebrow mb-2">Request</p><p className="whitespace-pre-wrap text-sm">{j.description}</p>{j.links.length > 0 && <ul className="mt-2 space-y-1 text-xs">{j.links.map((l) => <li key={l}><a href={l} target="_blank" rel="noreferrer" className="text-gold hover:underline">{l}</a></li>)}</ul>}</section>
+          <section className="card-dark p-5"><p className="eyebrow mb-2">Request{j.parentRef ? <span className="ml-2 normal-case tracking-normal text-text-muted">· repeat of {j.parentRef}</span> : null}</p>
+            {j.reference && <div className="mb-3 flex items-start gap-3 rounded-lg bg-surface-2/60 p-3 text-xs" data-testid="reference-card">{j.reference.image && <img src={j.reference.image} alt="" className="h-14 w-14 rounded-md object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />}<div><p className="font-semibold">{j.reference.title || 'Reference listing'} <span className="font-normal text-text-muted">· {j.reference.platform}{j.reference.productId ? ` #${j.reference.productId}` : ''}</span></p><p className="text-text-muted">{j.reference.priceCny != null ? `Listed ${cny(j.reference.priceCny)} ≈ ${usd2(j.reference.priceUsd ?? 0)}/unit` : 'No listed price'}{j.reference.moq ? ` · MOQ ${j.reference.moq.toLocaleString()}` : ''} · <a className="text-gold hover:underline" href={j.reference.url} target="_blank" rel="noreferrer">open listing</a></p></div></div>}
+            <p className="whitespace-pre-wrap text-sm">{j.description}</p>{j.links.length > 0 && <ul className="mt-2 space-y-1 text-xs">{j.links.map((l) => <li key={l}><a href={l} target="_blank" rel="noreferrer" className="text-gold hover:underline">{l}</a></li>)}</ul>}</section>
 
           {(j.sample || (!team && ['assigned', 'sourcing', 'quoted'].includes(j.status))) && <SampleCard d={d} team={team} busy={busy} act={act} />}
           {/* quotes */}
           <section data-testid="quotes"><div className="flex items-center justify-between"><h2 className="!text-lg">Supplier options</h2>{team && !closed && ['assigned', 'sourcing', 'quoted'].includes(j.status) && <QuoteForm job={j} pricing={d.settings} onAdd={(q) => act(() => sourcingApi.addQuote(j.id, q), 'Option sent to the customer.', 'quote')} />}</div>
             {d.quotes.length === 0 && <p className="mt-2 text-sm text-text-muted">{team ? 'Add the first option once you have factory prices.' : 'Your agent is contacting factories. Options usually appear within 2–4 days.'}</p>}
-            <div className="mt-3 grid gap-3 md:grid-cols-2">{d.quotes.map((q) => <QuoteCard key={q.id} q={q} job={j} team={team} busy={busy} onAccept={() => act(() => sourcingApi.accept(j.id, q.id), 'Option accepted — pay the deposit to start the order.', 'accept')} onRemove={() => act(() => sourcingApi.removeQuote(j.id, q.id), 'Option removed.', 'rm')} />)}</div></section>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">{d.quotes.map((q) => <QuoteCard key={q.id} q={q} job={j} team={team} busy={busy} onAccept={(qty) => act(() => sourcingApi.accept(j.id, q.id, qty), 'Option accepted — pay the deposit to start the order.', 'accept')} onRemove={() => act(() => sourcingApi.removeQuote(j.id, q.id), 'Option removed.', 'rm')} />)}</div></section>
 
           {j.po && <section className="card-dark p-5 text-sm" data-testid="po"><p className="eyebrow mb-2">Factory order</p><dl className="grid gap-2 sm:grid-cols-3"><div><dt className="text-xs text-text-muted">PO</dt><dd className="font-semibold">{j.po.number}</dd></div><div><dt className="text-xs text-text-muted">Supplier</dt><dd>{j.supplierRevealed ? j.po.supplier : 'Vetted factory'}</dd></div><div><dt className="text-xs text-text-muted">Ready by</dt><dd>{j.po.readyBy} · {j.po.incoterm}</dd></div></dl></section>}
           {(j.qc?.result || (team && ['ordered', 'in_production'].includes(j.status))) && <section className="card-dark p-5 text-sm" data-testid="qc"><div className="flex flex-wrap items-center justify-between gap-2"><p className="eyebrow">Quality inspection</p>{j.qc?.result && <Link to={`${team ? '/dashboard' : ''}/sourcing/${j.id}/qc`} className="btn-ghost !min-h-8 text-xs" data-testid="qc-report-link"><Printer size={12} aria-hidden="true" /> Inspection report</Link>}</div>
@@ -163,6 +172,7 @@ export function SourcingJob() {
           {team && !closed && <TeamActions d={d} busy={busy} onStep={(b) => act(() => sourcingApi.step(j.id, b), 'Updated — the customer has been told.', 'step')} onAssign={(a) => act(() => sourcingApi.assign(j.id, a), 'Reassigned.', 'assign')} />}
           {!team && !closed && ['requested', 'assigned', 'sourcing', 'quoted'].includes(j.status) && <button className="btn-ghost w-full text-danger" disabled={!!busy} onClick={() => { const r = prompt('Why are you cancelling? (optional)') ?? ''; void act(() => sourcingApi.cancel(j.id, r), 'Request cancelled.', 'cancel') }}>Cancel request</button>}
           {!closed && ['delivered', 'shipped'].includes(j.status) && <button className="btn-gold w-full" disabled={!!busy} onClick={() => act(() => sourcingApi.close(j.id), 'Closed — thank you!', 'close')} data-testid="close-job">Mark as complete</button>}
+          {!team && j.acceptedQuoteId && ['shipped', 'delivered', 'closed'].includes(j.status) && <RepeatCard d={d} busy={busy} act={act} />}
           <section className="card-dark p-4"><p className="eyebrow mb-2">Timeline</p><ul className="space-y-1.5 text-xs text-text-muted" data-testid="timeline">{j.timeline.slice().reverse().map((t, k) => <li key={k}><span className="text-text">{stepLabels[t.status as Job['status']] ?? t.status}</span> · {fmtDateTime(t.at)} · {t.by}{t.note ? ` — ${t.note}` : ''}</li>)}</ul></section>
         </aside>
       </div>
@@ -170,8 +180,10 @@ export function SourcingJob() {
   )
 }
 
-function QuoteCard({ q, job, team, busy, onAccept, onRemove }: { q: Quote; job: Job; team: boolean; busy: string; onAccept: () => void; onRemove: () => void }) {
+function QuoteCard({ q, job, team, busy, onAccept, onRemove }: { q: Quote; job: Job; team: boolean; busy: string; onAccept: (qty?: number) => void; onRemove: () => void }) {
   const canAccept = !team && job.status === 'quoted' && !job.acceptedQuoteId
+  const [qty, setQty] = useState(q.qty)
+  const unitFor = (n: number) => q.tiers.filter((t) => n >= t.minQty).sort((a, b) => b.minQty - a.minQty)[0]?.unitPriceCny ?? (q.tiers.length ? Math.max(q.unitPriceCny, ...q.tiers.map((t) => t.unitPriceCny)) : q.unitPriceCny)
   return (
     <div className={`card-dark p-4 ${q.status === 'rejected' ? 'opacity-60' : ''} ${q.status === 'accepted' ? 'ring-1 ring-gold' : ''}`} data-testid="quote-card">
       <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="font-semibold">{q.title}</p><p className="text-xs text-text-muted">{q.supplier ? <>{q.supplier.name}{q.supplier.verified && <BadgeCheck size={12} className="ml-1 inline text-teal" aria-label="Verified" />} · {q.supplier.city}{q.supplier.province ? `, ${q.supplier.province}` : ''}</> : 'Supplier'} · {q.leadDays} days{q.moq ? ` · MOQ ${q.moq.toLocaleString()}` : ''}{q.sampleAvailable ? ' · sample available' : ''}</p></div>{q.status !== 'proposed' && <Pill tone={q.status === 'accepted' ? 'green' : 'muted'}>{q.status}</Pill>}</div>
@@ -179,21 +191,24 @@ function QuoteCard({ q, job, team, busy, onAccept, onRemove }: { q: Quote; job: 
         {job.tier !== 'find' && <><dt className="text-text-muted">Inspection + China handling</dt><dd className="text-right tabular-nums">{usd2(q.inspectionUsd + q.handlingUsd)}</dd><dt className="text-text-muted">Freight{q.insuranceUsd ? ' + insurance' : ''}</dt><dd className="text-right tabular-nums">{usd2(q.freightUsd + q.insuranceUsd)}</dd>{q.dutyEstUsd > 0 && <><dt className="text-text-muted">Duty & clearance (est.)</dt><dd className="text-right tabular-nums">{usd2(q.dutyEstUsd)}</dd></>}</>}
         <dt className="border-t border-border pt-1 font-semibold">{job.tier === 'find' ? 'Sourcing fee' : 'Landed total'}</dt><dd className="border-t border-border pt-1 text-right font-semibold tabular-nums">{usd2(q.totalUsd)}</dd>
         {job.tier !== 'find' && <><dt className="text-text-muted">Deposit now / balance after QC</dt><dd className="text-right tabular-nums">{usd2(q.depositUsd)} / {usd2(q.balanceUsd)}</dd></>}</dl>
+      {q.tiers.length > 0 && <div className="mt-2 rounded-lg bg-surface-2/60 p-2 text-xs" data-testid="price-breaks"><p className="font-semibold">Price breaks</p><ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums"><li>{q.moq ? `${q.moq.toLocaleString()}+` : '1+'}: {cny(Math.max(q.unitPriceCny, ...q.tiers.map((t) => t.unitPriceCny)))}</li>{q.tiers.map((t) => <li key={t.minQty}>{t.minQty.toLocaleString()}+: {cny(t.unitPriceCny)}</li>)}</ul>
+        {canAccept && <label className="mt-2 flex items-center gap-2"><span className="text-text-muted">Order quantity</span><input type="number" min={q.moq || 1} step={1} className="input-dark !min-h-8 w-28 text-xs" value={qty} onChange={(e) => setQty(Number(e.target.value))} data-testid="accept-qty" /><span className="text-text-muted">→ {cny(unitFor(qty))} each ≈ {usd2((unitFor(qty) * qty) / 7.2)} factory{qty !== q.qty ? ' (landed total updates on accept)' : ''}</span></label>}</div>}
       {q.notes && <p className="mt-2 text-xs text-text-muted">{q.notes}</p>}
       {q.supplier && job.supplierRevealed && q.status === 'accepted' && (q.supplier.contact || q.supplier.wechat) && <p className="mt-2 text-xs" data-testid="supplier-contact"><strong>Contact:</strong> {q.supplier.contact}{q.supplier.wechat ? ` · WeChat ${q.supplier.wechat}` : ''}{q.supplier.phone ? ` · ${q.supplier.phone}` : ''}{q.supplier.storefront ? <> · <a className="text-gold hover:underline" href={q.supplier.storefront} target="_blank" rel="noreferrer">storefront</a></> : ''}</p>}
-      <div className="mt-3 flex justify-end gap-2">{team && q.status === 'proposed' && <button className="btn-ghost !min-h-8 text-xs text-danger" disabled={!!busy} onClick={onRemove}>Remove</button>}{canAccept && <button className="btn-gold !min-h-9 text-sm" disabled={!!busy} onClick={onAccept} data-testid="accept-quote">Accept this option</button>}</div>
+      <div className="mt-3 flex justify-end gap-2">{team && q.status === 'proposed' && <button className="btn-ghost !min-h-8 text-xs text-danger" disabled={!!busy} onClick={onRemove}>Remove</button>}{canAccept && <button className="btn-gold !min-h-9 text-sm" disabled={!!busy || qty < 1} onClick={() => onAccept(qty !== q.qty ? qty : undefined)} data-testid="accept-quote">Accept{qty !== q.qty ? ` ${qty.toLocaleString()} ${job.unit}` : ' this option'}</button>}</div>
     </div>
   )
 }
 
 function QuoteForm({ job, pricing, onAdd }: { job: Job; pricing: Detail['settings']; onAdd: (q: QuoteInput) => void }) {
-  const [open, setOpen] = useState(false); const [sups, setSups] = useState<Supplier[]>([]); const [q, setQ] = useState<QuoteInput>({ supplierId: '', title: '', unitPriceCny: 0, qty: job.quantity, moq: 0, leadDays: 25, freightUsd: 0, insuranceUsd: 0, dutyEstUsd: 0, notes: '', sampleAvailable: false })
+  const [open, setOpen] = useState(false); const [sups, setSups] = useState<Supplier[]>([]); const [q, setQ] = useState<QuoteInput>({ supplierId: '', title: '', unitPriceCny: job.reference?.priceCny ?? 0, qty: job.quantity, moq: job.reference?.moq ?? 0, leadDays: 25, freightUsd: 0, insuranceUsd: 0, dutyEstUsd: 0, notes: '', sampleAvailable: false, tiers: [] })
+  const tiers = q.tiers ?? []; const setTier = (i: number, patch: Partial<PriceBreak>) => setQ({ ...q, tiers: tiers.map((t, k) => (k === i ? { ...t, ...patch } : t)) })
   useEffect(() => { if (open) sourcingApi.suppliers().then(setSups).catch(() => {}) }, [open])
   const factory = q.unitPriceCny * q.qty / pricing.cnyPerUsd; const fee = job.tier === 'find' ? pricing.findFeeUsd : Math.max(pricing.minFeeUsd, factory * pricing.servicePct)
   const total = job.tier === 'find' ? fee : factory + fee + pricing.inspectionUsd + pricing.handlingUsd + (q.freightUsd ?? 0) + (q.insuranceUsd ?? 0) + (job.tier === 'door' ? q.dutyEstUsd ?? 0 : 0)
   if (!open) return <button className="btn-gold !min-h-9 text-sm" onClick={() => setOpen(true)} data-testid="add-quote">Add an option</button>
   return (
-    <form className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onSubmit={(e) => { e.preventDefault(); onAdd(q); setOpen(false) }} aria-label="Add supplier option">
+    <form className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onSubmit={(e) => { e.preventDefault(); onAdd({ ...q, tiers: tiers.filter((t) => t.minQty > 1 && t.unitPriceCny > 0) }); setOpen(false) }} aria-label="Add supplier option">
       <div className="card-dark max-h-[90dvh] w-full max-w-lg overflow-y-auto p-5 text-sm">
         <h3 className="!text-lg">Supplier option</h3>
         <div className="mt-3 grid gap-3">
@@ -203,6 +218,7 @@ function QuoteForm({ job, pricing, onAdd }: { job: Job; pricing: Detail['setting
           {job.tier !== 'find' && <div className="grid grid-cols-3 gap-2"><label className="grid gap-1"><span className="text-xs text-text-muted">Freight ($)</span><input type="number" min={0} className="input-dark !min-h-10" value={q.freightUsd ?? 0} onChange={(e) => setQ({ ...q, freightUsd: Number(e.target.value) })} data-testid="q-freight" /></label><label className="grid gap-1"><span className="text-xs text-text-muted">Insurance ($)</span><input type="number" min={0} className="input-dark !min-h-10" value={q.insuranceUsd ?? 0} onChange={(e) => setQ({ ...q, insuranceUsd: Number(e.target.value) })} /></label><label className="grid gap-1"><span className="text-xs text-text-muted">Duty est. ($){job.tier !== 'door' ? ' — door only' : ''}</span><input type="number" min={0} disabled={job.tier !== 'door'} className="input-dark !min-h-10" value={q.dutyEstUsd ?? 0} onChange={(e) => setQ({ ...q, dutyEstUsd: Number(e.target.value) })} /></label></div>}
           <label className="grid gap-1"><span className="text-xs text-text-muted">MOQ</span><input type="number" min={0} className="input-dark !min-h-10" value={q.moq ?? 0} onChange={(e) => setQ({ ...q, moq: Number(e.target.value) })} /></label>
           <label className="grid gap-1"><span className="text-xs text-text-muted">Notes for the customer</span><textarea rows={2} className="input-dark" value={q.notes} onChange={(e) => setQ({ ...q, notes: e.target.value })} /></label>
+          <div className="grid gap-1 text-xs"><span className="text-text-muted">Price breaks for bigger orders (optional)</span>{tiers.map((t, i) => <div key={i} className="flex items-center gap-2"><input type="number" min={2} className="input-dark !min-h-8 w-28 text-xs" placeholder="from qty" value={t.minQty || ''} onChange={(e) => setTier(i, { minQty: Number(e.target.value) })} data-testid={`tier-qty-${i}`} /><span>→ ¥</span><input type="number" min={0.01} step="0.01" className="input-dark !min-h-8 w-24 text-xs" placeholder="unit" value={t.unitPriceCny || ''} onChange={(e) => setTier(i, { unitPriceCny: Number(e.target.value) })} data-testid={`tier-price-${i}`} /><button type="button" className="text-text-muted hover:text-danger" aria-label="Remove break" onClick={() => setQ({ ...q, tiers: tiers.filter((_, k) => k !== i) })}><Trash2 size={12} /></button></div>)}{tiers.length < 6 && <button type="button" className="btn-ghost !min-h-8 w-fit text-xs" onClick={() => setQ({ ...q, tiers: [...tiers, { minQty: 0, unitPriceCny: 0 }] })} data-testid="tier-add">Add a price break</button>}</div>
           <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={!!q.sampleAvailable} onChange={(e) => setQ({ ...q, sampleAvailable: e.target.checked })} /> Sample available</label>
           <p className="rounded-lg bg-surface-2/60 p-3 text-xs tabular-nums">Factory {usd2(factory)} · fee {usd2(fee)}{job.tier !== 'find' ? ` · inspection ${usd2(pricing.inspectionUsd)} · handling ${usd2(pricing.handlingUsd)}` : ''} → <strong>landed {usd2(total)}</strong>{job.tier !== 'find' ? ` · deposit ${usd2(fee + pricing.inspectionUsd + factory * pricing.depositPct)}` : ''}</p>
         </div>
@@ -390,6 +406,66 @@ function AuditForm({ s, onDone }: { s: Supplier; onDone: () => void }) {
   )
 }
 
+function RepeatCard({ d, busy, act }: { d: Detail; busy: string; act: (fn: () => Promise<unknown>, msg: string, key: string) => Promise<void> }) {
+  const j = d.job; const nav = useNavigate(); const [qty, setQty] = useState(j.quantity); const [weeks, setWeeks] = useState(j.recurring?.everyWeeks ?? 4)
+  const rec = j.recurring
+  return (
+    <section className="card-dark p-4 text-sm" data-testid="repeat-card">
+      <p className="eyebrow mb-2"><Repeat size={12} className="mr-1 inline" aria-hidden="true" /> Order again</p>
+      <p className="text-xs text-text-muted">Same factory, same spec, price carried over from your last order — no sourcing wait. Price breaks apply to bigger quantities.</p>
+      <div className="mt-2 flex items-center gap-2"><input type="number" min={1} className="input-dark !min-h-9 w-28 text-xs" value={qty} onChange={(e) => setQty(Number(e.target.value))} data-testid="reorder-qty" /><span className="text-xs text-text-muted">{j.unit}</span><button className="btn-gold !min-h-9 text-xs" disabled={!!busy || qty < 1} onClick={() => act(async () => { const r = await sourcingApi.reorder(j.id, qty); nav(`/sourcing/${r.job.id}`) }, '', 'reorder')} data-testid="reorder-btn">Reorder now</button></div>
+      <div className="mt-3 border-t border-border pt-3">
+        <p className="font-semibold">Standing order {rec?.active && <Pill tone="green">on</Pill>}</p>
+        {rec?.active ? <p className="text-xs text-text-muted">{rec.quantity.toLocaleString()} {j.unit} every {rec.everyWeeks} weeks · next {rec.nextAt} · {rec.placed} placed so far. Each one arrives as a new request you confirm by paying the deposit.</p> : <p className="text-xs text-text-muted">Traders who restock regularly: we place a repeat order on a schedule; you just confirm the deposit each time.</p>}
+        <div className="mt-2 flex items-center gap-2"><span className="text-xs text-text-muted">Every</span><select className="input-dark !min-h-9 w-24 text-xs" value={weeks} onChange={(e) => setWeeks(Number(e.target.value))} data-testid="recurring-weeks">{[2, 3, 4, 6, 8, 12, 26].map((w) => <option key={w} value={w}>{w} weeks</option>)}</select>{rec?.active ? <button className="btn-ghost !min-h-9 text-xs" disabled={!!busy} onClick={() => act(() => sourcingApi.recurring(j.id, { active: false, everyWeeks: weeks }), 'Standing order paused.', 'recurring')} data-testid="recurring-off">Pause</button> : <button className="btn-ghost !min-h-9 text-xs" disabled={!!busy} onClick={() => act(() => sourcingApi.recurring(j.id, { active: true, everyWeeks: weeks }), 'Standing order set — we will tell you before each one.', 'recurring')} data-testid="recurring-on">Start standing order</button>}</div>
+      </div>
+    </section>
+  )
+}
+
+/* ================= photo-first mobile board for agents ================= */
+export function AgentToday() {
+  const { user } = useStore(); const [d, setD] = useState<Awaited<ReturnType<typeof sourcingApi.today>> | null>(null); const [error, setError] = useState(''); const [busy, setBusy] = useState(''); const [toast, setToast] = useState('')
+  const [reply, setReply] = useState<Record<string, string>>({}); const fileRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const load = () => sourcingApi.today().then(setD).catch((e) => setError(err(e, 'Could not load.')))
+  useEffect(() => { void load() }, [])
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 3000); return () => clearTimeout(t) }, [toast])
+  if (!isSourcingTeam(user)) return <Navigate to="/dashboard" replace />
+  const run = async (key: string, fn: () => Promise<unknown>, msg: string) => { setBusy(key); setError(''); try { await fn(); await load(); setToast(msg) } catch (e) { setError(err(e, 'Something went wrong.')) } finally { setBusy('') } }
+  const snap = async (it: TodayItem, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return
+    if (file.size > 3_000_000) { setError('Keep photos under 3 MB.'); return }
+    await run(`photo:${it.id}`, async () => { const data = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(new Error('Could not read the photo.')); r.readAsDataURL(file) }); await sourcingApi.upload(it.id, { kind: ['ordered', 'in_production'].includes(it.status) ? 'qc' : 'photo', title: `${it.ref} ${new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`, mime: file.type, data }) }, 'Photo sent to the customer.')
+    e.target.value = ''
+  }
+  const quick = (it: TodayItem) => {
+    const a = it.action
+    if (a.kind === 'assign') return <button className="btn-gold !min-h-11 flex-1 text-sm" disabled={!!busy} onClick={() => run(`a:${it.id}`, () => sourcingApi.assign(it.id, null), 'Yours.')} data-testid="today-take">Take it</button>
+    if (a.kind === 'step' && a.step && ['sourcing', 'in_production'].includes(a.step)) return <button className="btn-gold !min-h-11 flex-1 text-sm" disabled={!!busy} onClick={() => run(`s:${it.id}`, () => sourcingApi.step(it.id, { status: a.step! }), 'Updated.')} data-testid="today-step">{a.label}</button>
+    return <Link to={`/dashboard/sourcing/${it.id}`} className="btn-gold !min-h-11 flex-1 text-sm">{a.label}</Link>
+  }
+  return (
+    <div className="container-x max-w-xl py-4" data-testid="agent-today">
+      <div className="flex items-center justify-between"><div><p className="eyebrow mb-0.5"><Smartphone size={12} className="mr-1 inline" aria-hidden="true" /> Today</p><h1 className="!text-xl">{d ? `${d.items.filter((i) => i.action.kind !== 'wait').length} to do · ${d.items.length} open` : 'Loading…'}</h1></div><Link to="/dashboard/sourcing" className="text-xs text-text-muted">Full board →</Link></div>
+      {toast && <p role="status" className="mt-2 text-sm text-teal"><Check size={14} className="inline" aria-hidden="true" /> {toast}</p>}
+      {error && <p role="alert" className="mt-2 text-sm text-danger">{error}</p>}
+      <ul className="mt-4 space-y-3">{d?.items.map((it) => (
+        <li key={it.id} className={`card-dark p-4 ${it.action.kind === 'wait' ? 'opacity-80' : ''}`} data-testid="today-item">
+          <div className="flex items-start gap-3">{it.reference?.image ? <img src={it.reference.image} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} /> : <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-surface-2 text-xs text-text-muted">{it.photos ? `${it.photos} 📷` : '—'}</div>}
+            <div className="min-w-0 flex-1"><p className="truncate font-semibold">{it.title}</p><p className="text-xs text-text-muted">{it.ref} · {it.quantity.toLocaleString()} {it.unit} → {it.destinationName} · {it.customer?.name}</p><p className={`mt-1 text-xs font-semibold ${it.action.kind === 'wait' ? 'text-text-muted' : 'text-gold'}`}>{it.action.label}</p></div></div>
+          {it.lastMessage && <p className="mt-2 rounded-lg bg-surface-2/60 px-3 py-2 text-xs"><span className="text-text-muted">{it.lastMessage.author}:</span> {it.lastMessage.body}</p>}
+          <div className="mt-3 flex gap-2">
+            <input ref={(el) => { fileRefs.current[it.id] = el }} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => snap(it, e)} data-testid="today-camera" />
+            <button className="btn-ghost !min-h-11 !px-3" aria-label="Take a photo" disabled={!!busy} onClick={() => fileRefs.current[it.id]?.click()} data-testid="today-snap"><Camera size={18} aria-hidden="true" /></button>
+            {quick(it)}
+          </div>
+          <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); const body = (reply[it.id] ?? '').trim(); if (!body) return; void run(`m:${it.id}`, () => sourcingApi.message(it.id, body), 'Sent.'); setReply({ ...reply, [it.id]: '' }) }}><input className="input-dark !min-h-10 flex-1 text-sm" placeholder="Quick reply…" value={reply[it.id] ?? ''} onChange={(e) => setReply({ ...reply, [it.id]: e.target.value })} data-testid="today-reply" /><button className="btn-ghost !min-h-10 text-sm" disabled={!!busy || !(reply[it.id] ?? '').trim()}>Send</button></form>
+        </li>))}</ul>
+      {d && d.items.length === 0 && <div className="mt-6"><Empty title="Nothing open" body="New requests show up here the moment customers file them." /></div>}
+    </div>
+  )
+}
+
 /* ================= customer dashboard tab ================= */
 export function SourcingTab() {
   const [list, setList] = useState<Job[] | null>(null); const [error, setError] = useState('')
@@ -417,7 +493,7 @@ export function SourcingBoard() {
   const rows = (filter === 'open' ? open : filter === 'mine' ? open.filter((j) => j.agent?.id === d?.me) : filter === 'unassigned' ? open.filter((j) => !j.agent) : filter === 'action' ? action : all.filter((j) => ['closed', 'cancelled'].includes(j.status))).filter((j) => !q || `${j.ref} ${j.title} ${j.customer?.name ?? ''} ${j.destinationName}`.toLowerCase().includes(q.toLowerCase()))
   return (
     <div className="container-x py-6 md:py-8" data-testid="sourcing-board">
-      <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow mb-1">Ship Sync Sourcing</p><h1 className="!text-2xl md:!text-3xl">Sourcing board</h1></div><div className="flex gap-2"><Link to="/dashboard/sourcing?view=earnings" className={`btn-ghost !min-h-9 text-sm ${showEarnings ? '!border-gold' : ''}`} data-testid="earnings-link"><Wallet size={14} aria-hidden="true" /> Commissions</Link><Link to="/dashboard/suppliers" className="btn-ghost !min-h-9 text-sm"><Factory size={14} aria-hidden="true" /> Suppliers</Link></div></div>
+      <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow mb-1">Ship Sync Sourcing</p><h1 className="!text-2xl md:!text-3xl">Sourcing board</h1></div><div className="flex gap-2"><Link to="/dashboard/sourcing/today" className="btn-ghost !min-h-9 text-sm" data-testid="today-link"><Smartphone size={14} aria-hidden="true" /> Today</Link><Link to="/dashboard/sourcing?view=earnings" className={`btn-ghost !min-h-9 text-sm ${showEarnings ? '!border-gold' : ''}`} data-testid="earnings-link"><Wallet size={14} aria-hidden="true" /> Commissions</Link><Link to="/dashboard/suppliers" className="btn-ghost !min-h-9 text-sm"><Factory size={14} aria-hidden="true" /> Suppliers</Link></div></div>
       {showEarnings && <Earnings />}
       {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><StatCard label="Open requests" value={open.length} icon={Globe2} /><StatCard label="Needs action" value={action.length} icon={PackageCheck} warn={action.length > 0} active={filter === 'action'} onClick={() => setFilter('action')} /><StatCard label="Unassigned" value={open.filter((j) => !j.agent).length} icon={UserCheck} active={filter === 'unassigned'} onClick={() => setFilter('unassigned')} /><StatCard label="Team" value={d?.agents.length ?? 0} hint={d?.agents.map((a) => `${a.name} (${a.open})`).join(' · ')} icon={Handshake} /></div>

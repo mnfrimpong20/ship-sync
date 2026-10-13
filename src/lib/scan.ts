@@ -14,7 +14,7 @@ export interface ScanSummary {
 export interface Lookup extends ScanSummary { piece: Piece; suggested: ScanKind }
 export interface ScanResult extends ScanSummary { ok: true; scanId: string; piece: Piece; moved: ShipmentStatus | null; warnings: string[]; place: string; at: string }
 export interface RecentScan { id: string; kind: ScanKind; at: string; place: string; note: string; by: string; seq: number; total: number; labelCode: string; ref: string; shipmentId: string }
-export interface ScanInput { code: string; kind: ScanKind; containerId?: string; runId?: string; place?: string; note?: string; lat?: number; lon?: number; photo?: string; receivedBy?: string }
+export interface ScanInput { code: string; kind: ScanKind; containerId?: string; runId?: string; place?: string; note?: string; lat?: number; lon?: number; photo?: string; receivedBy?: string; signature?: string; at?: string }
 
 export const scanApi = {
   lookup: (code: string) => api<Lookup>(`/scan/lookup?code=${encodeURIComponent(code)}`),
@@ -32,4 +32,48 @@ export async function shrinkPhoto(file: File, max = 1100, quality = 0.72): Promi
     c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
     return c.toDataURL('image/jpeg', quality)
   } finally { URL.revokeObjectURL(url) }
+}
+
+/* ---------------- offline queue ----------------
+ * A driver in a yard with no signal still scans; failed submissions wait in localStorage and go up
+ * when the phone is back online (or on the next visit). The original scan time travels with them. */
+const QUEUE_KEY = 'ss-scan-queue'
+export interface QueuedScan { id: string; input: ScanInput; at: string; tries: number; error?: string }
+export const SCAN_QUEUE_EVENT = 'ss:scan-queue'
+const readQueue = (): QueuedScan[] => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]') } catch { return [] } }
+const writeQueue = (q: QueuedScan[]) => { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)) } catch { /* storage blocked */ } window.dispatchEvent(new Event(SCAN_QUEUE_EVENT)) }
+export const scanQueue = {
+  list: readQueue,
+  add(input: ScanInput) { const q = readQueue(); const item: QueuedScan = { id: Math.random().toString(36).slice(2, 10), input: { ...input, at: input.at ?? new Date().toISOString() }, at: new Date().toISOString(), tries: 0 }; q.push(item); writeQueue(q); return item },
+  remove(id: string) { writeQueue(readQueue().filter((x) => x.id !== id)) },
+  clear() { writeQueue([]) },
+  /** Try every queued scan in order; stops at the first network failure so order is preserved. Returns how many went up. */
+  async flush(): Promise<{ sent: number; left: number }> {
+    let sent = 0
+    for (const item of readQueue()) {
+      try { await scanApi.scan(item.input); this.remove(item.id); sent++ } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        const q = readQueue(); const it = q.find((x) => x.id === item.id)
+        if (it) { it.tries++; it.error = msg }
+        // A server rejection (4xx) will never succeed — drop it after a few tries so the queue doesn't jam.
+        if (it && /\(4\d\d\)|not found|no labels|not one of your|already|cannot|only/i.test(msg) && it.tries >= 2) { writeQueue(q.filter((x) => x.id !== item.id)); continue }
+        writeQueue(q); break
+      }
+    }
+    return { sent, left: readQueue().length }
+  },
+}
+/** Submit now if we can, otherwise queue. Network errors (fetch failed, offline) queue; server errors throw. */
+export async function scanOrQueue(input: ScanInput): Promise<{ queued: true; item: QueuedScan } | { queued: false; result: ScanResult }> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return { queued: true, item: scanQueue.add(input) }
+  try { return { queued: false, result: await scanApi.scan(input) } } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (/failed to fetch|networkerror|load failed|network request failed|fetch failed/i.test(msg)) return { queued: true, item: scanQueue.add(input) }
+    throw e
+  }
+}
+let flushing = false
+export function startQueueSync() {
+  const run = () => { if (flushing || !readQueue().length) return; flushing = true; scanQueue.flush().finally(() => { flushing = false }) }
+  window.addEventListener('online', run); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') run() }); setTimeout(run, 1500); setInterval(run, 60_000)
 }

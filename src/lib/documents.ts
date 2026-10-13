@@ -21,7 +21,7 @@ export interface DocPayload {
   container: { ref: string; number: string; seal: string; vesselName: string; voyage: string; originPort: string; destinationPort: string; etd: string | null; eta: string | null } | null
   quote: { price: number; currency: string; includes: string[] } | null
   invoice: { number: string; items: { description: string; qty: number; unit: number }[]; subtotal: number; tax: number; total: number; currency: string; issuedAt: string | null; dueAt: string | null } | null
-  pod: { at: string | null; place: string; by: string; receivedBy: string; photo: string | null; note: string; piecesDelivered: number; piecesTotal: number } | null
+  pod: { at: string | null; place: string; by: string; receivedBy: string; photo: string | null; signature?: string | null; note: string; piecesDelivered: number; piecesTotal: number } | null
 }
 export interface DocFull { document: ShipDoc; dataUrl: string | null; payload: DocPayload | null; canManage?: boolean; shipment?: { ref: string; origin: string; destination: string } | null }
 

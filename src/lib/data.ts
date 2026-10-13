@@ -121,7 +121,7 @@ export interface Shipment {
   /** Public piece list (from /track): one sticker per barrel/box. */
   pieces?: { seq: number; status: 'labelled' | 'loaded' | 'devanned' | 'delivered'; lastScanAt: string | null; lastScanKind: string; lastScanPlace: string }[]
   /** Proof of delivery (from /track) once the last piece has been handed over. */
-  pod?: { at: string | null; place: string; by: string; receivedBy: string; photo: string | null } | null
+  pod?: { at: string | null; place: string; by: string; receivedBy: string; photo: string | null; signature?: string | null } | null
   containerId?: string
   groupageId?: string
   /** Number of documents in the vault (customers: shared ones only). */

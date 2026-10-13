@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { BellRing, Boxes, CalendarCheck, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, Wallet, X } from 'lucide-react'
+import { BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, Wallet, X } from 'lucide-react'
 import { Logo } from './ui'
 import ThemeSwitcher from './ThemeSwitcher'
 import { NotificationBell } from './NotificationBell'
@@ -54,6 +54,7 @@ export default function AppShell() {
         { to: '/dashboard/routes', label: 'Routes', icon: MapPinned },
         { to: '/dashboard/pickups', label: 'Pickups', icon: CalendarCheck },
         { to: '/dashboard/payments', label: 'Payments', icon: Wallet },
+        { to: '/dashboard/collections', label: 'Collections', icon: Receipt },
         ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck } as Item] : []),
         { to: '/dashboard/team', label: 'Team', icon: UsersRound },
         ...(staffRole === 'owner' ? [{ to: '/dashboard/shipper?view=profile', label: 'Company profile', icon: UserCog } as Item] : []),
@@ -63,6 +64,7 @@ export default function AppShell() {
         { to: '/dashboard?tab=requests', label: 'Quote requests', icon: FileText, badge: openLeads },
         { to: '/dashboard?tab=shipments', label: 'Shipments', icon: Package, badge: active },
         { to: '/dashboard?tab=groupage', label: 'Shared barrels', icon: Boxes },
+        { to: '/dashboard?tab=invoices', label: 'Invoices', icon: Receipt },
         { to: '/quote', label: 'New request', icon: PlusCircle },
       ]
   const tools: Item[] = [

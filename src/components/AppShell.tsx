@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { BellRing, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, X } from 'lucide-react'
+import { BellRing, CalendarCheck, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, X } from 'lucide-react'
 import { Logo } from './ui'
 import ThemeSwitcher from './ThemeSwitcher'
 import { NotificationBell } from './NotificationBell'
@@ -51,6 +51,7 @@ export default function AppShell() {
         { to: '/dashboard/containers', label: 'Containers', icon: Container },
         { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders },
         { to: '/dashboard/routes', label: 'Routes', icon: MapPinned },
+        { to: '/dashboard/pickups', label: 'Pickups', icon: CalendarCheck },
         ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck } as Item] : []),
         { to: '/dashboard/team', label: 'Team', icon: UsersRound },
         ...(staffRole === 'owner' ? [{ to: '/dashboard/shipper?view=profile', label: 'Company profile', icon: UserCog } as Item] : []),

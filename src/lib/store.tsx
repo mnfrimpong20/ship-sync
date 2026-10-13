@@ -25,6 +25,8 @@ export interface QuoteRequest {
   contact: { name: string; email: string; phone: string }
   status: 'open' | 'booked' | 'closed'
   quotes: Quote[]
+  /** Vehicle details captured in the quote wizard when cargo is a vehicle. */
+  vehicle?: { vin: string; year: number | null; make: string; model: string; running: boolean; method: 'roro' | 'container'; titleStatus: 'clean' | 'lien' | 'salvage' | 'rebuilt' }
   /** Shipper view only: number of quotes from other companies (prices hidden). */
   competingQuotes?: number
   /** Price from this shipper's own rate card (shipper view of an open lead). */

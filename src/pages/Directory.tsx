@@ -26,7 +26,7 @@ export function DirectoryCard({ s, quote }: { s: Shipper; quote?: string }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2"><PlanBadge s={s} />{s.verified && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal"><BadgeCheck size={13} aria-hidden="true" /> Verified</span>}</div>
           <h3 className="mt-1 truncate !text-[17px] leading-tight"><Link to={`/shippers/${s.id}`} className="focus-ring hover:text-gold">{s.name}</Link></h3>
-          <p className="truncate text-sm text-text-muted">{s.tagline}</p>
+          <p className="line-clamp-2 min-h-10 text-sm leading-5 text-text-muted">{s.tagline}</p>
         </div>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -34,8 +34,9 @@ export function DirectoryCard({ s, quote }: { s: Shipper; quote?: string }) {
         <Rating value={s.rating} count={s.reviews} />
         <span className="ml-auto text-xs font-semibold text-text-muted" title="Price level">{priceLabel(s.priceIndex)}</span>
       </div>
-      <p className="mt-3 text-sm text-text-muted">Ships to {s.destinations.map((d) => countryByCode(d)?.name).filter(Boolean).join(', ')}<span className="text-text-muted/60"> · from {s.hq}</span></p>
+      <p className="mt-3 line-clamp-2 text-sm text-text-muted">Ships to {s.destinations.map((d) => countryByCode(d)?.name).filter(Boolean).join(', ')}<span className="text-text-muted/60"> · from {s.hq}</span></p>
       {doorish.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{doorish.map((x) => <li key={x} className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-text-muted">{x}</li>)}</ul>}
+      <div className="flex-1" />
       <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3 text-center text-xs">
         <div><dt className="text-text-muted">On-time</dt><dd className="font-semibold">{s.onTime}%</dd></div>
         <div><dt className="text-text-muted">Replies</dt><dd className="font-semibold">~{s.responseHours}h</dd></div>

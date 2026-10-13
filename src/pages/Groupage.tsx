@@ -25,7 +25,7 @@ export function FillBar({ g, compact = false }: { g: Pick<Groupage, 'fillPct' | 
 export function GroupageCard({ g, onJoin }: { g: Groupage; onJoin?: (g: Groupage) => void }) {
   const I = kindIcon[g.kind]
   return (
-    <div className="card-dark min-w-0 p-5" data-testid="groupage-card">
+    <div className="card-dark flex h-full min-w-0 flex-col p-5" data-testid="groupage-card">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           {g.shipperInitials && <Avatar initials={g.shipperInitials} hue={g.shipperHue ?? '#E3B54A'} size={40} />}
@@ -33,15 +33,15 @@ export function GroupageCard({ g, onJoin }: { g: Groupage; onJoin?: (g: Groupage
         </div>
         <Pill tone={g.status === 'full' ? 'teal' : 'gold'}>{g.status === 'full' ? 'Full' : 'Open'}</Pill>
       </div>
-      <p className="mt-3 inline-flex items-center gap-1.5 text-sm"><I size={14} className="text-gold" aria-hidden="true" /> {g.kindLabel} · {g.origin} → {g.destinationCity || g.destinationName}</p>
+      <p className="mt-3 flex items-start gap-1.5 text-sm"><I size={14} className="mt-1 shrink-0 text-gold" aria-hidden="true" /><span className="line-clamp-2">{g.kindLabel} · {g.origin} → {g.destinationCity || g.destinationName}</span></p>
       <div className="mt-3"><FillBar g={g} /></div>
       <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
         <div><dt className="text-text-muted">Per {g.unit}</dt><dd className="font-semibold tabular-nums">{money(g.pricePerUnitUsd)}</dd></div>
         <div><dt className="text-text-muted">Closes</dt><dd className="font-semibold">{day(g.closesAt)}</dd></div>
         <div><dt className="text-text-muted">Sails</dt><dd className="font-semibold">{day(g.departsAt)}</dd></div>
       </dl>
-      {g.includes.length > 0 && <p className="mt-2 text-xs text-text-muted">Includes {g.includes.join(', ')}.</p>}
-      <div className="mt-4 flex items-center justify-between gap-2">
+      {g.includes.length > 0 && <p className="mt-2 line-clamp-2 text-xs text-text-muted">Includes {g.includes.join(', ')}.</p>}
+      <div className="mt-auto flex items-center justify-between gap-2 pt-4">
         <span className="inline-flex items-center gap-1 text-xs text-text-muted"><Users size={12} aria-hidden="true" /> {g.participants} {g.participants === 1 ? 'person' : 'people'} in</span>
         {onJoin && <button onClick={() => onJoin(g)} disabled={g.status !== 'open'} className="btn-gold !min-h-9 !px-4 text-sm disabled:opacity-60" data-testid="join">{g.status === 'open' ? 'Reserve space' : 'Full'}</button>}
       </div>

@@ -17,14 +17,14 @@ export function SailingCard({ s, onBook, compact = false }: { s: Sailing; onBook
   const units = Object.entries(s.rates) as [Unit, number][]
   const cut = daysTo(s.cutoff)
   return (
-    <div className="card-dark min-w-0 p-5" data-testid="sailing-card">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0"><p className="font-semibold">{s.line} <span className="font-normal text-text-muted">· {s.kind === 'roro' ? 'RoRo' : 'Container service'}</span></p><p className="truncate text-xs text-text-muted">{s.vesselName} {s.voyage}{s.service ? ` · ${s.service}` : ''}</p></div>
-        <Pill tone={s.spaceLeft === 0 ? 'danger' : cut <= 3 ? 'gold' : 'teal'}>{s.spaceLeft === 0 ? 'Full' : cut <= 0 ? 'Cut-off today' : cut <= 3 ? `Cut-off in ${cut}d` : `${s.spaceLeft} slots`}</Pill>
+    <div className="card-dark flex h-full min-w-0 flex-col p-5" data-testid="sailing-card">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0"><p className="font-semibold">{s.line} <span className="font-normal text-text-muted">· {s.kind === 'roro' ? 'RoRo' : 'Container'}</span></p><p className="truncate text-xs text-text-muted">{s.vesselName} {s.voyage}{s.service ? ` · ${s.service}` : ''}</p></div>
+        <span className="shrink-0"><Pill tone={s.spaceLeft === 0 ? 'danger' : cut <= 3 ? 'gold' : 'teal'}>{s.spaceLeft === 0 ? 'Full' : cut <= 0 ? 'Cut-off today' : cut <= 3 ? `Cut-off in ${cut}d` : `${s.spaceLeft} slots`}</Pill></span>
       </div>
-      <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm"><div><p className="font-semibold">{s.originPort}</p><p className="text-xs text-text-muted">Sails {day(s.etd)}</p></div><Ship size={16} className="text-gold" aria-hidden="true" /><div className="text-right"><p className="font-semibold">{s.destinationPort}</p><p className="text-xs text-text-muted">ETA {day(s.eta)} · {s.transitDays}d</p></div></div>
+      <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm"><div><p className="font-semibold">{s.originPort}</p><p className="whitespace-nowrap text-xs text-text-muted">Sails {day(s.etd)}</p></div><Ship size={16} className="text-gold" aria-hidden="true" /><div className="text-right"><p className="font-semibold">{s.destinationPort}</p><p className="whitespace-nowrap text-xs text-text-muted">ETA {day(s.eta)} · {s.transitDays}d</p></div></div>
       {!compact && <dl className="mt-3 grid gap-1 text-xs">{units.map(([u, r]) => <div key={u} className="flex justify-between"><dt className="text-text-muted">{unitLabels[u]}</dt><dd className="font-semibold tabular-nums">{money(r)}</dd></div>)}</dl>}
-      <div className="mt-3 flex items-center justify-between gap-2"><span className="inline-flex items-center gap-1 text-[11px] text-text-muted"><Calendar size={11} aria-hidden="true" /> Docs by {day(s.cutoff)}</span>{onBook && <button onClick={() => onBook(s)} disabled={s.spaceLeft === 0} className="btn-gold !min-h-8 !px-3 text-xs disabled:opacity-60" data-testid="book-sailing">Book space</button>}</div>
+      <div className="mt-auto flex items-center justify-between gap-2 pt-3"><span className="inline-flex items-center gap-1 text-[11px] text-text-muted"><Calendar size={11} aria-hidden="true" /> Docs by {day(s.cutoff)}</span>{onBook && <button onClick={() => onBook(s)} disabled={s.spaceLeft === 0} className="btn-gold !min-h-8 !px-3 text-xs disabled:opacity-60" data-testid="book-sailing">Book space</button>}</div>
     </div>
   )
 }

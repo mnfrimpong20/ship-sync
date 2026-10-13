@@ -23,6 +23,12 @@ function Range({ b }: { b: Benchmark }) {
 }
 
 export function BenchmarkPanel({ b, title }: { b: Benchmark; title: string }) {
+  if (!b.sample.quotes) return (
+    <div className="card-dark p-5" data-testid="benchmark">
+      <div className="flex items-start justify-between gap-2"><h2 className="!text-base">{title}</h2><span className="text-xs text-text-muted">no quotes yet · 180 days</span></div>
+      <p className="mt-3 text-sm text-text-muted">We haven't seen enough quotes on this lane to show a price range yet. Request quotes and the market view fills in as shippers reply{b.demand.series.some((n) => n > 0) ? ` — ${b.demand.series.reduce((n, x) => n + x, 0)} request${b.demand.series.reduce((n, x) => n + x, 0) === 1 ? '' : 's'} in the last 12 weeks` : ''}.</p>
+    </div>
+  )
   return (
     <div className="card-dark p-5" data-testid="benchmark">
       <div className="flex items-start justify-between gap-2"><h2 className="!text-base">{title}</h2><span className="text-xs text-text-muted">{b.sample.quotes} quotes · {b.sample.shippers} shippers · 180 days</span></div>

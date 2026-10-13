@@ -26,14 +26,14 @@ interface Deps {
   wrap: (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) => void
 }
 
-export const NOTIFY_KINDS = ['quote_received', 'booking_confirmed', 'shipment_status', 'document', 'pickup', 'insurance', 'payment', 'groupage', 'quote_accepted', 'new_lead', 'container_update', 'invoice_overdue', 'system'] as const
+export const NOTIFY_KINDS = ['quote_received', 'booking_confirmed', 'shipment_status', 'document', 'pickup', 'insurance', 'payment', 'groupage', 'customs', 'quote_accepted', 'new_lead', 'container_update', 'invoice_overdue', 'system'] as const
 export type NotifyKind = (typeof NOTIFY_KINDS)[number]
 export const kindLabels: Record<NotifyKind, string> = {
   quote_received: 'New quotes', booking_confirmed: 'Booking confirmations', shipment_status: 'Shipment progress', quote_accepted: 'Quotes accepted',
-  document: 'Documents added to a shipment', pickup: 'Pickup bookings', insurance: 'Insurance & claims', payment: 'Payments & payouts', groupage: 'Shared barrels & containers', new_lead: 'New leads on your lanes', container_update: 'Container updates from the line', invoice_overdue: 'Overdue invoices', system: 'Account',
+  document: 'Documents added to a shipment', pickup: 'Pickup bookings', insurance: 'Insurance & claims', payment: 'Payments & payouts', groupage: 'Shared barrels & containers', customs: 'Customs clearance', new_lead: 'New leads on your lanes', container_update: 'Container updates from the line', invoice_overdue: 'Overdue invoices', system: 'Account',
 }
 /** Which kinds each side can receive — drives the preferences page. */
-export const kindsFor = (role: 'customer' | 'shipper'): NotifyKind[] => (role === 'customer' ? ['quote_received', 'booking_confirmed', 'pickup', 'shipment_status', 'document', 'insurance', 'payment', 'groupage'] : ['new_lead', 'quote_accepted', 'pickup', 'shipment_status', 'document', 'insurance', 'payment', 'groupage', 'container_update', 'invoice_overdue'])
+export const kindsFor = (role: 'customer' | 'shipper'): NotifyKind[] => (role === 'customer' ? ['quote_received', 'booking_confirmed', 'pickup', 'shipment_status', 'document', 'insurance', 'payment', 'groupage', 'customs'] : ['new_lead', 'quote_accepted', 'pickup', 'shipment_status', 'document', 'insurance', 'payment', 'groupage', 'customs', 'container_update', 'invoice_overdue'])
 
 export interface NotifyInput {
   userId: string
@@ -77,6 +77,9 @@ ${url ? `<a href="${esc(url)}" style="display:inline-block;background:#E3B54A;co
 </table></td></tr></table></body></html>`
 }
 
+export async function sendEmail(to: string, subject: string, html: string) {
+  return deliver(to, subject, html)
+}
 async function deliver(to: string, subject: string, html: string) {
   const p = emailProvider()
   if (p.id === 'log') { console.log(`[email → ${to}] ${subject}`); return }

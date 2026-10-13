@@ -7,6 +7,7 @@ import { seedRatesDemo } from './rates'
 import { seedPickupsDemo } from './pickups'
 import { seedPaymentsDemo } from './payments'
 import { seedGroupageDemo } from './groupage'
+import { seedBrokersDemo } from './brokers'
 
 /** Minimal query interface satisfied by both `pg` and PGlite. */
 export interface Db {
@@ -44,6 +45,7 @@ export async function getDb(): Promise<Db> {
   await seedPickupsDemo(db)
   await seedPaymentsDemo(db)
   await seedGroupageDemo(db)
+  await seedBrokersDemo(db)
   return db
 }
 
@@ -672,6 +674,60 @@ create table if not exists shipment_vehicles (
   updated_at timestamptz not null default now()
 );
 alter table requests add column if not exists vehicle jsonb;
+
+alter table escrow_payments add column if not exists invoice_id text;
+alter table escrow_payments alter column shipment_id drop not null;
+alter table invoices add column if not exists pay_token text;
+alter table invoices add column if not exists sent_at timestamptz;
+alter table invoices add column if not exists reminders_sent jsonb not null default '[]';
+alter table invoices add column if not exists last_reminder_at timestamptz;
+alter table shippers add column if not exists collections jsonb not null default '{}';
+create index if not exists idx_invoices_pay_token on invoices(pay_token);
+
+create table if not exists brokers (
+  id text primary key,
+  name text not null,
+  company text not null default '',
+  country text not null,
+  ports jsonb not null default '[]',
+  licence_no text not null default '',
+  licence_authority text not null default '',
+  phone text not null default '',
+  whatsapp text not null default '',
+  email text not null default '',
+  about text not null default '',
+  specialties jsonb not null default '[]',
+  fees jsonb not null default '{}',
+  duty_advance boolean not null default false,
+  rating real not null default 0,
+  reviews int not null default 0,
+  response_hours int not null default 24,
+  verified boolean not null default false,
+  active boolean not null default true,
+  initials text not null default '',
+  hue text not null default '#E3B54A',
+  created_at timestamptz not null default now()
+);
+create table if not exists broker_jobs (
+  id text primary key,
+  shipment_id text not null references shipments(id) on delete cascade,
+  broker_id text not null references brokers(id),
+  shipper_id text not null references shippers(id) on delete cascade,
+  user_id text,
+  booked_by text not null default '',
+  booked_by_role text not null default 'customer',
+  status text not null default 'requested',
+  fee_usd numeric not null default 0,
+  duty_local numeric,
+  duty_currency text,
+  reference text not null default '',
+  notes text not null default '',
+  token text unique not null,
+  timeline jsonb not null default '[]',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_broker_jobs_shipment on broker_jobs(shipment_id);
 
 `
 

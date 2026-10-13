@@ -10,6 +10,7 @@ import { startCarrierSync } from './containers'
 import { startNotifySweeps } from './notify'
 import { startRecipientSweeps } from './recipient'
 import { stripeWebhook } from './payments'
+import { startCollectionSweeps } from './collections'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
@@ -23,6 +24,7 @@ async function main() {
   startCarrierSync(getDb)
   startNotifySweeps(getDb)
   startRecipientSweeps(getDb)
+  startCollectionSweeps(getDb)
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', 1)

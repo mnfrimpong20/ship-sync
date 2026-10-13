@@ -38,8 +38,10 @@ const invoiceOut = (r: Row, payments: Row[]) => {
     items: J(r.items) as { description: string; qty: number; unit: number }[], subtotal: Number(r.subtotal), tax: Number(r.tax), total: Number(r.total), paid, balance: Math.max(0, Number(r.total) - paid),
     issuedAt: DATE(r.issued_at), dueAt: DATE(r.due_at), notes: r.notes, createdAt: ISO(r.created_at),
     payments: payments.map((p) => ({ id: p.id, amount: Number(p.amount), method: p.method, at: DATE(p.at), note: p.note })),
+    payToken: r.pay_token ?? null, sentAt: ISO(r.sent_at), remindersSent: (J(r.reminders_sent ?? '[]') as { kind: string; at: string; channel: string }[]), lastReminderAt: ISO(r.last_reminder_at),
   }
 }
+export { invoiceOut }
 
 /* ---------------- schemas ---------------- */
 const COUNTRY = z.enum(['GH', 'NG', 'LR', 'TG', 'CI', 'SL', 'SN'])

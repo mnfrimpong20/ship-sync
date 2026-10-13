@@ -20,6 +20,7 @@ import type { ApiUser } from './api'
 import { notify, notifyShipperStaff } from './notify'
 import { shipmentContext } from './documents'
 import { groupageAmount } from './groupage'
+import { onInvoicePaid } from './collections'
 import { statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
 
 type Row = Record<string, any>
@@ -73,7 +74,7 @@ function encode(obj: Record<string, unknown>, prefix = '', out = new URLSearchPa
   }
   return out
 }
-async function stripe<T = Row>(path: string, params?: Record<string, unknown>, method: 'POST' | 'GET' = params ? 'POST' : 'GET'): Promise<T> {
+export async function stripe<T = Row>(path: string, params?: Record<string, unknown>, method: 'POST' | 'GET' = params ? 'POST' : 'GET'): Promise<T> {
   const key = stripeKey(); if (!key) throw new Error('Stripe is not configured.')
   const res = await fetch(`${STRIPE_URL()}/v1${path}`, { method, headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Version': '2024-06-20' }, body: method === 'POST' ? encode(params ?? {}).toString() : undefined })
   const data = (await res.json().catch(() => ({}))) as Row
@@ -93,7 +94,7 @@ export function verifyStripeSignature(raw: Buffer | string, header: string | und
 /* ------------------------------------------------------------------ shapes */
 export type PaymentStatus = 'pending' | 'held' | 'released' | 'paid_out' | 'refunded' | 'cancelled' | 'direct'
 export const paymentOut = (p: Row) => ({
-  id: p.id, shipmentId: p.shipment_id, shipmentRef: p.ref ?? undefined, customer: p.customer ?? undefined, shipperId: p.shipper_id, shipperName: p.shipper_name ?? undefined,
+  id: p.id, shipmentId: p.shipment_id ?? null, invoiceId: p.invoice_id ?? null, shipmentRef: p.ref ?? undefined, customer: p.customer ?? undefined, shipperId: p.shipper_id, shipperName: p.shipper_name ?? undefined,
   items: J(p.items ?? '[]') as { description: string; amountUsd: number }[], amountUsd: Number(p.amount_usd), feeUsd: Number(p.fee_usd), netUsd: Number(p.net_usd),
   status: p.status as PaymentStatus, provider: p.provider as 'stripe' | 'manual', method: p.method ?? null, paidAt: ISO(p.paid_at), releasedAt: ISO(p.released_at), releaseReason: p.release_reason ?? null,
   refundedAt: ISO(p.refunded_at), refundReason: p.refund_reason ?? null, payoutId: p.payout_id ?? null, recordedBy: p.recorded_by ?? null, receiptDocumentId: p.receipt_document_id ?? null, createdAt: ISO(p.created_at),
@@ -108,7 +109,7 @@ const maskDetails = (d: Partial<PayoutDetails> | null | undefined, full: boolean
   const x = { bankName: '', accountName: '', accountNumber: '', routing: '', country: '', mobileMoney: '', ...(d ?? {}) }
   return full ? x : { ...x, accountNumber: x.accountNumber ? `····${x.accountNumber.slice(-4)}` : '', routing: x.routing ? `····${x.routing.slice(-3)}` : '' }
 }
-const SELECT = `select p.*, s.ref, s.customer, sh.name as shipper_name from escrow_payments p join shipments s on s.id = p.shipment_id join shippers sh on sh.id = p.shipper_id`
+const SELECT = `select p.*, s.ref, s.customer, sh.name as shipper_name from escrow_payments p left join shipments s on s.id = p.shipment_id join shippers sh on sh.id = p.shipper_id`
 const PAYOUT_SELECT = `select o.*, sh.name as shipper_name, (select count(*) from escrow_payments e where e.payout_id = o.id)::int as n_payments from payouts o join shippers sh on sh.id = o.shipper_id`
 
 /* ------------------------------------------------------------------ core */
@@ -133,19 +134,22 @@ export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; m
   const cfg = await getSettings(db)
   const amount = Number(p.amount_usd)
   const fee = opts.direct ? 0 : r2(amount * cfg.takeRatePct)
-  const status: PaymentStatus = opts.direct ? 'direct' : 'held'
-  await db.query(`update escrow_payments set status = $2, fee_usd = $3, net_usd = $4, provider_payment_intent = coalesce($5, provider_payment_intent), method = coalesce($6, method), paid_at = now(), recorded_by = coalesce($7, recorded_by) where id = $1`, [p.id, status, fee, r2(amount - fee), opts.intent ?? null, opts.method ?? null, opts.by ?? null])
-  const { rows: ss } = await db.query<Row>('select * from shipments where id = $1', [p.shipment_id]); const s = ss[0]
+  // No shipment behind the payment (a standalone invoice) → nothing to escrow against; released to the shipper's balance at once.
+  const status: PaymentStatus = opts.direct ? 'direct' : p.shipment_id ? 'held' : 'released'
+  await db.query(`update escrow_payments set status = $2, fee_usd = $3, net_usd = $4, provider_payment_intent = coalesce($5, provider_payment_intent), method = coalesce($6, method), paid_at = now(), recorded_by = coalesce($7, recorded_by), released_at = case when $2 = 'released' then now() else released_at end, release_reason = case when $2 = 'released' then 'invoice:no-shipment' else release_reason end where id = $1`, [p.id, status, fee, r2(amount - fee), opts.intent ?? null, opts.method ?? null, opts.by ?? null])
+  const { rows: ss } = p.shipment_id ? await db.query<Row>('select * from shipments where id = $1', [p.shipment_id]) : { rows: [] as Row[] }; const s = ss[0]
   const items = J(p.items ?? '[]') as { kind?: string }[]
   // Insurance premium included → collected.
-  if (items.some((i) => i.kind === 'insurance')) await db.query(`update insurance_policies set payment_status = 'collected', collected_at = now() where shipment_id = $1 and payment_status = 'due' and status <> 'cancelled'`, [p.shipment_id])
+  if (p.shipment_id && items.some((i) => i.kind === 'insurance')) await db.query(`update insurance_policies set payment_status = 'collected', collected_at = now() where shipment_id = $1 and payment_status = 'due' and status <> 'cancelled'`, [p.shipment_id])
   // Open invoice on the shipment → record the payment against it.
-  const { rows: inv } = await db.query<Row>(`select * from invoices where shipment_id = $1 and status in ('sent','draft') order by created_at desc limit 1`, [p.shipment_id])
+  const { rows: inv } = p.invoice_id ? await db.query<Row>(`select * from invoices where id = $1`, [p.invoice_id]) : p.shipment_id ? await db.query<Row>(`select * from invoices where shipment_id = $1 and status in ('sent','draft') order by created_at desc limit 1`, [p.shipment_id]) : { rows: [] as Row[] }
   if (inv[0]) {
     const freight = (J(p.items ?? '[]') as { kind?: string; amountUsd: number }[]).filter((i) => i.kind !== 'insurance').reduce((n, i) => n + i.amountUsd, 0)
     await db.query('insert into payments (id,invoice_id,amount,method,at,note) values ($1,$2,$3,$4,current_date,$5)', ['pay_' + uid(), inv[0].id, Math.round(freight), opts.direct ? opts.method ?? 'bank' : 'ship_sync', opts.direct ? `Recorded by ${opts.by ?? 'office'}` : `Paid online via Ship Sync (${p.id})`])
     const { rows: sum } = await db.query<{ s: string }>('select coalesce(sum(amount),0)::text as s from payments where invoice_id = $1', [inv[0].id])
     await db.query(`update invoices set status = case when $2::int >= total then 'paid' else 'sent' end where id = $1`, [inv[0].id, Number(sum[0].s)])
+    if (Number(sum[0].s) >= Number(inv[0].total) && !opts.direct) await onInvoicePaid(db, inv[0].id)
+    if (!s) await notifyShipperStaff(db, p.shipper_id, { kind: 'payment', title: `Invoice ${inv[0].number} paid online — $${amount.toLocaleString()}`, body: `$${r2(amount - fee).toLocaleString()} after the ${Math.round(cfg.takeRatePct * 100)}% platform fee is in your available balance.`, link: '/dashboard/payments', dedupe: `pay:${p.id}:office` }, ['owner', 'dispatcher'])
   }
   // Receipt into the documents vault (online payments only — the office issues its own receipt for cash).
   if (!opts.direct && s) {

@@ -23,6 +23,8 @@ import { mountInsurance } from './insurance'
 import { mountPayments } from './payments'
 import { mountGroupage } from './groupage'
 import { mountVehicles, vehicleFromRequest, zRequestVehicle } from './vehicles'
+import { mountCollections } from './collections'
+import { mountBrokers } from './brokers'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'driver' }
@@ -490,6 +492,8 @@ export function apiRouter() {
   mountPayments(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountGroupage(r, { getDb, requireUser, HttpError, wrap })
   mountVehicles(r, { getDb, requireUser, HttpError, wrap })
+  mountCollections(r, { getDb, requireUser, HttpError, wrap })
+  mountBrokers(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

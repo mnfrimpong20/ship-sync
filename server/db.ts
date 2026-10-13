@@ -5,6 +5,7 @@ import { sampleShipments, shippers as seedShippers } from '../src/lib/data'
 import { extraShippers } from './seedShippers'
 import { seedRatesDemo } from './rates'
 import { seedPickupsDemo } from './pickups'
+import { seedPaymentsDemo } from './payments'
 
 /** Minimal query interface satisfied by both `pg` and PGlite. */
 export interface Db {
@@ -40,6 +41,7 @@ export async function getDb(): Promise<Db> {
   await seedRunsDemo(db)
   await seedRatesDemo(db)
   await seedPickupsDemo(db)
+  await seedPaymentsDemo(db)
   return db
 }
 
@@ -546,6 +548,54 @@ create table if not exists recipient_receipts (
   ip text not null default '',
   created_at timestamptz not null default now()
 );
+
+create table if not exists escrow_payments (
+  id text primary key,
+  shipment_id text not null references shipments(id) on delete cascade,
+  shipper_id text not null references shippers(id) on delete cascade,
+  user_id text references users(id),
+  items jsonb not null default '[]',
+  amount_usd numeric not null,
+  fee_usd numeric not null default 0,
+  net_usd numeric not null default 0,
+  status text not null default 'pending',
+  provider text not null default 'stripe',
+  provider_session_id text,
+  provider_payment_intent text,
+  provider_refund_id text,
+  method text,
+  paid_at timestamptz,
+  released_at timestamptz,
+  release_reason text,
+  refunded_at timestamptz,
+  refund_reason text,
+  payout_id text,
+  recorded_by text,
+  receipt_document_id text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_escrow_shipment on escrow_payments(shipment_id);
+create index if not exists idx_escrow_shipper on escrow_payments(shipper_id);
+create table if not exists payouts (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  amount_usd numeric not null,
+  status text not null default 'requested',
+  method text not null default 'bank',
+  details jsonb not null default '{}',
+  reference text not null default '',
+  note text not null default '',
+  requested_by text not null default '',
+  requested_at timestamptz not null default now(),
+  paid_at timestamptz,
+  paid_by text
+);
+create table if not exists stripe_events (
+  id text primary key,
+  type text not null default '',
+  received_at timestamptz not null default now()
+);
+alter table shippers add column if not exists payout_details jsonb not null default '{}';
 
 `
 

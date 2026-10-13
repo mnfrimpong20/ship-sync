@@ -16,6 +16,7 @@ import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import type { ShipmentStatus } from '../src/lib/data'
 import { recipientOnStatus } from './recipient'
+import { escrowOnStatus } from './payments'
 
 type Row = Record<string, any>
 interface Deps {
@@ -25,14 +26,14 @@ interface Deps {
   wrap: (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) => void
 }
 
-export const NOTIFY_KINDS = ['quote_received', 'booking_confirmed', 'shipment_status', 'document', 'pickup', 'insurance', 'quote_accepted', 'new_lead', 'container_update', 'invoice_overdue', 'system'] as const
+export const NOTIFY_KINDS = ['quote_received', 'booking_confirmed', 'shipment_status', 'document', 'pickup', 'insurance', 'payment', 'quote_accepted', 'new_lead', 'container_update', 'invoice_overdue', 'system'] as const
 export type NotifyKind = (typeof NOTIFY_KINDS)[number]
 export const kindLabels: Record<NotifyKind, string> = {
   quote_received: 'New quotes', booking_confirmed: 'Booking confirmations', shipment_status: 'Shipment progress', quote_accepted: 'Quotes accepted',
-  document: 'Documents added to a shipment', pickup: 'Pickup bookings', insurance: 'Insurance & claims', new_lead: 'New leads on your lanes', container_update: 'Container updates from the line', invoice_overdue: 'Overdue invoices', system: 'Account',
+  document: 'Documents added to a shipment', pickup: 'Pickup bookings', insurance: 'Insurance & claims', payment: 'Payments & payouts', new_lead: 'New leads on your lanes', container_update: 'Container updates from the line', invoice_overdue: 'Overdue invoices', system: 'Account',
 }
 /** Which kinds each side can receive — drives the preferences page. */
-export const kindsFor = (role: 'customer' | 'shipper'): NotifyKind[] => (role === 'customer' ? ['quote_received', 'booking_confirmed', 'pickup', 'shipment_status', 'document', 'insurance'] : ['new_lead', 'quote_accepted', 'pickup', 'shipment_status', 'document', 'insurance', 'container_update', 'invoice_overdue'])
+export const kindsFor = (role: 'customer' | 'shipper'): NotifyKind[] => (role === 'customer' ? ['quote_received', 'booking_confirmed', 'pickup', 'shipment_status', 'document', 'insurance', 'payment'] : ['new_lead', 'quote_accepted', 'pickup', 'shipment_status', 'document', 'insurance', 'payment', 'container_update', 'invoice_overdue'])
 
 export interface NotifyInput {
   userId: string
@@ -172,6 +173,7 @@ export async function notifyShipmentStatus(db: Db, s: Row, status: ShipmentStatu
     await notify(db, { userId: s.user_id, kind: 'shipment_status', title: m.title(s), body, link: `/track?ref=${s.ref}`, dedupe: `ship:${s.id}:${status}`, emailSubject: m.title(s) })
   }
   await recipientOnStatus(db, s, status, clean)
+  await escrowOnStatus(db, s, status)
   if (status === 'delivered') {
     await notifyShipperStaff(db, s.shipper_id, { kind: 'shipment_status', title: `${s.ref} delivered${extra?.receivedBy ? ` to ${extra.receivedBy}` : ''}`, body: `${s.customer} · ${s.origin} → ${s.destination}.${extra?.photo ? ' POD photo attached to the scan.' : ''}`, link: `/dashboard/shipments`, dedupe: `ship:${s.id}:delivered` }, ['owner', 'dispatcher', 'agent'])
   }

@@ -27,11 +27,11 @@ interface Deps {
   wrap: (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) => void
 }
 
-export const DOC_KINDS = ['packing_list', 'commercial_invoice', 'bill_of_lading', 'customs', 'proof_of_delivery', 'identity', 'insurance', 'photo', 'other'] as const
+export const DOC_KINDS = ['packing_list', 'commercial_invoice', 'bill_of_lading', 'customs', 'proof_of_delivery', 'identity', 'insurance', 'receipt', 'photo', 'other'] as const
 export type DocKind = (typeof DOC_KINDS)[number]
 export const docKindLabels: Record<DocKind, string> = {
   packing_list: 'Packing list', commercial_invoice: 'Commercial invoice', bill_of_lading: 'Bill of lading / AWB', customs: 'Customs form', proof_of_delivery: 'Proof of delivery',
-  identity: 'ID document', insurance: 'Insurance certificate', photo: 'Photo', other: 'Other',
+  identity: 'ID document', insurance: 'Insurance certificate', receipt: 'Payment receipt', photo: 'Photo', other: 'Other',
 }
 const GENERATED: DocKind[] = ['packing_list', 'commercial_invoice', 'proof_of_delivery']
 const MAX_BYTES = 6 * 1024 * 1024

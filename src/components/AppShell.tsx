@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Anchor, BarChart3, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X } from 'lucide-react'
+import { Anchor, BarChart3, Factory, Globe2, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X } from 'lucide-react'
 import { Logo } from './ui'
 import ThemeSwitcher from './ThemeSwitcher'
 import { NotificationBell } from './NotificationBell'
 import { useStore } from '../lib/store'
 import { clientsApi } from '../lib/clients'
+import { SOURCING_SHIPPER } from '../lib/sourcing'
 
 interface Item { to: string; label: string; icon: typeof Inbox; end?: boolean; badge?: number }
 
@@ -37,6 +38,7 @@ export default function AppShell() {
   const staffRole = user.staffRole ?? 'owner'
   const isDriver = isShipper && staffRole === 'driver'
   const canManage = isShipper && (staffRole === 'owner' || staffRole === 'dispatcher')
+  const sourcingTeam = !!user.admin || (isShipper && user.shipperId === SOURCING_SHIPPER && !isDriver)
   const items: Item[] = isDriver
     ? [
         { to: '/dashboard/runs', label: 'My runs', icon: MapPinned, end: true },
@@ -45,6 +47,7 @@ export default function AppShell() {
     : isShipper
     ? [
         { to: '/dashboard/shipper', label: 'Overview', icon: LayoutDashboard, end: true },
+        ...(sourcingTeam ? [{ to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2 } as Item, { to: '/dashboard/suppliers', label: 'Suppliers', icon: Factory } as Item] : []),
         { to: '/dashboard/leads', label: 'Leads & quotes', icon: Inbox, badge: openLeads },
         { to: '/dashboard/rates', label: 'Rate cards', icon: Tags },
         { to: '/dashboard/lanes', label: 'Lane intelligence', icon: BarChart3 },
@@ -69,6 +72,7 @@ export default function AppShell() {
         { to: '/dashboard?tab=requests', label: 'Quote requests', icon: FileText, badge: openLeads },
         { to: '/dashboard?tab=shipments', label: 'Shipments', icon: Package, badge: active },
         { to: '/dashboard?tab=groupage', label: 'Shared barrels', icon: Boxes },
+        { to: '/dashboard?tab=sourcing', label: 'China sourcing', icon: Globe2 },
         { to: '/dashboard?tab=invoices', label: 'Invoices', icon: Receipt },
         { to: '/quote', label: 'New request', icon: PlusCircle },
       ]
@@ -77,7 +81,7 @@ export default function AppShell() {
     ...(isShipper ? [{ to: '/dashboard/scan', label: 'Scan a sticker', icon: ScanLine } as Item] : []),
     ...(isDriver ? [] : [{ to: '/live', label: 'Live map', icon: Radar } as Item]),
     { to: '/track', label: 'Track a shipment', icon: Search },
-    ...(user.admin ? [{ to: '/admin', label: 'Verification', icon: ShieldCheck } as Item] : []),
+    ...(user.admin ? [{ to: '/admin', label: 'Verification', icon: ShieldCheck } as Item, { to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2 } as Item] : []),
   ]
 
   const isActive = (it: Item) => {

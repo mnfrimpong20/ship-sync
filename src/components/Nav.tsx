@@ -8,6 +8,7 @@ import { useStore } from '../lib/store'
 
 const links = [
   { to: '/quote', label: 'Ship' },
+  { to: '/groupage', label: 'Fill a barrel' },
   { to: '/shippers', label: 'Shippers' },
   { to: '/track', label: 'Track' },
   { to: '/live', label: 'Live map' },

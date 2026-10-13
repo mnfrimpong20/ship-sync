@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { BellRing, CalendarCheck, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, Wallet, X } from 'lucide-react'
+import { BellRing, Boxes, CalendarCheck, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Truck, UserCog, Users, UsersRound, Wallet, X } from 'lucide-react'
 import { Logo } from './ui'
 import ThemeSwitcher from './ThemeSwitcher'
 import { NotificationBell } from './NotificationBell'
@@ -47,6 +47,7 @@ export default function AppShell() {
         { to: '/dashboard/shipper', label: 'Overview', icon: LayoutDashboard, end: true },
         { to: '/dashboard/leads', label: 'Leads & quotes', icon: Inbox, badge: openLeads },
         { to: '/dashboard/rates', label: 'Rate cards', icon: Tags },
+        { to: '/dashboard/groupage', label: 'Fill a barrel', icon: Boxes },
         { to: '/dashboard/shipments', label: 'Shipments', icon: Ship, badge: active },
         { to: '/dashboard/containers', label: 'Containers', icon: Container },
         { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders },
@@ -61,6 +62,7 @@ export default function AppShell() {
         { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
         { to: '/dashboard?tab=requests', label: 'Quote requests', icon: FileText, badge: openLeads },
         { to: '/dashboard?tab=shipments', label: 'Shipments', icon: Package, badge: active },
+        { to: '/dashboard?tab=groupage', label: 'Shared barrels', icon: Boxes },
         { to: '/quote', label: 'New request', icon: PlusCircle },
       ]
   const tools: Item[] = [

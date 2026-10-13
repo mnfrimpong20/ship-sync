@@ -1,3 +1,4 @@
+import { publicShipperSql } from './db'
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
 import type { Db } from './db'
@@ -95,7 +96,7 @@ export function recommend(all: Shipper[], n: z.infer<typeof zNeeds>) {
 
 export function mountDirectory(r: Router, d: Deps) {
   const { getDb, shipperOut, wrap } = d
-  const loadAll = async (db: Db) => (await db.query<Row>('select * from shippers')).rows.map(shipperOut)
+  const loadAll = async (db: Db) => (await db.query<Row>(`select * from shippers where ${publicShipperSql()}`)).rows.map(shipperOut)
 
   /** Search + filter + sort + paginate. Public. */
   r.get('/shippers/search', wrap(async (req, res) => {

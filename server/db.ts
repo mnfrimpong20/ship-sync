@@ -6,6 +6,11 @@ import { extraShippers } from './seedShippers'
 import { seedRatesDemo } from './rates'
 import { seedPickupsDemo } from './pickups'
 import { seedPaymentsDemo } from './payments'
+
+/** HIDE_DEMO_SHIPPERS=true removes the fictional seed shippers from every public list (directory, matching, home stats) without deleting them. */
+export const hideDemoShippers = () => /^(1|true|yes)$/i.test(process.env.HIDE_DEMO_SHIPPERS ?? '')
+/** SQL fragment for public shipper queries (`where <publicShipperSql()>`): never the platform's own sourcing desk, and no demo shippers once hidden. */
+export const publicShipperSql = (alias = '') => `${alias}id <> 'ship-sync-sourcing'${hideDemoShippers() ? ` and ${alias}demo = false` : ''}`
 import { seedGroupageDemo } from './groupage'
 import { seedBrokersDemo } from './brokers'
 import { rollSchedule } from './booking'
@@ -963,6 +968,60 @@ alter table sourcing_requests add column if not exists recurring jsonb;
 alter table sourcing_requests add column if not exists parent_id text;
 alter table sourcing_quotes add column if not exists tiers jsonb;
 alter table sourcing_quotes add column if not exists base_price_cny numeric;
+create table if not exists supplier_links (
+  token text primary key,
+  sourcing_id text not null references sourcing_requests(id) on delete cascade,
+  supplier_id text references suppliers(id) on delete set null,
+  created_by text not null default '',
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz,
+  revoked_at timestamptz
+);
+create table if not exists supplier_updates (
+  id text primary key,
+  sourcing_id text not null references sourcing_requests(id) on delete cascade,
+  token text,
+  kind text not null,
+  body text not null default '',
+  author text not null default '',
+  ready_by date,
+  pct int,
+  created_at timestamptz not null default now()
+);
+create table if not exists app_errors (
+  id text primary key,
+  source text not null,
+  route text,
+  method text,
+  status int,
+  message text not null,
+  stack text,
+  user_id text,
+  user_agent text,
+  ip text,
+  resolved_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists app_errors_open on app_errors (created_at desc) where resolved_at is null;
+create table if not exists password_resets (
+  token text primary key,
+  user_id text not null references users(id) on delete cascade,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create table if not exists contact_messages (
+  id text primary key,
+  name text not null,
+  email text not null,
+  phone text not null default '',
+  company text not null default '',
+  topic text not null default 'other',
+  message text not null,
+  ip text not null default '',
+  handled boolean not null default false,
+  created_at timestamptz not null default now()
+);
 create table if not exists agent_earnings (
   id text primary key,
   sourcing_id text not null references sourcing_requests(id) on delete cascade,
@@ -1078,6 +1137,15 @@ async function seedClientDemo(d: Db) {
 async function seedOpsDemo(d: Db) {
   const { rows: owners } = await d.query<{ id: string; name: string; email: string; shipper_id: string }>(`select u.id, u.name, u.email, u.shipper_id from users u where u.role = 'shipper' and u.shipper_id is not null and not exists (select 1 from staff s where s.user_id = u.id)`)
   for (const u of owners) await d.query(`insert into staff (id,shipper_id,user_id,name,email,role,status,base) values ($1,$2,$3,$4,$5,'owner','active','origin') on conflict (shipper_id, email) do nothing`, ['st_' + uid(), u.shipper_id, u.id, u.name, u.email])
+  // Finance and warehouse demo logins (password `shipsync`) — idempotent, so they appear on existing databases too.
+  {
+    const h = await bcrypt.hash(DEMO_PASSWORD, 10)
+    await d.query(`insert into users (id,email,name,password_hash,role,shipper_id) values ('u_demo_ama','ama@goldcoast.demo','Ama Serwaa',$1,'shipper','gold-coast-freight'), ('u_demo_kojo','kojo@goldcoast.demo','Kojo Antwi',$1,'shipper','gold-coast-freight') on conflict (email) do nothing`, [h])
+    await d.query(`insert into staff (id,shipper_id,user_id,name,email,phone,role,status,base,city) values
+      ('st_demo_ama','gold-coast-freight','u_demo_ama','Ama Serwaa','ama@goldcoast.demo','+1 713 555 0170','finance','active','origin','Houston, TX'),
+      ('st_demo_kojo','gold-coast-freight','u_demo_kojo','Kojo Antwi','kojo@goldcoast.demo','+1 713 555 0181','warehouse','active','origin','Houston, TX')
+      on conflict (shipper_id, email) do nothing`)
+  }
   const { rows } = await d.query<{ n: string }>(`select count(*)::text as n from vehicles where shipper_id = 'gold-coast-freight'`)
   if (Number(rows[0].n) > 0) return
   // Demo drivers get real logins (password `shipsync`) so the driver view can be tried.

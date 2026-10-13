@@ -110,7 +110,7 @@ export function mountRates(r: Router, d: Deps) {
   const staff = async (db: Db, req: Request, edit = false) => {
     const u = await requireUser(db, req)
     if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Shipper office staff only.')
-    if (edit && u.staffRole === 'agent') throw new HttpError(403, 'Only owners and dispatchers can change rate cards.')
+    if (edit && (u.staffRole === 'agent' || u.staffRole === 'finance' || u.staffRole === 'warehouse')) throw new HttpError(403, 'Only owners and dispatchers can change rate cards.')
     return u
   }
   const own = async (db: Db, shipperId: string, id: string) => {

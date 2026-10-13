@@ -265,7 +265,7 @@ export function mountPayments(r: Router, d: Deps) {
     if (!office && !owner && !u.admin) throw new HttpError(403, 'You do not have access to this shipment.')
     return { u, s, office, owner }
   }
-  const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.'); return u }
+  const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver' || u.staffRole === 'warehouse') throw new HttpError(403, 'Office staff only.'); return u }
   const byId = async (db: Db, id: string) => { const { rows } = await db.query<Row>(`${SELECT} where p.id = $1`, [id]); if (!rows[0]) throw new HttpError(404, 'Payment not found.'); return rows[0] }
   const latest = async (db: Db, shipmentId: string) => (await db.query<Row>(`${SELECT} where p.shipment_id = $1 and p.status <> 'cancelled' order by p.created_at desc limit 1`, [shipmentId])).rows[0] ?? null
   const publicCfg = (c: PaymentSettings) => ({ enabled: c.enabled, online: c.enabled && stripeMode() !== 'off', mode: stripeMode(), releaseOn: c.releaseOn, customerNote: c.customerNote, takeRatePct: c.takeRatePct })

@@ -14,6 +14,7 @@ import { startCollectionSweeps } from './collections'
 import { startScheduleSweeps } from './booking'
 import { startSourcingSweeps } from './sourcing'
 import { slugForHost } from './brand'
+import { startExportSchedule } from './system'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
@@ -30,6 +31,7 @@ async function main() {
   startCollectionSweeps(getDb)
   startScheduleSweeps(getDb)
   startSourcingSweeps(getDb)
+  startExportSchedule(getDb)
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', 1)

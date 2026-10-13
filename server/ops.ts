@@ -13,7 +13,7 @@ import { distanceKm } from '../src/lib/geo'
 import { notifyShipmentStatus } from './notify'
 
 type Row = Record<string, any>
-export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'driver'
+export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'
 interface Deps {
   getDb: () => Promise<Db>
   requireUser: (db: Db, req: Request) => Promise<ApiUser>
@@ -39,7 +39,7 @@ const runOut = (r: Row, stops: Row[]) => ({
 })
 
 /* ---------------- schemas ---------------- */
-const zRole = z.enum(['owner', 'dispatcher', 'agent', 'driver'])
+const zRole = z.enum(['owner', 'dispatcher', 'agent', 'finance', 'warehouse', 'driver'])
 const zBase = z.enum(['origin', 'destination'])
 const zInvite = z.object({ name: z.string().trim().min(2).max(80), email: z.string().trim().email('Enter a valid email.'), phone: z.string().trim().max(30).default(''), role: zRole.default('agent'), base: zBase.default('origin'), city: z.string().trim().max(60).default('') })
 const zStaffPatch = z.object({ role: zRole.optional(), status: z.enum(['active', 'inactive']).optional(), phone: z.string().trim().max(30).optional(), base: zBase.optional(), city: z.string().trim().max(60).optional(), name: z.string().trim().min(2).max(80).optional() })
@@ -135,7 +135,7 @@ export function mountOps(r: Router, d: Deps) {
   // ---- team
   r.get('/team', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId } = await staffOf(db, req)
-    const { rows } = await db.query<Row>(`select s.*, (select count(*) from runs r where r.driver_id = s.id)::int as run_count from staff s where s.shipper_id = $1 order by case s.role when 'owner' then 0 when 'dispatcher' then 1 when 'agent' then 2 else 3 end, s.name`, [shipperId])
+    const { rows } = await db.query<Row>(`select s.*, (select count(*) from runs r where r.driver_id = s.id)::int as run_count from staff s where s.shipper_id = $1 order by case s.role when 'owner' then 0 when 'dispatcher' then 1 when 'agent' then 2 when 'finance' then 3 when 'warehouse' then 4 else 5 end, s.name`, [shipperId])
     res.json({ team: rows.map(staffOut) })
   }))
   r.post('/team/invite', wrap(async (req, res) => {

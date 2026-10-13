@@ -106,7 +106,7 @@ const zSettings = z.object({ autoRemind: z.boolean(), beforeDays: z.number().int
 
 export function mountCollections(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
-  const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.'); return u }
+  const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver' || u.staffRole === 'warehouse') throw new HttpError(403, 'Office staff only.'); return u }
   const byToken = async (db: Db, token: string) => { const { rows } = await db.query<Row>(`${SELECT} where i.pay_token = $1`, [token]); if (!rows[0] || rows[0].status === 'void') throw new HttpError(404, 'This invoice link is not valid.'); return rows[0] }
   const latestPayment = async (db: Db, invId: string) => (await db.query<Row>(`select p.*, s.ref, s.customer, sh.name as shipper_name from escrow_payments p left join shipments s on s.id = p.shipment_id join shippers sh on sh.id = p.shipper_id where p.invoice_id = $1 and p.status <> 'cancelled' order by p.created_at desc limit 1`, [invId])).rows[0] ?? null
   const checkout = async (db: Db, inv: Row, email: string | null, userId: string | null, returnBase: string) => {

@@ -2,7 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
-import { getDb, makeRef, uid, type Db } from './db'
+import { publicShipperSql, getDb, makeRef, uid, type Db } from './db'
 import { statusLabels, statusOrder, type CargoType, type ShipmentStatus } from '../src/lib/data'
 import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } from '../src/lib/geo'
 import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion, type Position } from './live'
@@ -13,7 +13,7 @@ import { mountInsights } from './insights'
 import { mountContainers } from './containers'
 import { mountLabels } from './labels'
 import { mountScans, piecesForTracking, proofOfDelivery } from './scans'
-import { mountNotifications, notify, notifyShipmentStatus, notifyShipperStaff } from './notify'
+import { emailProvider, emailTemplate, mountNotifications, notify, notifyShipmentStatus, notifyShipperStaff, sendEmail } from './notify'
 import { autoQuoteFromRates, instantQuote, mountRates, type PriceInput } from './rates'
 import { documentCounts, mountDocuments } from './documents'
 import { mountPickups } from './pickups'
@@ -26,6 +26,10 @@ import { mountVehicles, vehicleFromRequest, zRequestVehicle } from './vehicles'
 import { mountCollections } from './collections'
 import { mountBrokers } from './brokers'
 import { mountSourcing } from './sourcing'
+import { mountSite } from './site'
+import { errorRecorder, mountSystem } from './system'
+import { mountBusiness } from './business'
+import { mountSupplierPortal } from './supplierPortal'
 import { mountBooking } from './booking'
 import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
@@ -33,7 +37,7 @@ import { mountReviews } from './reviews'
 import { mountBrand } from './brand'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
-export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'driver' }
+export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver' }
 type Row = Record<string, any>
 
 const SESSION_COOKIE = 'ss_session'
@@ -134,6 +138,17 @@ async function createSession(db: Db, res: Response, userId: string) {
   res.cookie(SESSION_COOKIE, id, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: SESSION_DAYS * 86400000, path: '/' })
 }
 
+/** In-memory sliding-window brake for auth endpoints (per process; good enough for one Replit instance). */
+const buckets = new Map<string, number[]>()
+function throttle(key: string, max: number, windowMs: number, Err: typeof HttpError) {
+  const now = Date.now(); const hits = (buckets.get(key) ?? []).filter((t) => now - t < windowMs)
+  if (hits.length >= max) throw new Err(429, 'Too many attempts — please wait a few minutes and try again.')
+  hits.push(now); buckets.set(key, hits)
+  if (buckets.size > 10_000) for (const [k, v] of buckets) if (v.every((t) => now - t > windowMs)) buckets.delete(k)
+}
+const clearThrottle = (key: string) => buckets.delete(key)
+const clientIp = (req: Request) => (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || req.ip || 'unknown'
+
 const requireUser = async (db: Db, req: Request) => { const u = await currentUser(db, req); if (!u) throw new HttpError(401, 'Please sign in.'); return u }
 const requireAdmin = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (!u.admin) throw new HttpError(403, 'Admin access only.'); return u }
 const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'SS'
@@ -167,7 +182,7 @@ async function signupUser(db: Db, input: { name: string; email: string; password
 /* ---------------- matching ---------------- */
 type MatchInput = { origin: string; destination: string; mode: 'air' | 'ocean' | 'either'; cargo: CargoType }
 async function matchShippers(db: Db, r: MatchInput) {
-  const { rows } = await db.query<Row>('select * from shippers')
+  const { rows } = await db.query<Row>(`select * from shippers where ${publicShipperSql()}`)
   return rows
     .map(shipperOut)
     .map((shipper) => {
@@ -292,16 +307,46 @@ export function apiRouter() {
   // auth
   r.post('/auth/signup', wrap(async (req, res) => {
     const db = await getDb(); const body = zSignup.parse(req.body)
+    throttle(`signup:ip:${clientIp(req)}`, 10, 60 * 60_000, HttpError)
     const user = await signupUser(db, body)
     await createSession(db, res, user.id)
     res.status(201).json({ user })
   }))
   r.post('/auth/login', wrap(async (req, res) => {
     const db = await getDb(); const body = zLogin.parse(req.body)
-    const { rows } = await db.query<Row>('select * from users where email = $1', [body.email.toLowerCase()])
+    const email = body.email.toLowerCase(); const ip = clientIp(req)
+    throttle(`login:ip:${ip}`, 30, 15 * 60_000, HttpError); throttle(`login:email:${email}`, 10, 15 * 60_000, HttpError)
+    const { rows } = await db.query<Row>('select * from users where email = $1', [email])
     if (!rows[0] || !(await bcrypt.compare(body.password, rows[0].password_hash))) throw new HttpError(401, 'Email or password is incorrect.')
+    clearThrottle(`login:email:${email}`)
     await createSession(db, res, rows[0].id)
     res.json({ user: await loadUserWithCompany(db, rows[0].id) })
+  }))
+  /** Forgot password: always answers OK (no account enumeration); emails a 1-hour link when the account exists. */
+  r.post('/auth/forgot', wrap(async (req, res) => {
+    const db = await getDb(); const { email } = z.object({ email: z.string().trim().email() }).parse(req.body); const e = email.toLowerCase()
+    throttle(`forgot:ip:${clientIp(req)}`, 10, 60 * 60_000, HttpError); throttle(`forgot:email:${e}`, 3, 60 * 60_000, HttpError)
+    const { rows } = await db.query<Row>('select id, name from users where email = $1', [e])
+    if (rows[0]) {
+      const token = randomBytes(24).toString('base64url')
+      await db.query(`insert into password_resets (token,user_id,expires_at) values ($1,$2,now() + interval '1 hour')`, [token, rows[0].id])
+      const link = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/#/reset?token=${token}`
+      if (emailProvider().id !== 'off') { try { await sendEmail(e, 'Reset your Ship Sync password', emailTemplate({ name: rows[0].name, title: 'Reset your password', body: 'Someone asked to reset the password for this Ship Sync account. The link below works for one hour. If that was not you, you can ignore this email — nothing changes.', link, cta: 'Choose a new password' })) } catch (err) { console.error('[auth] reset email', err) } }
+      else console.log('[auth] password reset link (email off):', link)
+    }
+    res.json({ ok: true })
+  }))
+  r.post('/auth/reset', wrap(async (req, res) => {
+    const db = await getDb(); const b = z.object({ token: z.string().min(10).max(80), password: z.string().min(8).max(200) }).parse(req.body)
+    throttle(`reset:ip:${clientIp(req)}`, 20, 60 * 60_000, HttpError)
+    const { rows } = await db.query<Row>(`select * from password_resets where token = $1 and used_at is null and expires_at > now()`, [b.token])
+    if (!rows[0]) throw new HttpError(400, 'This reset link has expired or was already used. Request a new one.')
+    const hash = await bcrypt.hash(b.password, 10)
+    await db.query('update users set password_hash = $2 where id = $1', [rows[0].user_id, hash])
+    await db.query('update password_resets set used_at = now() where token = $1', [b.token])
+    await db.query('delete from sessions where user_id = $1', [rows[0].user_id]) // sign out everywhere else
+    await createSession(db, res, rows[0].user_id)
+    res.json({ user: await loadUserWithCompany(db, rows[0].user_id) })
   }))
   r.post('/auth/logout', wrap(async (req, res) => {
     const db = await getDb(); const sid = req.cookies?.[SESSION_COOKIE]
@@ -312,7 +357,7 @@ export function apiRouter() {
 
   // shippers (public)
   mountDirectory(r, { getDb, shipperOut, wrap })
-  r.get('/shippers', wrap(async (_req, res) => { const db = await getDb(); const { rows } = await db.query<Row>('select * from shippers order by rating desc, reviews desc'); res.json({ shippers: rows.map(shipperOut) }) }))
+  r.get('/shippers', wrap(async (_req, res) => { const db = await getDb(); const { rows } = await db.query<Row>(`select * from shippers where ${publicShipperSql()} order by rating desc, reviews desc`); res.json({ shippers: rows.map(shipperOut) }) }))
   r.get('/shippers/:id', wrap(async (req, res) => { const db = await getDb(); const { rows } = await db.query<Row>('select * from shippers where id = $1', [req.params.id]); if (!rows[0]) throw new HttpError(404, 'Shipper not found.'); res.json({ shipper: shipperOut(rows[0]) }) }))
   r.patch('/shippers/me', wrap(async (req, res) => {
     const db = await getDb(); const user = await requireUser(db, req)
@@ -407,6 +452,7 @@ export function apiRouter() {
   r.post('/requests/:id/quotes', wrap(async (req, res) => {
     const db = await getDb(); const user = await requireUser(db, req)
     if (user.role !== 'shipper' || !user.shipperId) throw new HttpError(403, 'Only shipper accounts can send quotes.')
+    if (user.staffRole === 'driver' || user.staffRole === 'warehouse' || user.staffRole === 'finance') throw new HttpError(403, 'Your role can’t send quotes — ask an owner, dispatcher or agent.')
     const body = zQuote.parse(req.body)
     const { rows } = await db.query<Row>('select * from requests where id = $1', [req.params.id])
     if (!rows[0]) throw new HttpError(404, 'Request not found.')
@@ -516,6 +562,10 @@ export function apiRouter() {
   mountReviews(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountBrand(r, { getDb, requireUser, HttpError, wrap })
   mountSourcing(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  mountSite(r, { getDb, requireAdmin, HttpError, wrap })
+  mountSystem(r, { getDb, requireAdmin, HttpError, wrap })
+  mountBusiness(r, { getDb, requireAdmin, wrap })
+  mountSupplierPortal(r, { getDb, requireUser, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.
@@ -550,10 +600,13 @@ export function apiRouter() {
   }))
 
   // errors
-  r.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const record = errorRecorder(getDb, async (req) => (await currentUser(await getDb(), req))?.id ?? null)
+  r.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues[0]?.message ?? 'Invalid input.' })
     if (err instanceof HttpError) return res.status(err.status).json({ error: err.message })
+    if (err && typeof err === 'object' && 'type' in err && (err as { type: string }).type === 'entity.parse.failed') return res.status(400).json({ error: 'Malformed JSON body.' })
     console.error(err)
+    record(err, req).catch(() => {})
     res.status(500).json({ error: 'Something went wrong on our side. Please try again.' })
   })
   return r

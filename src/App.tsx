@@ -1,66 +1,91 @@
-import { useEffect } from 'react'
-import { HashRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom'
+import { Suspense, lazy, useEffect, useState } from 'react'
+import { HashRouter, Link, Route, Routes, useLocation, useOutlet } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
 import AppShell from './components/AppShell'
 import Home from './pages/Home'
 import Quote from './pages/Quote'
-import { ShipperProfile } from './pages/Shippers'
 import Directory from './pages/Directory'
 import Track from './pages/Track'
-import Live from './pages/Live'
-import Admin from './pages/Admin'
-import Clients from './pages/Clients'
-import ClientDetailPage from './pages/ClientDetail'
-import InvoiceView from './pages/InvoiceView'
-import Team from './pages/Team'
-import Fleet from './pages/Fleet'
-import RunsList from './pages/Routes'
-import RoutePlanner from './pages/RoutePlanner'
-import MyRuns from './pages/MyRuns'
-import Shipments from './pages/Shipments'
-import Leads from './pages/Leads'
-import Labels from './pages/Labels'
-import Scan from './pages/Scan'
-import Notifications from './pages/Notifications'
-import Rates from './pages/Rates'
-import DocumentView from './pages/DocumentView'
-import Pickups from './pages/Pickups'
-import Receive from './pages/Receive'
-import Duty from './pages/Duty'
-import Payments from './pages/Payments'
-import GroupagePage from './pages/Groupage'
-import GroupageManage from './pages/GroupageManage'
-import Pay from './pages/Pay'
-import Collections from './pages/Collections'
-import BrokersPage, { BrokerPortal } from './pages/Brokers'
-import Sailings, { PublicSailings } from './pages/Sailings'
-import Warehouse from './pages/Warehouse'
-import LanesPage, { ShipperLanes } from './pages/Lanes'
-import ReviewsPage from './pages/Reviews'
-import BrandedPage, { BrandEditor } from './pages/WhiteLabel'
-import SourcingPage, { SourcingNew, SourcingJob, SourcingBoard, SuppliersPage, QcReportPage, AgentToday } from './pages/Sourcing'
-import Containers from './pages/Containers'
-import ContainerDetail from './pages/ContainerDetail'
-import Join from './pages/Join'
-import { Login, Signup } from './pages/Auth'
-import { CustomerDashboard, ShipperDashboard } from './pages/Dashboard'
+import { AboutPage, ContactPage, LegalPage, NotFound } from './pages/Company'
+import { ForgotPassword, Login, ResetPassword, Signup } from './pages/Auth'
+import { applyPageMeta } from './lib/site'
+
+/* Everything below loads on demand: the marketing core above is the only code a first-time visitor downloads.
+   Named exports are wrapped so React.lazy gets a default. */
+const L = <T extends Record<string, unknown>, K extends keyof T>(load: () => Promise<T>, key: K) => lazy(() => load().then((m) => ({ default: m[key] as React.ComponentType<any> })))
+const ShipperProfile = L(() => import('./pages/Shippers'), 'ShipperProfile')
+const Live = lazy(() => import('./pages/Live'))
+const Admin = lazy(() => import('./pages/Admin'))
+const Clients = lazy(() => import('./pages/Clients'))
+const ClientDetailPage = lazy(() => import('./pages/ClientDetail'))
+const InvoiceView = lazy(() => import('./pages/InvoiceView'))
+const Team = lazy(() => import('./pages/Team'))
+const Fleet = lazy(() => import('./pages/Fleet'))
+const RunsList = lazy(() => import('./pages/Routes'))
+const RoutePlanner = lazy(() => import('./pages/RoutePlanner'))
+const MyRuns = lazy(() => import('./pages/MyRuns'))
+const Shipments = lazy(() => import('./pages/Shipments'))
+const Leads = lazy(() => import('./pages/Leads'))
+const Labels = lazy(() => import('./pages/Labels'))
+const Scan = lazy(() => import('./pages/Scan'))
+const Notifications = lazy(() => import('./pages/Notifications'))
+const Rates = lazy(() => import('./pages/Rates'))
+const DocumentView = lazy(() => import('./pages/DocumentView'))
+const Pickups = lazy(() => import('./pages/Pickups'))
+const Receive = lazy(() => import('./pages/Receive'))
+const Duty = lazy(() => import('./pages/Duty'))
+const Payments = lazy(() => import('./pages/Payments'))
+const GroupagePage = lazy(() => import('./pages/Groupage'))
+const GroupageManage = lazy(() => import('./pages/GroupageManage'))
+const Pay = lazy(() => import('./pages/Pay'))
+const Collections = lazy(() => import('./pages/Collections'))
+const BrokersPage = lazy(() => import('./pages/Brokers'))
+const BrokerPortal = L(() => import('./pages/Brokers'), 'BrokerPortal')
+const Sailings = lazy(() => import('./pages/Sailings'))
+const PublicSailings = L(() => import('./pages/Sailings'), 'PublicSailings')
+const Warehouse = lazy(() => import('./pages/Warehouse'))
+const LanesPage = lazy(() => import('./pages/Lanes'))
+const ShipperLanes = L(() => import('./pages/Lanes'), 'ShipperLanes')
+const ReviewsPage = lazy(() => import('./pages/Reviews'))
+const BrandedPage = lazy(() => import('./pages/WhiteLabel'))
+const SupplierPortalPage = lazy(() => import('./pages/SupplierPortal'))
+const BrandEditor = L(() => import('./pages/WhiteLabel'), 'BrandEditor')
+const SourcingPage = lazy(() => import('./pages/Sourcing'))
+const SourcingNew = L(() => import('./pages/Sourcing'), 'SourcingNew')
+const SourcingJob = L(() => import('./pages/Sourcing'), 'SourcingJob')
+const SourcingBoard = L(() => import('./pages/Sourcing'), 'SourcingBoard')
+const SuppliersPage = L(() => import('./pages/Sourcing'), 'SuppliersPage')
+const QcReportPage = L(() => import('./pages/Sourcing'), 'QcReportPage')
+const AgentToday = L(() => import('./pages/Sourcing'), 'AgentToday')
+const Containers = lazy(() => import('./pages/Containers'))
+const ContainerDetail = lazy(() => import('./pages/ContainerDetail'))
+const Join = lazy(() => import('./pages/Join'))
+const CustomerDashboard = L(() => import('./pages/Dashboard'), 'CustomerDashboard')
+const ShipperDashboard = L(() => import('./pages/Dashboard'), 'ShipperDashboard')
 import { StoreProvider } from './lib/store'
 import { page } from './lib/motion'
 
 function ScrollManager() {
   const { pathname, hash } = useLocation()
   useEffect(() => {
+    applyPageMeta(pathname)
     if (hash) { const el = document.querySelector(hash); if (el) { el.scrollIntoView({ behavior: 'smooth' }); return } }
     window.scrollTo({ top: 0 })
   }, [pathname, hash])
   return null
 }
 
+/** Shown for the few hundred ms while a lazily loaded page's code arrives. */
+function PageLoading() {
+  return <div className="bg-bg text-text" aria-busy="true"><div className="container-x py-24 text-center text-sm text-text-muted">Loading…</div></div>
+}
+
 /** Public marketing site: big header, footer, page transitions. */
 function MarketingLayout() {
   const loc = useLocation()
+  const outlet = useOutlet() // captured per location so the exiting page keeps rendering itself, not the next route
   return (
     <div className="flex min-h-screen flex-col">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-gold focus:px-4 focus:py-2 focus:text-on-accent">Skip to content</a>
@@ -68,12 +93,26 @@ function MarketingLayout() {
       <main id="main" className="flex-1">
         <AnimatePresence mode="wait">
           <motion.div key={loc.pathname} variants={page} initial="initial" animate="animate" exit="exit">
-            <Outlet />
+            <Suspense fallback={<PageLoading />}>{outlet}</Suspense>
           </motion.div>
         </AnimatePresence>
       </main>
       <Footer />
+      <MobileCta />
     </div>
+  )
+}
+
+/** Phone-only sticky bar on long marketing pages so the primary action is never more than a thumb away. */
+function MobileCta() {
+  const loc = useLocation(); const [show, setShow] = useState(false)
+  useEffect(() => { const on = () => setShow(window.scrollY > 640); on(); window.addEventListener('scroll', on, { passive: true }); return () => window.removeEventListener('scroll', on) }, [])
+  if (['/quote', '/login', '/signup', '/join', '/sourcing/new', '/contact'].some((p) => loc.pathname.startsWith(p)) || loc.pathname.startsWith('/pay') || loc.pathname.startsWith('/doc')) return null
+  return (
+    <AnimatePresence>{show && (
+      <motion.div initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }} transition={{ duration: 0.2 }} className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 p-3 backdrop-blur-xl md:hidden" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }} data-testid="mobile-cta">
+        <div className="flex gap-2"><Link to="/track" className="btn-ghost flex-1 !min-h-11 text-sm">Track</Link><Link to="/quote" className="btn-gold flex-[2] !min-h-11 text-sm">Get a quote</Link></div>
+      </motion.div>)}</AnimatePresence>
   )
 }
 
@@ -83,6 +122,7 @@ export default function App() {
       <StoreProvider>
         <HashRouter>
           <ScrollManager />
+          <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route element={<MarketingLayout />}>
               <Route path="/" element={<Home />} />
@@ -100,10 +140,17 @@ export default function App() {
               <Route path="/live" element={<Live />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot" element={<ForgotPassword />} />
+              <Route path="/reset" element={<ResetPassword />} />
               <Route path="/join" element={<Join />} />
               <Route path="/doc/:token" element={<DocumentView shared />} />
               <Route path="/pay/:token" element={<Pay />} />
-              <Route path="*" element={<Home />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/contact" element={<ContactPage />} />
+              <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+              <Route path="/terms" element={<LegalPage kind="terms" />} />
+              <Route path="/shipper-agreement" element={<LegalPage kind="shipper-agreement" />} />
+              <Route path="*" element={<NotFound />} />
             </Route>
             {/* The signed-in application lives in its own shell, apart from the marketing site. */}
             <Route element={<AppShell />}>
@@ -146,8 +193,10 @@ export default function App() {
             <Route path="/dashboard/labels" element={<Labels />} />
             <Route path="/r/:token" element={<Receive />} />
             <Route path="/broker/:token" element={<BrokerPortal />} />
+            <Route path="/s/:token" element={<SupplierPortalPage />} />
             <Route path="/t/:slug" element={<BrandedPage />} />
           </Routes>
+          </Suspense>
         </HashRouter>
       </StoreProvider>
     </MotionConfig>

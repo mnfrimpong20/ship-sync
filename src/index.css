@@ -20,8 +20,8 @@
   --color-border-light: #E3DED3;
   --color-danger: #C03A3A;
 
-  --font-heading: "Fraunces", Georgia, serif;
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-heading: "Manrope Variable", "Manrope", "Inter Variable", system-ui, sans-serif;
+  --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
 
   --radius-sm: 8px;
   --radius-md: 14px;
@@ -89,10 +89,12 @@ body {
   font-size: 17px;
   line-height: 1.6;
 }
-h1, h2, h3, .font-heading { font-family: var(--font-heading); line-height: 1.1; letter-spacing: -0.01em; }
-h1 { font-size: clamp(2.6rem, 5.5vw, 4.75rem); line-height: 1.05; font-weight: 700; }
-h2 { font-size: clamp(2rem, 3.5vw, 3rem); font-weight: 700; }
-h3 { font-size: 1.375rem; line-height: 1.25; font-weight: 600; }
+h1, h2, h3, .font-heading { font-family: var(--font-heading); line-height: 1.1; letter-spacing: -0.022em; font-variant-numeric: tabular-nums; }
+h1 { font-size: clamp(2.4rem, 5vw, 4.25rem); line-height: 1.04; font-weight: 800; letter-spacing: -0.03em; }
+h2 { font-size: clamp(1.85rem, 3.2vw, 2.75rem); font-weight: 800; }
+h3 { font-size: 1.3rem; line-height: 1.25; font-weight: 700; }
+/* Figures in tables, tiles, prices and refs line up column-wise. */
+table, dl, .tabular-nums, [data-testid$="card"] { font-variant-numeric: tabular-nums; }
 
 @utility container-x { @apply mx-auto w-full max-w-[1240px] px-5 md:px-8; }
 /* Edge-to-edge band with generous gutters — header, hero and footer. */
@@ -102,6 +104,7 @@ h3 { font-size: 1.375rem; line-height: 1.25; font-weight: 600; }
 .ss-app .container-x { max-width: none; }
 @media (min-width: 1280px) { .ss-app .container-x { padding-left: 2.5rem; padding-right: 2.5rem; } }
 @utility section-y { @apply py-20 md:py-28; }
+@media print { header, footer, nav, aside, .no-print { display: none !important } body { background: #fff; color: #000 } .card-dark { box-shadow: none !important; break-inside: avoid } }
 @utility eyebrow { @apply text-xs font-semibold uppercase tracking-[0.14em] text-gold-deep; }
 @utility focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-bg; }
 @utility btn { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 text-[15px] font-semibold transition-colors duration-200 focus-ring; }

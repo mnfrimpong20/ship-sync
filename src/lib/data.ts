@@ -94,7 +94,7 @@ export const faqs = [
 export type ShipmentStatus = 'booked' | 'picked_up' | 'at_origin_port' | 'in_transit' | 'arrived' | 'customs' | 'out_for_delivery' | 'delivered'
 
 export const statusLabels: Record<ShipmentStatus, string> = {
-  booked: 'Booked', picked_up: 'Picked up', at_origin_port: 'At origin port', in_transit: 'In transit', arrived: 'Arrived at destination', customs: 'Customs clearance', out_for_delivery: 'Out for delivery', delivered: 'Delivered',
+  booked: 'Booked', picked_up: 'Picked up', at_origin_port: 'At origin port', in_transit: 'In transit', arrived: 'Arrived', customs: 'Customs', out_for_delivery: 'Out for delivery', delivered: 'Delivered',
 }
 export const statusOrder: ShipmentStatus[] = ['booked', 'picked_up', 'at_origin_port', 'in_transit', 'arrived', 'customs', 'out_for_delivery', 'delivered']
 

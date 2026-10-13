@@ -55,7 +55,26 @@ export const SOURCING_SHIPPER = 'ship-sync-sourcing'
 export const cny = (n: number) => `¥${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
 export const usd2 = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
 
+export interface SupplierUpdate { id: string; kind: 'confirm' | 'progress' | 'ready' | 'delay' | 'note'; body: string; by: string; readyBy: string | null; pct: number | null; at: string }
+export interface SupplierLink { token: string; url: string; supplierId: string | null; createdAt: string; lastSeenAt: string | null; revokedAt: string | null }
+export interface SupplierPortal {
+  supplier: { name: string | null; contact: string | null }
+  job: { ref: string; title: string; description: string; quantity: number; unit: string; status: string; destination: string }
+  po: { number: string; incoterm: string; readyBy: string; leadDays: number; placedAt: string; confirmedAt: string | null; confirmedBy: string | null; readyAt: string | null; pct: number | null } | null
+  quote: { title: string; unitPriceCny: number; leadDays: number; notes: string; moq: number | null } | null
+  agent: string
+  updates: SupplierUpdate[]
+  photos: { id: string; title: string; by: string; at: string; url: string }[]
+}
+export const supplierApi = {
+  portal: (token: string) => api<SupplierPortal>(`/s/${token}`),
+  update: (token: string, b: { kind: SupplierUpdate['kind']; body: string; by: string; readyBy?: string; pct?: number }) => api<{ update: SupplierUpdate; status: string }>(`/s/${token}/update`, { json: b }),
+  photo: (token: string, b: { title: string; mime: string; data: string; by: string }) => api<{ photo: SupplierPortal['photos'][number] }>(`/s/${token}/photos`, { json: b }).then((r) => r.photo),
+}
 export const sourcingApi = {
+  supplierLink: (id: string) => api<{ link: SupplierLink | null; updates: SupplierUpdate[] }>(`/sourcing/${id}/supplier-link`),
+  createSupplierLink: (id: string) => api<{ link: SupplierLink; reused: boolean }>(`/sourcing/${id}/supplier-link`, { json: {} }),
+  revokeSupplierLink: (id: string) => api<{ ok: true }>(`/sourcing/${id}/supplier-link`, { method: 'DELETE' }),
   config: () => api<{ enabled: boolean; tiers: { id: Tier; label: string; blurb: string }[]; pricing: Pricing; stats: { agents: number; suppliers: number; verifiedSuppliers: number; completed: number }; steps: { id: Step; label: string }[] }>('/sourcing/config'),
   create: (b: RequestInput) => api<Detail>('/sourcing', { json: b }),
   mine: () => api<{ requests: Job[] }>('/sourcing/mine').then((r) => r.requests),

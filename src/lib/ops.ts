@@ -1,7 +1,7 @@
 import { api } from './store'
 import type { Mode, ShipmentStatus } from './data'
 
-export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'driver'
+export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'
 export type StaffBase = 'origin' | 'destination'
 export interface Staff { id: string; shipperId: string; userId?: string; name: string; email: string; phone: string; role: StaffRole; status: 'invited' | 'active' | 'inactive'; base: StaffBase; city: string; inviteToken?: string; createdAt: string; runCount?: number }
 export interface InviteInput { name: string; email: string; phone?: string; role: StaffRole; base: StaffBase; city?: string }
@@ -20,17 +20,29 @@ export interface Candidate { shipmentId: string; ref: string; mode: Mode; status
 export interface GeoHit { lat: number; lon: number; label: string; cached?: boolean }
 export interface JoinInvite { name: string; email: string; role: StaffRole; company: string }
 
-export const roleLabels: Record<StaffRole, string> = { owner: 'Owner', dispatcher: 'Dispatcher', agent: 'Agent', driver: 'Driver' }
+export const roleLabels: Record<StaffRole, string> = { owner: 'Owner', dispatcher: 'Dispatcher', agent: 'Agent', finance: 'Finance', warehouse: 'Warehouse', driver: 'Driver' }
 export const roleBlurb: Record<StaffRole, string> = {
   owner: 'Full access, including billing, team and company profile.',
   dispatcher: 'Plans routes, manages the fleet and team, works clients and shipments.',
-  agent: 'Works leads, clients, shipments and invoices. Read-only on routes.',
+  agent: 'Works leads, clients, shipments and bookings. No payments, fleet or company settings.',
+  finance: 'Payments, invoices, collections and client accounts. Sees shipments read-only.',
+  warehouse: 'Receiving, scanning, containers and pickups at the warehouse. Nothing commercial.',
   driver: 'Sees only their own runs and marks stops done from the road.',
 }
 export const vehicleTypeLabels: Record<VehicleType, string> = { van: 'Van', truck: 'Truck', box_truck: 'Box truck', pickup: 'Pickup', trailer: 'Trailer', car: 'Car', motorbike: 'Motorbike' }
 export const vehicleStatusLabels: Record<VehicleStatus, string> = { available: 'Available', on_run: 'On a run', maintenance: 'In maintenance', retired: 'Retired' }
 export const runStatusLabels: Record<RunStatus, string> = { planned: 'Planned', in_progress: 'In progress', done: 'Done', cancelled: 'Cancelled' }
 export const canManageOps = (role?: StaffRole) => role === 'owner' || role === 'dispatcher'
+/** Which /dashboard areas each role gets. Owners and dispatchers see everything; the lists are prefixes of pathnames. */
+export const ROLE_AREAS: Record<StaffRole, string[] | 'all'> = {
+  owner: 'all', dispatcher: 'all',
+  agent: ['/dashboard/shipper', '/dashboard/leads', '/dashboard/rates', '/dashboard/lanes', '/dashboard/groupage', '/dashboard/shipments', '/dashboard/containers', '/dashboard/sailings', '/dashboard/pickups', '/dashboard/routes', '/dashboard/warehouse', '/dashboard/clients', '/dashboard/reviews', '/dashboard/team', '/dashboard/documents', '/dashboard/invoices', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/sourcing', '/dashboard/suppliers'],
+  finance: ['/dashboard/shipper', '/dashboard/clients', '/dashboard/payments', '/dashboard/collections', '/dashboard/invoices', '/dashboard/reviews', '/dashboard/shipments', '/dashboard/team', '/dashboard/documents', '/dashboard/notifications'],
+  warehouse: ['/dashboard/warehouse', '/dashboard/containers', '/dashboard/pickups', '/dashboard/shipments', '/dashboard/scan', '/dashboard/labels', '/dashboard/team', '/dashboard/notifications', '/dashboard/documents'],
+  driver: ['/dashboard/runs', '/dashboard/team', '/dashboard/notifications', '/dashboard/scan'],
+}
+export const roleHome: Record<StaffRole, string> = { owner: '/dashboard/shipper', dispatcher: '/dashboard/shipper', agent: '/dashboard/shipper', finance: '/dashboard/shipper', warehouse: '/dashboard/warehouse', driver: '/dashboard/runs' }
+export const roleAllows = (role: StaffRole | undefined, pathname: string) => { const a = ROLE_AREAS[role ?? 'owner']; return a === 'all' || a.some((p) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p + '?')) }
 
 export const opsApi = {
   me: () => api<{ staff: Staff }>('/team/me').then((r) => r.staff),

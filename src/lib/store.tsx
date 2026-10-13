@@ -3,7 +3,7 @@ import { shippers as seedShippers, type CargoType, type Mode, type Shipment, typ
 import type { PositionPayload } from '../components/LiveMap'
 
 export type Role = 'customer' | 'shipper'
-export interface User { id: string; name: string; email: string; role: Role; company?: string; shipperId?: string; admin?: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'driver' }
+export interface User { id: string; name: string; email: string; role: Role; company?: string; shipperId?: string; admin?: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver' }
 export type ShipperProfileInput = Pick<Shipper, 'name' | 'tagline' | 'hq' | 'founded' | 'modes' | 'destinations' | 'origins' | 'cargo' | 'services' | 'about' | 'priceIndex' | 'responseHours'>
 export type AdminShipper = Shipper & { owner: { email: string; name: string } | null; quoteCount: number; shipmentCount: number }
 
@@ -60,6 +60,7 @@ interface Store {
   shipperById: (id: string) => Shipper | undefined
   login: (email: string, password: string) => Promise<User>
   signup: (u: { name: string; email: string; password: string; role: Role; company?: string }) => Promise<User>
+  resetPassword: (token: string, password: string) => Promise<User>
   logout: () => Promise<void>
   refresh: () => Promise<void>
   createRequest: (r: NewRequest) => Promise<QuoteRequest>
@@ -119,6 +120,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback<Store['login']>(async (email, password) => {
     const { user: u } = await api<{ user: User }>('/auth/login', { json: { email, password } })
+    setUser(u); await loadPrivate(u); return u
+  }, [loadPrivate])
+
+  const resetPassword = useCallback<Store['resetPassword']>(async (token, password) => {
+    const { user: u } = await api<{ user: User }>('/auth/reset', { json: { token, password } })
     setUser(u); await loadPrivate(u); return u
   }, [loadPrivate])
 
@@ -182,8 +188,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return shipper
   }, [])
 
-  const value = useMemo<Store>(() => ({ ready, user, shippers, requests, shipments, shipperById, login, signup, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit, updateShipper, adminShippers, adminVerify }),
-    [ready, user, shippers, requests, shipments, shipperById, login, signup, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit, updateShipper, adminShippers, adminVerify])
+  const value = useMemo<Store>(() => ({ ready, user, shippers, requests, shipments, shipperById, login, signup, resetPassword, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit, updateShipper, adminShippers, adminVerify }),
+    [ready, user, shippers, requests, shipments, shipperById, login, signup, resetPassword, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit, updateShipper, adminShippers, adminVerify])
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }
 

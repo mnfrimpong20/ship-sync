@@ -433,6 +433,26 @@ create table if not exists rate_cards (
   updated_at timestamptz not null default now(),
   unique (shipper_id, origin, destination, mode, cargo)
 );
+create table if not exists documents (
+  id text primary key,
+  shipment_id text not null references shipments(id) on delete cascade,
+  shipper_id text not null references shippers(id) on delete cascade,
+  kind text not null default 'other',
+  title text not null,
+  filename text not null default '',
+  mime text not null default '',
+  size int not null default 0,
+  data text,
+  payload jsonb,
+  source text not null default 'upload',
+  visibility text not null default 'shared',
+  uploaded_by text not null default '',
+  uploaded_by_role text not null default 'shipper',
+  share_token text unique,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_documents_shipment on documents(shipment_id);
 
 `
 

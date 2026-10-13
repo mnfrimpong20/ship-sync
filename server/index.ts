@@ -24,7 +24,7 @@ async function main() {
   app.disable('x-powered-by')
   app.set('trust proxy', 1)
   app.use(compression()) // /api/live/region carries thousands of vessels; gzip cuts it ~8x
-  app.use(express.json({ limit: '200kb' }))
+  app.use(express.json({ limit: '10mb' })) // document uploads and POD photos travel as base64 in JSON
   app.use(cookieParser())
   app.use('/api', apiRouter())
 

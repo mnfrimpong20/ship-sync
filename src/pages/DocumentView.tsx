@@ -83,7 +83,23 @@ function ProofOfDeliveryDoc({ p }: { p: DocPayload }) {
   )
 }
 
+function InsuranceCertificate({ p }: { p: DocPayload & { policy?: { certificateNo: string; provider: string; coverage: string; declaredValueUsd: number; rate: number; premiumUsd: number; deductibleUsd: number; terms: string; startsAt: string; insured: string; cargo: string } } }) {
+  const pol = p.policy!
+  return (
+    <Sheet title="Certificate of insurance" number={pol.certificateNo} p={p} foot={<>Issued through Ship Sync on behalf of {pol.provider}. This certificate evidences cover under the terms below; it is not a policy wording. Claims: via the shipment page on Ship Sync within 14 days of delivery.</>}>
+      <section className="mt-6 grid gap-6 sm:grid-cols-2">
+        <Party label="Insured" lines={[pol.insured, p.sender.company, p.sender.city, p.sender.phone]} />
+        <Party label="Consignee" lines={p.receiver ? [p.receiver.name, p.receiver.address, [p.receiver.city, p.receiver.country].filter(Boolean).join(', ')] : ['—']} />
+      </section>
+      <section className="mt-6 rounded-lg bg-slate-50 p-4"><Facts rows={[['Cover', pol.coverage], ['Sum insured', money(pol.declaredValueUsd)], ['Premium', `${money(pol.premiumUsd)} (${(pol.rate * 100).toFixed(1)}%)`], ['Deductible', money(pol.deductibleUsd)], ['Goods', `${pol.cargo}${p.shipment.description ? ` — ${p.shipment.description}` : ''}`], ['Voyage', `${p.shipment.origin} → ${p.shipment.destinationName} (${p.shipment.mode === 'air' ? 'air' : 'ocean'})`], ['Shipment', p.shipment.ref], ['Cover from', fmtDate(pol.startsAt)], ['Carrier / forwarder', p.shipper.name], ['Vessel', p.container?.vesselName || p.shipment.vesselName || null]]} /></section>
+      <section className="mt-6 text-xs leading-relaxed text-slate-700"><p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Terms</p><p className="mt-1">{pol.terms}</p></section>
+      <div className="mt-10 grid gap-8 sm:grid-cols-2 text-xs text-slate-600"><div className="border-t border-slate-400 pt-2">For {pol.provider}</div><div className="border-t border-slate-400 pt-2">Ship Sync — issued {fmtDate(p.generatedAt)}</div></div>
+    </Sheet>
+  )
+}
+
 export function GeneratedDoc({ kind, p }: { kind: string; p: DocPayload }) {
+  if (kind === 'insurance' && (p as { policy?: unknown }).policy) return <InsuranceCertificate p={p} />
   if (kind === 'packing_list') return <PackingList p={p} />
   if (kind === 'commercial_invoice') return <CommercialInvoice p={p} />
   if (kind === 'proof_of_delivery') return <ProofOfDeliveryDoc p={p} />

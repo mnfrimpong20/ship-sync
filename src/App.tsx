@@ -29,6 +29,7 @@ import DocumentView from './pages/DocumentView'
 import Pickups from './pages/Pickups'
 import Receive from './pages/Receive'
 import Duty from './pages/Duty'
+import Payments from './pages/Payments'
 import Containers from './pages/Containers'
 import ContainerDetail from './pages/ContainerDetail'
 import Join from './pages/Join'
@@ -94,6 +95,7 @@ export default function App() {
               <Route path="/dashboard/leads" element={<Leads />} />
               <Route path="/dashboard/rates" element={<Rates />} />
               <Route path="/dashboard/pickups" element={<Pickups />} />
+              <Route path="/dashboard/payments" element={<Payments />} />
               <Route path="/dashboard/containers" element={<Containers />} />
               <Route path="/dashboard/containers/:id" element={<ContainerDetail />} />
               <Route path="/dashboard/clients" element={<Clients />} />

@@ -70,6 +70,7 @@ export default function AppShell() {
         { to: '/dashboard/reviews', label: 'Reviews', icon: Star, group: 'Money' },
         ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck, group: 'Company' } as Item] : []),
         { to: '/dashboard/team', label: 'Team', icon: UsersRound, group: 'Company' },
+        ...(canManage ? [{ to: '/dashboard/verification', label: 'Verification', icon: ShieldCheck, group: 'Company' } as Item] : []),
         ...(staffRole === 'owner' ? [{ to: '/dashboard/shipper?view=profile', label: 'Company profile', icon: UserCog, group: 'Company' } as Item] : []),
       ]
     : [

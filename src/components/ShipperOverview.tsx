@@ -5,6 +5,8 @@ import { AlertTriangle, ArrowRight, Bell, CalendarDays, Clock, FileText, Inbox, 
 import { insightsApi, type AttentionItem, type Kpi, type Overview, type WeekPoint } from '../lib/insights'
 import { fmtDateTime, money } from './ui'
 import { fadeUp, stagger } from '../lib/motion'
+import { OnboardingChecklist } from './Onboarding'
+import { useStore } from '../lib/store'
 
 /* ---------- small pieces ---------- */
 function Delta({ d }: { d?: number | null }) {
@@ -111,6 +113,7 @@ function Attention({ items }: { items: AttentionItem[] }) {
 
 /* ---------- page section ---------- */
 export default function ShipperOverview({ firstName }: { firstName: string }) {
+  const { user } = useStore()
   const [o, setO] = useState<Overview | null>(null)
   const [error, setError] = useState('')
   useEffect(() => { let live = true; insightsApi.overview().then((d) => live && setO(d)).catch((e) => live && setError(e instanceof Error ? e.message : 'Could not load insights.')); return () => { live = false } }, [])
@@ -124,6 +127,8 @@ export default function ShipperOverview({ firstName }: { firstName: string }) {
 
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="mt-8 space-y-8">
+      {/* first-run checklist: disappears once the core steps are done */}
+      <OnboardingChecklist canDismiss={user?.staffRole === 'owner' || user?.staffRole === 'dispatcher'} />
       {/* attention */}
       <motion.section variants={fadeUp} aria-labelledby="att-h">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="att-h" className="!text-lg">{greet}, {firstName}.</h2><p className="text-sm text-text-muted">{summary}</p></div>{o.attention.length > 4 && <span className="text-xs text-text-muted">+{o.attention.length - 4} more below</span>}</div>

@@ -44,7 +44,7 @@ export function DutyForm({ value, onChange, meta, lockDestination, cargo }: { va
         </>
       )}
       {value.goods === 'personal_effects' && value.destination === 'GH' && <label className="inline-flex items-center gap-2 text-xs sm:col-span-2"><input type="checkbox" className="h-4 w-4 accent-[var(--color-gold)]" checked={Boolean(value.exemptPersonalEffects)} onChange={(e) => set({ exemptPersonalEffects: e.target.checked })} /> Returning resident — personal effects exempt from duty</label>}
-      <label className="text-xs text-text-muted sm:col-span-2">Exchange rate ({value.destination === 'NG' ? 'NGN' : 'GHS'} per USD) — leave blank for today’s indicative rate<input type="number" min={0} step="0.01" aria-label="Exchange rate" className="input-dark mt-1 !min-h-9 !w-40 text-sm tabular-nums" value={value.fx ?? ''} placeholder={String(meta?.fx[value.destination] ?? '')} onChange={(e) => set({ fx: e.target.value === '' ? undefined : Number(e.target.value) || undefined })} /></label>
+      <label className="grid gap-1 text-xs text-text-muted sm:col-span-2"><span>Exchange rate ({value.destination === 'NG' ? 'NGN' : 'GHS'} per USD) — leave blank for today’s indicative rate</span><input type="number" min={0} step="0.01" aria-label="Exchange rate" className="input-dark !min-h-9 !w-40 text-sm tabular-nums" value={value.fx ?? ''} placeholder={String(meta?.fx[value.destination] ?? '')} onChange={(e) => set({ fx: e.target.value === '' ? undefined : Number(e.target.value) || undefined })} /></label>
     </div>
   )
 }

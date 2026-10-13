@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { siteApi, type SiteStats } from '../lib/site'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { ArrowRight, BadgeCheck, Plane, Ship, ShieldCheck, Clock } from 'lucide-react'
@@ -7,6 +8,8 @@ import { countries, origins, type Mode } from '../lib/data'
 import HeroVideo from './HeroVideo'
 
 export default function Hero() {
+  const [stats, setStats] = useState<SiteStats | null>(null)
+  useEffect(() => { siteApi.stats().then(setStats).catch(() => {}) }, [])
   const nav = useNavigate()
   const [origin, setOrigin] = useState('New York, NY')
   const [dest, setDest] = useState('GH')
@@ -36,7 +39,7 @@ export default function Hero() {
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/signup?role=shipper" className="btn-ghost w-full !border-white/50 !text-white hover:!border-white hover:!bg-white/10 sm:w-auto">List your shipping company</Link></motion.div>
           </motion.div>
           <motion.ul variants={fadeUp} className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-text-muted">
-            <li className="flex items-center gap-2"><BadgeCheck size={16} className="text-gold" aria-hidden="true" /> 120+ verified shippers</li>
+            <li className="flex items-center gap-2"><BadgeCheck size={16} className="text-gold" aria-hidden="true" /> {stats ? `${stats.verifiedShippers} verified shippers` : 'Verified shippers only'}</li>
             <li className="flex items-center gap-2"><ShieldCheck size={16} className="text-gold" aria-hidden="true" /> Licence & insurance checked</li>
             <li className="flex items-center gap-2"><Clock size={16} className="text-gold" aria-hidden="true" /> Quotes within 24 hours</li>
           </motion.ul>
@@ -83,7 +86,7 @@ export default function Hero() {
 
       <div className="container-fluid relative">
         <motion.dl initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger} className="grid grid-cols-2 gap-6 border-t border-border py-10 md:grid-cols-4">
-          {[['120+', 'Verified shippers'], ['7', 'West African countries'], ['48k', 'Shipments quoted'], ['94%', 'Average on-time rate']].map(([v, l]) => (
+          {[[stats ? String(stats.verifiedShippers) : '—', 'Verified shippers'], [stats ? String(stats.destinations) : '7', 'West African countries'], [stats ? stats.quotes.toLocaleString() : '—', 'Quotes issued'], [stats ? `${stats.onTimePct}%` : '—', 'Average on-time rate']].map(([v, l]) => (
             <motion.div key={l} variants={fadeUp}>
               <dt className="text-sm text-text-muted">{l}</dt>
               <dd className="font-heading text-3xl font-bold text-text md:text-4xl">{v}</dd>

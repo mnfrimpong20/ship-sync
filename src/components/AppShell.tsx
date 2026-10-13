@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Suspense, useEffect, useState } from 'react'
+import { Link, NavLink, Navigate, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Anchor, BarChart3, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X } from 'lucide-react'
 import { Logo } from './ui'
@@ -8,6 +8,7 @@ import { NotificationBell } from './NotificationBell'
 import { useStore } from '../lib/store'
 import { clientsApi } from '../lib/clients'
 import { SOURCING_SHIPPER } from '../lib/sourcing'
+import { roleAllows, roleHome } from '../lib/ops'
 
 interface Item { to: string; label: string; icon: typeof Inbox; end?: boolean; badge?: number; group?: string }
 
@@ -18,6 +19,7 @@ interface Item { to: string; label: string; icon: typeof Inbox; end?: boolean; b
 export default function AppShell() {
   const { ready, user, logout, requests, shipments } = useStore()
   const loc = useLocation()
+  const outlet = useOutlet()
   const nav = useNavigate()
   const [open, setOpen] = useState(false)
   const [menu, setMenu] = useState(false)
@@ -30,6 +32,8 @@ export default function AppShell() {
 
   if (!ready) return <div className="grid min-h-screen place-items-center bg-bg text-text-muted">Loading…</div>
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
+  // Staff see only their area: a warehouse clerk who lands on the owner's overview goes to the warehouse, a finance user asking for Fleet goes home.
+  if (user.role === 'shipper' && user.staffRole && !user.admin && loc.pathname.startsWith('/dashboard') && !roleAllows(user.staffRole, loc.pathname)) return <Navigate to={roleHome[user.staffRole]} replace />
 
   const isShipper = user.role === 'shipper'
   const openLeads = isShipper ? requests.filter((r) => r.status === 'open' && !r.quotes.some((q) => q.shipperId === user.shipperId)).length : requests.reduce((n, r) => n + (r.status === 'open' ? r.quotes.length : 0), 0)
@@ -38,6 +42,7 @@ export default function AppShell() {
   const staffRole = user.staffRole ?? 'owner'
   const isDriver = isShipper && staffRole === 'driver'
   const canManage = isShipper && (staffRole === 'owner' || staffRole === 'dispatcher')
+  const allowed = (it: Item) => !isShipper || user.admin || roleAllows(staffRole, it.to.split('?')[0]) || !it.to.startsWith('/dashboard')
   const sourcingTeam = !!user.admin || (isShipper && user.shipperId === SOURCING_SHIPPER && !isDriver)
   const items: Item[] = isDriver
     ? [
@@ -76,12 +81,13 @@ export default function AppShell() {
         { to: '/dashboard?tab=invoices', label: 'Invoices', icon: Receipt },
         { to: '/quote', label: 'New request', icon: PlusCircle },
       ]
+  const visible = items.filter(allowed)
   const tools: Item[] = [
     { to: '/dashboard/notifications', label: 'Notifications', icon: BellRing },
     ...(isShipper ? [{ to: '/dashboard/scan', label: 'Scan a sticker', icon: ScanLine } as Item] : []),
     ...(isDriver ? [] : [{ to: '/live', label: 'Live map', icon: Radar } as Item]),
     { to: '/track', label: 'Track a shipment', icon: Search },
-    ...(user.admin ? [{ to: '/admin', label: 'Verification', icon: ShieldCheck } as Item, { to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2 } as Item] : []),
+    ...(user.admin ? [{ to: '/admin', label: 'Business', icon: BarChart3, end: true } as Item, { to: '/admin?view=attention', label: 'Attention', icon: BellRing } as Item, { to: '/admin?view=shippers', label: 'Verification', icon: ShieldCheck } as Item, { to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2 } as Item] : []),
   ]
 
   const isActive = (it: Item) => {
@@ -111,8 +117,8 @@ export default function AppShell() {
       <div className="flex h-16 items-center justify-between px-5"><Logo /><button onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-lg text-text-muted lg:hidden focus-ring" aria-label="Close menu"><X size={18} /></button></div>
       <div className="px-4 pb-3"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : 'Customer'}</p>{isShipper && user.staffRole && <p className="text-[11px] text-text-muted/70">{user.staffRole.charAt(0).toUpperCase() + user.staffRole.slice(1)}</p>}</div>
       <nav className="flex-1 space-y-5 overflow-y-auto px-3" aria-label="Application">
-        <NavItems list={items.filter((i) => !i.group)} />
-        {Array.from(new Set(items.map((i) => i.group).filter(Boolean))).map((g) => <div key={g}><p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted/70">{g}</p><NavItems list={items.filter((i) => i.group === g)} /></div>)}
+        <NavItems list={visible.filter((i) => !i.group)} />
+        {Array.from(new Set(visible.map((i) => i.group).filter(Boolean))).map((g) => <div key={g}><p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted/70">{g}</p><NavItems list={visible.filter((i) => i.group === g)} /></div>)}
         <div><p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted/70">Tools</p><NavItems list={tools} /></div>
       </nav>
       <div className="border-t border-border p-3">
@@ -122,7 +128,7 @@ export default function AppShell() {
   )
 
   return (
-    <div className="min-h-screen bg-bg text-text lg:grid lg:grid-cols-[256px_1fr]">
+    <div className="min-h-screen bg-bg text-text lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
       <aside className="no-print sticky top-0 hidden h-screen border-r border-border bg-surface/60 lg:block">{sidebar}</aside>
       <AnimatePresence>
         {open && (
@@ -132,9 +138,9 @@ export default function AppShell() {
           </motion.div>
         )}
       </AnimatePresence>
-      <div className="flex min-h-screen flex-col">
-        <header className="no-print sticky top-0 z-40 flex h-16 items-center justify-between gap-4 border-b border-border bg-bg/85 px-4 backdrop-blur-xl md:px-8">
-          <div className="flex items-center gap-3">
+      <div className="flex min-h-screen min-w-0 flex-col">
+        <header className="no-print sticky top-0 z-40 flex h-16 items-center justify-between gap-2 border-b border-border bg-bg/85 px-3 backdrop-blur-xl sm:gap-4 sm:px-4 md:px-8">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button onClick={() => setOpen(true)} className="grid h-10 w-10 place-items-center rounded-lg text-text focus-ring lg:hidden" aria-label="Open menu"><Menu size={20} /></button>
             <span className="lg:hidden"><Logo tagline={false} /></span>
           </div>
@@ -142,9 +148,9 @@ export default function AppShell() {
             <ThemeSwitcher compact />
             <NotificationBell />
             <div className="relative">
-              <button onClick={() => setMenu((m) => !m)} className="btn-ghost !min-h-10 !px-3 text-sm" aria-expanded={menu} aria-haspopup="menu">
+              <button onClick={() => setMenu((m) => !m)} className="btn-ghost !min-h-10 !px-2 text-sm sm:!px-3" aria-expanded={menu} aria-haspopup="menu">
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-gold text-[11px] font-bold text-on-accent">{user.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}</span>
-                <span className="hidden sm:inline">{user.name.split(' ')[0]}</span><ChevronDown size={14} aria-hidden="true" />
+                <span className="hidden sm:inline">{user.name.split(' ')[0]}</span><ChevronDown size={14} className="hidden sm:inline" aria-hidden="true" />
               </button>
               <AnimatePresence>
                 {menu && (
@@ -162,7 +168,7 @@ export default function AppShell() {
         <main id="main" className="ss-app flex-1">
           <AnimatePresence mode="wait">
             <motion.div key={loc.pathname} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-              <Outlet />
+              <Suspense fallback={<div className="p-10 text-center text-sm text-text-muted" aria-busy="true">Loading…</div>}>{outlet}</Suspense>
             </motion.div>
           </AnimatePresence>
         </main>

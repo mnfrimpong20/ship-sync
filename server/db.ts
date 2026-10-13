@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs'
 import bcrypt from 'bcryptjs'
 import { sampleShipments, shippers as seedShippers } from '../src/lib/data'
 import { extraShippers } from './seedShippers'
+import { seedRatesDemo } from './rates'
 
 /** Minimal query interface satisfied by both `pg` and PGlite. */
 export interface Db {
@@ -36,6 +37,7 @@ export async function getDb(): Promise<Db> {
   await seedOpenLeads(db)
   await seedContainerDemo(db)
   await seedRunsDemo(db)
+  await seedRatesDemo(db)
   return db
 }
 
@@ -409,6 +411,28 @@ create table if not exists notification_prefs (
 );
 alter table invoices add column if not exists overdue_notified_at timestamptz;
 alter table scans add column if not exists received_by text not null default '';
+create table if not exists rate_cards (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  origin text not null default '',
+  destination text not null,
+  mode text not null,
+  cargo text not null,
+  price int not null,
+  unit text not null default 'unit',
+  min_charge int not null default 0,
+  pickup_fee int not null default 0,
+  delivery_fee int not null default 0,
+  insurance_fee int not null default 0,
+  transit_days int not null,
+  valid_days int not null default 10,
+  notes text not null default '',
+  auto_send boolean not null default false,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (shipper_id, origin, destination, mode, cargo)
+);
 
 `
 

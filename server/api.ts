@@ -14,6 +14,7 @@ import { mountContainers } from './containers'
 import { mountLabels } from './labels'
 import { mountScans, piecesForTracking, proofOfDelivery } from './scans'
 import { mountNotifications, notify, notifyShipmentStatus, notifyShipperStaff } from './notify'
+import { autoQuoteFromRates, instantQuote, mountRates, type PriceInput } from './rates'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'driver' }
@@ -173,7 +174,10 @@ async function matchShippers(db: Db, r: MatchInput) {
 
 /** Fictional demo shippers reply automatically so the marketplace can be tried without real forwarders. */
 async function demoAutoQuotes(db: Db, req: Row) {
-  const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })).filter((m) => m.shipper.demo).slice(0, 4)
+  // Shippers that publish rate cards price for themselves — the simulator leaves them alone.
+  const { rows: priced } = await db.query<Row>('select distinct shipper_id from rate_cards where active')
+  const real = new Set(priced.map((p) => p.shipper_id))
+  const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })).filter((m) => m.shipper.demo && !real.has(m.shipper.id)).slice(0, 4)
   const base: Record<CargoType, number> = { barrels: 160, boxes: 95, pallets: 420, vehicle: 1650, container20: 3900, container40: 5600, commercial: 900 }
   const airMult = req.mode === 'air' ? 3.2 : 1
   for (const [i, m] of matches.entries()) {
@@ -186,6 +190,18 @@ async function demoAutoQuotes(db: Db, req: Row) {
       [uid(), req.id, m.shipper.id, price, transit, new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), `${m.shipper.tagline}. ${req.delivery ? 'Door delivery included.' : 'Consignee collects at port/airport.'} Duty and destination taxes payable by consignee.`, JSON.stringify(includes)])
   }
   if (matches.length) await notify(db, { userId: req.user_id, kind: 'quote_received', title: `${matches.length} quote${matches.length === 1 ? '' : 's'} for ${req.ref}`, body: `${matches.map((m) => m.shipper.name).join(', ')} ${matches.length === 1 ? 'has' : 'have'} priced your ${req.origin} → ${req.destination} request. Compare and accept the one you like.`, link: '/dashboard', dedupe: `rq:${req.id}:demo-quotes` })
+}
+
+/** Shippers with a published, auto-send rate card for this lane quote instantly; the customer hears about it right away. */
+async function instantQuotesFromRates(db: Db, req: Row) {
+  const matches = await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })
+  const quoted = await autoQuoteFromRates(db, req, matches.map((m) => m.shipper.id))
+  for (const q of quoted) {
+    const name = matches.find((m) => m.shipper.id === q.shipperId)?.shipper.name ?? 'A shipper'
+    await notify(db, { userId: req.user_id, kind: 'quote_received', title: `Instant quote: ${name} — $${q.price.toLocaleString()} for ${req.ref}`, body: `${name} publishes rates for this lane, so your price is ready now. Open your dashboard to compare and accept.`, link: '/dashboard', dedupe: `rq:${req.id}:rate:${q.shipperId}` })
+    await notifyShipperStaff(db, q.shipperId, { kind: 'new_lead', title: `Instant quote sent — ${req.ref}`, body: `$${q.price.toLocaleString()} went to ${req.contact_name} from your rate card (${req.quantity} × ${req.cargo}, ${req.origin} → ${req.destination}).`, link: '/dashboard/leads', dedupe: `lead:${req.id}:auto` }, ['owner', 'dispatcher', 'agent'])
+  }
+  return quoted
 }
 
 /** Shippers whose lanes match a fresh request hear about it as a lead (unless they already auto-quoted it). */
@@ -218,6 +234,7 @@ const zRole = z.enum(['customer', 'shipper'])
 const zSignup = z.object({ name: z.string().trim().min(2, 'Enter your name.'), email: z.string().trim().email('Enter a valid email address.'), password: z.string().min(8, 'Password must be at least 8 characters.'), role: zRole, company: z.string().trim().optional() })
 const zLogin = z.object({ email: z.string().trim().email('Enter a valid email address.'), password: z.string().min(1, 'Enter your password.') })
 const zMatch = z.object({ origin: z.string().min(1), destination: z.string().length(2), mode: z.enum(['air', 'ocean', 'either']), cargo: z.enum(['barrels', 'boxes', 'pallets', 'vehicle', 'container20', 'container40', 'commercial']) })
+const zMatchPriced = zMatch.extend({ quantity: z.number().int().min(1).max(10_000).optional(), weightKg: z.number().min(0).optional(), pickup: z.boolean().optional(), delivery: z.boolean().optional(), insurance: z.boolean().optional() })
 const zRequest = zMatch.extend({
   quantity: z.number().int().min(1), weightKg: z.number().int().min(0).optional(), description: z.string().max(2000).default(''), pickup: z.boolean(), delivery: z.boolean(), insurance: z.boolean(),
   readyDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), contact: z.object({ name: z.string().trim().min(2), email: z.string().trim().email(), phone: z.string().trim().min(7) }),
@@ -310,7 +327,13 @@ export function apiRouter() {
     res.json({ shipper: shipperOut(rows[0]) })
   }))
 
-  r.post('/match', wrap(async (req, res) => { const db = await getDb(); res.json({ matches: await matchShippers(db, zMatch.parse(req.body)) }) }))
+  r.post('/match', wrap(async (req, res) => {
+    const db = await getDb(); const b = zMatchPriced.parse(req.body)
+    const matches = await matchShippers(db, b)
+    const priced = []
+    for (const m of matches) { const q = await instantQuote(db, m.shipper.id, b as PriceInput); priced.push({ ...m, estimate: q ? { price: q.price, transitDays: q.transitDays, mode: q.mode, instant: q.autoSend } : null }) }
+    res.json({ matches: priced })
+  }))
 
   // requests
   r.get('/requests', wrap(async (req, res) => {
@@ -322,7 +345,13 @@ export function apiRouter() {
     const s = shipperOut(me[0])
     const mine = all.filter((q) => q.quotes.some((x) => x.shipperId === user.shipperId) || (s.destinations.includes(q.destination) && (q.mode === 'either' || s.modes.includes(q.mode))))
     // hide other shippers' prices from competitors — keep only count + own quote
-    res.json({ requests: mine.map((q) => ({ ...q, quotes: q.quotes.filter((x) => x.shipperId === user.shipperId), competingQuotes: q.quotes.filter((x) => x.shipperId !== user.shipperId).length })) })
+    const out = []
+    for (const q of mine) {
+      const mineQ = q.quotes.filter((x) => x.shipperId === user.shipperId)
+      const suggested = q.status === 'open' && !mineQ.length ? await instantQuote(db, user.shipperId!, { origin: q.origin, destination: q.destination, mode: q.mode, cargo: q.cargo, quantity: q.quantity, weightKg: q.weightKg, pickup: q.pickup, delivery: q.delivery, insurance: q.insurance }) : null
+      out.push({ ...q, quotes: mineQ, competingQuotes: q.quotes.filter((x) => x.shipperId !== user.shipperId).length, suggested: suggested ? { price: suggested.price, transitDays: suggested.transitDays, notes: suggested.notes, includes: suggested.includes, breakdown: suggested.breakdown } : null })
+    }
+    res.json({ requests: out })
   }))
   r.post('/requests', wrap(async (req, res) => {
     const db = await getDb(); const body = zRequest.parse(req.body)
@@ -340,6 +369,7 @@ export function apiRouter() {
       [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone],
     )
     const { rows } = await db.query<Row>('select * from requests where id = $1', [id])
+    await instantQuotesFromRates(db, rows[0])
     if (DEMO_AUTO_QUOTES) await demoAutoQuotes(db, rows[0])
     await notifyNewLead(db, rows[0])
     const [request] = await loadRequests(db, 'id = $1', [id])
@@ -440,6 +470,7 @@ export function apiRouter() {
   mountLabels(r, { getDb, requireUser, HttpError, wrap })
   mountScans(r, { getDb, requireUser, HttpError, wrap })
   mountNotifications(r, { getDb, requireUser, HttpError, wrap })
+  mountRates(r, { getDb, requireUser, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

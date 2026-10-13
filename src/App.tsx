@@ -51,6 +51,7 @@ const ShipperLanes = L(() => import('./pages/Lanes'), 'ShipperLanes')
 const ReviewsPage = lazy(() => import('./pages/Reviews'))
 const BrandedPage = lazy(() => import('./pages/WhiteLabel'))
 const SupplierPortalPage = lazy(() => import('./pages/SupplierPortal'))
+const Verification = lazy(() => import('./pages/Verification'))
 const BrandEditor = L(() => import('./pages/WhiteLabel'), 'BrandEditor')
 const SourcingPage = lazy(() => import('./pages/Sourcing'))
 const SourcingNew = L(() => import('./pages/Sourcing'), 'SourcingNew')
@@ -182,6 +183,7 @@ export default function App() {
               <Route path="/dashboard/invoices/:id" element={<InvoiceView />} />
               <Route path="/dashboard/documents/:id" element={<DocumentView />} />
               <Route path="/dashboard/team" element={<Team />} />
+              <Route path="/dashboard/verification" element={<Verification />} />
               <Route path="/dashboard/fleet" element={<Fleet />} />
               <Route path="/dashboard/routes" element={<RunsList />} />
               <Route path="/dashboard/routes/:id" element={<RoutePlanner />} />

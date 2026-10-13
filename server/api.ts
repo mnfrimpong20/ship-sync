@@ -17,6 +17,7 @@ import { mountNotifications, notify, notifyShipmentStatus, notifyShipperStaff } 
 import { autoQuoteFromRates, instantQuote, mountRates, type PriceInput } from './rates'
 import { documentCounts, mountDocuments } from './documents'
 import { mountPickups } from './pickups'
+import { mountRecipient } from './recipient'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'driver' }
@@ -476,6 +477,7 @@ export function apiRouter() {
   mountRates(r, { getDb, requireUser, HttpError, wrap })
   mountDocuments(r, { getDb, requireUser, HttpError, wrap })
   mountPickups(r, { getDb, requireUser, HttpError, wrap })
+  mountRecipient(r, { getDb, requireUser, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

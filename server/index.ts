@@ -8,6 +8,7 @@ import { getDb } from './db'
 import { ais, startAirSweep } from './live'
 import { startCarrierSync } from './containers'
 import { startNotifySweeps } from './notify'
+import { startRecipientSweeps } from './recipient'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
@@ -20,6 +21,7 @@ async function main() {
   startAirSweep()
   startCarrierSync(getDb)
   startNotifySweeps(getDb)
+  startRecipientSweeps(getDb)
   const app = express()
   app.disable('x-powered-by')
   app.set('trust proxy', 1)

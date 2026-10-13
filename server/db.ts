@@ -488,6 +488,34 @@ create table if not exists pickup_requests (
   updated_at timestamptz not null default now()
 );
 create index if not exists idx_pickups_shipper on pickup_requests(shipper_id, pickup_date);
+alter table shipments add column if not exists recipient_token text unique;
+alter table shippers add column if not exists recipient_sms boolean not null default true;
+create table if not exists recipient_messages (
+  id text primary key,
+  shipment_id text not null references shipments(id) on delete cascade,
+  shipper_id text not null references shippers(id) on delete cascade,
+  to_phone text not null,
+  channel text not null default 'sms',
+  kind text not null,
+  text text not null,
+  status text not null default 'pending',
+  provider_id text,
+  error text not null default '',
+  attempts int not null default 0,
+  by_name text not null default '',
+  created_at timestamptz not null default now(),
+  sent_at timestamptz
+);
+create index if not exists idx_recipient_messages_shipment on recipient_messages(shipment_id);
+create table if not exists recipient_receipts (
+  id text primary key,
+  shipment_id text not null references shipments(id) on delete cascade,
+  name text not null,
+  note text not null default '',
+  all_good boolean not null default true,
+  ip text not null default '',
+  created_at timestamptz not null default now()
+);
 
 `
 

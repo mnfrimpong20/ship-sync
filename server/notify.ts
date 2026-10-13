@@ -15,6 +15,7 @@ import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import type { ShipmentStatus } from '../src/lib/data'
+import { recipientOnStatus } from './recipient'
 
 type Row = Record<string, any>
 interface Deps {
@@ -93,7 +94,9 @@ export function sendPending(db: Db): Promise<void> {
   if (inflight) return inflight
   inflight = (async () => {
     try {
+      for (let pass = 0; pass < 10; pass++) {
       const { rows } = await db.query<Row>(`select * from notifications where email_status = 'pending' and attempts < 5 order by at asc limit 50`)
+      if (!rows.length) break
       for (const n of rows) {
         try {
           await deliver(n.email_to, n.email_subject || n.title, n.email_html || emailTemplate({ title: n.title, body: n.body, link: n.link }))
@@ -103,6 +106,9 @@ export function sendPending(db: Db): Promise<void> {
           await db.query(`update notifications set email_status = case when attempts + 1 >= 5 then 'failed' else 'pending' end, attempts = attempts + 1, last_error = $2 where id = $1`, [n.id, msg.slice(0, 300)])
           console.error('[notify] email', n.id, msg)
         }
+      }
+      const { rows: fresh } = await db.query<Row>(`select 1 from notifications where email_status = 'pending' and attempts = 0 limit 1`)
+      if (!fresh.length) break
       }
     } catch (e) { console.error('[notify] sendPending', e) } finally { inflight = null }
   })()
@@ -165,6 +171,7 @@ export async function notifyShipmentStatus(db: Db, s: Row, status: ShipmentStatu
     const body = status === 'delivered' && extra?.receivedBy ? `Received by ${extra.receivedBy}.${extra.photo ? ' A proof-of-delivery photo is on the tracking page.' : ''}` : m.body(s, clean)
     await notify(db, { userId: s.user_id, kind: 'shipment_status', title: m.title(s), body, link: `/track?ref=${s.ref}`, dedupe: `ship:${s.id}:${status}`, emailSubject: m.title(s) })
   }
+  await recipientOnStatus(db, s, status, clean)
   if (status === 'delivered') {
     await notifyShipperStaff(db, s.shipper_id, { kind: 'shipment_status', title: `${s.ref} delivered${extra?.receivedBy ? ` to ${extra.receivedBy}` : ''}`, body: `${s.customer} · ${s.origin} → ${s.destination}.${extra?.photo ? ' POD photo attached to the scan.' : ''}`, link: `/dashboard/shipments`, dedupe: `ship:${s.id}:delivered` }, ['owner', 'dispatcher', 'agent'])
   }

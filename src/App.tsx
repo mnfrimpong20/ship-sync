@@ -35,6 +35,11 @@ import GroupageManage from './pages/GroupageManage'
 import Pay from './pages/Pay'
 import Collections from './pages/Collections'
 import BrokersPage, { BrokerPortal } from './pages/Brokers'
+import Sailings, { PublicSailings } from './pages/Sailings'
+import Warehouse from './pages/Warehouse'
+import LanesPage, { ShipperLanes } from './pages/Lanes'
+import ReviewsPage from './pages/Reviews'
+import BrandedPage, { BrandEditor } from './pages/WhiteLabel'
 import Containers from './pages/Containers'
 import ContainerDetail from './pages/ContainerDetail'
 import Join from './pages/Join'
@@ -87,6 +92,8 @@ export default function App() {
               <Route path="/duty" element={<Duty />} />
               <Route path="/groupage" element={<GroupagePage />} />
               <Route path="/brokers" element={<BrokersPage />} />
+              <Route path="/sailings" element={<PublicSailings />} />
+              <Route path="/lanes" element={<LanesPage />} />
               <Route path="/live" element={<Live />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
@@ -106,6 +113,11 @@ export default function App() {
               <Route path="/dashboard/payments" element={<Payments />} />
               <Route path="/dashboard/groupage" element={<GroupageManage />} />
               <Route path="/dashboard/collections" element={<Collections />} />
+              <Route path="/dashboard/sailings" element={<Sailings />} />
+              <Route path="/dashboard/warehouse" element={<Warehouse />} />
+              <Route path="/dashboard/lanes" element={<ShipperLanes />} />
+              <Route path="/dashboard/reviews" element={<ReviewsPage />} />
+              <Route path="/dashboard/brand" element={<BrandEditor />} />
               <Route path="/dashboard/containers" element={<Containers />} />
               <Route path="/dashboard/containers/:id" element={<ContainerDetail />} />
               <Route path="/dashboard/clients" element={<Clients />} />
@@ -124,6 +136,7 @@ export default function App() {
             <Route path="/dashboard/labels" element={<Labels />} />
             <Route path="/r/:token" element={<Receive />} />
             <Route path="/broker/:token" element={<BrokerPortal />} />
+            <Route path="/t/:slug" element={<BrandedPage />} />
           </Routes>
         </HashRouter>
       </StoreProvider>

@@ -5,7 +5,7 @@ import type { PositionPayload } from '../components/LiveMap'
 export type Role = 'customer' | 'shipper'
 export interface User { id: string; name: string; email: string; role: Role; company?: string; shipperId?: string; admin?: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver' }
 export type ShipperProfileInput = Pick<Shipper, 'name' | 'tagline' | 'hq' | 'founded' | 'modes' | 'destinations' | 'origins' | 'cargo' | 'services' | 'about' | 'priceIndex' | 'responseHours'>
-export type AdminShipper = Shipper & { owner: { email: string; name: string } | null; quoteCount: number; shipmentCount: number }
+export type AdminShipper = Shipper & { owner: { email: string; name: string } | null; quoteCount: number; shipmentCount: number; docCount: number; docsPending: number; verificationRequestedAt: string | null }
 
 export interface QuoteRequest {
   id: string
@@ -73,7 +73,7 @@ interface Store {
   setTransit: (id: string, t: { vesselName?: string; mmsi?: string; flight?: string }) => Promise<void>
   updateShipper: (p: ShipperProfileInput) => Promise<Shipper>
   adminShippers: () => Promise<AdminShipper[]>
-  adminVerify: (id: string, v: { verified: boolean; plan?: Shipper['plan'] }) => Promise<Shipper>
+  adminVerify: (id: string, v: { verified: boolean; plan?: Shipper['plan']; note?: string }) => Promise<Shipper>
 }
 
 export class ApiError extends Error {

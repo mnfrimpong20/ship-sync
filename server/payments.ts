@@ -19,6 +19,7 @@ import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { notify, notifyShipperStaff } from './notify'
 import { shipmentContext } from './documents'
+import { groupageAmount } from './groupage'
 import { statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
 
 type Row = Record<string, any>
@@ -116,7 +117,9 @@ export async function amountDue(db: Db, s: Row) {
   const items: { description: string; amountUsd: number; kind: 'freight' | 'insurance' }[] = []
   const { rows: q } = s.request_id ? await db.query<Row>(`select price, includes from quotes where request_id = $1 and status = 'accepted' limit 1`, [s.request_id]) : { rows: [] as Row[] }
   const { rows: inv } = await db.query<Row>(`select total from invoices where shipment_id = $1 and status in ('sent','draft') order by created_at desc limit 1`, [s.id])
+  const grp = await groupageAmount(db, s)
   if (inv[0]) items.push({ description: `Freight & services — ${s.ref} (invoice)`, amountUsd: Number(inv[0].total), kind: 'freight' })
+  else if (grp) items.push({ ...grp, kind: 'freight' })
   else if (q[0]) items.push({ description: `${s.mode === 'air' ? 'Air' : 'Ocean'} freight ${s.origin} → ${s.destination} — ${s.ref}`, amountUsd: Number(q[0].price), kind: 'freight' })
   const { rows: pol } = await db.query<Row>(`select premium_usd from insurance_policies where shipment_id = $1 and status <> 'cancelled' and payment_status = 'due' limit 1`, [s.id])
   if (pol[0]) items.push({ description: 'All-risk cargo insurance premium', amountUsd: Number(pol[0].premium_usd), kind: 'insurance' })

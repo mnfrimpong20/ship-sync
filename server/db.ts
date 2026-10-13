@@ -6,6 +6,7 @@ import { extraShippers } from './seedShippers'
 import { seedRatesDemo } from './rates'
 import { seedPickupsDemo } from './pickups'
 import { seedPaymentsDemo } from './payments'
+import { seedGroupageDemo } from './groupage'
 
 /** Minimal query interface satisfied by both `pg` and PGlite. */
 export interface Db {
@@ -42,6 +43,7 @@ export async function getDb(): Promise<Db> {
   await seedRatesDemo(db)
   await seedPickupsDemo(db)
   await seedPaymentsDemo(db)
+  await seedGroupageDemo(db)
   return db
 }
 
@@ -596,6 +598,80 @@ create table if not exists stripe_events (
   received_at timestamptz not null default now()
 );
 alter table shippers add column if not exists payout_details jsonb not null default '{}';
+
+create table if not exists groupages (
+  id text primary key,
+  shipper_id text not null references shippers(id) on delete cascade,
+  kind text not null,
+  title text not null,
+  origin text not null,
+  destination text not null,
+  destination_city text not null default '',
+  capacity int not null,
+  price_per_unit_usd numeric not null,
+  min_units int not null default 1,
+  max_units int,
+  includes jsonb not null default '[]',
+  closes_at date not null,
+  departs_at date not null,
+  transit_days int not null default 35,
+  notes text not null default '',
+  status text not null default 'open',
+  container_id text,
+  created_by text not null default '',
+  created_at timestamptz not null default now(),
+  closed_at timestamptz
+);
+create table if not exists groupage_spots (
+  id text primary key,
+  groupage_id text not null references groupages(id) on delete cascade,
+  user_id text references users(id),
+  name text not null,
+  email text not null default '',
+  phone text not null default '',
+  units int not null,
+  description text not null default '',
+  pickup boolean not null default false,
+  status text not null default 'reserved',
+  amount_usd numeric not null default 0,
+  shipment_id text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_groupage_spots_g on groupage_spots(groupage_id);
+alter table shipments add column if not exists groupage_id text;
+alter table shipments add column if not exists groupage_spot_id text;
+
+create table if not exists shipment_vehicles (
+  id text primary key,
+  shipment_id text unique references shipments(id) on delete cascade,
+  request_id text,
+  vin text not null default '',
+  year int,
+  make text not null default '',
+  model text not null default '',
+  trim text not null default '',
+  body text not null default '',
+  engine_l numeric,
+  fuel text not null default '',
+  color text not null default '',
+  mileage int,
+  running boolean not null default true,
+  method text not null default 'roro',
+  title_status text not null default 'clean',
+  lien_holder text not null default '',
+  title_in_hand boolean not null default false,
+  owner_name text not null default '',
+  declared_value_usd numeric,
+  personal_items text not null default '',
+  notes text not null default '',
+  decoded jsonb,
+  checklist jsonb not null default '{}',
+  export_step text not null default 'pending',
+  aes_itn text not null default '',
+  handover jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table requests add column if not exists vehicle jsonb;
 
 `
 

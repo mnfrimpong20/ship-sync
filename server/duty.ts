@@ -12,6 +12,7 @@
  */
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
+import { vehicleDutyDefaults } from './vehicles'
 import type { Db } from './db'
 import type { ApiUser } from './api'
 import { notify } from './notify'
@@ -141,7 +142,8 @@ export function mountDuty(r: Router, d: Deps) {
   r.get('/shipments/:id/duty', wrap(async (req, res) => {
     const db = await getDb(); const { s, office } = await access(db, req, String(req.params.id))
     const saved = parse(s.duty) as { input?: DutyInput; confirmed?: { amountLocal: number; currency: string; reference: string; note: string; by: string; at: string } } | null
-    const input: DutyInput = saved?.input ?? { destination: s.destination, goods: s.cargo === 'vehicle' ? 'vehicle' : 'personal_effects', valueUsd: 0 }
+    let input: DutyInput = saved?.input ?? { destination: s.destination, goods: s.cargo === 'vehicle' ? 'vehicle' : 'personal_effects', valueUsd: 0 }
+    if (!saved?.input && s.cargo === 'vehicle') { const vd = await vehicleDutyDefaults(db, s.id); if (vd) input = { ...input, valueUsd: vd.valueUsd ?? 0, vehicle: { year: vd.year ?? new Date().getFullYear() - 5, cc: vd.cc ?? 2000, kind: vd.kind } } }
     res.set('Cache-Control', 'no-store')
     res.json({ input, estimate: input.valueUsd > 0 ? estimateDuty(input) : null, confirmed: saved?.confirmed ?? null, canManage: office })
   }))

@@ -1,6 +1,6 @@
 import { api } from './store'
 
-export type NotifyKind = 'quote_received' | 'booking_confirmed' | 'shipment_status' | 'document' | 'pickup' | 'quote_accepted' | 'new_lead' | 'container_update' | 'invoice_overdue' | 'system'
+export type NotifyKind = 'quote_received' | 'booking_confirmed' | 'shipment_status' | 'document' | 'pickup' | 'insurance' | 'quote_accepted' | 'new_lead' | 'container_update' | 'invoice_overdue' | 'system'
 export interface Notification { id: string; kind: NotifyKind; title: string; body: string; link: string; at: string; readAt: string | null; emailStatus: 'pending' | 'sent' | 'skipped' | 'failed' }
 export interface NotifyPrefs { email: boolean; muted: NotifyKind[] }
 export interface NotificationsResponse { notifications: Notification[]; unread: number; prefs: NotifyPrefs; kinds: { id: NotifyKind; label: string }[]; email: { provider: 'resend' | 'log' | 'off'; to: string } }

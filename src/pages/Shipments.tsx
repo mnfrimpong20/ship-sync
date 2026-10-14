@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { AlertTriangle, Bot, ChevronDown, Container, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Filter, Package, Plane, Plus, Radar, Search, Ship, Tag, X } from 'lucide-react'
+import { AlertTriangle, Bot, ChevronDown, Hourglass, Container, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Filter, Package, Plane, Plus, Radar, Search, Ship, Tag, X } from 'lucide-react'
 import { useStore } from '../lib/store'
-import { countries, countryByCode, statusLabels, statusOrder, type Mode, type Shipment, type ShipmentStatus } from '../lib/data'
+import { countries, countryByCode, flowFor, flowIndex, nextStatus, statusLabels, statusOrder, type Handover, type Mode, type Shipment, type ShipmentStatus } from '../lib/data'
 import { clientsApi, type Client } from '../lib/clients'
 import { Empty, ModeBadge, Pill, fmtDate } from '../components/ui'
 import { ShipmentDetail } from './Track'
@@ -20,19 +20,19 @@ import { CustomsCard } from '../components/CustomsCard'
 import { DisputeCard, ReviewCard } from '../components/ReviewCards'
 import { AutomationPrefs, AutoTag, ShipmentManage } from '../components/ShipmentTools'
 
-type Bucket = 'all' | 'active' | 'pickup' | 'transit' | 'destination' | 'late' | 'untracked' | 'delivered'
+type Bucket = 'all' | 'active' | 'pickup' | 'transit' | 'destination' | 'late' | 'untracked' | 'stuck' | 'delivered'
 type Sort = 'newest' | 'eta' | 'status' | 'ref'
 const PAGE = 10
 const today = () => new Date().toISOString().slice(0, 10)
 const isLate = (s: Shipment) => s.status !== 'delivered' && !!s.eta && s.eta < today()
 const untracked = (s: Shipment) => s.status !== 'delivered' && !s.mmsi && !s.flight
-const bucketOf = (s: Shipment): Exclude<Bucket, 'all' | 'active' | 'late' | 'untracked'> => s.status === 'delivered' ? 'delivered' : s.status === 'booked' || s.status === 'picked_up' ? 'pickup' : s.status === 'at_origin_port' || s.status === 'in_transit' ? 'transit' : 'destination'
-const inBucket = (s: Shipment, b: Bucket) => b === 'all' ? true : b === 'active' ? s.status !== 'delivered' : b === 'late' ? isLate(s) : b === 'untracked' ? untracked(s) : bucketOf(s) === b
+const bucketOf = (s: Shipment): Exclude<Bucket, 'all' | 'active' | 'late' | 'untracked' | 'stuck'> => s.status === 'delivered' ? 'delivered' : s.status === 'booked' || s.status === 'picked_up' ? 'pickup' : s.status === 'at_origin_port' || s.status === 'in_transit' ? 'transit' : 'destination'
+const inBucket = (s: Shipment, b: Bucket) => b === 'all' ? true : b === 'active' ? s.status !== 'delivered' : b === 'late' ? isLate(s) : b === 'untracked' ? untracked(s) : b === 'stuck' ? !!s.stuck : bucketOf(s) === b
 const lastEvent = (s: Shipment) => s.events[s.events.length - 1]?.at ?? ''
 
-function Progress({ status }: { status: ShipmentStatus }) {
-  const i = statusOrder.indexOf(status)
-  return <span className="flex gap-0.5" aria-hidden="true">{statusOrder.map((st, k) => <i key={st} className={`h-1.5 w-2.5 rounded-sm ${k <= i ? (status === 'delivered' ? 'bg-teal' : 'bg-gold') : 'bg-surface-2'}`} />)}</span>
+function Progress({ status, handover }: { status: ShipmentStatus; handover?: Handover }) {
+  const i = flowIndex(status, handover)
+  return <span className="flex gap-0.5" aria-hidden="true">{flowFor(handover).map((st, k) => <i key={st} className={`h-1.5 w-2.5 rounded-sm ${k <= i ? (status === 'delivered' ? 'bg-teal' : 'bg-gold') : 'bg-surface-2'}`} />)}</span>
 }
 
 function TrackingForm({ s, onDone }: { s: Shipment; onDone: (msg: string) => void }) {
@@ -98,7 +98,7 @@ export default function Shipments() {
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
 
   const mine = useMemo(() => shipments.filter((s) => s.shipperId === user?.shipperId), [shipments, user])
-  const counts = useMemo(() => ({ active: mine.filter((s) => s.status !== 'delivered').length, pickup: mine.filter((s) => bucketOf(s) === 'pickup').length, transit: mine.filter((s) => bucketOf(s) === 'transit').length, destination: mine.filter((s) => bucketOf(s) === 'destination').length, late: mine.filter(isLate).length, untracked: mine.filter(untracked).length, delivered: mine.filter((s) => s.status === 'delivered').length }), [mine])
+  const counts = useMemo(() => ({ active: mine.filter((s) => s.status !== 'delivered').length, pickup: mine.filter((s) => bucketOf(s) === 'pickup').length, transit: mine.filter((s) => bucketOf(s) === 'transit').length, destination: mine.filter((s) => bucketOf(s) === 'destination').length, late: mine.filter(isLate).length, untracked: mine.filter(untracked).length, stuck: mine.filter((s) => s.stuck).length, delivered: mine.filter((s) => s.status === 'delivered').length }), [mine])
   const list = useMemo(() => {
     const ql = q.trim().toLowerCase()
     const rows = mine.filter((s) => inBucket(s, bucket) && (!mode || s.mode === mode) && (!dest || s.destination === dest) && (!ql || [s.ref, s.customer, s.description, s.origin, s.vesselName ?? '', s.flight ?? '', countryByCode(s.destination)?.name ?? ''].join(' ').toLowerCase().includes(ql)))
@@ -112,7 +112,7 @@ export default function Shipments() {
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/shipments" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
 
-  const advance = async (s: Shipment) => { setBusy(true); setError(''); try { await advanceShipment(s.id); setToast(`${s.ref} moved to “${statusLabels[statusOrder[Math.min(statusOrder.length - 1, statusOrder.indexOf(s.status) + 1)]]}”.`) } catch (e) { setError(e instanceof Error ? e.message : 'Could not update.') } finally { setBusy(false) } }
+  const advance = async (s: Shipment) => { setBusy(true); setError(''); try { await advanceShipment(s.id); setToast(`${s.ref} moved to “${statusLabels[nextStatus(s.status, s.handover) ?? s.status]}”.`) } catch (e) { setError(e instanceof Error ? e.message : 'Could not update.') } finally { setBusy(false) } }
   const exportCsv = () => {
     const head = ['Ref', 'Status', 'Mode', 'Origin', 'Destination', 'Cargo', 'Description', 'Customer', 'ETA', 'Vessel/Flight', 'MMSI']
     const lines = list.map((s) => [s.ref, statusLabels[s.status], s.mode, s.origin, countryByCode(s.destination)?.name ?? s.destination, s.cargo, s.description, s.customer, s.eta ?? '', s.flight ?? s.vesselName ?? '', s.mmsi ?? ''].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
@@ -133,10 +133,10 @@ export default function Shipments() {
           <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-text">{toast}</motion.p>}</AnimatePresence>
           {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
 
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            {([['pickup', 'Awaiting pickup', Package, counts.pickup, 'Booked or collected, not yet at port'], ['transit', 'On the water / in the air', Ship, counts.transit, 'At origin port or sailing'], ['destination', 'At destination', Radar, counts.destination, 'Arrived, customs or out for delivery'], ['late', 'Past ETA', AlertTriangle, counts.late, 'Update the ETA or the status'], ['untracked', 'No live tracking', Plane, counts.untracked, 'Add vessel MMSI or flight']] as const).map(([b, l, I, n, h]) => (
-              <button key={b} onClick={() => set({ b })} aria-pressed={bucket === b} className={`card-dark p-4 text-left transition-colors hover:border-gold/40 focus-ring ${bucket === b ? '!border-gold' : ''} ${b === 'late' && n > 0 ? 'border-l-4 border-l-danger' : ''}`}>
-                <div className="flex items-center justify-between"><p className="text-xs text-text-muted">{l}</p><I size={15} className={b === 'late' && n > 0 ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" /></div>
+          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-3 xl:grid-cols-6">
+            {([['pickup', 'Awaiting pickup', Package, counts.pickup, 'Booked or collected, not yet at port'], ['transit', 'On the water / in the air', Ship, counts.transit, 'At origin port or sailing'], ['destination', 'At destination', Radar, counts.destination, 'Arrived, customs or out for delivery'], ['late', 'Past ETA', AlertTriangle, counts.late, 'Update the ETA or the status'], ['stuck', 'Stuck', Hourglass, counts.stuck, 'Much longer than usual in one status'], ['untracked', 'No live tracking', Plane, counts.untracked, 'Add vessel MMSI or flight']] as const).map(([b, l, I, n, h]) => (
+              <button key={b} onClick={() => set({ b })} aria-pressed={bucket === b} className={`card-dark p-4 text-left transition-colors hover:border-gold/40 focus-ring ${bucket === b ? '!border-gold' : ''} ${(b === 'late' || b === 'stuck') && n > 0 ? 'border-l-4 border-l-danger' : ''}`}>
+                <div className="flex items-center justify-between"><p className="text-xs text-text-muted">{l}</p><I size={15} className={(b === 'late' || b === 'stuck') && n > 0 ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" /></div>
                 <p className="mt-1 font-heading text-2xl font-bold tabular-nums">{n}</p><p className="text-[11px] text-text-muted">{h}</p>
               </button>
             ))}
@@ -168,10 +168,10 @@ export default function Shipments() {
                           <td className="px-3 py-3"><Link to={`/track?ref=${s.ref}`} className="font-mono text-xs text-gold-deep hover:underline focus-ring">{s.ref}</Link><div className="mt-1"><ModeBadge mode={s.mode} /></div></td>
                           <td className="whitespace-nowrap px-3 py-3"><p className="font-semibold">{s.origin}</p><p className="text-xs text-text-muted">→ {d?.name ?? s.destination}</p></td>
                           <td className="max-w-[220px] px-3 py-3"><p className="truncate" title={s.description}>{s.description || '—'}</p><p className="text-xs capitalize text-text-muted">{s.cargo.replace('container', 'container ')}</p></td>
-                          <td className="px-3 py-3"><Pill tone={s.status === 'delivered' ? 'green' : late ? 'danger' : 'teal'}>{statusLabels[s.status]}</Pill><div className="mt-1.5"><Progress status={s.status} /></div>{!s.consigneeId && s.status !== 'delivered' && <button onClick={() => setOpen(s.id)} className="mt-1.5 block text-[11px] font-medium text-danger hover:underline focus-ring" data-testid="no-recipient">No recipient — add</button>}</td>
+                          <td className="px-3 py-3"><Pill tone={s.status === 'delivered' ? 'green' : late ? 'danger' : 'teal'}>{statusLabels[s.status]}</Pill><div className="mt-1.5"><Progress status={s.status} handover={s.handover} /></div>{!s.consigneeId && s.status !== 'delivered' && <button onClick={() => setOpen(s.id)} className="mt-1.5 block text-[11px] font-medium text-danger hover:underline focus-ring" data-testid="no-recipient">No recipient — add</button>}{s.stuck && <span className="mt-1 block text-[11px] font-medium text-danger" data-testid="stuck-badge">Stuck {s.stuck.days}d (usually {s.stuck.typical})</span>}{s.owedUsd && s.status !== 'delivered' ? <span className="mt-1 block text-[11px] text-gold-deep" data-testid="owed-badge">${s.owedUsd.toLocaleString()} unpaid</span> : null}{s.handover === 'collection' && s.status !== 'delivered' && <span className="mt-1 block text-[11px] text-text-muted">Recipient collects</span>}</td>
                           <td className="whitespace-nowrap px-3 py-3 tabular-nums">{s.eta ? <span className={late ? 'font-semibold text-danger' : ''}>{fmtDate(s.eta + 'T12:00:00Z')}{late && <span className="block text-[11px] font-normal">past ETA</span>}</span> : '—'}</td>
                           <td className="px-3 py-3 text-xs">{(s.documents ?? 0) > 0 && <span className="mb-1 mr-1 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted" title={`${s.documents} document${s.documents === 1 ? '' : 's'}`}><FileText size={11} aria-hidden="true" /> {s.documents}</span>}{(() => { const c = containerOf(s); return <>{c && <Link to={`/dashboard/containers/${c.id}`} className="mb-1 inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold-deep hover:border-gold focus-ring"><Container size={11} aria-hidden="true" /> {c.ref}</Link>}{c && <br />}{s.flight || s.vesselName ? <span className="inline-flex items-center gap-1">{s.mode === 'air' ? <Plane size={13} className="text-sky" aria-hidden="true" /> : <Ship size={13} className="text-teal" aria-hidden="true" />}{s.flight ?? s.vesselName}{s.mmsi ? <span className="text-text-muted"> · {s.mmsi}</span> : ''}</span> : c ? <span className="text-text-muted">Follows container</span> : s.status !== 'delivered' ? <button onClick={() => { setOpen(s.id); setTracking(s.id) }} className="text-gold-deep hover:underline focus-ring">Add tracking</button> : <span className="text-text-muted">—</span>}</> })()}</td>
-                          <td className="sticky right-0 bg-surface px-3 py-3 text-right shadow-[-8px_0_12px_-10px_rgba(0,0,0,0.25)]"><div className="inline-flex gap-1.5">{s.status !== 'delivered' && (s.autoBy ? <AutoTag s={s} onOverride={() => setOpen(s.id)} /> : <button onClick={() => advance(s)} disabled={busy} className="btn-ghost !min-h-8 whitespace-nowrap !px-2.5 text-xs disabled:opacity-60" data-testid="next-step">Next step <ChevronRight size={13} aria-hidden="true" /></button>)}<Link to={`/dashboard/labels?shipments=${s.id}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Print labels for ${s.ref}`} title="Print labels"><Tag size={13} /></Link><Link to={`/track?ref=${s.ref}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Open tracking page for ${s.ref}`} title="Tracking page"><ExternalLink size={13} /></Link></div>{!s.autoBy && (s.status === 'arrived' || s.status === 'customs') && <Link to="/dashboard/routes" className="mt-1 block text-[11px] text-gold-deep hover:underline" data-testid="plan-delivery">Add to a delivery run to automate</Link>}</td>
+                          <td className="sticky right-0 bg-surface px-3 py-3 text-right shadow-[-8px_0_12px_-10px_rgba(0,0,0,0.25)]"><div className="inline-flex gap-1.5">{s.status === 'ready_for_collection' ? <button onClick={() => setOpen(s.id)} className="btn-gold !min-h-8 whitespace-nowrap !px-2.5 text-xs" data-testid="handover-btn">Hand over</button> : s.status !== 'delivered' && (s.autoBy ? <AutoTag s={s} onOverride={() => setOpen(s.id)} /> : <button onClick={() => advance(s)} disabled={busy} className="btn-ghost !min-h-8 whitespace-nowrap !px-2.5 text-xs disabled:opacity-60" data-testid="next-step">Next step <ChevronRight size={13} aria-hidden="true" /></button>)}<Link to={`/dashboard/labels?shipments=${s.id}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Print labels for ${s.ref}`} title="Print labels"><Tag size={13} /></Link><Link to={`/track?ref=${s.ref}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Open tracking page for ${s.ref}`} title="Tracking page"><ExternalLink size={13} /></Link></div>{!s.autoBy && s.handover !== 'collection' && (s.status === 'arrived' || s.status === 'customs') && <Link to="/dashboard/routes" className="mt-1 block text-[11px] text-gold-deep hover:underline" data-testid="plan-delivery">Add to a delivery run to automate</Link>}</td>
                         </tr>
                         {isOpen && (
                           <tr className="border-b border-border/70 bg-surface-2/30"><td /><td colSpan={8} className="px-3 pb-5 pt-2">

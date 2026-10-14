@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2, Plane, Radio, Search, Ship } from 'lucide-react'
-import { cargoLabel, countryByCode, statusLabels, statusOrder, type Shipment } from '../lib/data'
+import { cargoLabel, countryByCode, flowFor, flowIndex, statusLabels, type Shipment } from '../lib/data'
 import { useStore } from '../lib/store'
 import { Avatar, ModeBadge, Pill, fmtDate, fmtDateTime } from '../components/ui'
 import type { PositionPayload } from '../components/LiveMap'
@@ -142,8 +142,9 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
   const { shipperById } = useStore()
   const shipper = shipperById(s.shipperId) ?? { id: s.shipperId, name: 'Shipper', hq: '', initials: 'SS', hue: '#E3B54A' }
   const dest = countryByCode(s.destination)!
-  const idx = statusOrder.indexOf(s.status)
-  const pct = (idx / (statusOrder.length - 1)) * 100
+  const flow = flowFor(s.handover)
+  const idx = flowIndex(s.status, s.handover)
+  const pct = (idx / (flow.length - 1)) * 100
   return (
     <div className="grid gap-6 lg:grid-cols-12">
       <div className={compact ? 'lg:col-span-12' : 'lg:col-span-8'}>
@@ -155,19 +156,21 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
               <p className="mt-1 text-sm text-text-muted">{s.description} · {cargoLabel(s.cargo)}</p>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <Pill tone={s.status === 'delivered' ? 'green' : s.status === 'customs' ? 'gold' : 'teal'}>{statusLabels[s.status]}</Pill>
+              {s.cancelledAt ? <Pill tone="muted">Cancelled</Pill> : <Pill tone={s.status === 'delivered' ? 'green' : s.status === 'customs' || s.status === 'ready_for_collection' ? 'gold' : 'teal'}>{statusLabels[s.status]}</Pill>}
               <p className="text-xs text-text-muted">{s.status === 'delivered' ? 'Delivered' : 'ETA'} {fmtDate(s.eta)}</p>
               <ShareTracking s={s} />
             </div>
           </div>
 
+          {s.cancelledAt && <p className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger" data-testid="cancelled-banner">This shipment was cancelled{s.cancelReason ? ` — ${s.cancelReason}` : ''}. Contact the shipper with any questions.</p>}
+          {s.status === 'ready_for_collection' && <p className="mt-6 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm">Ready for collection at the shipper’s warehouse. The recipient brings a photo ID and the 6-digit code from their text.</p>}
           <div className="mt-8">
             <div className="relative h-2 overflow-hidden rounded-full bg-surface-2">
               <motion.div className="absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,var(--color-teal),var(--color-gold))]" initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} />
             </div>
-            <p className="mt-2 flex justify-between text-[11px] text-text-muted md:hidden"><span className="font-semibold text-text">{statusLabels[statusOrder[idx]]}</span><span>step {idx + 1} of {statusOrder.length}</span></p>
+            <p className="mt-2 flex justify-between text-[11px] text-text-muted md:hidden"><span className="font-semibold text-text">{statusLabels[s.status]}</span><span>step {idx + 1} of {flow.length}</span></p>
             <ol className="mt-3 hidden grid-cols-8 gap-1 text-[11px] text-text-muted md:grid">
-              {statusOrder.map((st, i) => <li key={st} className={i <= idx ? 'text-text' : ''}>{statusLabels[st]}</li>)}
+              {flow.map((st, i) => <li key={st} className={i <= idx ? 'text-text' : ''}>{statusLabels[st]}</li>)}
             </ol>
           </div>
 

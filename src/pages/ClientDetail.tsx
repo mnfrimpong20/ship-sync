@@ -186,16 +186,16 @@ function Shipments({ d, busy, run, reload, advance }: Common & { advance: (id: s
           const inv = d.invoices.find((i) => i.shipmentId === s.id && i.status !== 'void')
           const isOpen = manage === s.id
           return (
-            <li key={s.id} className="card-dark p-4" data-testid="client-shipment">
+            <li key={s.id} className={`card-dark p-4 ${s.cancelledAt ? 'opacity-60' : ''}`} data-testid="client-shipment">
               <div className="flex flex-wrap items-center gap-4">
                 <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-2"><Link to={`/track?ref=${s.ref}`} className="font-mono text-xs text-gold hover:underline focus-ring rounded">{s.ref}</Link><ModeBadge mode={s.mode} /><Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill>{!s.consigneeId && <Pill tone="danger">No recipient</Pill>}{inv && <Pill tone={inv.status === 'paid' ? 'green' : 'gold'}>{inv.number} · {money(inv.total)}</Pill>}</p>
+                  <p className="flex flex-wrap items-center gap-2"><Link to={`/track?ref=${s.ref}`} className="font-mono text-xs text-gold hover:underline focus-ring rounded">{s.ref}</Link><ModeBadge mode={s.mode} />{s.cancelledAt ? <Pill tone="muted">Cancelled</Pill> : <Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill>}{!s.consigneeId && !s.cancelledAt && <Pill tone="danger">No recipient</Pill>}{s.handover === 'collection' && !s.cancelledAt && s.status !== 'delivered' && <Pill tone="muted">Collects</Pill>}{s.stuck && <Pill tone="danger">Stuck {s.stuck.days}d</Pill>}{inv && <Pill tone={inv.status === 'paid' ? 'green' : 'gold'}>{inv.number} · {money(inv.total)}</Pill>}</p>
                   <p className="mt-1 text-sm font-semibold text-text">{s.origin} → {dest?.flag} {dest?.name}</p>
                   <p className="text-xs text-text-muted">{s.description} · {cargoLabel(s.cargo)}{cons ? ` · to ${cons.name}${cons.city ? `, ${cons.city}` : ''}` : ''} · ETA {fmtDate(s.eta)}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {!s.consigneeId && <button onClick={() => setManage(s.id)} className="btn-ghost !min-h-9 !px-3 text-xs text-danger">Add recipient</button>}
-                  {s.status !== 'delivered' && (s.autoBy ? <AutoTag s={s} onOverride={() => setManage(s.id)} /> : <button onClick={() => run(async () => { await advance(s.id); await reload() }, `${s.ref} updated.`)} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60">Mark next step <ChevronRight size={13} aria-hidden="true" /></button>)}
+                  {!s.consigneeId && !s.cancelledAt && <button onClick={() => setManage(s.id)} className="btn-ghost !min-h-9 !px-3 text-xs text-danger">Add recipient</button>}
+                  {s.status === 'ready_for_collection' && !s.cancelledAt ? <button onClick={() => setManage(s.id)} className="btn-gold !min-h-9 !px-3 text-xs">Hand over</button> : s.status !== 'delivered' && !s.cancelledAt && (s.autoBy ? <AutoTag s={s} onOverride={() => setManage(s.id)} /> : <button onClick={() => run(async () => { await advance(s.id); await reload() }, `${s.ref} updated.`)} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60">Mark next step <ChevronRight size={13} aria-hidden="true" /></button>)}
                   <button onClick={() => setManage(isOpen ? null : s.id)} className="btn-ghost !min-h-9 !px-3 text-xs" aria-expanded={isOpen} data-testid="manage-toggle"><Ellipsis size={13} aria-hidden="true" /> Manage</button>
                   <Link to={`/track?ref=${s.ref}`} className="btn-ghost !min-h-9 !px-3 text-xs"><Ship size={13} aria-hidden="true" /> Track</Link>
                 </div>

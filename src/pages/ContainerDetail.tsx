@@ -8,6 +8,7 @@ import { CONTAINER_STAGES, canLoad, cargoCbm, containersApi, isOpen, sizeCbm, si
 import { Empty, Pill, fmtDate, fmtDateTime } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { ContainerForm, StageStepper, stageTone } from './Containers'
+import { PartnerLinksCard } from '../components/PartnerLinks'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -171,6 +172,7 @@ export default function ContainerDetail() {
               </div>
             </motion.div>
             <motion.div variants={fadeUp} className="flex flex-wrap gap-2">
+              {d.shipments.length > 0 && <Link to={`/dashboard/containers/${c.id}/manifest`} className="btn-ghost !min-h-10 !px-4 text-sm" data-testid="manifest-link"><ScanLine size={15} aria-hidden="true" /> Manifest</Link>}
               {d.shipments.length > 0 && <Link to={`/dashboard/labels?shipments=${d.shipments.map((s) => s.id).join(',')}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Piece stickers for every loaded shipment"><Tag size={15} aria-hidden="true" /> Print labels</Link>}
               {c.mmsi && <Link to={`/live?vessel=${c.mmsi}`} className="btn-ghost !min-h-10 !px-4 text-sm"><Radar size={15} aria-hidden="true" /> Track vessel</Link>}
               {(c.status === 'booked' || c.status === 'loading') && !c.bookingRef && <Link to={`/dashboard/sailings?container=${c.id}&destination=${c.destination}&kind=container`} className="btn-ghost !min-h-10 !px-4 text-sm" data-testid="book-space"><Ship size={15} aria-hidden="true" /> Book space on a sailing</Link>}
@@ -230,6 +232,8 @@ export default function ContainerDetail() {
                   </div>
                 )}
               </motion.section>
+
+              <motion.div variants={fadeUp}><PartnerLinksCard containerId={c.id} containerRef={c.ref} /></motion.div>
 
               <motion.section variants={fadeUp} className="card-dark p-5" aria-labelledby="events-h">
                 <h2 id="events-h" className="!text-lg">Timeline</h2>

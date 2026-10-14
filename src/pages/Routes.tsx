@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { AlertTriangle, CalendarDays, Check, ChevronRight, Ellipsis, MapPinned, Play, Plus, Route as RouteIcon, Truck, User, UserX, X, XCircle } from 'lucide-react'
 import { useStore } from '../lib/store'
-import { canManageOps, opsApi, runStatusLabels, type Run, type RunKind, type RunStatus, type Staff } from '../lib/ops'
+import { canManageOps, opsApi, runStatusLabels, type Candidate, type Run, type RunKind, type RunStatus, type Staff } from '../lib/ops'
 import { Empty, Pill, fmtDate } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { Chip, Confirm, Expander, Pager, SearchBox, StatCard, Th, thead, trow, usePaged } from '../components/board'
@@ -36,6 +36,46 @@ type Bucket = 'open' | 'today' | 'active' | 'unassigned' | 'done' | 'all'
 type Sort = 'date' | 'newest' | 'progress' | 'name'
 const PAGE = 10
 const inBucket = (r: Run, b: Bucket) => b === 'all' ? true : b === 'open' ? r.status === 'planned' || r.status === 'in_progress' : b === 'today' ? r.date === today() && r.status !== 'cancelled' : b === 'active' ? r.status === 'in_progress' : b === 'unassigned' ? r.status === 'planned' && !r.driverId : r.status === 'done' || r.status === 'cancelled'
+
+/** Delivery stops waiting for a run, grouped by town — unloaded ones first. One click turns a group into a planned run. */
+function SuggestedRuns({ drivers, onCreated }: { drivers: Staff[]; onCreated: (r: Run) => void }) {
+  const [c, setC] = useState<Candidate[] | null>(null)
+  const [date, setDate] = useState(() => new Date(Date.now() + 86400000).toISOString().slice(0, 10))
+  const [driver, setDriver] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(''); const [err, setErr] = useState('')
+  useEffect(() => { opsApi.candidates('delivery').then(setC).catch(() => setC([])) }, [])
+  const groups = useMemo(() => {
+    const m = new Map<string, Candidate[]>()
+    for (const x of c ?? []) { if (x.status === 'out_for_delivery') continue; const k = (x.city || '').trim() || 'No town on file'; if (!m.has(k)) m.set(k, []); m.get(k)!.push(x) }
+    return [...m.entries()].map(([city, list]) => ({ city, list, ready: list.filter((x) => x.readyAt).length })).sort((a, b) => b.ready - a.ready || b.list.length - a.list.length)
+  }, [c])
+  if (!c || !groups.length) return null
+  const create = async (g: { city: string; list: Candidate[] }) => {
+    setBusy(g.city); setErr('')
+    try { const r = await opsApi.createRun({ name: `${g.city} deliveries`, kind: 'delivery', date, driverId: driver[g.city] || null, stops: g.list.map((x) => ({ shipmentId: x.shipmentId, label: x.label, address: x.address, contact: x.contact, phone: x.phone })) }); setC((v) => (v ?? []).filter((x) => !g.list.some((y) => y.shipmentId === x.shipmentId))); onCreated(r) }
+    catch (e) { setErr(e instanceof Error ? e.message : 'Could not create the run.') } finally { setBusy('') }
+  }
+  return (
+    <motion.section variants={fadeUp} className="card-dark mt-6 p-5" aria-label="Suggested delivery runs" data-testid="suggested-runs">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><h2 className="!text-base">Suggested delivery runs</h2><p className="text-xs text-text-muted">Shipments at destination with door delivery and no run yet, by town. Unloaded ones are ready to go.</p></div>
+        <label className="flex items-center gap-2 text-xs text-text-muted">Run date <input type="date" className="input-dark !min-h-9 !w-auto text-sm" value={date} min={today()} onChange={(e) => setDate(e.target.value)} /></label>
+      </div>
+      {err && <p role="alert" className="mt-2 text-xs text-danger">{err}</p>}
+      <ul className="mt-3 divide-y divide-border">
+        {groups.map((g) => (
+          <li key={g.city} className="flex flex-wrap items-center justify-between gap-3 py-3" data-testid="suggested-run">
+            <div className="min-w-0"><p className="font-semibold">{g.city} <span className="text-sm font-normal text-text-muted">· {g.list.length} stop{g.list.length === 1 ? '' : 's'}{g.ready ? ` · ${g.ready} unloaded` : ''}</span></p><p className="truncate text-xs text-text-muted">{g.list.map((x) => x.ref).join(', ')}</p></div>
+            <div className="flex items-center gap-2">
+              {drivers.length > 0 && <select aria-label={`Driver for ${g.city}`} className="input-dark !min-h-9 !w-auto text-sm" value={driver[g.city] ?? ''} onChange={(e) => setDriver({ ...driver, [g.city]: e.target.value })}><option value="">No driver yet</option>{drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>}
+              <button onClick={() => create(g)} disabled={!!busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60" data-testid="create-suggested">{busy === g.city ? 'Creating…' : 'Create run'}</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </motion.section>
+  )
+}
 
 export default function Routes() {
   const { ready, user } = useStore()
@@ -105,6 +145,7 @@ export default function Routes() {
             <StatCard label="Needs a driver" value={counts.unassigned} hint={counts.overdue ? `${counts.overdue} planned run${counts.overdue === 1 ? '' : 's'} past its date` : 'Planned runs without a driver'} icon={UserX} warn={counts.overdue > 0 || counts.unassigned > 0} active={bucket === 'unassigned'} onClick={() => set({ b: 'unassigned' })} />
             <StatCard label="Stops still to do" value={counts.stops} hint="Across all open runs" icon={RouteIcon} />
           </motion.div>
+          {manage && <SuggestedRuns drivers={drivers} onCreated={(r) => { setRuns((x) => [r, ...(x ?? [])]); setToast(`${r.name} planned with ${r.stops.length} stop${r.stops.length === 1 ? '' : 's'}.`) }} />}
 
           <motion.div variants={fadeUp} className="mt-6 flex flex-wrap items-center gap-2">
             <Chip active={bucket === 'open'} onClick={() => set({ b: undefined })} count={counts.open}>Planned & active</Chip>

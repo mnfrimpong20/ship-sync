@@ -1,3 +1,4 @@
+import { roleHome } from '../lib/ops'
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -57,7 +58,7 @@ export function Login() {
     setErr(''); setBusy(true)
     try {
       const u = await login(email, pw)
-      nav(sp.get('next') || (u.role === 'shipper' ? '/dashboard/shipper' : '/dashboard'))
+      nav(sp.get('next') || (u.role === 'shipper' ? (u.staffRole ? roleHome[u.staffRole] : '/dashboard/shipper') : '/dashboard'))
     } catch (err) { setErr(err instanceof Error ? err.message : 'Sign in failed.'); setBusy(false) }
   }
   return (

@@ -12,6 +12,7 @@ const STEPS: { key: string; label: string; done: (s: string) => boolean }[] = [
   { key: 'booked', label: 'Booked', done: () => true },
   { key: 'in_transit', label: 'On its way', done: (s) => statusOrder.indexOf(s as never) >= statusOrder.indexOf('in_transit') },
   { key: 'arrived', label: 'Arrived', done: (s) => statusOrder.indexOf(s as never) >= statusOrder.indexOf('arrived') },
+  { key: 'ready', label: 'Ready', done: (s) => statusOrder.indexOf(s as never) >= statusOrder.indexOf('ready_for_collection') },
   { key: 'delivered', label: 'Delivered', done: (s) => s === 'delivered' },
 ]
 

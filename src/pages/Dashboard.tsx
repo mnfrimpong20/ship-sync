@@ -15,6 +15,7 @@ import { InsuranceCard } from '../components/InsuranceCard'
 import { NeedsYou, NextArrivalCard, Recipients } from '../components/CustomerHome'
 import { customerApi, type AttentionItem, type NextArrival } from '../lib/customer'
 import { PaymentCard } from '../components/PaymentCard'
+import { CollectionNotice, OffersCard } from '../components/FlowCards'
 import { VehicleCard } from '../components/VehicleCard'
 import { CustomsCard } from '../components/CustomsCard'
 import { DisputeCard, ReviewCard } from '../components/ReviewCards'
@@ -264,7 +265,7 @@ function ShipmentsTab() {
           )
         })}
       </ul>
-      <div className="min-w-0 lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}{s && <div className="mt-6 space-y-4"><ReviewCard shipmentId={s.id} shipperName={shipperById(s.shipperId)?.name} /><DisputeCard shipmentId={s.id} /><PaymentCard shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}<PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><CustomsCard shipmentId={s.id} destination={s.destination} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /><DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} /></div>}</div>
+      <div className="min-w-0 lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}{s && <div className="mt-6 space-y-4"><CollectionNotice s={s} /><OffersCard s={s} /><ReviewCard shipmentId={s.id} shipperName={shipperById(s.shipperId)?.name} /><DisputeCard shipmentId={s.id} /><PaymentCard shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}<PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><CustomsCard shipmentId={s.id} destination={s.destination} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /><DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} /></div>}</div>
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { publicShipperSql, getDb, makeRef, uid, type Db } from './db'
-import { statusLabels, statusOrder, type CargoType, type ShipmentStatus } from '../src/lib/data'
+import { nextStatus, statusLabels, statusOrder, type CargoType, type ShipmentStatus } from '../src/lib/data'
 import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } from '../src/lib/geo'
 import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion, type Position } from './live'
 import { attachShipmentToClient, logShipmentActivity, mountClients } from './clients'
@@ -33,7 +33,9 @@ import { mountSupplierPortal } from './supplierPortal'
 import { mountOnboarding, onVerified } from './onboarding'
 import { consigneeToClient, mountCustomer, rememberConsignee, zConsignee } from './customer'
 import { isActiveDestination, mountGeoMeta, bustOrigins } from './geoMeta'
-import { invoiceForBooking, mountShipmentOps } from './shipmentOps'
+import { afterBooking, invoiceForBooking, mountShipmentOps } from './shipmentOps'
+import { assertRelease, stuckFor } from './flow'
+import { mountFlow } from './flowRoutes'
 import { mountBooking } from './booking'
 import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
@@ -280,15 +282,26 @@ async function loadRequests(db: Db, where: string, params: unknown[]) {
   const { rows: quotes } = await db.query<Row>(`select * from quotes where request_id = any($1::text[]) order by sent_at asc`, [ids])
   return rows.map((r) => requestOut(r, quotes.filter((q) => q.request_id === r.id)))
 }
-async function loadShipments(db: Db, where: string, params: unknown[]) {
-  const { rows } = await db.query<Row>(`select * from shipments where ${where} order by created_at desc`, params)
+async function loadShipments(db: Db, where: string, params: unknown[], opts: { includeCancelled?: boolean } = {}) {
+  const { rows } = await db.query<Row>(`select * from shipments where (${where})${opts.includeCancelled ? '' : ' and cancelled_at is null'} order by created_at desc`, params)
   if (!rows.length) return []
   const ids = rows.map((r) => r.id)
-  const [{ rows: events }, auto] = await Promise.all([
+  const [{ rows: events }, auto, { rows: inv }, { rows: esc }] = await Promise.all([
     db.query<Row>(`select * from shipment_events where shipment_id = any($1::text[]) order by at asc, id asc`, [ids]),
     autoDrivers(db, rows),
+    db.query<Row>(`select i.shipment_id, sum(greatest(i.total - coalesce(p.paid, 0), 0))::numeric as owed from invoices i left join (select invoice_id, sum(amount) as paid from payments group by invoice_id) p on p.invoice_id = i.id where i.shipment_id = any($1::text[]) and i.status in ('sent','partial') group by i.shipment_id`, [ids]),
+    db.query<Row>(`select shipment_id, sum(amount_usd)::numeric as paid from escrow_payments where shipment_id = any($1::text[]) and status in ('held','released','paid_out','direct') group by shipment_id`, [ids]),
   ])
-  return rows.map((r) => ({ ...shipmentOut(r, events.filter((e) => e.shipment_id === r.id)), autoBy: auto.get(r.id) }))
+  const out = []
+  for (const r of rows) {
+    const evs = events.filter((e) => e.shipment_id === r.id)
+    const sd = r.storage_due ? J(r.storage_due) as { days: number; amountUsd: number; freeUntil: string | null } : null
+    const owedInv = Math.max(0, Number(inv.find((x) => x.shipment_id === r.id)?.owed ?? 0) - Number(esc.find((x) => x.shipment_id === r.id)?.paid ?? 0))
+    const owed = Math.round((owedInv + (r.storage_billed ? 0 : Number(sd?.amountUsd ?? 0))) * 100) / 100
+    out.push({ ...shipmentOut(r, evs), autoBy: auto.get(r.id), handover: (r.handover ?? 'delivery') as 'delivery' | 'collection', readyAt: r.ready_at ? ISO(r.ready_at) : undefined, etaOriginal: r.eta_original ? DATE(r.eta_original) : undefined,
+      cancelledAt: r.cancelled_at ? ISO(r.cancelled_at) : undefined, cancelReason: r.cancel_reason ?? undefined, stuck: await stuckFor(db, r, evs), owedUsd: owed > 0 ? owed : undefined, storageDue: sd && sd.amountUsd > 0 && !r.storage_billed ? sd : undefined })
+  }
+  return out
 }
 /**
  * What will move each shipment's status without a click, if anything:
@@ -313,7 +326,7 @@ async function autoDrivers(db: Db, rows: Row[]) {
     const n = Number(pcs.find((x) => x.shipment_id === r.id)?.n ?? 0)
     if (del && i >= at('arrived') && i < at('delivered')) out.set(r.id, { kind: 'run', label: del.status === 'in_progress' ? 'driver on the way' : `delivery run ${DATE(del.run_date)}` })
     else if (pick && r.status === 'booked') out.set(r.id, { kind: 'run', label: `pickup run ${DATE(pick.run_date)}` })
-    else if (c && i < at('customs')) out.set(r.id, { kind: 'container', label: `follows ${c.ref}` })
+    else if (c && (i < at('customs') || (r.handover === 'collection' && i < at('ready_for_collection')))) out.set(r.id, { kind: 'container', label: `follows ${c.ref}` })
     else if (n > 0 && r.status === 'booked') out.set(r.id, { kind: 'scan', label: 'label scan' })
   }
   return out
@@ -556,6 +569,7 @@ export function apiRouter() {
     await consigneeToClient(db, sid, r0.consignee ? J(r0.consignee) : null)
     if (r0.cargo === 'vehicle') await vehicleFromRequest(db, r0.id, sid)
     await invoiceForBooking(db, sid, q).catch((e) => console.error('[invoice] auto', e))
+    await afterBooking(db, sid, { delivery: !!r0.delivery }).catch((e) => console.error('[booking] after', e))
     await notify(db, { userId: user.id, kind: 'booking_confirmed', title: `Booking confirmed — ${r0.ref}`, body: `${shipper.name} will handle your ${r0.origin} → ${r0.destination} shipment for $${Number(q.price).toLocaleString()}. Track it any time with reference ${r0.ref}.`, link: `/track?ref=${r0.ref}`, dedupe: `ship:${sid}:booked` })
     await notifyShipperStaff(db, q.shipper_id, { kind: 'quote_accepted', title: `${r0.contact_name} accepted your quote — ${r0.ref}`, body: `$${Number(q.price).toLocaleString()} · ${r0.quantity} × ${r0.cargo} · ${r0.origin} → ${r0.destination}. The order is now booked; arrange pickup or drop-off.`, link: '/dashboard/shipments', dedupe: `ship:${sid}:accepted` }, ['owner', 'dispatcher', 'agent'])
     const [shipment] = await loadShipments(db, 'id = $1', [sid])
@@ -576,13 +590,16 @@ export function apiRouter() {
     const s = rows[0]
     if (!s) throw new HttpError(404, 'Shipment not found.')
     if (user.role !== 'shipper' || s.shipper_id !== user.shipperId) throw new HttpError(403, 'Only the handling shipper can update this shipment.')
-    const idx = statusOrder.indexOf(s.status as ShipmentStatus)
-    if (idx >= statusOrder.length - 1) throw new HttpError(409, 'Shipment is already delivered.')
-    const next = statusOrder[idx + 1]
-    const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 500) : null
+    if (s.cancelled_at) throw new HttpError(409, 'This shipment was cancelled.')
+    const next = nextStatus(s.status as ShipmentStatus, s.handover)
+    if (!next) throw new HttpError(409, 'Shipment is already delivered.')
+    const manualCollect = next === 'delivered' && s.status === 'ready_for_collection'
+    if (manualCollect && !['owner', 'dispatcher'].includes(user.staffRole ?? 'owner')) throw new HttpError(409, 'Collections are closed with the recipient’s code — use “Hand over” under Manage.')
+    const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 500) : manualCollect ? `Marked collected by ${user.name} (no code entered).` : null
+    if (next === 'delivered') await assertRelease(db, s, { by: user.name, byRole: user.staffRole, override: req.body?.override?.reason ? { reason: String(req.body.override.reason).slice(0, 200) } : null })
     await db.query('update shipments set status = $2 where id = $1', [s.id, next])
     if (next === 'in_transit') { await db.query('update shipments set departed_at = coalesce(departed_at, now()) where id = $1', [s.id]) }
-    await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, next, idx < 3 ? s.origin : s.destination, note])
+    await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, next, statusOrder.indexOf(next) < 3 ? s.origin : s.destination, note])
     await logShipmentActivity(db, s.id, `${s.ref} moved to “${statusLabels[next]}”${note ? ` — ${note}` : '.'}`)
     await notifyShipmentStatus(db, s, next, note ?? undefined)
     const [shipment] = await loadShipments(db, 'id = $1', [s.id])
@@ -641,6 +658,7 @@ export function apiRouter() {
   mountCustomer(r, { getDb, requireUser, HttpError, wrap })
   mountGeoMeta(r, { getDb, requireAdmin, HttpError, wrap })
   mountShipmentOps(r, { getDb, requireUser, HttpError, wrap, loadShipments })
+  mountFlow(r, { getDb, requireUser, HttpError, wrap, loadShipments })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.
@@ -669,7 +687,7 @@ export function apiRouter() {
   }))
   r.get('/track/:ref', wrap(async (req, res) => {
     const db = await getDb()
-    const [shipment] = await loadShipments(db, 'upper(ref) = upper($1)', [req.params.ref])
+    const [shipment] = await loadShipments(db, 'upper(ref) = upper($1)', [req.params.ref], { includeCancelled: true })
     if (!shipment) throw new HttpError(404, 'We couldn’t find a shipment with that reference.')
     res.json({ shipment, pieces: await piecesForTracking(db, shipment.id), pod: shipment.status === 'delivered' ? await proofOfDelivery(db, shipment.id) : null })
   }))
@@ -679,6 +697,7 @@ export function apiRouter() {
   r.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues[0]?.message ?? 'Invalid input.' })
     if (err instanceof HttpError) return res.status(err.status).json({ error: err.message })
+    if (err && typeof (err as { httpStatus?: unknown }).httpStatus === 'number') return res.status((err as { httpStatus: number }).httpStatus).json({ error: (err as Error).message })
     if (err && typeof err === 'object' && 'type' in err && (err as { type: string }).type === 'entity.parse.failed') return res.status(400).json({ error: 'Malformed JSON body.' })
     console.error(err)
     record(err, req).catch(() => {})

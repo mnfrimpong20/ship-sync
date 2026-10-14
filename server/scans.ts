@@ -9,6 +9,7 @@
  * Every scan is a row in `scans` and a customer-visible event on the order. Staff only; customers' own scans of the QR
  * simply open the tracking page.
  */
+import { assertRelease } from './flow'
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
 import { warehouseOnScan } from './warehouse'
@@ -124,6 +125,7 @@ export function mountScans(r: Router, d: Deps) {
     if (b.kind === 'devanning' && !container) warnings.push(`${s.ref} was never recorded in a container — devanning scan logged anyway.`)
 
     const place = b.place || (b.kind === 'loading' ? container?.origin_port || s.origin : b.kind === 'devanning' ? container?.destination_port || countryByCode(s.destination)?.name || s.destination : b.kind === 'delivery' ? (s.consignee_id ? (await db.query<Row>('select city from client_consignees where id = $1', [s.consignee_id])).rows[0]?.city : '') || countryByCode(s.destination)?.name || s.destination : '')
+    if (b.kind === 'delivery' && s.status !== 'delivered') await assertRelease(db, s, { by: who, byRole: u.staffRole, override: u.staffRole !== 'driver' && req.body?.override?.reason ? { reason: String(req.body.override.reason).slice(0, 200) } : null })
     const scanId = 'sc_' + uid()
     await db.query('insert into scans (id,piece_id,shipment_id,kind,place,note,by_name,by_staff_id,lat,lon,photo,received_by,signature,at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,coalesce($14::timestamptz, now()))', [scanId, piece.id, s.id, b.kind, place, b.note, who, null, b.lat ?? null, b.lon ?? null, b.photo ?? null, b.receivedBy || '', b.signature ?? null, b.at ? new Date(b.at) : null])
     if (nextStatus && !already) await db.query('update pieces set status = $2, last_scan_at = now(), last_scan_kind = $3, last_scan_place = $4, last_scan_by = $5 where id = $1', [piece.id, nextStatus, b.kind, place, who])
@@ -145,6 +147,10 @@ export function mountScans(r: Router, d: Deps) {
       const dev = pieces.filter((p) => ORDER.indexOf(p.status) >= 2).length
       if (await raise(db, s, 'customs', place, `Devanned at ${place} by ${who}.`)) moved = 'customs'
       await event(`${label} received at the destination warehouse by ${who}${dev === n ? ' — all pieces received' : ` (${dev} of ${n})`}${noteTail}.`)
+      if (dev === n) {
+        await db.query('update shipments set ready_at = coalesce(ready_at, now()) where id = $1', [s.id])
+        if (s.handover === 'collection' && (await raise(db, s, 'ready_for_collection', place, `All pieces at ${place}. Ready for collection.`))) moved = 'ready_for_collection'
+      }
     } else if (b.kind === 'delivery') {
       const del = pieces.filter((p) => p.status === 'delivered').length
       if (del === n && (await raise(db, s, 'delivered', place, `All ${n === 1 ? 'pieces' : `${n} pieces`} delivered${b.receivedBy ? ` to ${b.receivedBy}` : ''} by ${who}.`, { photo: Boolean(b.photo), receivedBy: b.receivedBy || undefined }))) moved = 'delivered'

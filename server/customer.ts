@@ -13,7 +13,7 @@ import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
-import { countryByCode, statusOrder, type ShipmentStatus } from '../src/lib/data'
+import { countryByCode, statusOrder, type ShipmentStatus, flowFor, flowIndex } from '../src/lib/data'
 
 type Row = Record<string, any>
 interface Deps {
@@ -111,7 +111,7 @@ export async function customerAttention(db: Db, userId: string) {
     const s = nx[0]
     const { rows: ev } = await db.query<Row>('select status, at, place from shipment_events where shipment_id = $1 order by at desc limit 1', [s.id])
     const { rows: cs } = s.consignee_id ? await db.query<Row>('select name, city, phone from client_consignees where id = $1', [s.consignee_id]) : { rows: [] as Row[] }
-    nextArrival = { id: s.id, ref: s.ref, status: s.status, stepIndex: statusOrder.indexOf(s.status as ShipmentStatus), steps: statusOrder.length, origin: s.origin, destination: s.destination, destinationName: countryByCode(s.destination)?.name ?? s.destination, eta: DATE(s.eta), daysToEta: Math.ceil((new Date(String(DATE(s.eta))).getTime() - now) / 86_400_000), mode: s.mode, vessel: s.vessel_name ?? null, flight: s.flight ?? null, shipper: s.shipper_name, cargo: s.cargo, description: s.description, lastEvent: ev[0] ? { status: ev[0].status, at: ISO(ev[0].at), place: ev[0].place } : null, recipient: cs[0] ? { name: cs[0].name, city: cs[0].city, phone: cs[0].phone } : null, receiverPath: s.recipient_token ? `/r/${s.recipient_token}` : null }
+    nextArrival = { id: s.id, ref: s.ref, status: s.status, stepIndex: flowIndex(s.status as ShipmentStatus, s.handover), steps: flowFor(s.handover).length, handover: s.handover ?? 'delivery', origin: s.origin, destination: s.destination, destinationName: countryByCode(s.destination)?.name ?? s.destination, eta: DATE(s.eta), daysToEta: Math.ceil((new Date(String(DATE(s.eta))).getTime() - now) / 86_400_000), mode: s.mode, vessel: s.vessel_name ?? null, flight: s.flight ?? null, shipper: s.shipper_name, cargo: s.cargo, description: s.description, lastEvent: ev[0] ? { status: ev[0].status, at: ISO(ev[0].at), place: ev[0].place } : null, recipient: cs[0] ? { name: cs[0].name, city: cs[0].city, phone: cs[0].phone } : null, receiverPath: s.recipient_token ? `/r/${s.recipient_token}` : null }
   }
   return { items, nextArrival, activeCount: ships.length }
 }

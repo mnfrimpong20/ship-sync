@@ -1,3 +1,4 @@
+import { cascadeEta, devanShipments, sendPreAlerts } from './flow'
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
 import { uid, type Db } from './db'
@@ -65,7 +66,7 @@ export async function advanceContainer(db: Db, c: Row, status: ContainerStatus, 
   await db.query('update containers set status = $2 where id = $1', [c.id, status])
   await db.query('insert into container_events (container_id,status,at,place,note,by_name,source,code) values ($1,$2,$3,$4,$5,$6,$7,$8)', [c.id, status, o.at ?? new Date(), o.place ?? '', o.note ?? '', o.by, o.source ?? 'manual', o.code ?? ''])
   const target = CASCADE[status]
-  const { rows } = await db.query<Row>('select * from shipments where container_id = $1', [c.id])
+  const { rows } = await db.query<Row>('select * from shipments where container_id = $1 and cancelled_at is null', [c.id])
   let cascaded = 0
   for (const s of rows) {
     if (!target) continue
@@ -74,6 +75,8 @@ export async function advanceContainer(db: Db, c: Row, status: ContainerStatus, 
     if (before !== target) cascaded++
   }
   c.status = status
+  if (status === 'devanned') { const r = await devanShipments(db, c, o.by); cascaded += r.collection }
+  if (status === 'sailed') await sendPreAlerts(db, c).catch((e) => console.error('[containers] pre-alert', e))
   return cascaded
 }
 
@@ -99,7 +102,7 @@ export async function syncContainer(db: Db, c: Row): Promise<string[]> {
     // The line's schedule is authoritative for ETD/ETA; a changed ETA is worth telling the office about.
     const day = (v: unknown) => (v == null ? '' : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10))
     if (snap.etd && snap.etd !== day(c.etd)) patch.etd = snap.etd
-    if (snap.eta && snap.eta !== day(c.eta)) { patch.eta = snap.eta; if (c.eta) changes.push(`ETA now ${snap.eta}`) }
+    if (snap.eta && snap.eta !== day(c.eta)) { patch.eta = snap.eta; const n = await cascadeEta(db, c.id, snap.eta, `${adapter.label} update`); if (c.eta) changes.push(`ETA now ${snap.eta}${n ? ` (${n} client${n === 1 ? '' : 's'} told)` : ''}`) }
     const mmsi = snap.mmsi || ais.resolve(snap.imo || patch.imo || c.imo, snap.vesselName || c.vessel_name)
     if (mmsi && mmsi !== c.mmsi) { patch.mmsi = mmsi; changes.push(`MMSI ${mmsi} — live tracking on`) }
     if (Object.keys(patch).length) {
@@ -206,6 +209,7 @@ export function mountContainers(r: Router, d: Deps) {
     const c = await own(db, sid, String(req.params.id)); const b = zContainer.partial().parse(req.body)
     await db.query(`update containers set number=$2, size=$3, line=$4, booking_ref=$5, seal=$6, vessel_name=$7, mmsi=$8, voyage=$9, origin_port=$10, destination=$11, destination_port=$12, cutoff_date=$13, etd=$14, eta=$15, notes=$16 where id = $1`,
       [c.id, b.number ?? c.number, b.size ?? c.size, b.line ?? c.line, b.bookingRef ?? c.booking_ref, b.seal ?? c.seal, b.vesselName ?? c.vessel_name, b.mmsi ?? c.mmsi, b.voyage ?? c.voyage, b.originPort ?? c.origin_port, b.destination ?? c.destination, b.destinationPort ?? c.destination_port, b.cutoffDate === undefined ? c.cutoff_date : b.cutoffDate, b.etd === undefined ? c.etd : b.etd, b.eta === undefined ? c.eta : b.eta, b.notes ?? c.notes])
+    if (b.eta && b.eta !== DATE(c.eta)) await cascadeEta(db, c.id, b.eta, 'updated by the office')
     // Vessel details entered after sailing still flow to the loaded shipments.
     if ((b.vesselName || b.mmsi) && ['sailed', 'arrived', 'customs'].includes(c.status)) { const { rows } = await db.query<Row>('select * from shipments where container_id = $1', [c.id]); for (const s of rows) await raise(db, s, s.status, '', '', { vessel: b.vesselName, mmsi: b.mmsi }) }
     res.json(await detail(db, sid, c.id))

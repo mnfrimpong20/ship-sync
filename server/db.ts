@@ -1022,6 +1022,42 @@ alter table shippers add column if not exists verification_note text;
 alter table shippers add column if not exists onboarding_dismissed_at timestamptz;
 alter table shippers add column if not exists prefs jsonb not null default '{}';
 alter table shipments add column if not exists booking jsonb;
+alter table shipments add column if not exists handover text not null default 'delivery';
+alter table shipments add column if not exists ready_at timestamptz;
+alter table shipments add column if not exists collection_code text;
+alter table shipments add column if not exists collection_attempts int not null default 0;
+alter table shipments add column if not exists eta_original date;
+alter table shipments add column if not exists delivered_at timestamptz;
+alter table shipments add column if not exists cancelled_at timestamptz;
+alter table shipments add column if not exists cancel_reason text;
+alter table shipments add column if not exists details_token text;
+alter table shipments add column if not exists recipient_nudges int not null default 0;
+alter table shipments add column if not exists recipient_nudged_at timestamptz;
+alter table shipments add column if not exists storage_due jsonb;
+alter table shipments add column if not exists storage_warned_at timestamptz;
+alter table shipments add column if not exists storage_billed boolean not null default false;
+alter table shipments add column if not exists stuck_notified text;
+alter table shipments add column if not exists flight_airborne_at timestamptz;
+alter table shipments add column if not exists upgrades jsonb not null default '{}';
+create unique index if not exists idx_shipments_details_token on shipments(details_token) where details_token is not null;
+create table if not exists partner_links (
+  id text primary key,
+  token text unique not null,
+  shipper_id text not null references shippers(id) on delete cascade,
+  container_id text references containers(id) on delete cascade,
+  name text not null,
+  email text not null default '',
+  phone text not null default '',
+  created_by text not null default '',
+  created_at timestamptz not null default now(),
+  revoked_at timestamptz,
+  last_seen_at timestamptz,
+  pre_alert_sent_at timestamptz
+);
+create index if not exists idx_partner_links_container on partner_links(container_id);
+update pieces set label_code = substring(label_code from '^(.*)-[0-9]{3}$') || '-P' || seq where label_code ~ '-[0-9]{3}$';
+update shipments set eta_original = eta where eta_original is null;
+update shipments set delivered_at = (select min(at) from shipment_events e where e.shipment_id = shipments.id and e.status = 'delivered') where status = 'delivered' and delivered_at is null;
 create table if not exists supplier_links (
   token text primary key,
   sourcing_id text not null references sourcing_requests(id) on delete cascade,

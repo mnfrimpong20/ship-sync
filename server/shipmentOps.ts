@@ -7,13 +7,16 @@
  *   POST   /clients/:id/shipments/full  the comprehensive booking: pieces, consignee, pickup, vehicle, price → invoice, tracking link
  * plus `invoiceForBooking()` — the invoice a marketplace booking creates automatically when the shipper has it on.
  */
+import { ensurePieces } from './labels'
+import { pickupRow, placePickupOnRun } from './pickups'
+import { generateDocument } from './documents'
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
 import { makeRef, uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { notify, notifyShipperStaff, notifyShipmentStatus } from './notify'
 import { sendInvoiceMessage } from './collections'
-import { countryByCode, statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
+import { countryByCode, nextStatus, prevStatus, statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
 import { zConsignee } from './customer'
 
 type Row = Record<string, any>
@@ -54,8 +57,26 @@ export async function createInvoice(db: Db, o: { shipperId: string; clientId: st
 }
 
 /** Per-shipper booking preferences (stored in shippers.prefs). */
-export interface ShipperPrefs { autoInvoice: boolean; invoiceDueDays: number; autoLabels: boolean; autoTrackingLink: boolean }
-export const DEFAULT_PREFS: ShipperPrefs = { autoInvoice: true, invoiceDueDays: 14, autoLabels: true, autoTrackingLink: true }
+export interface ShipperPrefs {
+  autoInvoice: boolean; invoiceDueDays: number; autoLabels: boolean; autoTrackingLink: boolean
+  /** How recipients usually get their goods. Each booking can override it. */
+  defaultHandover: 'delivery' | 'collection'
+  /** Unpaid balance at handover: off · warn the driver/desk · block until paid (owners can override). */
+  holdUnpaid: 'off' | 'warn' | 'block'
+  /** Offered to collection recipients on arrival; 0 hides the offer. */
+  doorDeliveryUsd: number
+  /** Customer-requested pickups in an open slot go straight onto the day's run. */
+  autoConfirmPickups: boolean
+  /** Ask the client (email/notification) for the recipient when a booking has none. */
+  recipientNudges: boolean
+  /** Shown in the collection text, e.g. opening hours or what ID to bring. */
+  collectionNote: string
+  /** Packing list (and commercial invoice when there's a declared value) generated at booking. */
+  autoDocuments: boolean
+  /** Office alert when a shipment sits in one status much longer than usual. */
+  stuckAlerts: boolean
+}
+export const DEFAULT_PREFS: ShipperPrefs = { autoInvoice: true, invoiceDueDays: 14, autoLabels: true, autoTrackingLink: true, defaultHandover: 'collection', holdUnpaid: 'warn', doorDeliveryUsd: 0, autoConfirmPickups: false, recipientNudges: true, collectionNote: 'Bring a photo ID and your collection code.', autoDocuments: true, stuckAlerts: true }
 export async function prefsOf(db: Db, shipperId: string): Promise<ShipperPrefs> { const { rows } = await db.query<Row>('select prefs from shippers where id = $1', [shipperId]); return { ...DEFAULT_PREFS, ...((J(rows[0]?.prefs) ?? {}) as Partial<ShipperPrefs>) } }
 
 /** Marketplace booking (quote accepted): the invoice follows the quote — price, what it includes, due in N days. */
@@ -70,14 +91,29 @@ export async function invoiceForBooking(db: Db, shipmentId: string, quote: Row) 
   return inv
 }
 
+/** Everything that follows a new booking, whichever way it was made: handover default, original ETA, documents. */
+export async function afterBooking(db: Db, shipmentId: string, o: { delivery?: boolean; handover?: 'delivery' | 'collection'; by?: string }) {
+  const { rows } = await db.query<Row>('select * from shipments where id = $1', [shipmentId]); const s = rows[0]; if (!s) return
+  const prefs = await prefsOf(db, s.shipper_id)
+  const handover = o.handover ?? (o.delivery ? 'delivery' : prefs.defaultHandover)
+  await db.query('update shipments set handover = $2, eta_original = coalesce(eta_original, eta) where id = $1', [s.id, handover]); s.handover = handover
+  if (prefs.autoDocuments) {
+    await generateDocument(db, s, 'packing_list', 'shared', o.by ?? 'Ship Sync').catch((e) => console.error('[booking] packing list', e instanceof Error ? e.message : e))
+    const b = (typeof s.booking === 'string' ? JSON.parse(s.booking) : s.booking) ?? {}
+    if (Number(b.declaredValueUsd) > 0) await generateDocument(db, s, 'commercial_invoice', 'shipper', o.by ?? 'Ship Sync').catch((e) => console.error('[booking] commercial invoice', e instanceof Error ? e.message : e))
+  }
+}
+
 /* ---------------- automation summary ---------------- */
 const TRIGGERS: { from: ShipmentStatus; to: ShipmentStatus; how: string }[] = [
+  { from: 'picked_up', to: 'in_transit', how: 'the flight is seen airborne on ADS-B (air shipments with a flight number)' },
   { from: 'booked', to: 'picked_up', how: 'a pickup run stop is marked done, or a piece is scanned as collected/received at the warehouse' },
   { from: 'picked_up', to: 'at_origin_port', how: 'the container it is loaded in is gated in at port' },
   { from: 'at_origin_port', to: 'in_transit', how: 'the container sails (carrier milestone or manual), or a vessel/flight is assigned with a departure' },
   { from: 'in_transit', to: 'arrived', how: 'the container arrives (carrier milestone) or the vessel reaches the destination port' },
   { from: 'arrived', to: 'customs', how: 'the container moves to customs' },
   { from: 'customs', to: 'out_for_delivery', how: 'a delivery run containing it is started' },
+  { from: 'ready_for_collection', to: 'delivered', how: 'the recipient’s collection code is entered at the desk' },
   { from: 'out_for_delivery', to: 'delivered', how: 'the driver marks the stop done / scans proof of delivery, or the recipient confirms on their link' },
 ]
 
@@ -122,11 +158,14 @@ export function mountShipmentOps(r: Router, d: Deps) {
     const db = await getDb(); const { u, s } = await office(db, req, String(req.params.id))
     if (!['owner', 'dispatcher'].includes(u.staffRole ?? 'owner')) throw new HttpError(403, 'Only owners and dispatchers can move a shipment back.')
     const b = z.object({ reason: z.string().trim().min(3, 'Say why — the customer sees it.').max(300) }).parse(req.body)
-    const idx = statusOrder.indexOf(s.status as ShipmentStatus); if (idx <= 0) throw new HttpError(409, 'Already at the first step.')
-    const prev = statusOrder[idx - 1]
+    if (s.cancelled_at) throw new HttpError(409, 'This shipment was cancelled.')
+    const prev = prevStatus(s.status as ShipmentStatus, s.handover); if (!prev) throw new HttpError(409, 'Already at the first step.')
+    const idx = statusOrder.indexOf(s.status as ShipmentStatus)
     await db.query('update shipments set status = $2 where id = $1', [s.id, prev])
-    if (prev !== 'in_transit' && idx - 1 < statusOrder.indexOf('in_transit')) await db.query('update shipments set departed_at = null where id = $1', [s.id])
-    await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, prev, idx - 1 < 3 ? s.origin : (countryByCode(s.destination)?.name ?? s.destination), `Moved back to “${statusLabels[prev]}” by ${u.name}: ${b.reason}`])
+    if (statusOrder.indexOf(prev) < statusOrder.indexOf('in_transit')) await db.query('update shipments set departed_at = null where id = $1', [s.id])
+    if (s.status === 'ready_for_collection') await db.query('update shipments set collection_code = null where id = $1', [s.id])
+    if (s.status === 'delivered') await db.query('update shipments set delivered_at = null where id = $1', [s.id])
+    await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, prev, statusOrder.indexOf(prev) < 3 ? s.origin : (countryByCode(s.destination)?.name ?? s.destination), `Moved back to “${statusLabels[prev]}” by ${u.name}: ${b.reason}`])
     if (s.client_id) await db.query(`insert into client_activities (id,client_id,shipper_id,type,body) values ($1,$2,$3,'system',$4)`, [uid(), s.client_id, s.shipper_id, `${s.ref} moved back to “${statusLabels[prev]}” — ${b.reason}`])
     await notifyShipmentStatus(db, s, prev, `Corrected: ${b.reason}`)
     const [shipment] = await loadShipments(db, 'id = $1', [s.id]); res.json({ shipment })
@@ -165,13 +204,17 @@ export function mountShipmentOps(r: Router, d: Deps) {
     const { rows: runs } = await db.query<Row>(`select r.kind, r.status, r.run_date from run_stops rs join runs r on r.id = rs.run_id where rs.shipment_id = $1 and rs.status = 'pending' order by r.run_date`, [s.id])
     const { rows: pcs } = await db.query<Row>('select count(*)::int as n from pieces where shipment_id = $1', [s.id])
     const idx = statusOrder.indexOf(s.status as ShipmentStatus)
-    const next = TRIGGERS.find((t) => t.from === s.status)
+    const nx = nextStatus(s.status as ShipmentStatus, s.handover)
+    const next = s.handover === 'collection' && (s.status === 'customs' || s.status === 'arrived') && s.container_id ? { from: s.status, to: 'ready_for_collection' as ShipmentStatus, how: 'the container is marked unloaded at your destination warehouse — the recipient gets their collection code' }
+      : s.status === 'ready_for_collection' ? { from: s.status, to: 'delivered' as ShipmentStatus, how: 'the recipient shows their collection code at the desk (Manage → Hand over), or the destination agent enters it' }
+      : TRIGGERS.find((t) => t.from === s.status && t.to === nx) ?? (nx ? { from: s.status, to: nx, how: 'someone moves it on by hand — nothing automatic is connected for this step' } : undefined)
     const wired = { container: c[0] ? { ref: c[0].ref, status: c[0].status, carrierTracking: c[0].tracking_status === 'live', eta: DATE(c[0].eta) } : null, pickupRun: runs.find((x) => x.kind === 'pickup') ? { status: runs.find((x) => x.kind === 'pickup')!.status, date: DATE(runs.find((x) => x.kind === 'pickup')!.run_date) } : null, deliveryRun: runs.find((x) => x.kind === 'delivery') ? { status: runs.find((x) => x.kind === 'delivery')!.status, date: DATE(runs.find((x) => x.kind === 'delivery')!.run_date) } : null, pieces: Number(pcs[0].n), vessel: s.vessel_name || s.flight || null, recipient: !!s.consignee_id }
     const missing: string[] = []
     if (idx < 1 && !wired.pickupRun && !wired.pieces) missing.push('Plan a pickup run or print piece labels — either collection moves it to Picked up automatically.')
     if (idx >= 1 && idx < 3 && !wired.container && s.mode === 'ocean') missing.push('Load it into a container — gate-in and sailing then update it from the carrier.')
     if (idx >= 2 && idx < 4 && !wired.vessel && !wired.container) missing.push('Assign the vessel or flight so the tracking page shows a live position.')
-    if (idx >= 4 && idx < 7 && !wired.deliveryRun) missing.push('Add it to a delivery run — starting the run marks it Out for delivery; the driver’s scan marks it Delivered.')
+    if (s.handover !== 'collection' && idx >= statusOrder.indexOf('arrived') && idx < statusOrder.indexOf('out_for_delivery') && !wired.deliveryRun) missing.push('Add it to a delivery run — starting the run marks it Out for delivery; the driver’s scan marks it Delivered.')
+    if (s.mode === 'air' && idx >= 1 && idx < statusOrder.indexOf('in_transit') && !s.flight) missing.push('Add the flight number — takeoff and landing then move it to In transit and Arrived on their own.')
     if (!wired.recipient) missing.push('Add the recipient so they get the arrival text and the driver can find them.')
     res.json({ status: s.status, next: next ? { to: next.to, how: next.how } : null, wired, missing, triggers: TRIGGERS })
   }))
@@ -181,7 +224,7 @@ export function mountShipmentOps(r: Router, d: Deps) {
   r.put('/shipper/prefs', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireUser(db, req)
     if (u.role !== 'shipper' || !u.shipperId || !['owner', 'dispatcher', 'finance'].includes(u.staffRole ?? 'owner')) throw new HttpError(403, 'Owners, dispatchers and finance can change automation settings.')
-    const b = z.object({ autoInvoice: z.boolean().optional(), invoiceDueDays: z.number().int().min(0).max(120).optional(), autoLabels: z.boolean().optional(), autoTrackingLink: z.boolean().optional() }).parse(req.body)
+    const b = z.object({ autoInvoice: z.boolean().optional(), invoiceDueDays: z.number().int().min(0).max(120).optional(), autoLabels: z.boolean().optional(), autoTrackingLink: z.boolean().optional(), defaultHandover: z.enum(['delivery', 'collection']).optional(), holdUnpaid: z.enum(['off', 'warn', 'block']).optional(), doorDeliveryUsd: z.number().min(0).max(5000).optional(), autoConfirmPickups: z.boolean().optional(), recipientNudges: z.boolean().optional(), collectionNote: z.string().trim().max(200).optional(), autoDocuments: z.boolean().optional(), stuckAlerts: z.boolean().optional() }).parse(req.body)
     const next = { ...(await prefsOf(db, u.shipperId)), ...b }
     await db.query('update shippers set prefs = $2 where id = $1', [u.shipperId, JSON.stringify(next)])
     res.json({ prefs: next })
@@ -197,7 +240,7 @@ export function mountShipmentOps(r: Router, d: Deps) {
     pickup: z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), windowStart: z.string().regex(/^\d{2}:\d{2}$/).default('09:00'), windowEnd: z.string().regex(/^\d{2}:\d{2}$/).default('12:00'), address: z.string().trim().min(3).max(200), city: z.string().trim().max(80).default(''), contactName: z.string().trim().max(80).default(''), contactPhone: z.string().trim().max(30).default(''), notes: z.string().trim().max(300).default('') }).optional(),
     vehicle: z.object({ vin: z.string().trim().max(20).default(''), year: z.number().int().min(1950).max(2030).nullable().default(null), make: z.string().trim().max(40).default(''), model: z.string().trim().max(40).default(''), running: z.boolean().default(true), method: z.enum(['roro', 'container']).default('roro'), titleStatus: z.enum(['clean', 'salvage', 'rebuilt', 'lien']).default('clean') }).optional(),
     price: z.object({ freightUsd: z.number().min(0).max(1_000_000), pickupUsd: z.number().min(0).max(100000).default(0), deliveryUsd: z.number().min(0).max(100000).default(0), insuranceUsd: z.number().min(0).max(100000).default(0), otherUsd: z.number().min(0).max(100000).default(0), otherLabel: z.string().trim().max(80).default(''), taxUsd: z.number().min(0).max(100000).default(0), dueDays: z.number().int().min(0).max(120).default(14), createInvoice: z.boolean().default(true), sendInvoice: z.boolean().default(true) }).optional(),
-    labels: z.boolean().default(true), sendTracking: z.boolean().default(true),
+    labels: z.boolean().default(true), sendTracking: z.boolean().default(true), handover: z.enum(['delivery', 'collection']).optional(),
   })
   r.post('/clients/:id/shipments/full', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireUser(db, req)
@@ -221,7 +264,7 @@ export function mountShipmentOps(r: Router, d: Deps) {
     if (b.cargo === 'vehicle' && b.vehicle) { await db.query(`insert into shipment_vehicles (id,shipment_id,vin,year,make,model,running,method,title_status,declared_value_usd) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) on conflict (shipment_id) do nothing`, ['veh_' + uid(), id, b.vehicle.vin, b.vehicle.year, b.vehicle.make, b.vehicle.model, b.vehicle.running, b.vehicle.method, b.vehicle.titleStatus, b.declaredValueUsd ?? 0]).catch(() => {}); did.push('vehicle recorded') }
     // pieces / labels
     if (b.labels && b.cargo !== 'vehicle' && b.quantity > 0 && b.quantity <= 500) {
-      for (let i = 1; i <= b.quantity; i++) await db.query(`insert into pieces (id,shipment_id,seq,label_code) values ($1,$2,$3,$4) on conflict do nothing`, ['pc_' + uid(), id, i, `${ref}-${String(i).padStart(3, '0')}`])
+      await ensurePieces(db, { id, ref, request_id: null, description: descr }, b.quantity)
       did.push(`${b.quantity} label${b.quantity === 1 ? '' : 's'} ready to print`)
     }
     // pickup
@@ -229,8 +272,9 @@ export function mountShipmentOps(r: Router, d: Deps) {
     if (b.pickup) {
       pickupId = 'pk_' + uid()
       await db.query(`insert into pickup_requests (id,shipment_id,shipper_id,user_id,pickup_date,window_start,window_end,address,city,contact_name,contact_phone,notes,status,by_role) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'confirmed','shipper')`, [pickupId, id, u.shipperId, c.user_id ?? null, b.pickup.date, b.pickup.windowStart, b.pickup.windowEnd, b.pickup.address, b.pickup.city, b.pickup.contactName || c.name, b.pickup.contactPhone || c.phone || '', b.pickup.notes])
-      await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [id, 'booked', b.origin, `Pickup booked for ${b.pickup.date}, ${b.pickup.windowStart}–${b.pickup.windowEnd} at ${b.pickup.address}.`])
-      did.push(`pickup on ${b.pickup.date}`)
+      const pr = await pickupRow(db, pickupId); if (pr) await placePickupOnRun(db, pr).catch((e) => console.error('[booking] pickup run', e))
+      await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [id, 'booked', b.origin, `Pickup booked for ${b.pickup.date}, ${b.pickup.windowStart}–${b.pickup.windowEnd} at ${b.pickup.address} — on the pickup run for that day.`])
+      did.push(`pickup on ${b.pickup.date} (on that day’s run)`)
     }
     // invoice
     let invoice: { id: string; number: string; total: number; sent: string[] } | null = null
@@ -245,6 +289,7 @@ export function mountShipmentOps(r: Router, d: Deps) {
       await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [id, 'booked', b.origin, `Invoice ${invoice.number} issued for $${invoice.total.toLocaleString()}${invoice.sent.length ? ` and sent by ${invoice.sent.join(' + ')}` : ''}.`])
       did.push(`invoice ${invoice.number}${invoice.sent.length ? ' sent' : ''}`)
     }
+    await afterBooking(db, id, { handover: b.handover, by: u.name }).catch((e) => console.error('[booking] after', e))
     // tracking link to the customer
     if (b.sendTracking && c.user_id) { await notify(db, { userId: c.user_id, kind: 'booking_confirmed', title: `Booking confirmed — ${ref}`, body: `${u.company ?? 'Your shipper'} booked your ${b.mode} shipment ${b.origin} → ${countryByCode(b.destination)?.name ?? b.destination}, ETA ${b.eta}. Track it any time with reference ${ref}.`, link: `/dashboard?tab=shipments&open=${id}`, dedupe: `book:${id}` }); did.push('customer told') }
     await db.query(`insert into client_activities (id,client_id,shipper_id,type,body,created_by) values ($1,$2,$3,'system',$4,$5)`, [uid(), c.id, u.shipperId, `Shipment ${ref} booked (${b.mode}, ${b.origin} → ${countryByCode(b.destination)?.name ?? b.destination})${did.length ? ` — ${did.join(', ')}` : ''}.`, u.id])

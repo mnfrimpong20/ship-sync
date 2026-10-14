@@ -62,7 +62,7 @@ export async function shipmentContext(db: Db, s: Row) {
     shipper: { name: shipper[0]?.name ?? '', hq: shipper[0]?.hq ?? '', tagline: shipper[0]?.tagline ?? '' },
     sender: client[0] ? { name: client[0].name, company: client[0].company, email: client[0].email, phone: client[0].phone || client[0].whatsapp, city: client[0].city } : { name: s.customer, company: '', email: req[0]?.contact_email ?? '', phone: req[0]?.contact_phone ?? '', city: s.origin },
     receiver: cons[0] ? { name: cons[0].name, phone: cons[0].phone, address: cons[0].address, city: cons[0].city, country: cons[0].country } : null,
-    request: req[0] ? { quantity: Number(req[0].quantity), weightKg: req[0].weight_kg == null ? null : Number(req[0].weight_kg), pickup: req[0].pickup, delivery: req[0].delivery, insurance: req[0].insurance } : null,
+    request: req[0] ? { quantity: Number(req[0].quantity), weightKg: req[0].weight_kg == null ? null : Number(req[0].weight_kg), pickup: req[0].pickup, delivery: req[0].delivery, insurance: req[0].insurance } : s.booking ? (() => { const b = typeof s.booking === 'string' ? JSON.parse(s.booking) : s.booking; return { quantity: Number(b.quantity ?? 1), weightKg: b.weightKg ?? null, pickup: false, delivery: s.handover === 'delivery', insurance: false, dims: b.dims ?? '', declaredValueUsd: b.declaredValueUsd ?? null } })() : null,
     pieces: pieces.map((p) => ({ seq: Number(p.seq), code: p.label_code, status: p.status, lastScanAt: ISO(p.last_scan_at), lastScanPlace: p.last_scan_place })),
     container: container[0] ? { ref: container[0].ref, number: container[0].number, seal: container[0].seal, vesselName: container[0].vessel_name, voyage: container[0].voyage, originPort: container[0].origin_port, destinationPort: container[0].destination_port, etd: ISO(container[0].etd)?.slice(0, 10) ?? null, eta: ISO(container[0].eta)?.slice(0, 10) ?? null } : null,
     quote: quote[0] ? { price: Number(quote[0].price), currency: quote[0].currency, includes: typeof quote[0].includes === 'string' ? JSON.parse(quote[0].includes) : quote[0].includes } : null,
@@ -91,6 +91,19 @@ const zUpload = z.object({
 const zPatch = z.object({ title: z.string().trim().min(1).max(120).optional(), kind: z.enum(DOC_KINDS).optional(), visibility: z.enum(['shipper', 'shared']).optional() })
 const zGenerate = z.object({ kind: z.enum(['packing_list', 'commercial_invoice', 'proof_of_delivery']), visibility: z.enum(['shipper', 'shared']).default('shared') })
 const META = `id, shipment_id, kind, title, filename, mime, size, source, visibility, uploaded_by, uploaded_by_role, share_token, created_at, updated_at, (data is not null) as has_file, (payload is not null) as has_payload`
+
+/** Build (or rebuild) a generated document from the shipment's data. Used by the office button and by booking automation. */
+export async function generateDocument(db: Db, s: Row, kind: 'packing_list' | 'commercial_invoice' | 'proof_of_delivery', visibility: 'shipper' | 'shared', by: string, HttpError: Deps['HttpError'] = class extends Error { status: number; constructor(st: number, m: string) { super(m); this.status = st } }) {
+  const payload = await buildPayload(db, s, kind, HttpError)
+  const title = `${docKindLabels[kind]} ${payload.number}`
+  // Regenerating replaces the previous generated copy of the same kind.
+  const { rows: old } = await db.query<Row>(`select id from documents where shipment_id = $1 and kind = $2 and source = 'generated'`, [s.id, kind])
+  const id = old[0]?.id ?? 'doc_' + uid()
+  if (old[0]) await db.query(`update documents set title = $2, payload = $3, visibility = $4, uploaded_by = $5, updated_at = now() where id = $1`, [id, title, JSON.stringify(payload), visibility, by])
+  else await db.query(`insert into documents (id,shipment_id,shipper_id,kind,title,filename,mime,size,payload,source,visibility,uploaded_by,uploaded_by_role) values ($1,$2,$3,$4,$5,'','',0,$6,'generated',$7,$8,'shipper')`, [id, s.id, s.shipper_id, kind, title, JSON.stringify(payload), visibility, by])
+  if (s.user_id && visibility === 'shared' && !old[0]) await notify(db, { userId: s.user_id, kind: 'document', title: `${docKindLabels[kind]} ready for ${s.ref}`, body: `${payload.shipper.name} issued ${title}. Open the shipment to view, print or download it.`, link: `/dashboard?tab=shipments&s=${s.id}`, dedupe: `doc:${id}` })
+  return { id, old: Boolean(old[0]) }
+}
 
 export function mountDocuments(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
@@ -136,15 +149,8 @@ export function mountDocuments(r: Router, d: Deps) {
     const db = await getDb(); const { u, s, office } = await access(db, req, String(req.params.id))
     if (!office) throw new HttpError(403, 'Only the shipper can generate documents.')
     const b = zGenerate.parse(req.body)
-    const payload = await buildPayload(db, s, b.kind, HttpError)
-    const title = `${docKindLabels[b.kind]} ${payload.number}`
-    // Regenerating replaces the previous generated copy of the same kind.
-    const { rows: old } = await db.query<Row>(`select id from documents where shipment_id = $1 and kind = $2 and source = 'generated'`, [s.id, b.kind])
-    const id = old[0]?.id ?? 'doc_' + uid()
-    if (old[0]) await db.query(`update documents set title = $2, payload = $3, visibility = $4, uploaded_by = $5, updated_at = now() where id = $1`, [id, title, JSON.stringify(payload), b.visibility, u.name])
-    else await db.query(`insert into documents (id,shipment_id,shipper_id,kind,title,filename,mime,size,payload,source,visibility,uploaded_by,uploaded_by_role) values ($1,$2,$3,$4,$5,'','',0,$6,'generated',$7,$8,'shipper')`, [id, s.id, s.shipper_id, b.kind, title, JSON.stringify(payload), b.visibility, u.name])
-    if (s.user_id && b.visibility === 'shared' && !old[0]) await notify(db, { userId: s.user_id, kind: 'document', title: `${docKindLabels[b.kind]} ready for ${s.ref}`, body: `${payload.shipper.name} issued ${title}. Open the shipment to view, print or download it.`, link: `/dashboard?tab=shipments&s=${s.id}`, dedupe: `doc:${id}` })
-    res.status(old[0] ? 200 : 201).json({ document: docOut(await docById(db, id)), regenerated: Boolean(old[0]) })
+    const { id, old } = await generateDocument(db, s, b.kind, b.visibility, u.name, HttpError)
+    res.status(old ? 200 : 201).json({ document: docOut(await docById(db, id)), regenerated: old })
   }))
 
   /** Full document (file as data URL, or the payload) for the viewer. */

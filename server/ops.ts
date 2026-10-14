@@ -2,6 +2,8 @@
  * Operations for shippers: team & roles, fleet, and route planning (pickup runs at the origin, delivery runs to
  * consignees in West Africa). Staff sign in as normal users linked to the company; what they may do depends on their role.
  */
+import { assertRelease, owedFor } from './flow'
+import { prefsOf } from './shipmentOps'
 import type { Request, Response, NextFunction, Router } from 'express'
 import { randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
@@ -31,7 +33,7 @@ const num = (v: unknown) => (v == null ? undefined : Number(v))
 
 export const staffOut = (r: Row) => ({ id: r.id, shipperId: r.shipper_id, userId: r.user_id ?? undefined, name: r.name, email: r.email, phone: r.phone, role: r.role as StaffRole, status: r.status as 'invited' | 'active' | 'inactive', base: r.base as 'origin' | 'destination', city: r.city, inviteToken: r.invite_token ?? undefined, createdAt: ISO(r.created_at), runCount: r.run_count != null ? Number(r.run_count) : undefined, perms: (J(r.perms) ?? {}) as { allow?: string[]; deny?: string[] }, lastActiveAt: ISO(r.last_active_at), activity: r.runs_week != null ? { runsWeek: Number(r.runs_week), stopsWeek: Number(r.stops_week), scansWeek: Number(r.scans_week), quotesWeek: Number(r.quotes_week), quotesWonWeek: Number(r.quotes_won_week), lastScanAt: ISO(r.last_scan_at) } : undefined })
 const vehicleOut = (r: Row) => ({ id: r.id, name: r.name, type: r.type, plate: r.plate, capacityKg: num(r.capacity_kg), capacityNote: r.capacity_note, base: r.base as 'origin' | 'destination', city: r.city, country: r.country, status: r.status as 'available' | 'on_run' | 'maintenance' | 'retired', driverId: r.driver_id ?? undefined, notes: r.notes, createdAt: ISO(r.created_at) })
-const stopOut = (r: Row) => ({ id: r.id, runId: r.run_id, seq: Number(r.seq), shipmentId: r.shipment_id ?? undefined, label: r.label, address: r.address, lat: num(r.lat), lon: num(r.lon), contact: r.contact, phone: r.phone, status: r.status as 'pending' | 'done' | 'skipped', doneAt: r.done_at ? ISO(r.done_at) : undefined, note: r.note, shipmentRef: r.shipment_ref ?? undefined, shipmentStatus: r.shipment_status ?? undefined })
+const stopOut = (r: Row) => ({ collectUsd: r.collect_usd ?? undefined, collectRule: r.collect_rule ?? undefined, id: r.id, runId: r.run_id, seq: Number(r.seq), shipmentId: r.shipment_id ?? undefined, label: r.label, address: r.address, lat: num(r.lat), lon: num(r.lon), contact: r.contact, phone: r.phone, status: r.status as 'pending' | 'done' | 'skipped', doneAt: r.done_at ? ISO(r.done_at) : undefined, note: r.note, shipmentRef: r.shipment_ref ?? undefined, shipmentStatus: r.shipment_status ?? undefined })
 const runOut = (r: Row, stops: Row[]) => ({
   id: r.id, name: r.name, kind: r.kind as 'pickup' | 'delivery', date: DATE(r.run_date), driverId: r.driver_id ?? undefined, vehicleId: r.vehicle_id ?? undefined,
   start: r.start_lat != null ? { label: r.start_label, lat: Number(r.start_lat), lon: Number(r.start_lon) } : null,
@@ -126,7 +128,14 @@ export function mountOps(r: Router, d: Deps) {
   const loadRuns = async (db: Db, where: string, params: unknown[]) => {
     const { rows } = await db.query<Row>(`select r.*, s.name as driver_name, v.name as vehicle_name from runs r left join staff s on s.id = r.driver_id left join vehicles v on v.id = r.vehicle_id where ${where} order by r.run_date desc, r.created_at desc`, params)
     if (!rows.length) return []
-    const { rows: stops } = await db.query<Row>(`select st.*, sh.ref as shipment_ref, sh.status as shipment_status from run_stops st left join shipments sh on sh.id = st.shipment_id where st.run_id = any($1::text[]) order by st.seq asc`, [rows.map((x) => x.id)])
+    const { rows: stops } = await db.query<Row>(`select st.*, sh.ref as shipment_ref, sh.status as shipment_status, sh.storage_due, sh.storage_billed, sh.shipper_id as sh_shipper from run_stops st left join shipments sh on sh.id = st.shipment_id where st.run_id = any($1::text[]) order by st.seq asc`, [rows.map((x) => x.id)])
+    // What the driver has to collect at each delivery stop.
+    const kinds = new Map(rows.map((x) => [x.id, x.kind]))
+    const holds = new Map<string, string>()
+    for (const st of stops) if (st.shipment_id && kinds.get(st.run_id) !== 'pickup' && st.status === 'pending') {
+      const o = await owedFor(db, { id: st.shipment_id, storage_due: st.storage_due, storage_billed: st.storage_billed })
+      if (o.totalUsd > 0) { st.collect_usd = o.totalUsd; if (!holds.has(st.sh_shipper)) holds.set(st.sh_shipper, (await prefsOf(db, st.sh_shipper)).holdUnpaid); st.collect_rule = holds.get(st.sh_shipper) }
+    }
     return rows.map((x) => runOut(x, stops.filter((s) => s.run_id === x.id)))
   }
   const ownRun = async (db: Db, shipperId: string, id: string) => { const [run] = await loadRuns(db, 'r.id = $1 and r.shipper_id = $2', [id, shipperId]); if (!run) throw new HttpError(404, 'Run not found.'); return run }
@@ -245,12 +254,12 @@ export function mountOps(r: Router, d: Deps) {
   r.get('/runs/candidates', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId } = await staffOf(db, req)
     const kind = req.query.kind === 'pickup' ? 'pickup' : 'delivery'
-    const statuses = kind === 'pickup' ? ['booked'] : ['arrived', 'customs', 'out_for_delivery']
+    const statuses = kind === 'pickup' ? ['booked'] : ['arrived', 'customs', 'ready_for_collection', 'out_for_delivery']
     const { rows } = await db.query<Row>(`select s.*, c.name as client_name, c.phone as client_phone, c.city as client_city, cs.name as cons_name, cs.phone as cons_phone, cs.address as cons_address, cs.city as cons_city, cs.country as cons_country
       from shipments s left join clients c on c.id = s.client_id left join client_consignees cs on cs.id = s.consignee_id
-      where s.shipper_id = $1 and s.status = any($2::text[]) and not exists (select 1 from run_stops st join runs r on r.id = st.run_id where st.shipment_id = s.id and r.status in ('planned','in_progress')) order by s.eta asc`, [shipperId, statuses])
+      where s.shipper_id = $1 and s.status = any($2::text[]) and s.cancelled_at is null ${kind === 'delivery' ? `and coalesce(s.handover, 'delivery') = 'delivery'` : ''} and not exists (select 1 from run_stops st join runs r on r.id = st.run_id where st.shipment_id = s.id and r.status in ('planned','in_progress')) order by s.eta asc`, [shipperId, statuses])
     res.json({ candidates: rows.map((s) => ({
-      shipmentId: s.id, ref: s.ref, mode: s.mode, status: s.status, description: s.description, eta: DATE(s.eta),
+      shipmentId: s.id, ref: s.ref, mode: s.mode, status: s.status, description: s.description, eta: DATE(s.eta), readyAt: s.ready_at ? ISO(s.ready_at) : null, city: kind === 'pickup' ? s.origin : (s.cons_city || ''),
       label: kind === 'pickup' ? `${s.customer} · ${s.origin}` : `${s.cons_name || s.customer} · ${s.cons_city || countryByCode(s.destination)?.name || s.destination}`,
       address: kind === 'pickup' ? s.origin : [s.cons_address, s.cons_city, countryByCode(s.cons_country || s.destination)?.name].filter(Boolean).join(', '),
       contact: kind === 'pickup' ? s.customer : (s.cons_name || s.customer), phone: kind === 'pickup' ? (s.client_phone || '') : (s.cons_phone || s.client_phone || ''),
@@ -281,7 +290,7 @@ export function mountOps(r: Router, d: Deps) {
     if (b.status === 'in_progress') {
       if (run.vehicleId) await db.query(`update vehicles set status = 'on_run' where id = $1 and status = 'available'`, [run.vehicleId])
       // Delivery run starting → shipments are out for delivery.
-      if (run.kind === 'delivery') for (const st of run.stops) if (st.shipmentId && st.shipmentStatus && ['arrived', 'customs'].includes(st.shipmentStatus)) await setShipmentStatus(db, st.shipmentId, 'out_for_delivery', `Out for delivery on run “${run.name}”.`)
+      if (run.kind === 'delivery') for (const st of run.stops) if (st.shipmentId && st.shipmentStatus && ['arrived', 'customs', 'ready_for_collection'].includes(st.shipmentStatus)) await setShipmentStatus(db, st.shipmentId, 'out_for_delivery', `Out for delivery on run “${run.name}”.`)
     }
     if (b.status === 'done' || b.status === 'cancelled') { if (run.vehicleId) await db.query(`update vehicles set status = 'available' where id = $1 and status = 'on_run'`, [run.vehicleId]) }
     res.json({ run: await ownRun(db, shipperId, run.id) })
@@ -314,6 +323,11 @@ export function mountOps(r: Router, d: Deps) {
     await db.query('update run_stops set status=$2, note=$3, seq=$4, lat=$5, lon=$6, label=$7, address=$8, contact=$9, phone=$10, done_at = case when $2 = \'done\' then coalesce(done_at, now()) else null end where id = $1',
       [st.id, b.status ?? st.status, b.note ?? st.note, b.seq ?? st.seq, b.lat ?? st.lat ?? null, b.lon ?? st.lon ?? null, b.label ?? st.label, b.address ?? st.address, b.contact ?? st.contact, b.phone ?? st.phone])
     // Completed stops move the shipment along and show up on the customer's tracking page.
+    if (b.status === 'done' && st.shipmentId && st.status !== 'done' && run.kind !== 'pickup') {
+      // Money first: with "block unpaid" on, the stop can't close until it's settled (office can override with a reason).
+      const { rows: sh } = await db.query<Row>('select * from shipments where id = $1', [st.shipmentId])
+      if (sh[0]) await assertRelease(db, sh[0], { by: me.name, byRole: role, override: role !== 'driver' && req.body?.override?.reason ? { reason: String(req.body.override.reason).slice(0, 200) } : null })
+    }
     if (b.status === 'done' && st.shipmentId && st.status !== 'done') {
       if (run.kind === 'pickup') await setShipmentStatus(db, st.shipmentId, 'picked_up', `Collected by ${me.name}${b.note ? ` — ${b.note}` : '.'}`)
       else await setShipmentStatus(db, st.shipmentId, 'delivered', `Delivered by ${me.name}${b.note ? ` — ${b.note}` : '.'}`)

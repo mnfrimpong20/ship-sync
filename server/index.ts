@@ -13,6 +13,7 @@ import { stripeWebhook } from './payments'
 import { startCollectionSweeps } from './collections'
 import { startScheduleSweeps } from './booking'
 import { startSourcingSweeps } from './sourcing'
+import { startFlowSweeps } from './flow'
 import { slugForHost } from './brand'
 import { startExportSchedule } from './system'
 
@@ -31,6 +32,7 @@ async function main() {
   startCollectionSweeps(getDb)
   startScheduleSweeps(getDb)
   startSourcingSweeps(getDb)
+  startFlowSweeps(getDb)
   startExportSchedule(getDb)
   const app = express()
   app.disable('x-powered-by')

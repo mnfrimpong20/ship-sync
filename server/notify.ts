@@ -163,12 +163,15 @@ const MILESTONES: Partial<Record<ShipmentStatus, { title: (s: Row) => string; bo
   picked_up: { title: (s) => `${s.ref} picked up`, body: (s, note) => note || `Your shipment${s.description ? ` (${s.description})` : ''} has been collected and is on its way to the warehouse.` },
   in_transit: { title: (s) => `${s.ref} is on its way`, body: (s, note) => note || `Your shipment has ${s.mode === 'air' ? 'departed' : 'sailed'}${s.vessel_name ? ` on ${s.vessel_name}` : ''}. Follow it live on the tracking page.` },
   arrived: { title: (s) => `${s.ref} has arrived`, body: (s, note) => note || `Your shipment has reached the destination ${s.mode === 'air' ? 'airport' : 'port'} and is going through clearance.` },
+  ready_for_collection: { title: (s) => `${s.ref} is ready for collection`, body: (s, note) => note || `Your shipment is at the warehouse${s.collection_code ? ` — collection code ${s.collection_code}` : ''}. Your recipient brings a photo ID and the code.` },
   out_for_delivery: { title: (s) => `${s.ref} is out for delivery`, body: (_s, note) => note || 'A driver has your shipment today. Make sure someone is available to receive it.' },
   delivered: { title: (s) => `${s.ref} delivered`, body: (_s, note) => note || 'Your shipment has been handed over. Thank you for shipping with Ship Sync.' },
 }
 
 /** Tell the customer (and, for delivery, the office) that a shipment moved. Safe to call from every status-change path — dedupes per shipment+status. */
 export async function notifyShipmentStatus(db: Db, s: Row, status: ShipmentStatus, note?: string, extra?: { photo?: boolean; receivedBy?: string }) {
+  // Flow automation first (collection code, storage billing, offers) so the messages below can mention it.
+  try { await (await import('./flow')).onStatusEntered(db, s, status) } catch (e) { console.error('[flow] onStatus', e) }
   const m = MILESTONES[status]
   if (!m) return
   const clean = (note ?? '').replace(/\s+/g, ' ').trim()

@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { geocode } from './ops'
+import { prefsOf } from './shipmentOps'
 import { notify, notifyShipperStaff } from './notify'
 
 type Row = Record<string, any>
@@ -68,6 +69,26 @@ const zBook = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), windowSt
 const zReschedule = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), windowStart: zTime, windowEnd: zTime, note: z.string().trim().max(300).default('') })
 const SELECT = `select p.*, s.ref, s.customer, s.origin, s.user_id as owner_id, st.status as stop_status from pickup_requests p join shipments s on s.id = p.shipment_id left join run_stops st on st.id = p.stop_id`
 
+/** Put a confirmed pickup on a planned pickup run for its date (creating one if needed). */
+export async function placePickupOnRun(db: Db, p: Row, runId?: string | null) {
+  let run: Row | undefined
+  if (runId) { run = (await db.query<Row>(`select * from runs where id = $1 and shipper_id = $2 and kind = 'pickup' and status in ('planned','in_progress')`, [runId, p.shipper_id])).rows[0]; if (!run) throw Object.assign(new Error('That run is not open.'), { httpStatus: 404 }) }
+  else {
+    run = (await db.query<Row>(`select * from runs where shipper_id = $1 and kind = 'pickup' and run_date = $2 and status = 'planned' order by created_at limit 1`, [p.shipper_id, DAY(p.pickup_date)])).rows[0]
+    if (!run) { const id = 'run_' + uid(); await db.query(`insert into runs (id,shipper_id,name,kind,run_date,notes) values ($1,$2,$3,'pickup',$4,'Created from customer pickup bookings.')`, [id, p.shipper_id, `Pickups ${DAY(p.pickup_date)}`, DAY(p.pickup_date)]); run = (await db.query<Row>('select * from runs where id = $1', [id])).rows[0] }
+  }
+  const geo = await geocode(db, [p.address, p.city].filter(Boolean).join(', ')).catch(() => null)
+  const { rows: n } = await db.query<{ n: number }>('select count(*)::int as n from run_stops where run_id = $1', [run.id])
+  const stopId = 'stp_' + uid()
+  await db.query('insert into run_stops (id,run_id,seq,shipment_id,label,address,lat,lon,contact,phone,note) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+    [stopId, run.id, n[0].n, p.shipment_id, `${p.ref} · ${p.customer}`, [p.address, p.city].filter(Boolean).join(', '), geo?.lat ?? null, geo?.lon ?? null, p.contact_name, p.contact_phone, `Pickup window ${windowLabel(p.window_start, p.window_end)}${p.notes ? ` · ${p.notes}` : ''}`])
+  await db.query('update pickup_requests set run_id = $2, stop_id = $3 where id = $1', [p.id, run.id, stopId])
+  return run
+}
+
+/** A pickup row joined the way the board reads it. */
+export async function pickupRow(db: Db, id: string) { const { rows } = await db.query<Row>(`${SELECT} where p.id = $1`, [id]); return rows[0] ?? null }
+
 export function mountPickups(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
 
@@ -97,22 +118,7 @@ export function mountPickups(r: Router, d: Deps) {
     if (slot.left <= 0) throw new HttpError(409, 'That slot is full — pick another time.')
     return slot
   }
-  /** Put a confirmed pickup on a planned pickup run for its date (creating one if needed). */
-  const placeOnRun = async (db: Db, p: Row, runId?: string | null) => {
-    let run: Row | undefined
-    if (runId) { run = (await db.query<Row>(`select * from runs where id = $1 and shipper_id = $2 and kind = 'pickup' and status in ('planned','in_progress')`, [runId, p.shipper_id])).rows[0]; if (!run) throw new HttpError(404, 'That run is not open.') }
-    else {
-      run = (await db.query<Row>(`select * from runs where shipper_id = $1 and kind = 'pickup' and run_date = $2 and status = 'planned' order by created_at limit 1`, [p.shipper_id, DAY(p.pickup_date)])).rows[0]
-      if (!run) { const id = 'run_' + uid(); await db.query(`insert into runs (id,shipper_id,name,kind,run_date,notes) values ($1,$2,$3,'pickup',$4,'Created from customer pickup bookings.')`, [id, p.shipper_id, `Pickups ${DAY(p.pickup_date)}`, DAY(p.pickup_date)]); run = (await db.query<Row>('select * from runs where id = $1', [id])).rows[0] }
-    }
-    const geo = await geocode(db, [p.address, p.city].filter(Boolean).join(', ')).catch(() => null)
-    const { rows: n } = await db.query<{ n: number }>('select count(*)::int as n from run_stops where run_id = $1', [run.id])
-    const stopId = 'stp_' + uid()
-    await db.query('insert into run_stops (id,run_id,seq,shipment_id,label,address,lat,lon,contact,phone,note) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
-      [stopId, run.id, n[0].n, p.shipment_id, `${p.ref} · ${p.customer}`, [p.address, p.city].filter(Boolean).join(', '), geo?.lat ?? null, geo?.lon ?? null, p.contact_name, p.contact_phone, `Pickup window ${windowLabel(p.window_start, p.window_end)}${p.notes ? ` · ${p.notes}` : ''}`])
-    await db.query('update pickup_requests set run_id = $2, stop_id = $3 where id = $1', [p.id, run.id, stopId])
-    return run
-  }
+  const placeOnRun = (db: Db, p: Row, runId?: string | null) => placePickupOnRun(db, p, runId)
   const detach = async (db: Db, p: Row) => {
     if (p.stop_id) await db.query(`delete from run_stops st using runs r where st.id = $1 and r.id = st.run_id and st.status = 'pending' and r.status = 'planned'`, [p.stop_id])
     await db.query('update pickup_requests set run_id = null, stop_id = null where id = $1', [p.id])
@@ -159,6 +165,12 @@ export function mountPickups(r: Router, d: Deps) {
       [id, s.id, s.shipper_id, s.user_id ?? null, b.date, b.windowStart, b.windowEnd, b.address, b.city, b.contactName, b.contactPhone, b.notes, isOffice ? 'confirmed' : 'requested', isOffice ? 'shipper' : 'customer'])
     let p = await byId(db, id)
     if (isOffice) { await placeOnRun(db, p); p = await byId(db, id); await tellCustomer(db, p, `Pickup booked for ${s.ref}`, `${u.name} scheduled collection for ${when(p)} at ${p.address}.`) }
+    else if ((await prefsOf(db, s.shipper_id)).autoConfirmPickups) {
+      // The slot was validated against the shipper's hours and capacity — put it straight on the day's run.
+      await placeOnRun(db, p); await db.query(`update pickup_requests set status = 'confirmed', updated_at = now() where id = $1`, [p.id]); p = await byId(db, id)
+      await tellCustomer(db, p, `Pickup confirmed — ${s.ref}`, `${when(p)} at ${p.address}. Have the pieces packed and labelled.`)
+      await tellOffice(db, p, `Pickup booked — ${s.ref}`, `${p.contact_name} booked ${when(p)} at ${p.address}. It’s on that day’s pickup run.`)
+    }
     else await tellOffice(db, p, `Pickup requested — ${s.ref}`, `${p.contact_name} asked for ${when(p)} at ${p.address}${p.city ? `, ${p.city}` : ''}. Confirm it to add it to a run.`)
     res.status(201).json({ pickup: pickupOut(p) })
   }))

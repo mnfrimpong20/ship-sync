@@ -14,7 +14,7 @@ interface Deps {
   requireUser: (db: Db, req: Request) => Promise<ApiUser>
   HttpError: new (status: number, message: string) => Error
   wrap: (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) => void
-  loadShipments: (db: Db, where: string, params: unknown[]) => Promise<any[]>
+  loadShipments: (db: Db, where: string, params: unknown[], opts?: { includeCancelled?: boolean }) => Promise<any[]>
 }
 
 const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v))
@@ -159,7 +159,7 @@ export function mountClients(r: Router, d: Deps) {
     const [{ rows: cons }, { rows: acts }, shipments, invoices] = await Promise.all([
       db.query<Row>('select * from client_consignees where client_id = $1 order by is_default desc, name asc', [c.id]),
       db.query<Row>('select * from client_activities where client_id = $1 order by at desc limit 200', [c.id]),
-      loadShipments(db, 'client_id = $1', [c.id]),
+      loadShipments(db, 'client_id = $1', [c.id], { includeCancelled: true }),
       loadInvoices(db, 'client_id = $1', [c.id]),
     ])
     res.json({ client: clientOut(c), consignees: cons.map(consigneeOut), activities: acts.map(activityOut), shipments, invoices })
@@ -253,6 +253,7 @@ export function mountClients(r: Router, d: Deps) {
       [id, ref, shipperId, c.user_id ?? null, c.id, consignee?.id ?? null, b.mode, b.origin, b.destination, b.cargo, b.description || `${b.cargo} for ${c.name}`, b.eta, c.name])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [id, 'booked', b.origin, b.note || `Booked directly with ${user.company ?? 'your shipper'}.${consignee ? ` Consignee: ${consignee.name}, ${consignee.city}.` : ''}`])
     await act(db, c.id, shipperId, 'system', `Shipment ${ref} booked (${b.mode}, ${b.origin} → ${countryByCode(b.destination)?.name ?? b.destination}).`, user.id)
+    await (await import('./shipmentOps')).afterBooking(db, id, { by: user.name }).catch((e) => console.error('[booking] after', e))
     const [shipment] = await loadShipments(db, 'id = $1', [id])
     res.status(201).json({ shipment })
   }))

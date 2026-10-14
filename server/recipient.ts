@@ -13,7 +13,7 @@ import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { notify, notifyShipperStaff } from './notify'
-import { normalisePhone, sendText, smsProvider } from './sms'
+import { messagingReady, normalisePhone, sendText, smsProvider, whatsappProvider } from './sms'
 import { countryByCode, statusLabels, type ShipmentStatus } from '../src/lib/data'
 
 type Row = Record<string, any>
@@ -78,18 +78,18 @@ export async function messageRecipient(db: Db, s: Row, kind: RecipientKind, o: {
   if (!o.force) { const { rows } = await db.query<Row>(`select 1 from recipient_messages where shipment_id = $1 and kind = $2 and status <> 'failed' limit 1`, [s.id, kind]); if (rows[0]) return null }
   const token = await ensureReceiverToken(db, s)
   const text = compose(kind, s, sh.name, receiverUrl(token), receiver, { note: o.note })
-  const provider = smsProvider()
-  const channel = provider.whatsapp ? 'whatsapp' : 'sms'
+  const ready = messagingReady()
+  const channel = whatsappProvider().id !== 'off' ? 'whatsapp' : 'sms'
   const id = 'rm_' + uid()
-  await db.query(`insert into recipient_messages (id,shipment_id,shipper_id,to_phone,channel,kind,text,status,by_name) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [id, s.id, s.shipper_id, to, channel, kind, text, provider.id === 'off' ? 'skipped' : 'pending', o.by ?? ''])
-  if (provider.id !== 'off') void sendPendingTexts(db)
+  await db.query(`insert into recipient_messages (id,shipment_id,shipper_id,to_phone,channel,kind,text,status,by_name) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [id, s.id, s.shipper_id, to, channel, kind, text, ready ? 'pending' : 'skipped', o.by ?? ''])
+  if (ready) void sendPendingTexts(db)
   const { rows } = await db.query<Row>('select * from recipient_messages where id = $1', [id])
   return rows[0]
 }
 
 let inflight: Promise<void> | null = null
 export function sendPendingTexts(db: Db): Promise<void> {
-  if (smsProvider().id === 'off') return Promise.resolve()
+  if (!messagingReady()) return Promise.resolve()
   if (inflight) return inflight
   inflight = (async () => {
     try {
@@ -99,7 +99,10 @@ export function sendPendingTexts(db: Db): Promise<void> {
         if (!rows.length) break
         for (const m of rows) {
           try { const pid = await sendText(m.to_phone, m.text, m.channel); await db.query(`update recipient_messages set status = 'sent', provider_id = $2, attempts = attempts + 1, error = '', sent_at = now() where id = $1`, [m.id, pid]) }
-          catch (e) { const msg = e instanceof Error ? e.message : String(e); await db.query(`update recipient_messages set status = case when attempts + 1 >= 5 then 'failed' else 'pending' end, attempts = attempts + 1, error = $2 where id = $1`, [m.id, msg.slice(0, 300)]); console.error('[recipient] send', m.id, msg) }
+          catch (e) { const msg = e instanceof Error ? e.message : String(e)
+            // WhatsApp not delivered (no account, template, window) → same text by SMS if we have it.
+            if (m.channel === 'whatsapp' && smsProvider().id !== 'off') { await db.query(`update recipient_messages set channel = 'sms', status = 'pending', error = $2 where id = $1`, [m.id, `WhatsApp failed, retrying by SMS: ${msg}`.slice(0, 300)]); continue }
+            await db.query(`update recipient_messages set status = case when attempts + 1 >= 5 then 'failed' else 'pending' end, attempts = attempts + 1, error = $2 where id = $1`, [m.id, msg.slice(0, 300)]); console.error('[recipient] send', m.id, msg) }
         }
         const { rows: more } = await db.query<Row>(`select 1 from recipient_messages where status = 'pending' and attempts = 0 limit 1`); if (!more.length) break
       }
@@ -109,12 +112,12 @@ export function sendPendingTexts(db: Db): Promise<void> {
 }
 export function startRecipientSweeps(getDb: () => Promise<Db>) {
   setInterval(() => void getDb().then(sendPendingTexts).catch(() => {}), 5 * 60_000)
-  console.log(`[recipient] texts via ${smsProvider().label}`)
+  console.log(`[recipient] texts via ${smsProvider().label}${whatsappProvider().id !== 'off' ? ` + ${whatsappProvider().label}` : ''}`)
 }
 
 /** Called from notifyShipmentStatus — milestones the receiver cares about. */
 export async function recipientOnStatus(db: Db, s: Row, status: ShipmentStatus, note?: string) {
-  const map: Partial<Record<ShipmentStatus, RecipientKind>> = { in_transit: 'sailed', arrived: 'arrived', out_for_delivery: 'out_for_delivery', delivered: 'delivered' }
+  const map: Partial<Record<ShipmentStatus, RecipientKind>> = { in_transit: 'sailed', arrived: 'arrived', ready_for_collection: 'ready', out_for_delivery: 'out_for_delivery', delivered: 'delivered' }
   const kind = map[status]; if (!kind) return
   try { await messageRecipient(db, s, kind, { note }) } catch (e) { console.error('[recipient] status', e) }
 }
@@ -133,7 +136,7 @@ export function mountRecipient(r: Router, d: Deps) {
     if (!office && !owner) throw new HttpError(403, 'You do not have access to this shipment.')
     return { u, s, office }
   }
-  const settingsOut = async (db: Db, shipperId: string) => { const sh = await shipperOf(db, shipperId); const p = smsProvider(); return { enabled: Boolean(sh?.recipient_sms), provider: p.id, providerLabel: p.label, channel: p.whatsapp ? 'whatsapp' : 'sms', appUrl: appUrl() } }
+  const settingsOut = async (db: Db, shipperId: string) => { const sh = await shipperOf(db, shipperId); const p = smsProvider(); const w = whatsappProvider(); return { enabled: Boolean(sh?.recipient_sms), provider: messagingReady() ? (p.id !== 'off' ? p.id : w.id) : 'off', providerLabel: [p.id !== 'off' ? p.label : '', w.id !== 'off' ? w.label : ''].filter(Boolean).join(' + ') || 'Not configured', channel: w.id !== 'off' ? 'whatsapp' : 'sms', whatsapp: w.id !== 'off', appUrl: appUrl() } }
 
   /** Receiver link, consignee, message history and any receipt confirmation. */
   r.get('/shipments/:id/recipient', wrap(async (req, res) => {

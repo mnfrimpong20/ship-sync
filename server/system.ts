@@ -8,7 +8,7 @@ import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
 import { hideDemoShippers, uid, type Db } from './db'
 import { emailProvider } from './notify'
-import { smsProvider } from './sms'
+import { smsProvider, whatsappProvider } from './sms'
 
 type Row = Record<string, any>
 type ApiUser = { id: string; email: string; role: string; shipperId?: string | null; admin?: boolean }
@@ -156,7 +156,7 @@ export function mountSystem(r: Router, d: Deps) {
       version: process.env.npm_package_version ?? null, node: process.version, uptimeSec: Math.round(process.uptime()), env: process.env.NODE_ENV ?? 'development',
       database: process.env.DATABASE_URL ? 'postgres' : 'pglite (embedded — not for production)',
       demoShippersHidden: hideDemoShippers(), demoAutoQuotes: (process.env.DEMO_AUTO_QUOTES ?? 'true') !== 'false',
-      email: emailProvider().id, sms: smsProvider().id,
+      email: emailProvider().id, sms: smsProvider().id, whatsapp: whatsappProvider().id,
       stripe: has('STRIPE_SECRET_KEY') && has('STRIPE_WEBHOOK_SECRET'), ais: has('AISSTREAM_API_KEY'), terminal49: has('TERMINAL49_API_KEY'), appUrl: process.env.APP_URL ?? null,
       contact: { email: has('CONTACT_EMAIL'), phone: has('CONTACT_PHONE'), whatsapp: has('CONTACT_WHATSAPP') },
       users: { total: u[0].n, real: u[0].real }, shippers: { total: s[0].n, real: s[0].real },

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Bot, Check, CircleDashed, Pencil, RotateCcw, Trash2, UserPlus, Zap } from 'lucide-react'
+import { AlertTriangle, Bot, Check, ChevronRight, CircleDashed, Pencil, RotateCcw, Trash2, UserPlus, Zap } from 'lucide-react'
 import { countries, statusLabels, statusOrder, type Shipment } from '../lib/data'
 import { useStore } from '../lib/store'
 import { clientsApi, type Consignee, type ConsigneeInput } from '../lib/clients'
@@ -53,13 +53,25 @@ export function RecipientEditor({ s, consignees: given, onSaved }: { s: Shipment
   )
 }
 
+/** Shown instead of a "Next step" button when something other than a click will move the status. */
+export function AutoTag({ s, onOverride }: { s: Shipment; onOverride?: () => void }) {
+  if (!s.autoBy) return null
+  const why = s.autoBy.kind === 'container' ? `Status follows container ${s.autoBy.label.replace('follows ', '')} through Customs` : s.autoBy.kind === 'run' ? `Moves when the driver works the ${s.autoBy.label}` : 'Moves to Picked up when a piece label is scanned'
+  return (
+    <button type="button" onClick={onOverride} title={`${why}. Open Manage to override by hand.`} className="inline-flex max-w-[210px] items-center gap-1 whitespace-nowrap rounded-full border border-teal/40 bg-teal/10 px-2.5 py-1 text-[11px] font-medium text-teal focus-ring" data-testid="auto-tag">
+      <Bot size={12} className="shrink-0" aria-hidden="true" /> <span className="truncate">Auto · {s.autoBy.label}</span>
+    </button>
+  )
+}
+
 /** Everything the office may need to fix on a shipment: who receives it, what moves it on its own, and corrections. */
 export function ShipmentManage({ s, consignees, onChanged, onDeleted }: { s: Shipment; consignees?: Consignee[]; onChanged: (toast: string) => void | Promise<void>; onDeleted: (toast: string) => void | Promise<void> }) {
-  const { user } = useStore()
+  const { user, advanceShipment } = useStore()
+  const office = user?.role === 'shipper' && user.staffRole !== 'driver'
   const manager = user?.role === 'shipper' && ['owner', 'dispatcher', undefined].includes(user.staffRole)
   const [auto, setAuto] = useState<Automation | null>(null)
   const [editRcp, setEditRcp] = useState(false)
-  const [mode, setMode] = useState<'' | 'revert' | 'delete'>('')
+  const [mode, setMode] = useState<'' | 'forward' | 'revert' | 'delete'>('')
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   const load = () => shipmentOpsApi.automation(s.id).then(setAuto).catch(() => {})
@@ -71,10 +83,12 @@ export function ShipmentManage({ s, consignees, onChanged, onDeleted }: { s: Shi
   const hasRcp = !!s.consigneeId
   const idx = statusOrder.indexOf(s.status)
   const prev = idx > 0 ? statusOrder[idx - 1] : null
+  const nextSt = idx < statusOrder.length - 1 ? statusOrder[idx + 1] : null
   const go = async () => {
     setBusy(true); setErr('')
     try {
-      if (mode === 'revert') { await shipmentOpsApi.revert(s.id, reason); setMode(''); setReason(''); await onChanged(`${s.ref} moved back to “${statusLabels[prev!]}”.`) }
+      if (mode === 'forward') { await advanceShipment(s.id, reason.trim() ? `Updated by hand: ${reason.trim()}` : undefined); setMode(''); setReason(''); await onChanged(`${s.ref} moved to “${statusLabels[nextSt!]}”.`) }
+      else if (mode === 'revert') { await shipmentOpsApi.revert(s.id, reason); setMode(''); setReason(''); await onChanged(`${s.ref} moved back to “${statusLabels[prev!]}”.`) }
       else if (mode === 'delete') { const r = await shipmentOpsApi.remove(s.id, reason); await onDeleted(`${s.ref} deleted${r.reopenedRequest ? ' — the customer’s request is open for quotes again' : ''}.`) }
     } catch (e) { setErr(msg(e)) } finally { setBusy(false) }
   }
@@ -115,22 +129,23 @@ export function ShipmentManage({ s, consignees, onChanged, onDeleted }: { s: Shi
       </div>
 
       {/* corrections */}
-      {manager && (prev || s.status === 'booked') && (
+      {office && (nextSt || prev) && (
         <div className="mt-4 border-t border-border pt-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Corrections</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Manual override</p>
           {err && <p role="alert" className="mt-1 text-xs text-danger" data-testid="manage-error">{err}</p>}
           {!mode && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {prev && <button onClick={() => setMode('revert')} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="revert-open"><RotateCcw size={12} aria-hidden="true" /> Move back to “{statusLabels[prev]}”</button>}
-              {s.status === 'booked' && <button onClick={() => setMode('delete')} className="btn-ghost !min-h-8 !px-2.5 text-xs text-danger" data-testid="delete-open"><Trash2 size={12} aria-hidden="true" /> Delete booking</button>}
+              {nextSt && <button onClick={() => setMode('forward')} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="forward-open">Move forward to “{statusLabels[nextSt]}” <ChevronRight size={12} aria-hidden="true" /></button>}
+              {manager && prev && <button onClick={() => setMode('revert')} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="revert-open"><RotateCcw size={12} aria-hidden="true" /> Move back to “{statusLabels[prev]}”</button>}
+              {manager && s.status === 'booked' && <button onClick={() => setMode('delete')} className="btn-ghost !min-h-8 !px-2.5 text-xs text-danger" data-testid="delete-open"><Trash2 size={12} aria-hidden="true" /> Delete booking</button>}
             </div>
           )}
           {mode && (
             <form onSubmit={(e) => { e.preventDefault(); void go() }} className="mt-2 grid gap-2">
-              <label className="grid gap-1 text-xs"><span className="text-text-muted">{mode === 'revert' ? 'Why? (shown on the timeline and to the customer)' : 'Reason (sent to the customer, optional)'}</span>
-                <input autoFocus className="input-dark !min-h-9 text-sm" required={mode === 'revert'} minLength={mode === 'revert' ? 3 : 0} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={mode === 'revert' ? 'Marked by mistake' : 'Duplicate booking'} data-testid="manage-reason" /></label>
+              <label className="grid gap-1 text-xs"><span className="text-text-muted">{mode === 'revert' ? 'Why? (shown on the timeline and to the customer)' : mode === 'forward' ? (s.autoBy ? `Why override? This normally moves on its own (${s.autoBy.label}).` : 'Note for the timeline (optional)') : 'Reason (sent to the customer, optional)'}</span>
+                <input autoFocus className="input-dark !min-h-9 text-sm" required={mode === 'revert' || (mode === 'forward' && !!s.autoBy)} minLength={mode === 'revert' || (mode === 'forward' && s.autoBy) ? 3 : 0} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={mode === 'revert' ? 'Marked by mistake' : mode === 'forward' ? 'Carrier update is late — confirmed by phone' : 'Duplicate booking'} data-testid="manage-reason" /></label>
               {mode === 'delete' && <p className="text-[11px] text-text-muted">Only possible while nothing depends on it — no payment, sent invoice, scans or container. A marketplace booking reopens the customer’s request.</p>}
-              <div className="flex justify-end gap-1.5"><button type="button" onClick={() => { setMode(''); setReason(''); setErr('') }} className="btn-ghost !min-h-8 !px-2.5 text-xs">Cancel</button><button disabled={busy} className={`!min-h-8 !px-3 text-xs disabled:opacity-60 ${mode === 'delete' ? 'btn-ghost !border-danger text-danger' : 'btn-gold'}`} data-testid="manage-confirm">{busy ? 'Working…' : mode === 'revert' ? 'Move back' : 'Delete for good'}</button></div>
+              <div className="flex justify-end gap-1.5"><button type="button" onClick={() => { setMode(''); setReason(''); setErr('') }} className="btn-ghost !min-h-8 !px-2.5 text-xs">Cancel</button><button disabled={busy} className={`!min-h-8 !px-3 text-xs disabled:opacity-60 ${mode === 'delete' ? 'btn-ghost !border-danger text-danger' : 'btn-gold'}`} data-testid="manage-confirm">{busy ? 'Working…' : mode === 'forward' ? `Move to ${statusLabels[nextSt!]}` : mode === 'revert' ? 'Move back' : 'Delete for good'}</button></div>
             </form>
           )}
         </div>

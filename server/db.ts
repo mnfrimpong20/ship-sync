@@ -59,6 +59,7 @@ export async function getDb(): Promise<Db> {
   await seedWarehouseDemo(db)
   await seedSourcingDemo(db)
   await seedDestinations(db)
+  await (await import('./analyticsSeed')).seedAnalyticsDemo(db)
   return db
 }
 

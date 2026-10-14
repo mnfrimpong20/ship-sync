@@ -10,6 +10,7 @@ import { attachShipmentToClient, logShipmentActivity, mountClients } from './cli
 import { mountOps } from './ops'
 import { mountDirectory } from './directory'
 import { mountInsights } from './insights'
+import { mountAnalytics } from './analytics'
 import { mountContainers } from './containers'
 import { mountLabels } from './labels'
 import { mountScans, piecesForTracking, proofOfDelivery } from './scans'
@@ -47,13 +48,13 @@ import { mountBrand } from './brand'
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: StaffPerms; staffId?: string }
 export interface StaffPerms { allow?: Area[]; deny?: Area[] }
 /** Areas a company can grant or withhold per person on top of their role. Mirrors ROLE_AREAS in src/lib/ops.ts. */
-export const AREAS = ['leads', 'rates', 'lanes', 'groupage', 'brand', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'payments', 'collections', 'reviews', 'fleet', 'team', 'verification', 'sourcing'] as const
+export const AREAS = ['leads', 'rates', 'lanes', 'groupage', 'brand', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'payments', 'collections', 'reviews', 'fleet', 'team', 'verification', 'sourcing', 'analytics'] as const
 export type Area = (typeof AREAS)[number]
 const ROLE_BASE: Record<string, Area[] | 'all'> = {
   owner: 'all', dispatcher: 'all',
-  agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing'],
-  finance: ['clients', 'payments', 'collections', 'reviews', 'shipments', 'team'],
-  warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team'],
+  agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing', 'analytics'],
+  finance: ['clients', 'payments', 'collections', 'reviews', 'shipments', 'team', 'analytics'],
+  warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team', 'analytics'],
   driver: ['routes', 'team'],
 }
 /** Role + per-person overrides → may this staff member use this area? Admins and customers are handled by callers. */
@@ -690,6 +691,7 @@ export function apiRouter() {
   mountClients(r, { getDb, requireUser, HttpError, wrap, loadShipments })
   mountOps(r, { getDb, requireUser, createSession, loadUserWithCompany, HttpError, wrap, loadShipments })
   mountInsights(r, { getDb, requireUser, HttpError, wrap })
+  mountAnalytics(r, { getDb, requireUser, HttpError, wrap })
   mountContainers(r, { getDb, requireUser, HttpError, wrap, loadShipments })
   mountLabels(r, { getDb, requireUser, HttpError, wrap })
   mountScans(r, { getDb, requireUser, HttpError, wrap })

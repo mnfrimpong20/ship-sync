@@ -3,7 +3,7 @@ import type { Mode, ShipmentStatus } from './data'
 
 export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'
 export type StaffBase = 'origin' | 'destination'
-export type Area = 'leads' | 'rates' | 'lanes' | 'groupage' | 'brand' | 'shipments' | 'containers' | 'sailings' | 'pickups' | 'routes' | 'warehouse' | 'clients' | 'payments' | 'collections' | 'reviews' | 'fleet' | 'team' | 'verification' | 'sourcing'
+export type Area = 'leads' | 'rates' | 'lanes' | 'groupage' | 'brand' | 'shipments' | 'containers' | 'sailings' | 'pickups' | 'routes' | 'warehouse' | 'clients' | 'payments' | 'collections' | 'reviews' | 'fleet' | 'team' | 'verification' | 'sourcing' | 'analytics'
 export interface StaffPerms { allow?: Area[]; deny?: Area[] }
 export interface StaffActivity { runsWeek: number; stopsWeek: number; scansWeek: number; quotesWeek: number; quotesWonWeek: number; lastScanAt: string | null }
 export interface Staff { id: string; shipperId: string; userId?: string; name: string; email: string; phone: string; role: StaffRole; status: 'invited' | 'active' | 'inactive'; base: StaffBase; city: string; inviteToken?: string; createdAt: string; runCount?: number; perms?: StaffPerms; lastActiveAt?: string | null; activity?: StaffActivity }
@@ -38,13 +38,13 @@ export const runStatusLabels: Record<RunStatus, string> = { planned: 'Planned', 
 export const canManageOps = (role?: StaffRole) => role === 'owner' || role === 'dispatcher'
 /** Which /dashboard areas each role gets. Owners and dispatchers see everything; the lists are prefixes of pathnames. */
 /** Which /dashboard areas each role gets by default; a person's `perms` add (allow) or remove (deny) areas on top. */
-export const AREA_PATHS: Record<Area, string> = { leads: '/dashboard/leads', rates: '/dashboard/rates', lanes: '/dashboard/lanes', groupage: '/dashboard/groupage', brand: '/dashboard/brand', shipments: '/dashboard/shipments', containers: '/dashboard/containers', sailings: '/dashboard/sailings', pickups: '/dashboard/pickups', routes: '/dashboard/routes', warehouse: '/dashboard/warehouse', clients: '/dashboard/clients', payments: '/dashboard/payments', collections: '/dashboard/collections', reviews: '/dashboard/reviews', fleet: '/dashboard/fleet', team: '/dashboard/team', verification: '/dashboard/verification', sourcing: '/dashboard/sourcing' }
-export const AREA_LABELS: Record<Area, string> = { leads: 'Requests', rates: 'Rate cards', lanes: 'Lane intelligence', groupage: 'Fill a barrel', brand: 'Branded page', shipments: 'Client shipments', containers: 'Containers', sailings: 'Book a sailing', pickups: 'Pickups', routes: 'Routes', warehouse: 'Warehouse', clients: 'Clients', payments: 'Payments', collections: 'Collections', reviews: 'Reviews', fleet: 'Fleet', team: 'Team', verification: 'Verification', sourcing: 'Sourcing' }
+export const AREA_PATHS: Record<Area, string> = { leads: '/dashboard/leads', rates: '/dashboard/rates', lanes: '/dashboard/lanes', groupage: '/dashboard/groupage', brand: '/dashboard/brand', shipments: '/dashboard/shipments', containers: '/dashboard/containers', sailings: '/dashboard/sailings', pickups: '/dashboard/pickups', routes: '/dashboard/routes', warehouse: '/dashboard/warehouse', clients: '/dashboard/clients', payments: '/dashboard/payments', collections: '/dashboard/collections', reviews: '/dashboard/reviews', fleet: '/dashboard/fleet', team: '/dashboard/team', verification: '/dashboard/verification', sourcing: '/dashboard/sourcing', analytics: '/dashboard/analytics' }
+export const AREA_LABELS: Record<Area, string> = { leads: 'Requests', rates: 'Rate cards', lanes: 'Lane intelligence', groupage: 'Fill a barrel', brand: 'Branded page', shipments: 'Client shipments', containers: 'Containers', sailings: 'Book a sailing', pickups: 'Pickups', routes: 'Routes', warehouse: 'Warehouse', clients: 'Clients', payments: 'Payments', collections: 'Collections', reviews: 'Reviews', fleet: 'Fleet', team: 'Team', verification: 'Verification', sourcing: 'Sourcing', analytics: 'Analytics' }
 export const ROLE_BASE: Record<StaffRole, Area[] | 'all'> = {
   owner: 'all', dispatcher: 'all',
-  agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing'],
-  finance: ['clients', 'payments', 'collections', 'reviews', 'shipments', 'team'],
-  warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team'],
+  agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing', 'analytics'],
+  finance: ['clients', 'payments', 'collections', 'reviews', 'shipments', 'team', 'analytics'],
+  warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team', 'analytics'],
   driver: ['routes', 'team'],
 }
 const ALWAYS = ['/dashboard/shipper', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/documents', '/dashboard/invoices', '/dashboard/runs', '/dashboard/suppliers']

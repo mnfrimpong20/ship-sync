@@ -156,5 +156,9 @@ export const sampleShipments: Shipment[] = [
 ]
 
 export const countryByCode = (code: string) => countries.find((c) => c.code === code)
+/** Destinations are admin-managed on the server; the static list above is the fallback and the seed. Replaces the array's contents in place so every importer sees the live list. */
+export function hydrateCountries(list: Country[]) { if (!list.length) return; countries.splice(0, countries.length, ...list) }
+/** Origins likewise: curated cities + verified shippers' pickup cities, ranked by how many collect there. */
+export function hydrateOrigins(list: string[]) { if (!list.length) return; origins.splice(0, origins.length, ...list) }
 export const shipperById = (id: string) => shippers.find((s) => s.id === id)
 export const cargoLabel = (id: CargoType) => cargoTypes.find((c) => c.id === id)?.label ?? id

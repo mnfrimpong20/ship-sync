@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { shippers as seedShippers, type CargoType, type Mode, type Shipment, type Shipper } from './data'
 import type { PositionPayload } from '../components/LiveMap'
+import { hydrateCountries, hydrateOrigins, type Country } from './data'
 
 export type Role = 'customer' | 'shipper'
 export interface User { id: string; name: string; email: string; role: Role; company?: string; shipperId?: string; admin?: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: { allow?: string[]; deny?: string[] }; staffId?: string }
@@ -56,6 +57,8 @@ export type NewRequest = Omit<QuoteRequest, 'id' | 'ref' | 'createdAt' | 'status
 
 interface Store {
   ready: boolean
+  /** Bumps when the destination/origin lists are (re)loaded so lists re-render. */
+  geoVersion: number
   user: User | null
   shippers: Shipper[]
   requests: QuoteRequest[]
@@ -111,8 +114,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setRequests(r.requests); setShipments(s.shipments)
   }, [])
 
+  const [geoVersion, setGeoVersion] = useState(0)
   const refresh = useCallback(async () => {
-    const [{ user: u }, { shippers: sh }] = await Promise.all([api<{ user: User | null }>('/auth/me'), api<{ shippers: Shipper[] }>('/shippers')])
+    const [{ user: u }, { shippers: sh }, dest, orig] = await Promise.all([api<{ user: User | null }>('/auth/me'), api<{ shippers: Shipper[] }>('/shippers'), api<{ destinations: (Country & { dialCode: string; active: boolean })[] }>('/meta/destinations').catch(() => null), api<{ origins: { city: string; shippers: number }[] }>('/meta/origins').catch(() => null)])
+    if (dest?.destinations.length) hydrateCountries(dest.destinations.map(({ code, name, flag, ports, airports, oceanDays, airDays, note }) => ({ code, name, flag, ports, airports, oceanDays, airDays, note })))
+    if (orig?.origins.length) hydrateOrigins(orig.origins.map((o) => o.city))
+    setGeoVersion((v) => v + 1)
     setUser(u); setShippers(sh)
     await loadPrivate(u)
   }, [loadPrivate])
@@ -191,8 +198,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return shipper
   }, [])
 
-  const value = useMemo<Store>(() => ({ ready, user, shippers, requests, shipments, shipperById, login, signup, resetPassword, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit, updateShipper, adminShippers, adminVerify }),
-    [ready, user, shippers, requests, shipments, shipperById, login, signup, resetPassword, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit, updateShipper, adminShippers, adminVerify])
+  const value = useMemo<Store>(() => ({ ready, geoVersion, user, shippers, requests, shipments, shipperById, login, signup, resetPassword, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit, updateShipper, adminShippers, adminVerify }),
+    [ready, geoVersion, user, shippers, requests, shipments, shipperById, login, signup, resetPassword, logout, refresh, createRequest, acceptQuote, sendQuote, advanceShipment, matchShippers, track, position, setTransit, updateShipper, adminShippers, adminVerify])
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }
 

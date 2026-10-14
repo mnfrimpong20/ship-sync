@@ -283,8 +283,40 @@ async function loadRequests(db: Db, where: string, params: unknown[]) {
 async function loadShipments(db: Db, where: string, params: unknown[]) {
   const { rows } = await db.query<Row>(`select * from shipments where ${where} order by created_at desc`, params)
   if (!rows.length) return []
-  const { rows: events } = await db.query<Row>(`select * from shipment_events where shipment_id = any($1::text[]) order by at asc, id asc`, [rows.map((r) => r.id)])
-  return rows.map((r) => shipmentOut(r, events.filter((e) => e.shipment_id === r.id)))
+  const ids = rows.map((r) => r.id)
+  const [{ rows: events }, auto] = await Promise.all([
+    db.query<Row>(`select * from shipment_events where shipment_id = any($1::text[]) order by at asc, id asc`, [ids]),
+    autoDrivers(db, rows),
+  ])
+  return rows.map((r) => ({ ...shipmentOut(r, events.filter((e) => e.shipment_id === r.id)), autoBy: auto.get(r.id) }))
+}
+/**
+ * What will move each shipment's status without a click, if anything:
+ *   a pending run stop (pickup → Picked up; delivery → Out for delivery/Delivered),
+ *   its container (cascades through Customs), or piece labels (a scan → Picked up).
+ */
+async function autoDrivers(db: Db, rows: Row[]) {
+  const out = new Map<string, { kind: 'run' | 'container' | 'scan'; label: string }>()
+  const ids = rows.map((r) => r.id)
+  const cids = [...new Set(rows.map((r) => r.container_id).filter(Boolean))]
+  const [{ rows: stops }, { rows: cons }, { rows: pcs }] = await Promise.all([
+    db.query<Row>(`select rs.shipment_id, r.kind, r.status, r.run_date from run_stops rs join runs r on r.id = rs.run_id where rs.shipment_id = any($1::text[]) and rs.status = 'pending' and r.status <> 'cancelled' order by r.run_date`, [ids]),
+    cids.length ? db.query<Row>('select id, ref from containers where id = any($1::text[])', [cids]) : Promise.resolve({ rows: [] as Row[] }),
+    db.query<Row>(`select shipment_id, count(*)::int as n from pieces where shipment_id = any($1::text[]) group by shipment_id`, [ids]),
+  ])
+  const at = (s: string) => statusOrder.indexOf(s as ShipmentStatus)
+  for (const r of rows) {
+    const i = at(r.status)
+    const del = stops.find((x) => x.shipment_id === r.id && x.kind !== 'pickup')
+    const pick = stops.find((x) => x.shipment_id === r.id && x.kind === 'pickup')
+    const c = cons.find((x) => x.id === r.container_id)
+    const n = Number(pcs.find((x) => x.shipment_id === r.id)?.n ?? 0)
+    if (del && i >= at('arrived') && i < at('delivered')) out.set(r.id, { kind: 'run', label: del.status === 'in_progress' ? 'driver on the way' : `delivery run ${DATE(del.run_date)}` })
+    else if (pick && r.status === 'booked') out.set(r.id, { kind: 'run', label: `pickup run ${DATE(pick.run_date)}` })
+    else if (c && i < at('customs')) out.set(r.id, { kind: 'container', label: `follows ${c.ref}` })
+    else if (n > 0 && r.status === 'booked') out.set(r.id, { kind: 'scan', label: 'label scan' })
+  }
+  return out
 }
 
 /* ---------------- schemas ---------------- */

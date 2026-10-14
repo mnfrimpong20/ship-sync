@@ -10,6 +10,7 @@ import bcrypt from 'bcryptjs'
 import { randomBytes } from 'node:crypto'
 
 type Val = string | number | boolean | null | Date
+type Row = Record<string, any>
 const DAY = 86400000
 
 function prng(seed: number) {
@@ -185,4 +186,35 @@ export async function seedAnalyticsDemo(db: Db) {
   await bulk(db, 'runs', ['id', 'shipper_id', 'name', 'kind', 'run_date', 'driver_id', 'vehicle_id', 'start_label', 'status', 'distance_km', 'created_at'], keep)
   await bulk(db, 'run_stops', ['id', 'run_id', 'seq', 'label', 'status', 'done_at', 'note'], stops.filter((s) => keepIds.has(s[1])))
   console.log(`[seed] analytics demo history: ${R.length} requests, ${S.length} shipments, ${I.length} invoices, ${V.length} reviews, ${keep.length} runs`)
+}
+
+/** Demo costs for the seeded history: line freight, trucking, port and clearing per shipment, plus monthly overhead. Idempotent (ids rac_*). */
+export async function seedAnalyticsCosts(db: Db) {
+  if (process.env.DEMO_HISTORY === 'false') return
+  const { rows: ex } = await db.query<{ n: string }>(`select count(*)::text as n from costs where id like 'rac_%'`)
+  if (Number(ex[0].n) > 0) return
+  const { rows: ships } = await db.query<Row>(`select s.id, s.origin, s.cargo, s.created_at, coalesce(sum(i.total),0)::float as rev from shipments s join invoices i on i.shipment_id = s.id where s.id like 'ras_%' group by s.id, s.origin, s.cargo, s.created_at`)
+  if (!ships.length) return
+  const rnd = prng(777); const between = (a: number, b: number) => a + rnd() * (b - a)
+  const rows: Val[][] = []; let k = 0
+  const d10 = (t: number) => new Date(t).toISOString().slice(0, 10)
+  for (const s of ships) {
+    const rev = Number(s.rev); const t = new Date(s.created_at).getTime()
+    // Atlanta and Newark trucking is dearer (no own yard) — that's what the margin view should surface
+    const far = /Atlanta|Newark|Chicago/.test(s.origin)
+    const lines: [string, number, string, string][] = [
+      ['freight', rev * between(0.46, 0.58), 'Ocean freight share', 'Grimaldi / MSC'],
+      ['trucking', rev * (far ? between(0.1, 0.17) : between(0.03, 0.06)), far ? 'Drayage from inland pickup' : 'Local pickup', far ? 'Partner trucking' : 'Own truck'],
+      ['port', rev * between(0.03, 0.05), 'Terminal & documentation', 'Port of Houston'],
+      ['customs', rev * between(0.04, 0.08), 'Clearing at Tema', 'Tema clearing agent'],
+    ]
+    if (s.cargo === 'vehicle') lines.push(['agent', rev * between(0.04, 0.07), 'Vehicle export docs', 'Export agent'])
+    for (const [cat, amt, desc, vendor] of lines) rows.push([`rac_${++k}`, 'gold-coast-freight', null, s.id, cat, desc, vendor, Math.round(amt), d10(t + between(1, 20) * DAY), 'Demo history'])
+  }
+  for (let m = 0; m < 12; m++) {
+    const t = Date.now() - m * 30 * DAY
+    rows.push([`rac_o${m}a`, 'gold-coast-freight', null, null, 'warehouse', 'Houston yard rent', 'Katy Industrial Park', 1450, d10(t), 'Demo history'])
+    rows.push([`rac_o${m}b`, 'gold-coast-freight', null, null, 'fuel', 'Truck fuel & maintenance', 'Fleet card', Math.round(between(380, 620)), d10(t - 5 * DAY), 'Demo history'])
+  }
+  await bulk(db, 'costs', ['id', 'shipper_id', 'container_id', 'shipment_id', 'category', 'description', 'vendor', 'amount_usd', 'incurred_on', 'created_by'], rows)
 }

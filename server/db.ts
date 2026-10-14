@@ -11,7 +11,7 @@ import { seedDestinations } from './geoMeta'
 /** HIDE_DEMO_SHIPPERS=true removes the fictional seed shippers from every public list (directory, matching, home stats) without deleting them. */
 export const hideDemoShippers = () => /^(1|true|yes)$/i.test(process.env.HIDE_DEMO_SHIPPERS ?? '')
 /** SQL fragment for public shipper queries (`where <publicShipperSql()>`): never the platform's own sourcing desk, and no demo shippers once hidden. */
-export const publicShipperSql = (alias = '') => `${alias}id <> 'ship-sync-sourcing'${hideDemoShippers() ? ` and ${alias}demo = false` : ''}`
+export const publicShipperSql = (alias = '') => `${alias}id <> 'ship-sync-sourcing' and coalesce(${alias}standing, 'good') <> 'paused'${hideDemoShippers() ? ` and ${alias}demo = false` : ''}`
 import { seedGroupageDemo } from './groupage'
 import { seedBrokersDemo } from './brokers'
 import { rollSchedule } from './booking'
@@ -60,6 +60,10 @@ export async function getDb(): Promise<Db> {
   await seedSourcingDemo(db)
   await seedDestinations(db)
   await (await import('./analyticsSeed')).seedAnalyticsDemo(db)
+  await (await import('./analyticsSeed')).seedAnalyticsCosts(db)
+  // plans: the two main demo shippers are on Pro; everyone else on Starter gets a trial window
+  await db.query(`update shippers set plan = 'pro' where demo and id in ('gold-coast-freight','atlantic-bridge') and plan = 'starter'`)
+  await db.query(`update shippers set trial_ends_at = now() + interval '30 days' where trial_ends_at is null and plan = 'starter'`)
   return db
 }
 
@@ -1161,6 +1165,68 @@ create table if not exists supplier_audits (
   categories jsonb not null default '{}',
   created_at timestamptz not null default now()
 );
+-- platform: audit log, view-as, feature switches, plans
+create table if not exists audit_log (
+  id text primary key, at timestamptz not null default now(), actor_id text, actor_name text not null default '', actor_email text not null default '', actor_role text not null default '',
+  view_as_by text, shipper_id text, method text not null default '', path text not null default '', action text not null default '', entity text not null default '', entity_id text, status int, data jsonb, ip text
+);
+create index if not exists idx_audit_at on audit_log(at desc);
+create index if not exists idx_audit_shipper on audit_log(shipper_id, at desc);
+alter table sessions add column if not exists read_only boolean not null default false;
+alter table sessions add column if not exists impersonator_id text;
+alter table shippers add column if not exists feature_overrides jsonb not null default '{}';
+alter table shippers add column if not exists trial_ends_at timestamptz;
+alter table shippers add column if not exists quality jsonb;
+alter table shippers add column if not exists standing text not null default 'good';
+alter table shippers add column if not exists standing_note text not null default '';
+alter table shippers add column if not exists standing_at timestamptz;
+alter table shippers add column if not exists standing_locked boolean not null default false;
+create table if not exists subscriptions (
+  shipper_id text primary key references shippers(id) on delete cascade, plan text not null, status text not null default 'active', provider text not null default 'manual',
+  customer_id text, subscription_id text, session_id text, amount_usd numeric not null default 0, current_period_end timestamptz, cancel_at_period_end boolean not null default false,
+  started_at timestamptz not null default now(), canceled_at timestamptz, updated_at timestamptz not null default now(), note text not null default ''
+);
+create table if not exists subscription_events (id text primary key, shipper_id text not null, kind text not null, plan text, amount_usd numeric, at timestamptz not null default now(), by_name text not null default '');
+-- shipper money & planning
+create table if not exists costs (
+  id text primary key, shipper_id text not null references shippers(id) on delete cascade, container_id text references containers(id) on delete set null, shipment_id text references shipments(id) on delete set null,
+  category text not null, description text not null default '', vendor text not null default '', amount_usd numeric not null, incurred_on date not null default current_date, created_by text not null default '', created_at timestamptz not null default now()
+);
+create index if not exists idx_costs_shipper on costs(shipper_id, incurred_on);
+-- growth tools
+create table if not exists campaigns (
+  id text primary key, shipper_id text not null references shippers(id) on delete cascade, name text not null, channel text not null, subject text not null default '', message text not null,
+  audience text not null default 'custom', status text not null default 'sent', sent_at timestamptz, created_by text not null default '', created_at timestamptz not null default now()
+);
+create table if not exists campaign_recipients (
+  id text primary key, campaign_id text not null references campaigns(id) on delete cascade, client_id text, name text not null default '', to_addr text not null default '', channel text not null,
+  status text not null default 'queued', error text not null default '', sent_at timestamptz, booked_shipment_id text, booked_at timestamptz
+);
+create index if not exists idx_campaign_recipients on campaign_recipients(campaign_id);
+create table if not exists quote_templates (
+  id text primary key, shipper_id text not null references shippers(id) on delete cascade, name text not null, mode text not null default 'ocean', cargo text not null default '',
+  unit_price numeric not null default 0, min_charge numeric not null default 0, pickup_fee numeric not null default 0, delivery_fee numeric not null default 0, insurance_pct numeric not null default 0,
+  transit_days int not null default 35, valid_days int not null default 14, kind text not null default 'firm', includes jsonb not null default '[]', notes text not null default '', created_at timestamptz not null default now()
+);
+-- integrations
+create table if not exists webhooks (
+  id text primary key, shipper_id text not null references shippers(id) on delete cascade, url text not null, secret text not null, events jsonb not null default '[]', active boolean not null default true,
+  failures int not null default 0, last_status int, last_at timestamptz, created_at timestamptz not null default now()
+);
+create table if not exists webhook_deliveries (
+  id text primary key, webhook_id text not null references webhooks(id) on delete cascade, event text not null, payload jsonb not null, status text not null default 'pending', attempts int not null default 0,
+  response_status int, error text not null default '', next_at timestamptz not null default now(), created_at timestamptz not null default now(), delivered_at timestamptz
+);
+create index if not exists idx_webhook_due on webhook_deliveries(status, next_at);
+-- admin
+create table if not exists announcements (
+  id text primary key, title text not null, body text not null default '', audience text not null default 'all', destination text, level text not null default 'info', link text not null default '',
+  starts_at timestamptz not null default now(), ends_at timestamptz, active boolean not null default true, notify boolean not null default false, created_by text not null default '', created_at timestamptz not null default now()
+);
+create table if not exists announcement_dismissals (announcement_id text not null, user_id text not null, at timestamptz not null default now(), primary key (announcement_id, user_id));
+create table if not exists risk_dismissals (key text primary key, by_name text not null default '', note text not null default '', at timestamptz not null default now());
+update shippers set plan = 'pro' where demo and id in ('gold-coast-freight','atlantic-bridge') and plan = 'starter';
+update shippers set trial_ends_at = now() + interval '30 days' where trial_ends_at is null and plan = 'starter';
 
 `
 

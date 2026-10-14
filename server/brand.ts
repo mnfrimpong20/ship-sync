@@ -60,6 +60,7 @@ export function mountBrand(r: Router, d: Deps) {
   }))
   r.put('/brand', wrap(async (req, res) => {
     const db = await getDb(); const u = await owner(db, req); const b = zBrand.parse(req.body)
+    await (await import('./features')).requirePerk(db, u.shipperId!, 'brand', HttpError)
     const { rows } = await db.query<Row>('select * from shippers where id = $1', [u.shipperId]); const cur = brandOf(rows[0])
     const next: Brand = { ...cur, ...b, slug: b.slug ?? cur.slug }
     if (b.slug) { const { rows: dup } = await db.query<Row>(`select id from shippers where id <> $1 and (brand->>'slug' = $2 or lower(regexp_replace(regexp_replace(replace(name, '&', 'and'), '[^A-Za-z0-9]+', '-', 'g'), '^-|-$', '', 'g')) = $2)`, [u.shipperId, b.slug]); if (dup.length) throw new HttpError(409, 'That address is taken — try another.') }

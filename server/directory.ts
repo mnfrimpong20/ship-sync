@@ -54,7 +54,7 @@ function textScore(s: Shipper, q: string) {
 
 /** Directory ranking when the user hasn't chosen a sort: plan tier, then verified, then rating weighted by review count. */
 function recommendedScore(s: Shipper) {
-  return planRank(s) * 100 + (s.verified ? 30 : 0) + s.rating * 10 + Math.min(20, Math.log10(s.reviews + 1) * 8) + s.onTime / 10 - s.responseHours
+  return planRank(s) * 100 + (s.verified ? 30 : 0) + s.rating * 10 + Math.min(20, Math.log10(s.reviews + 1) * 8) + s.onTime / 10 - s.responseHours + ((s.qualityScore ?? 60) - 60) * 0.6 - (s.standing === 'probation' ? 15 : s.standing === 'warning' ? 5 : 0)
 }
 
 /** Needs-based recommendation: hard filters first, then weighted signals with human-readable reasons. */

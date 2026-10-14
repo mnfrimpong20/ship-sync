@@ -163,6 +163,12 @@ export function mountOps(r: Router, d: Deps) {
     const email = b.email.toLowerCase()
     const { rows: dup } = await db.query('select 1 from staff where shipper_id = $1 and email = $2', [shipperId, email])
     if (dup.length) throw new HttpError(409, 'That person is already on your team.')
+    { // plan team limit (staff besides the owner account)
+      const { effectivePlan, PLANS } = await import('./features')
+      const { rows: sp } = await db.query<Row>('select plan, trial_ends_at from shippers where id = $1', [shipperId]); const plan = PLANS[effectivePlan(sp[0] ?? {}).plan]
+      const { rows: cnt } = await db.query<Row>(`select count(*)::int as n from staff where shipper_id = $1 and status in ('active','invited')`, [shipperId])
+      if (plan.team != null && Number(cnt[0]?.n ?? 0) >= plan.team) throw new HttpError(402, `Your ${plan.label} plan includes ${plan.team} team members. Upgrade under Plan & billing to add more.`)
+    }
     const { rows: existing } = await db.query<Row>('select id, shipper_id from users where email = $1', [email])
     if (existing[0] && existing[0].shipper_id && existing[0].shipper_id !== shipperId) throw new HttpError(409, 'That email already belongs to another company on Ship Sync.')
     const token = randomBytes(18).toString('base64url')

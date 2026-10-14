@@ -9,6 +9,7 @@ import type { Request, Response, NextFunction, Router } from 'express'
 import type { Db } from './db'
 import { can, type ApiUser } from './api'
 import { countryByCode, statusLabels, type ShipmentStatus } from '../src/lib/data'
+import { extrasFor, mountAnalyticsExtras } from './analyticsExtras'
 
 type Row = Record<string, any>
 interface Deps {
@@ -56,10 +57,20 @@ export function mountAnalytics(r: Router, d: Deps) {
     const db = await getDb(); const u = await requireUser(db, req)
     if (u.role !== 'shipper' || !u.shipperId) throw new HttpError(403, 'Shippers only.')
     if (!can(u, 'analytics') && !['owner', 'dispatcher'].includes(u.staffRole ?? 'owner')) throw new HttpError(403, 'Analytics access is needed for this.')
-    const sid = u.shipperId
-    const access = { sales: can(u, 'leads'), operations: can(u, 'shipments'), finance: can(u, 'payments'), customers: can(u, 'clients') }
-    const days = Math.max(7, Math.min(730, Number(req.query.days) || 90))
-    const fOrigin = String(req.query.origin ?? '').trim(); const fCargo = String(req.query.cargo ?? '').trim()
+    if (!(await (await import('./features')).featureOn(db, 'analytics', u.shipperId))) throw new HttpError(403, 'Analytics is switched off for your account.')
+    res.set('Cache-Control', 'no-store')
+    res.json(await computeAnalytics(db, u, { days: Number(req.query.days) || 90, origin: String(req.query.origin ?? ''), cargo: String(req.query.cargo ?? '') }, HttpError))
+  }))
+  mountAnalyticsExtras(r, d)
+}
+
+/** Everything on the analytics page for one person (sections gated by their areas and the plan). Also used by the Monday report. */
+export async function computeAnalytics(db: Db, u: ApiUser, q: { days: number; origin?: string; cargo?: string }, HttpError: new (status: number, message: string) => Error) {
+    const sid = u.shipperId!
+    const full = await (await import('./features')).hasPerk(db, sid, 'fullAnalytics')
+    const access = { sales: can(u, 'leads'), operations: full && can(u, 'shipments'), finance: full && can(u, 'payments'), customers: full && can(u, 'clients') }
+    const days = Math.max(7, Math.min(730, Number(q.days) || 90))
+    const fOrigin = String(q.origin ?? '').trim(); const fCargo = String(q.cargo ?? '').trim()
     const now = Date.now(); const from = now - days * DAY; const pFrom = from - days * DAY
     const inP = (t: number) => t >= from && t <= now; const inPrev = (t: number) => t >= pFrom && t < from
     const monthly = days > 120
@@ -365,13 +376,16 @@ export function mountAnalytics(r: Router, d: Deps) {
     // filter values available
     const origins = [...new Set([...eligible.map((x) => x.origin), ...shipsAll.map((s) => s.origin)])].sort()
     const cargos = [...new Set([...eligible.map((x) => x.cargo), ...shipsAll.map((s) => s.cargo)])].sort()
-    res.set('Cache-Control', 'no-store')
-    res.json({
+    const extras = await extrasFor(db, u, { days, from, now, eligible, quotesBy, ships, shipsAll, evBy, deliveredAt, sales: access.sales ? sales : null, finance: access.finance ? finance : null, operations: access.operations ? operations : null, bucketStart, buckets })
+    for (const i of extras.insights) if (access[i.area as keyof typeof access] ?? true) insights.push(i)
+    insights.sort((a, b) => b.weight - a.weight)
+    const { insights: _x, ...extra } = extras
+    return {
       period: { days, from: new Date(from).toISOString(), to: new Date(now).toISOString(), prevFrom: new Date(pFrom).toISOString(), bucket: monthly ? 'month' : 'week' },
       filters: { origin: fOrigin || null, cargo: fCargo || null, origins, cargos },
-      access,
+      access, locked: !full,
       sales: access.sales ? sales : null, operations: access.operations ? operations : null, finance: access.finance ? finance : null, customers: access.customers ? customers : null,
       insights: insights.map(({ weight: _w, ...i }) => i),
-    })
-  }))
+      ...extra,
+    }
 }

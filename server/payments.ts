@@ -234,6 +234,7 @@ export function stripeWebhook(getDb: () => Promise<Db>) {
     let evt: Row; try { evt = JSON.parse(raw.toString()) } catch { return res.status(400).json({ error: 'Bad payload.' }) }
     const db = await getDb()
     if (evt.id) { const { rows } = await db.query('select 1 from stripe_events where id = $1', [evt.id]); if (rows.length) return res.json({ received: true, duplicate: true }); await db.query('insert into stripe_events (id,type) values ($1,$2)', [evt.id, evt.type ?? '']) }
+    if (await (await import('./billing')).handleBillingEvent(db, evt)) return res.json({ received: true, billing: true })
     const obj: Row = evt.data?.object ?? {}
     if (evt.type === 'checkout.session.completed' || evt.type === 'checkout.session.async_payment_succeeded') {
       const pid = obj.client_reference_id || obj.metadata?.payment_id

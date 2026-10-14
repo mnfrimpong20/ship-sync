@@ -144,6 +144,7 @@ export function mountGroupage(r: Router, d: Deps) {
   }))
   r.post('/groupage', wrap(async (req, res) => {
     const db = await getDb(); const u = await office(db, req); const b = zGroupage.parse(req.body)
+    if (!(await (await import('./features')).featureOn(db, 'groupage', u.shipperId))) throw new HttpError(403, 'Shared barrels are switched off for your account.')
     if (b.departsAt < b.closesAt) throw new HttpError(400, 'Departure must be on or after the closing date.')
     const id = 'grp_' + uid()
     await db.query(`insert into groupages (id,shipper_id,kind,title,origin,destination,destination_city,capacity,price_per_unit_usd,min_units,max_units,includes,closes_at,departs_at,transit_days,notes,status,created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'open',$17)`,
@@ -173,6 +174,7 @@ export function mountGroupage(r: Router, d: Deps) {
       const desc = `${s.units} × ${s.units === 1 ? k.unit : k.unitPlural} in ${g.title}${s.description ? ` — ${s.description}` : ''}`
       await db.query('insert into shipments (id,ref,shipper_id,user_id,mode,origin,destination,cargo,description,status,eta,customer,groupage_id,groupage_spot_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',
         [sid, ref, g.shipper_id, s.user_id, 'ocean', g.origin, g.destination, k.cargo, desc, 'booked', eta, s.name, g.id, s.id])
+      void import('./integrations').then((m) => m.emitShipment(db, sid, 'shipment.booked')).catch(() => {})
       await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, 'booked', g.origin, `Booked in shared ${k.label.toLowerCase().replace('shared ', '')} "${g.title}" with ${g.shipper_name}. ${s.units} ${s.units === 1 ? k.unit : k.unitPlural} at $${Number(g.price_per_unit_usd)} each.`])
       await db.query(`update groupage_spots set status = 'booked', shipment_id = $2 where id = $1`, [s.id, sid])
       if (s.user_id) { await attachShipmentToClient(db, g.shipper_id, s.user_id, sid, s.name, s.email); await notify(db, { userId: s.user_id, kind: 'booking_confirmed', title: `Booked — ${ref} in ${g.title}`, body: `${g.shipper_name} closed the slot. Your ${s.units} ${s.units === 1 ? k.unit : k.unitPlural} sail from ${g.origin} around ${DATE(g.departs_at)}. Pay $${Number(s.amount_usd).toLocaleString()} from your dashboard${s.pickup ? ' and book a pickup' : ''}.`, link: `/dashboard?tab=shipments&s=${sid}`, dedupe: `ship:${sid}:booked`, emailSubject: `Booked — ${ref}` }) }

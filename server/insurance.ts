@@ -107,7 +107,7 @@ export function mountInsurance(r: Router, d: Deps) {
   r.post('/shipments/:id/insurance', wrap(async (req, res) => {
     const db = await getDb(); const { u, s, office, owner } = await access(db, req, String(req.params.id))
     if (!owner && !office) throw new HttpError(403, 'Only the customer or the shipper can add cover.')
-    const p = await getProduct(db); if (!p.enabled) throw new HttpError(409, 'Insurance is not available right now.')
+    const p = await getProduct(db); if (!p.enabled || !(await (await import('./features')).featureOn(db, 'insurance', s.shipper_id))) throw new HttpError(409, 'Insurance is not available right now.')
     if (!['booked', 'picked_up'].includes(s.status)) throw new HttpError(409, 'Cover must be added before the goods leave the origin.')
     if (await policyFor(db, s.id)) throw new HttpError(409, 'This shipment is already insured.')
     const b = zBuy.parse(req.body)

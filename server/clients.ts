@@ -251,6 +251,7 @@ export function mountClients(r: Router, d: Deps) {
     const id = uid(); const ref = makeRef()
     await db.query(`insert into shipments (id,ref,shipper_id,user_id,client_id,consignee_id,mode,origin,destination,cargo,description,status,eta,customer) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'booked',$12,$13)`,
       [id, ref, shipperId, c.user_id ?? null, c.id, consignee?.id ?? null, b.mode, b.origin, b.destination, b.cargo, b.description || `${b.cargo} for ${c.name}`, b.eta, c.name])
+    void import('./integrations').then((m) => m.emitShipment(db, id, 'shipment.booked')).catch(() => {})
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [id, 'booked', b.origin, b.note || `Booked directly with ${user.company ?? 'your shipper'}.${consignee ? ` Consignee: ${consignee.name}, ${consignee.city}.` : ''}`])
     await act(db, c.id, shipperId, 'system', `Shipment ${ref} booked (${b.mode}, ${b.origin} → ${countryByCode(b.destination)?.name ?? b.destination}).`, user.id)
     await (await import('./shipmentOps')).afterBooking(db, id, { by: user.name }).catch((e) => console.error('[booking] after', e))
@@ -305,7 +306,7 @@ export function mountClients(r: Router, d: Deps) {
     await db.query('insert into payments (id,invoice_id,amount,method,at,note) values ($1,$2,$3,$4,$5,$6)', ['pay_' + uid(), inv.id, b.amount, b.method, b.at ?? new Date().toISOString().slice(0, 10), b.note])
     const { rows: sum } = await db.query<{ s: string }>('select coalesce(sum(amount),0)::text as s from payments where invoice_id = $1', [inv.id])
     const paid = Number(sum[0].s)
-    if (paid >= Number(inv.total)) await db.query(`update invoices set status = 'paid' where id = $1`, [inv.id])
+    if (paid >= Number(inv.total)) { await db.query(`update invoices set status = 'paid' where id = $1`, [inv.id]); void import('./integrations').then((m) => m.emitWebhook(db, inv.shipper_id, 'invoice.paid', { invoice: { id: inv.id, number: inv.number, total: Number(inv.total), currency: inv.currency ?? 'USD', shipmentId: inv.shipment_id ?? null, paidAt: new Date().toISOString() } })).catch(() => {}) }
     else if (inv.status === 'draft') await db.query(`update invoices set status = 'sent' where id = $1`, [inv.id])
     await act(db, inv.client_id, shipperId, 'system', `Payment of $${b.amount.toLocaleString()} recorded on ${inv.number}${paid >= Number(inv.total) ? ' — paid in full.' : '.'}`)
     const [invoice] = await loadInvoices(db, 'id = $1', [inv.id])
@@ -319,6 +320,7 @@ export function mountClients(r: Router, d: Deps) {
     const c = await ownClient(db, shipperId, invoice.clientId)
     const { rows: sh } = await db.query<Row>('select * from shippers where id = $1', [shipperId])
     const shipment = invoice.shipmentId ? (await loadShipments(db, 'id = $1', [invoice.shipmentId]))[0] : null
-    res.json({ invoice, client: clientOut(c), shipper: { id: sh[0].id, name: sh[0].name, hq: sh[0].hq, initials: sh[0].initials, hue: sh[0].hue }, shipment })
+    const display = await (await import('./integrations')).displayCurrency(db, shipperId)
+    res.json({ invoice, client: clientOut(c), shipper: { id: sh[0].id, name: sh[0].name, hq: sh[0].hq, initials: sh[0].initials, hue: sh[0].hue }, shipment, display })
   }))
 }

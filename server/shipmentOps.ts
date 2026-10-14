@@ -256,6 +256,7 @@ export function mountShipmentOps(r: Router, d: Deps) {
     const id = uid(); const ref = makeRef()
     const descr = b.description || `${b.quantity} × ${b.cargo}${b.vehicle?.make ? ` — ${[b.vehicle.year, b.vehicle.make, b.vehicle.model].filter(Boolean).join(' ')}` : ''} for ${c.name}`
     await db.query(`insert into shipments (id,ref,shipper_id,user_id,client_id,consignee_id,mode,origin,destination,cargo,description,status,eta,customer) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'booked',$12,$13)`, [id, ref, u.shipperId, c.user_id ?? null, c.id, consigneeId, b.mode, b.origin, b.destination, b.cargo, descr, b.eta, c.name])
+    void import('./integrations').then((m) => m.emitShipment(db, id, 'shipment.booked')).catch(() => {})
     const extras = JSON.stringify({ quantity: b.quantity, weightKg: b.weightKg ?? null, dims: b.dims, declaredValueUsd: b.declaredValueUsd ?? null, readyDate: b.readyDate ?? null, bookedBy: u.name })
     await db.query('update shipments set booking = $2 where id = $1', [id, extras])
     const did: string[] = []

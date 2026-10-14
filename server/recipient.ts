@@ -79,7 +79,8 @@ export async function messageRecipient(db: Db, s: Row, kind: RecipientKind, o: {
   const token = await ensureReceiverToken(db, s)
   const text = compose(kind, s, sh.name, receiverUrl(token), receiver, { note: o.note })
   const ready = messagingReady()
-  const channel = whatsappProvider().id !== 'off' ? 'whatsapp' : 'sms'
+  const waOn = await (await import('./features')).featureOn(db, 'whatsapp', s.shipper_id)
+  const channel = waOn && whatsappProvider().id !== 'off' ? 'whatsapp' : 'sms'
   const id = 'rm_' + uid()
   await db.query(`insert into recipient_messages (id,shipment_id,shipper_id,to_phone,channel,kind,text,status,by_name) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [id, s.id, s.shipper_id, to, channel, kind, text, ready ? 'pending' : 'skipped', o.by ?? ''])
   if (ready) void sendPendingTexts(db)

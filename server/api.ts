@@ -11,6 +11,12 @@ import { mountOps } from './ops'
 import { mountDirectory } from './directory'
 import { mountInsights } from './insights'
 import { mountAnalytics } from './analytics'
+import { auditMiddleware, mountAudit } from './audit'
+import { mountBilling, startBillingSweeps } from './billing'
+import { mountCosts } from './costs'
+import { mountGrowth, startGrowthSweeps } from './growth'
+import { mountIntegrations, startWebhookSweeps } from './integrations'
+import { mountAdminInsights, startScorecardSweeps } from './adminInsights'
 import { mountContainers } from './containers'
 import { mountLabels } from './labels'
 import { mountScans, piecesForTracking, proofOfDelivery } from './scans'
@@ -45,7 +51,7 @@ import { mountReviews } from './reviews'
 import { mountBrand } from './brand'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
-export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: StaffPerms; staffId?: string }
+export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: StaffPerms; staffId?: string; readOnly?: boolean; viewAsBy?: string }
 export interface StaffPerms { allow?: Area[]; deny?: Area[] }
 /** Areas a company can grant or withhold per person on top of their role. Mirrors ROLE_AREAS in src/lib/ops.ts. */
 export const AREAS = ['leads', 'rates', 'lanes', 'groupage', 'brand', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'payments', 'collections', 'reviews', 'fleet', 'team', 'verification', 'sourcing', 'analytics'] as const
@@ -80,7 +86,7 @@ const J = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : v)
 const shipperOut = (r: Row) => ({
   id: r.id, name: r.name, tagline: r.tagline, hq: r.hq, founded: r.founded, modes: J(r.modes), destinations: J(r.destinations), origins: J(r.origins), cargo: J(r.cargo),
   rating: Number(r.rating), reviews: r.reviews, verified: r.verified, responseHours: r.response_hours, onTime: r.on_time, services: J(r.services), about: r.about,
-  priceIndex: r.price_index, plan: r.plan, initials: r.initials, hue: r.hue, demo: r.demo, verifiedAt: r.verified_at ? ISO(r.verified_at) : undefined, createdAt: r.created_at ? ISO(r.created_at) : undefined,
+  priceIndex: r.price_index, plan: r.plan, standing: r.standing ?? 'good', qualityScore: J(r.quality)?.score ?? null, initials: r.initials, hue: r.hue, demo: r.demo, verifiedAt: r.verified_at ? ISO(r.verified_at) : undefined, createdAt: r.created_at ? ISO(r.created_at) : undefined,
 })
 const quoteMode = (r: Row) => (r.mode === 'air' || r.mode === 'ocean' ? r.mode : (J(r.includes) as string[] ?? []).includes('Air freight') ? 'air' : 'ocean')
 const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.shipper_id, price: r.price, currency: r.currency, transitDays: r.transit_days, validUntil: DATE(r.valid_until), notes: r.notes, includes: J(r.includes), status: r.status, sentAt: ISO(r.sent_at), updatedAt: r.updated_at ? ISO(r.updated_at) : undefined,
@@ -158,12 +164,15 @@ async function currentUser(db: Db, req: Request): Promise<ApiUser | null> {
   const sid = req.cookies?.[SESSION_COOKIE]
   if (!sid) return null
   const { rows } = await db.query<Row>(
-    `select u.*, s.name as company, st.role as staff_role, st.perms as staff_perms, st.id as staff_id, st.last_active_at from sessions se join users u on u.id = se.user_id left join shippers s on s.id = u.shipper_id left join staff st on st.user_id = u.id and st.shipper_id = u.shipper_id where se.id = $1 and se.expires_at > now()`, [sid],
+    `select u.*, s.name as company, st.role as staff_role, st.perms as staff_perms, st.id as staff_id, st.last_active_at, se.read_only as se_read_only, se.impersonator_id as se_impersonator from sessions se join users u on u.id = se.user_id left join shippers s on s.id = u.shipper_id left join staff st on st.user_id = u.id and st.shipper_id = u.shipper_id where se.id = $1 and se.expires_at > now()`, [sid],
   )
   const r = rows[0]; if (!r) return null
   // Staff "last active" — touched at most every 10 minutes so the team page can show who's really using the app.
   if (r.staff_id && (!r.last_active_at || Date.now() - new Date(r.last_active_at).getTime() > 10 * 60_000)) db.query('update staff set last_active_at = now() where id = $1', [r.staff_id]).catch(() => {})
-  return userOut(r, r.company ?? undefined)
+  const u = userOut(r, r.company ?? undefined)
+  if (r.se_impersonator) { u.readOnly = !!r.se_read_only; u.viewAsBy = r.se_impersonator }
+  ;(req as Request & { ssUser?: ApiUser }).ssUser = u
+  return u
 }
 
 async function createSession(db: Db, res: Response, userId: string) {
@@ -183,7 +192,12 @@ function throttle(key: string, max: number, windowMs: number, Err: typeof HttpEr
 const clearThrottle = (key: string) => buckets.delete(key)
 const clientIp = (req: Request) => (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || req.ip || 'unknown'
 
-const requireUser = async (db: Db, req: Request) => { const u = await currentUser(db, req); if (!u) throw new HttpError(401, 'Please sign in.'); return u }
+const requireUser = async (db: Db, req: Request) => {
+  const u = await currentUser(db, req); if (!u) throw new HttpError(401, 'Please sign in.')
+  // An admin "viewing as" someone can look but never change anything.
+  if (u.readOnly && req.method !== 'GET' && !/\/(view-as\/exit|auth\/logout)$/.test(req.path)) throw new HttpError(403, 'Read-only view — exit “View as” to make changes.')
+  return u
+}
 const requireAdmin = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (!u.admin) throw new HttpError(403, 'Admin access only.'); return u }
 const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'SS'
 
@@ -211,8 +225,8 @@ async function signupUser(db: Db, input: { name: string; email: string; password
     const company = (input.company ?? '').trim() || `${input.name}'s Shipping`
     const initials = company.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
     await db.query(
-      `insert into shippers (id,name,tagline,hq,founded,modes,destinations,origins,cargo,verified,response_hours,services,about,price_index,plan,initials,hue,demo)
-       values ($1,$2,$3,$4,$5,'["ocean","air"]','[]','[]','[]',false,24,'[]',$6,2,'starter',$7,$8,false)`,
+      `insert into shippers (id,name,tagline,hq,founded,modes,destinations,origins,cargo,verified,response_hours,services,about,price_index,plan,initials,hue,demo,trial_ends_at)
+       values ($1,$2,$3,$4,$5,'["ocean","air"]','[]','[]','[]',false,24,'[]',$6,2,'starter',$7,$8,false,now() + interval '14 days')`,
       [shipperId, company, 'New on Ship Sync', '', new Date().getFullYear(), `${company} is a new shipping company on Ship Sync. Profile details coming soon.`, initials, '#E3B54A'],
     )
   }
@@ -296,6 +310,7 @@ async function notifyNewLead(db: Db, req: Row) {
   const done = new Set(quoted.map((q) => q.shipper_id))
   const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })).filter((m) => !done.has(m.shipper.id) && leadFit(m.shipper, req as never).local)
   for (const m of matches) {
+    void import('./integrations').then((x) => x.emitWebhook(db, m.shipper.id, 'request.received', { request: { id: req.id, ref: req.ref, origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo, quantity: req.quantity, readyDate: String(req.ready_date ?? '').slice(0, 10) } })).catch(() => {})
     await notifyShipperStaff(db, m.shipper.id, { kind: 'new_lead', title: `New client request: ${req.quantity} × ${req.cargo} to ${req.destination}`, body: `${req.contact_name} wants to ship from ${req.origin} (${req.mode === 'either' ? 'air or ocean' : req.mode}), ready ${String(req.ready_date).slice(0, 10)}. Send a quote before the competition does.`, link: '/dashboard/leads', dedupe: `lead:${req.id}` }, ['owner', 'dispatcher', 'agent'])
   }
 }
@@ -409,6 +424,7 @@ const zQuote = z.object({ price: z.number().int().min(1), transitDays: z.number(
 /* ---------------- router ---------------- */
 export function apiRouter() {
   const r = Router()
+  r.use(auditMiddleware(getDb))
 
   r.get('/health', wrap(async (_req, res) => { const db = await getDb(); res.json({ ok: true, db: db.kind }) }))
 
@@ -578,6 +594,7 @@ export function apiRouter() {
     const db = await getDb(); const user = await requireUser(db, req)
     if (user.role !== 'shipper' || !user.shipperId) throw new HttpError(403, 'Only shipper accounts can send quotes.')
     if (!can(user, 'leads')) throw new HttpError(403, 'Your role can’t send quotes — ask an owner or dispatcher to give you Leads access.')
+    { const { rows: st } = await db.query<Row>('select standing from shippers where id = $1', [user.shipperId]); if (st[0]?.standing === 'paused') throw new HttpError(403, 'Your marketplace listing is paused — contact Ship Sync to restore it before quoting.') }
     const body = zQuote.parse(req.body)
     const { rows } = await db.query<Row>('select * from requests where id = $1', [req.params.id])
     if (!rows[0]) throw new HttpError(404, 'Request not found.')
@@ -626,6 +643,7 @@ export function apiRouter() {
     await db.query('update shipments set booking = $2 where id = $1', [sid, JSON.stringify({ quantity: r0.quantity, weightKg: r0.weight_kg ?? null, dims: r0.dims ?? '', declaredValueUsd: r0.declared_value_usd == null ? null : Number(r0.declared_value_usd), readyDate: DATE(r0.ready_date), quoteKind: q.kind ?? 'firm', bookedBy: r0.contact_name })])
     if (q.kind === 'estimate') await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, 'booked', r0.origin, 'Price is an estimate — final amount confirmed when the pieces are weighed at check-in.'])
     await invoiceForBooking(db, sid, q).catch((e) => console.error('[invoice] auto', e))
+    void import('./integrations').then((m) => m.emitShipment(db, sid, 'shipment.booked')).catch(() => {})
     // Shippers who didn't win hear how they compared — no names, no exact winning price.
     for (const l of losers) {
       const diff = Math.round(((Number(l.price) - Number(q.price)) / Number(q.price)) * 100)
@@ -692,6 +710,15 @@ export function apiRouter() {
   mountOps(r, { getDb, requireUser, createSession, loadUserWithCompany, HttpError, wrap, loadShipments })
   mountInsights(r, { getDb, requireUser, HttpError, wrap })
   mountAnalytics(r, { getDb, requireUser, HttpError, wrap })
+  mountAudit(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  mountBilling(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  startBillingSweeps(getDb)
+  mountCosts(r, { getDb, requireUser, HttpError, wrap })
+  mountGrowth(r, { getDb, requireUser, HttpError, wrap })
+  mountIntegrations(r, { getDb, requireUser, HttpError, wrap })
+  startGrowthSweeps(getDb); startWebhookSweeps(getDb)
+  mountAdminInsights(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  startScorecardSweeps(getDb)
   mountContainers(r, { getDb, requireUser, HttpError, wrap, loadShipments })
   mountLabels(r, { getDb, requireUser, HttpError, wrap })
   mountScans(r, { getDb, requireUser, HttpError, wrap })

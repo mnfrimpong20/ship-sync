@@ -68,6 +68,7 @@ export async function instantQuote(db: Db, shipperId: string, r: PriceInput) {
 /** Every shipper with an auto-send card matching this request gets a quote at once. Returns the shippers quoted. */
 export async function autoQuoteFromRates(db: Db, req: Row, shipperIds: string[]) {
   if (!shipperIds.length) return [] as { shipperId: string; price: number }[]
+  { const { featureOn } = await import('./features'); const ok: string[] = []; for (const id of shipperIds) if (await featureOn(db, 'autoQuotes', id)) ok.push(id); shipperIds = ok; if (!ok.length) return [] }
   const { rows } = await db.query<Row>('select * from rate_cards where shipper_id = any($1::text[]) and active and auto_send', [shipperIds])
   const byShipper = new Map<string, RateCard[]>()
   for (const r of rows) { const c = rateOut(r); byShipper.set(c.shipperId, [...(byShipper.get(c.shipperId) ?? []), c]) }

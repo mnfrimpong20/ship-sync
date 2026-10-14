@@ -250,6 +250,8 @@ export function mountFlow(r: Router, d: Deps) {
     const db = await getDb(); const u = await requireUser(db, req); if (!u.admin) throw new HttpError(403, 'Admins only.')
     const f = await import('./flow')
     const jobs: Record<string, (db: Db) => Promise<unknown>> = { nudges: (db2) => f.sweepRecipientNudges(db2, Number(req.body?.minAgeMinutes ?? 10)), positions: f.sweepCarrierPositions, storage: f.sweepStorage, stuck: f.sweepStuck, ontime: f.sweepOnTime }
+    const g = await import('./growth'); const ai = await import('./adminInsights'); const bl = await import('./billing'); const ig = await import('./integrations')
+    Object.assign(jobs, { weekly: (db2: Db) => g.sweepWeekly(db2, true), halfEmpty: g.sweepHalfEmpty, scorecards: ai.sweepScorecards, billing: bl.sweepBilling, webhooks: ig.deliverDue })
     const job = jobs[String(req.params.name)]; if (!job) throw new HttpError(404, `Sweeps: ${Object.keys(jobs).join(', ')}.`)
     await job(db); res.json({ ok: true })
   }))

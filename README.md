@@ -47,3 +47,7 @@ See `DESIGN.md` for the design brief (palette, type, sections, motion rules).
 - **Corrections:** `POST /shipments/:id/revert {reason}` moves one step back (owners/dispatchers; reason on the timeline and to the customer). `DELETE /shipments/:id` removes a booking still at "Booked" with no payment, sent invoice, scans or container; a marketplace booking reopens the request.
 - **"Moves on its own" panel:** `GET /shipments/:id/automation` shows which event will advance the status next (pickup run/scan → Picked up, container gate-in/sailing/arrival from the carrier, delivery run start → Out for delivery, driver POD/recipient confirmation → Delivered) and what to set up so it happens without clicks.
 - **Auto vs manual:** every shipment payload carries `autoBy` ({kind: run|container|scan, label}) when something other than a click will move it next. The boards show an "Auto · follows CN-…" tag instead of "Next step"; a hand override lives in Manage → Manual override and asks for a reason when the shipment is auto-driven. At Arrived/Customs with nothing driving it, the board suggests adding it to a delivery run.
+
+## Vocabulary (one word per stage)
+
+**Request** — a client asking for a price (menu: Requests, route `/dashboard/leads`). **Shipment** — one client's booking with an SS- reference, from an accepted quote or booked directly (menu: Client shipments). **Container** — holds many shipments. "Order" is kept only for the shareable order link and for China sourcing (factory purchase orders). Marketing copy for shippers may still say "leads".

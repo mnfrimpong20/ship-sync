@@ -9,7 +9,7 @@ import { ClientAvatar, ClientForm, waLink } from './Clients'
 import { collectionsApi } from '../lib/collections'
 import { ModeBadge, Pill, fmtDate, fmtDateTime, money } from '../components/ui'
 import { BookingForm } from '../components/BookingForm'
-import { ShipmentManage } from '../components/ShipmentTools'
+import { AutoTag, ShipmentManage } from '../components/ShipmentTools'
 
 type Tab = 'overview' | 'shipments' | 'invoices' | 'activity'
 const today = () => new Date().toISOString().slice(0, 10)
@@ -195,7 +195,7 @@ function Shipments({ d, busy, run, reload, advance }: Common & { advance: (id: s
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {!s.consigneeId && <button onClick={() => setManage(s.id)} className="btn-ghost !min-h-9 !px-3 text-xs text-danger">Add recipient</button>}
-                  {s.status !== 'delivered' && <button onClick={() => run(async () => { await advance(s.id); await reload() }, `${s.ref} updated.`)} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60">Mark next step <ChevronRight size={13} aria-hidden="true" /></button>}
+                  {s.status !== 'delivered' && (s.autoBy ? <AutoTag s={s} onOverride={() => setManage(s.id)} /> : <button onClick={() => run(async () => { await advance(s.id); await reload() }, `${s.ref} updated.`)} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60">Mark next step <ChevronRight size={13} aria-hidden="true" /></button>)}
                   <button onClick={() => setManage(isOpen ? null : s.id)} className="btn-ghost !min-h-9 !px-3 text-xs" aria-expanded={isOpen} data-testid="manage-toggle"><Ellipsis size={13} aria-hidden="true" /> Manage</button>
                   <Link to={`/track?ref=${s.ref}`} className="btn-ghost !min-h-9 !px-3 text-xs"><Ship size={13} aria-hidden="true" /> Track</Link>
                 </div>

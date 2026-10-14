@@ -91,12 +91,22 @@ export const faqs = [
   { q: 'Is my cargo insured?', a: 'Most shippers offer all-risk cargo insurance as an add-on shown on the quote. Look for the “Insurance” badge in the directory, and declare the value accurately when you post your shipment.' },
 ]
 
-export type ShipmentStatus = 'booked' | 'picked_up' | 'at_origin_port' | 'in_transit' | 'arrived' | 'customs' | 'out_for_delivery' | 'delivered'
+export type ShipmentStatus = 'booked' | 'picked_up' | 'at_origin_port' | 'in_transit' | 'arrived' | 'customs' | 'ready_for_collection' | 'out_for_delivery' | 'delivered'
 
 export const statusLabels: Record<ShipmentStatus, string> = {
-  booked: 'Booked', picked_up: 'Picked up', at_origin_port: 'At origin port', in_transit: 'In transit', arrived: 'Arrived', customs: 'Customs', out_for_delivery: 'Out for delivery', delivered: 'Delivered',
+  booked: 'Booked', picked_up: 'Picked up', at_origin_port: 'At origin port', in_transit: 'In transit', arrived: 'Arrived', customs: 'Customs', ready_for_collection: 'Ready for collection', out_for_delivery: 'Out for delivery', delivered: 'Delivered',
 }
-export const statusOrder: ShipmentStatus[] = ['booked', 'picked_up', 'at_origin_port', 'in_transit', 'arrived', 'customs', 'out_for_delivery', 'delivered']
+/** Every status in order. A shipment walks one of two paths through it — see flowFor(). */
+export const statusOrder: ShipmentStatus[] = ['booked', 'picked_up', 'at_origin_port', 'in_transit', 'arrived', 'customs', 'ready_for_collection', 'out_for_delivery', 'delivered']
+/** How the recipient gets the goods at destination: a driver brings them, or they collect from the shipper's warehouse. */
+export type Handover = 'delivery' | 'collection'
+/** The statuses a shipment actually passes through: collection skips "Out for delivery", door delivery skips "Ready for collection". */
+export const flowFor = (h: Handover | undefined | null): ShipmentStatus[] => statusOrder.filter((x) => (h === 'collection' ? x !== 'out_for_delivery' : x !== 'ready_for_collection'))
+export const nextStatus = (s: ShipmentStatus, h?: Handover | null): ShipmentStatus | null => { const f = flowFor(h); const i = f.indexOf(s); if (i < 0) { const j = statusOrder.indexOf(s); return f.find((x) => statusOrder.indexOf(x) > j) ?? null } return f[i + 1] ?? null }
+export const prevStatus = (s: ShipmentStatus, h?: Handover | null): ShipmentStatus | null => { const f = flowFor(h); const i = f.indexOf(s); if (i < 0) { const j = statusOrder.indexOf(s); return [...f].reverse().find((x) => statusOrder.indexOf(x) < j) ?? null } return i > 0 ? f[i - 1] : null }
+/** Position of a status within its flow (statuses outside the flow sit after the last earlier step). */
+export const flowIndex = (s: ShipmentStatus, h?: Handover | null) => { const f = flowFor(h); const i = f.indexOf(s); if (i >= 0) return i; const j = statusOrder.indexOf(s); return f.filter((x) => statusOrder.indexOf(x) < j).length - 1 }
+export const handoverLabels: Record<Handover, string> = { delivery: 'Door delivery', collection: 'Recipient collects' }
 
 export interface TrackingEvent { status: ShipmentStatus; at: string; place: string; note?: string }
 export interface Shipment {
@@ -129,6 +139,17 @@ export interface Shipment {
   /** Number of documents in the vault (customers: shared ones only). */
   documents?: number
   consigneeId?: string
+  handover?: Handover
+  /** Set when the goods are unloaded at destination and can be delivered or collected. */
+  readyAt?: string
+  etaOriginal?: string
+  cancelledAt?: string
+  cancelReason?: string
+  /** Days in the current status well past what's normal for this lane. */
+  stuck?: { days: number; typical: number }
+  /** Unpaid balance (invoices + storage) that has to be settled before release. */
+  owedUsd?: number
+  storageDue?: { days: number; amountUsd: number; freeUntil: string | null }
 }
 
 export const sampleShipments: Shipment[] = [

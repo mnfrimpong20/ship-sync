@@ -12,14 +12,14 @@ export type VehicleType = 'van' | 'truck' | 'box_truck' | 'pickup' | 'trailer' |
 export type VehicleStatus = 'available' | 'on_run' | 'maintenance' | 'retired'
 export interface Vehicle { id: string; name: string; type: VehicleType; plate: string; capacityKg?: number; capacityNote: string; base: StaffBase; city: string; country: string; status: VehicleStatus; driverId?: string; notes: string; createdAt: string }
 export type VehicleInput = Omit<Vehicle, 'id' | 'createdAt' | 'driverId' | 'capacityKg'> & { driverId?: string | null; capacityKg?: number | null }
-export interface RunStop { id: string; runId: string; seq: number; shipmentId?: string; label: string; address: string; lat?: number; lon?: number; contact: string; phone: string; status: 'pending' | 'done' | 'skipped'; doneAt?: string; note: string; shipmentRef?: string; shipmentStatus?: ShipmentStatus }
+export interface RunStop { id: string; runId: string; seq: number; shipmentId?: string; label: string; address: string; lat?: number; lon?: number; contact: string; phone: string; status: 'pending' | 'done' | 'skipped'; doneAt?: string; note: string; collectUsd?: number; collectRule?: 'off' | 'warn' | 'block'; shipmentRef?: string; shipmentStatus?: ShipmentStatus }
 export interface RunStart { label: string; lat: number; lon: number }
 export type RunKind = 'pickup' | 'delivery'
 export type RunStatus = 'planned' | 'in_progress' | 'done' | 'cancelled'
 export interface Run { id: string; name: string; kind: RunKind; date: string; driverId?: string; vehicleId?: string; start: RunStart | null; status: RunStatus; distanceKm?: number; notes: string; createdAt: string; stops: RunStop[]; driverName?: string; vehicleName?: string }
 export interface StopInput { shipmentId?: string; label: string; address?: string; lat?: number; lon?: number; contact?: string; phone?: string }
 export interface RunInput { name: string; kind: RunKind; date: string; driverId?: string | null; vehicleId?: string | null; start?: RunStart | null; notes?: string; stops: StopInput[] }
-export interface Candidate { shipmentId: string; ref: string; mode: Mode; status: ShipmentStatus; description: string; eta: string | null; label: string; address: string; contact: string; phone: string }
+export interface Candidate { shipmentId: string; ref: string; mode: Mode; status: ShipmentStatus; description: string; eta: string | null; label: string; address: string; contact: string; phone: string; readyAt?: string | null; city?: string }
 export interface GeoHit { lat: number; lon: number; label: string; cached?: boolean }
 export interface JoinInvite { name: string; email: string; role: StaffRole; company: string }
 
@@ -39,7 +39,7 @@ export const canManageOps = (role?: StaffRole) => role === 'owner' || role === '
 /** Which /dashboard areas each role gets. Owners and dispatchers see everything; the lists are prefixes of pathnames. */
 /** Which /dashboard areas each role gets by default; a person's `perms` add (allow) or remove (deny) areas on top. */
 export const AREA_PATHS: Record<Area, string> = { leads: '/dashboard/leads', rates: '/dashboard/rates', lanes: '/dashboard/lanes', groupage: '/dashboard/groupage', brand: '/dashboard/brand', shipments: '/dashboard/shipments', containers: '/dashboard/containers', sailings: '/dashboard/sailings', pickups: '/dashboard/pickups', routes: '/dashboard/routes', warehouse: '/dashboard/warehouse', clients: '/dashboard/clients', payments: '/dashboard/payments', collections: '/dashboard/collections', reviews: '/dashboard/reviews', fleet: '/dashboard/fleet', team: '/dashboard/team', verification: '/dashboard/verification', sourcing: '/dashboard/sourcing' }
-export const AREA_LABELS: Record<Area, string> = { leads: 'Leads & quotes', rates: 'Rate cards', lanes: 'Lane intelligence', groupage: 'Fill a barrel', brand: 'Branded page', shipments: 'Shipments', containers: 'Containers', sailings: 'Book a sailing', pickups: 'Pickups', routes: 'Routes', warehouse: 'Warehouse', clients: 'Clients', payments: 'Payments', collections: 'Collections', reviews: 'Reviews', fleet: 'Fleet', team: 'Team', verification: 'Verification', sourcing: 'Sourcing' }
+export const AREA_LABELS: Record<Area, string> = { leads: 'Requests', rates: 'Rate cards', lanes: 'Lane intelligence', groupage: 'Fill a barrel', brand: 'Branded page', shipments: 'Client shipments', containers: 'Containers', sailings: 'Book a sailing', pickups: 'Pickups', routes: 'Routes', warehouse: 'Warehouse', clients: 'Clients', payments: 'Payments', collections: 'Collections', reviews: 'Reviews', fleet: 'Fleet', team: 'Team', verification: 'Verification', sourcing: 'Sourcing' }
 export const ROLE_BASE: Record<StaffRole, Area[] | 'all'> = {
   owner: 'all', dispatcher: 'all',
   agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing'],

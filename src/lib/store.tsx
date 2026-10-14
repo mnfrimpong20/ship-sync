@@ -1,3 +1,4 @@
+import { onShipmentsChanged } from './flowEvents'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { shippers as seedShippers, type CargoType, type Mode, type Shipment, type Shipper } from './data'
 import type { PositionPayload } from '../components/LiveMap'
@@ -124,6 +125,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     await loadPrivate(u)
   }, [loadPrivate])
 
+  useEffect(() => onShipmentsChanged(() => { void refresh().catch(() => {}) }), [refresh])
   useEffect(() => { refresh().catch(() => {}).finally(() => setReady(true)) }, [refresh])
 
   const shipperById = useCallback((id: string) => shippers.find((s) => s.id === id), [shippers])

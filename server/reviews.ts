@@ -34,7 +34,7 @@ export const reviewOut = (r: Row, full = false) => ({
   id: r.id, shipmentId: r.shipment_id, shipmentRef: r.ref ?? undefined, shipperId: r.shipper_id, shipperName: r.shipper_name ?? undefined, userId: full ? r.user_id : undefined, author: initial(r.author ?? ''), rating: Number(r.rating), tags: (J(r.tags) ?? []) as string[], body: r.body,
   reply: r.reply ?? '', repliedAt: ISO(r.replied_at), status: r.status as 'published' | 'hidden', lane: r.origin ? `${String(r.origin).split(',')[0]} → ${r.destination}` : undefined, cargo: r.cargo ?? undefined, createdAt: ISO(r.created_at),
 })
-export const disputeOut = (d: Row) => ({
+export const disputeOut = (d: Row) => ({ photos: (J(d.photos) ?? []) as string[],
   id: d.id, shipmentId: d.shipment_id, shipmentRef: d.ref ?? undefined, customer: d.customer ?? undefined, shipperId: d.shipper_id, shipperName: d.shipper_name ?? undefined, openedBy: d.opened_by, openedByRole: d.opened_by_role as 'customer' | 'office', reason: d.reason as DisputeReason, reasonLabel: DISPUTE_REASONS[d.reason as DisputeReason] ?? d.reason, description: d.description, amountClaimedUsd: d.amount_claimed_usd == null ? null : Number(d.amount_claimed_usd),
   status: d.status as 'open' | 'resolved' | 'withdrawn', messages: (J(d.messages) ?? []) as { at: string; by: string; role: string; text: string }[], resolution: J(d.resolution) as { outcome: string; amountUsd: number; note: string; by: string; at: string } | null, paymentId: d.payment_id ?? null, paymentAmountUsd: d.p_amount == null ? null : Number(d.p_amount), paymentStatus: d.p_status ?? null, createdAt: ISO(d.created_at), updatedAt: ISO(d.updated_at),
 })
@@ -53,7 +53,7 @@ export async function recomputeRating(db: Db, shipperId: string) {
 
 const zReview = z.object({ rating: z.number().int().min(1).max(5), tags: z.array(z.enum(REVIEW_TAGS)).max(5).default([]), body: z.string().trim().min(10).max(1200) })
 const zReply = z.object({ reply: z.string().trim().min(2).max(800) })
-const zDispute = z.object({ reason: z.enum(Object.keys(DISPUTE_REASONS) as [DisputeReason, ...DisputeReason[]]), description: z.string().trim().min(10).max(2000), amountClaimedUsd: z.number().min(0).max(1_000_000).optional() })
+const zDispute = z.object({ reason: z.enum(Object.keys(DISPUTE_REASONS) as [DisputeReason, ...DisputeReason[]]), description: z.string().trim().min(10).max(2000), amountClaimedUsd: z.number().min(0).max(1_000_000).optional(), photos: z.array(z.string().max(2_800_000).regex(/^data:image\/(png|jpe?g|webp);base64,/)).max(4).default([]) })
 const zMessage = z.object({ text: z.string().trim().min(1).max(2000) })
 const zResolve = z.object({ outcome: z.enum(['refund_full', 'refund_partial', 'release', 'no_action']), amountUsd: z.number().min(0).max(1_000_000).optional(), note: z.string().trim().min(2).max(1000) })
 
@@ -134,6 +134,7 @@ export function mountReviews(r: Router, d: Deps) {
     if (pay) await db.query('update escrow_payments set hold = true where id = $1', [pay.id])
     const msg = { at: new Date().toISOString(), by: u.name, role: office ? 'office' : 'customer', text: b.description }
     await db.query(`insert into disputes (id,shipment_id,shipper_id,user_id,opened_by,opened_by_role,reason,description,amount_claimed_usd,status,messages,payment_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'open',$10,$11)`, [id, s.id, s.shipper_id, s.user_id ?? null, u.name, office ? 'office' : 'customer', b.reason, b.description, b.amountClaimedUsd ?? null, JSON.stringify([msg]), pay?.id ?? null])
+    if (b.photos.length) await db.query('update disputes set photos = $2 where id = $1', [id, JSON.stringify(b.photos)])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, s.destination, `Dispute opened by ${u.name}: ${DISPUTE_REASONS[b.reason]}.${pay ? ' Escrow on hold.' : ''}`])
     const { rows: admins } = await db.query<Row>('select id from users where is_admin')
     for (const a of admins) await notify(db, { userId: a.id, kind: 'dispute', title: `Dispute: ${DISPUTE_REASONS[b.reason]} — ${s.ref}`, body: `${u.name} (${office ? 'shipper' : 'customer'})${b.amountClaimedUsd ? ` claims $${b.amountClaimedUsd.toLocaleString()}` : ''}. ${pay ? `$${Number(pay.amount_usd).toLocaleString()} in escrow is on hold.` : 'No platform payment on this shipment.'}`, link: '/admin', dedupe: `dsp:${id}:a` })
@@ -145,7 +146,8 @@ export function mountReviews(r: Router, d: Deps) {
     const db = await getDb(); const dp = await disputeById(db, String(req.params.id)); const { u, office, owner } = await access(db, req, dp.shipment_id)
     if (dp.status !== 'open') throw new HttpError(409, 'This dispute is closed.')
     const b = zMessage.parse(req.body); const role = u.admin && !office && !owner ? 'shipsync' : office ? 'office' : 'customer'
-    const msgs = (J(dp.messages) ?? []) as Row[]; msgs.push({ at: new Date().toISOString(), by: u.name, role, text: b.text })
+    const photo = typeof req.body?.photo === 'string' && /^data:image\/(png|jpe?g|webp);base64,/.test(req.body.photo) && req.body.photo.length < 2_800_000 ? req.body.photo : undefined
+    const msgs = (J(dp.messages) ?? []) as Row[]; msgs.push({ at: new Date().toISOString(), by: u.name, role, text: b.text, ...(photo ? { photo } : {}) })
     await db.query('update disputes set messages = $2, updated_at = now() where id = $1', [dp.id, JSON.stringify(msgs.slice(-60))])
     if (role !== 'customer' && dp.user_id) await notify(db, { userId: dp.user_id, kind: 'dispute', title: `New message on your dispute — ${dp.ref}`, body: `${u.name}: ${b.text.slice(0, 160)}`, link: `/dashboard?tab=shipments&s=${dp.shipment_id}`, dedupe: `dsp:${dp.id}:m:${msgs.length}` })
     if (role !== 'office') await notifyShipperStaff(db, dp.shipper_id, { kind: 'dispute', title: `New message on dispute — ${dp.ref}`, body: `${u.name}: ${b.text.slice(0, 160)}`, link: `/dashboard/shipments?q=${dp.ref}&b=all`, dedupe: `dsp:${dp.id}:m:${msgs.length}:o` }, ['owner', 'dispatcher'])

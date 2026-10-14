@@ -239,7 +239,7 @@ export function stripeWebhook(getDb: () => Promise<Db>) {
     if (evt.type === 'checkout.session.completed' || evt.type === 'checkout.session.async_payment_succeeded') {
       const pid = obj.client_reference_id || obj.metadata?.payment_id
       const { rows } = await db.query<Row>(`${SELECT} where p.id = $1 or p.provider_session_id = $2`, [pid ?? '', obj.id ?? ''])
-      if (rows[0] && obj.payment_status === 'paid') await markPaid(db, rows[0], { intent: typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id ?? null, method: obj.payment_method_types?.[0] ?? 'card' })
+      if (obj.payment_status === 'paid') for (const row of rows) await markPaid(db, row, { intent: typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id ?? null, method: obj.payment_method_types?.[0] ?? 'card' })
     } else if (evt.type === 'checkout.session.expired') {
       await db.query(`update escrow_payments set status = 'cancelled' where provider_session_id = $1 and status = 'pending'`, [obj.id ?? ''])
     } else if (evt.type === 'charge.refunded') {

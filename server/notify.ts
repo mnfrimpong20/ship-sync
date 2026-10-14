@@ -143,6 +143,7 @@ export async function notify(db: Db, n: NotifyInput): Promise<string | null> {
   )
   if (!rows[0]) return null
   if (wantEmail) void sendPending(db)
+  void import('./customerHub').then((m) => m.queueText(db, u.id, n)).catch(() => {})
   return id
 }
 

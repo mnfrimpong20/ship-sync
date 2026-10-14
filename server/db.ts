@@ -1225,6 +1225,46 @@ create table if not exists announcements (
 );
 create table if not exists announcement_dismissals (announcement_id text not null, user_id text not null, at timestamptz not null default now(), primary key (announcement_id, user_id));
 create table if not exists risk_dismissals (key text primary key, by_name text not null default '', note text not null default '', at timestamptz not null default now());
+-- customer hub
+create table if not exists shipment_items (
+  id text primary key, shipment_id text not null references shipments(id) on delete cascade, piece int, description text not null, category text not null default 'other', qty int not null default 1,
+  value_usd numeric not null default 0, flag text, created_by text not null default '', created_at timestamptz not null default now()
+);
+create index if not exists idx_shipment_items on shipment_items(shipment_id);
+create table if not exists favorites (user_id text not null references users(id) on delete cascade, shipper_id text not null references shippers(id) on delete cascade, at timestamptz not null default now(), primary key (user_id, shipper_id));
+create table if not exists repeat_plans (
+  id text primary key, user_id text not null references users(id) on delete cascade, name text not null, every_days int not null, next_on date not null, template jsonb not null,
+  active boolean not null default true, last_reminded_on date, last_request_id text, created_at timestamptz not null default now()
+);
+create table if not exists alerts (
+  id text primary key, user_id text not null references users(id) on delete cascade, kind text not null, origin text not null default '', destination text not null, mode text not null default 'ocean', cargo text not null default '',
+  threshold_usd numeric, active boolean not null default true, last_value numeric, last_sent_at timestamptz, created_at timestamptz not null default now()
+);
+create table if not exists shipment_messages (
+  id text primary key, shipment_id text not null references shipments(id) on delete cascade, author_role text not null, author_name text not null default '', body text not null, photo text, created_at timestamptz not null default now(), read_by_customer boolean not null default false, read_by_office boolean not null default false
+);
+create index if not exists idx_shipment_messages on shipment_messages(shipment_id, created_at);
+alter table notification_prefs add column if not exists phone text not null default '';
+alter table notification_prefs add column if not exists text_channel text not null default 'off';
+alter table notification_prefs add column if not exists text_kinds jsonb not null default '[]';
+alter table notification_prefs add column if not exists quiet_start int;
+alter table notification_prefs add column if not exists quiet_end int;
+alter table notification_prefs add column if not exists tz_offset int not null default 0;
+create table if not exists user_texts (id text primary key, user_id text not null, to_phone text not null, channel text not null, body text not null, send_after timestamptz not null default now(), status text not null default 'pending', error text not null default '', created_at timestamptz not null default now(), sent_at timestamptz);
+alter table users add column if not exists referral_code text;
+alter table users add column if not exists referred_by text;
+alter table users add column if not exists company_name text not null default '';
+alter table users add column if not exists tax_id text not null default '';
+alter table users add column if not exists billing_address text not null default '';
+alter table users add column if not exists po_required boolean not null default false;
+create unique index if not exists idx_users_referral on users(referral_code) where referral_code is not null;
+create table if not exists credits (id text primary key, user_id text not null references users(id) on delete cascade, amount_usd numeric not null, reason text not null, source_user_id text, used_at timestamptz, used_ref text, created_at timestamptz not null default now());
+create table if not exists account_members (id text primary key, owner_id text not null references users(id) on delete cascade, member_id text references users(id) on delete cascade, email text not null, role text not null default 'member', token text, status text not null default 'invited', created_at timestamptz not null default now());
+alter table sessions add column if not exists acting_as text;
+alter table requests add column if not exists po_number text not null default '';
+alter table requests add column if not exists created_by_name text not null default '';
+alter table invoices add column if not exists plan jsonb;
+alter table disputes add column if not exists photos jsonb not null default '[]';
 update shippers set plan = 'pro' where demo and id in ('gold-coast-freight','atlantic-bridge') and plan = 'starter';
 update shippers set trial_ends_at = now() + interval '30 days' where trial_ends_at is null and plan = 'starter';
 

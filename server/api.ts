@@ -17,6 +17,7 @@ import { mountCosts } from './costs'
 import { mountGrowth, startGrowthSweeps } from './growth'
 import { mountIntegrations, startWebhookSweeps } from './integrations'
 import { mountAdminInsights, startScorecardSweeps } from './adminInsights'
+import { mountCustomerHub, startCustomerSweeps } from './customerHub'
 import { mountContainers } from './containers'
 import { mountLabels } from './labels'
 import { mountScans, piecesForTracking, proofOfDelivery } from './scans'
@@ -51,7 +52,7 @@ import { mountReviews } from './reviews'
 import { mountBrand } from './brand'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
-export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: StaffPerms; staffId?: string; readOnly?: boolean; viewAsBy?: string }
+export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: StaffPerms; staffId?: string; readOnly?: boolean; viewAsBy?: string; actingBy?: { id: string; name: string; email: string } }
 export interface StaffPerms { allow?: Area[]; deny?: Area[] }
 /** Areas a company can grant or withhold per person on top of their role. Mirrors ROLE_AREAS in src/lib/ops.ts. */
 export const AREAS = ['leads', 'rates', 'lanes', 'groupage', 'brand', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'payments', 'collections', 'reviews', 'fleet', 'team', 'verification', 'sourcing', 'analytics'] as const
@@ -164,12 +165,17 @@ async function currentUser(db: Db, req: Request): Promise<ApiUser | null> {
   const sid = req.cookies?.[SESSION_COOKIE]
   if (!sid) return null
   const { rows } = await db.query<Row>(
-    `select u.*, s.name as company, st.role as staff_role, st.perms as staff_perms, st.id as staff_id, st.last_active_at, se.read_only as se_read_only, se.impersonator_id as se_impersonator from sessions se join users u on u.id = se.user_id left join shippers s on s.id = u.shipper_id left join staff st on st.user_id = u.id and st.shipper_id = u.shipper_id where se.id = $1 and se.expires_at > now()`, [sid],
+    `select u.*, s.name as company, st.role as staff_role, st.perms as staff_perms, st.id as staff_id, st.last_active_at, se.read_only as se_read_only, se.impersonator_id as se_impersonator, se.acting_as as se_acting_as from sessions se join users u on u.id = se.user_id left join shippers s on s.id = u.shipper_id left join staff st on st.user_id = u.id and st.shipper_id = u.shipper_id where se.id = $1 and se.expires_at > now()`, [sid],
   )
   const r = rows[0]; if (!r) return null
   // Staff "last active" — touched at most every 10 minutes so the team page can show who's really using the app.
   if (r.staff_id && (!r.last_active_at || Date.now() - new Date(r.last_active_at).getTime() > 10 * 60_000)) db.query('update staff set last_active_at = now() where id = $1', [r.staff_id]).catch(() => {})
-  const u = userOut(r, r.company ?? undefined)
+  let u = userOut(r, r.company ?? undefined)
+  // Household / business accounts: a member who switched into a shared account acts as its owner.
+  if (r.se_acting_as && r.role === 'customer') {
+    const { rows: m } = await db.query<Row>(`select o.* from account_members am join users o on o.id = am.owner_id where am.owner_id = $1 and am.member_id = $2 and am.status = 'active'`, [r.se_acting_as, r.id])
+    if (m[0]) { u = userOut(m[0]); u.actingBy = { id: r.id, name: r.name, email: r.email } }
+  }
   if (r.se_impersonator) { u.readOnly = !!r.se_read_only; u.viewAsBy = r.se_impersonator }
   ;(req as Request & { ssUser?: ApiUser }).ssUser = u
   return u
@@ -381,7 +387,7 @@ async function autoDrivers(db: Db, rows: Row[]) {
 
 /* ---------------- schemas ---------------- */
 const zRole = z.enum(['customer', 'shipper'])
-const zSignup = z.object({ name: z.string().trim().min(2, 'Enter your name.'), email: z.string().trim().email('Enter a valid email address.'), password: z.string().min(8, 'Password must be at least 8 characters.'), role: zRole, company: z.string().trim().optional() })
+const zSignup = z.object({ name: z.string().trim().min(2, 'Enter your name.'), email: z.string().trim().email('Enter a valid email address.'), password: z.string().min(8, 'Password must be at least 8 characters.'), role: zRole, company: z.string().trim().optional(), ref: z.string().trim().max(24).optional() })
 const zLogin = z.object({ email: z.string().trim().email('Enter a valid email address.'), password: z.string().min(1, 'Enter your password.') })
 const zMatch = z.object({ origin: z.string().min(1), destination: z.string().length(2), mode: z.enum(['air', 'ocean', 'either']), cargo: z.enum(['barrels', 'boxes', 'pallets', 'vehicle', 'container20', 'container40', 'commercial']) })
 const zMatchPriced = zMatch.extend({ quantity: z.number().int().min(1).max(10_000).optional(), weightKg: z.number().min(0).optional(), pickup: z.boolean().optional(), delivery: z.boolean().optional(), insurance: z.boolean().optional() })
@@ -433,6 +439,7 @@ export function apiRouter() {
     const db = await getDb(); const body = zSignup.parse(req.body)
     throttle(`signup:ip:${clientIp(req)}`, 10, 60 * 60_000, HttpError)
     const user = await signupUser(db, body)
+    if (body.ref && user.role === 'customer') await (await import('./customerHub')).applyReferral(db, user.id, body.ref).catch(() => {})
     await createSession(db, res, user.id)
     res.status(201).json({ user })
   }))
@@ -572,6 +579,11 @@ export function apiRouter() {
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,least($14::date + 14, current_date + 45))`,
       [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone, body.cargo === 'vehicle' && body.vehicle ? JSON.stringify(body.vehicle) : null, body.preferredShipperId ?? null, body.consignee ? JSON.stringify(body.consignee) : null, body.preferredShipperId ? (body.source ?? 'picked') : 'marketplace', body.dims, body.declaredValueUsd ?? null],
     )
+    { // PO number (business accounts) and who placed it (household members act for the owner)
+      const { rows: bz } = await db.query<Row>('select po_required from users where id = $1', [user.id])
+      if (bz[0]?.po_required && !String(req.body?.poNumber ?? '').trim()) { await db.query('delete from requests where id = $1', [id]); throw new HttpError(400, 'Your business account needs a PO number on every request.') }
+      await db.query('update requests set po_number = $2, created_by_name = $3 where id = $1', [id, String(req.body?.poNumber ?? '').trim().slice(0, 40), user.actingBy?.name ?? user.name])
+    }
     if (body.consignee) await rememberConsignee(db, user.id, body.consignee)
     const { rows } = await db.query<Row>('select * from requests where id = $1', [id])
     if (body.preferredShipperId) {
@@ -719,6 +731,8 @@ export function apiRouter() {
   startGrowthSweeps(getDb); startWebhookSweeps(getDb)
   mountAdminInsights(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   startScorecardSweeps(getDb)
+  mountCustomerHub(r, { getDb, requireUser, HttpError, wrap })
+  startCustomerSweeps(getDb)
   mountContainers(r, { getDb, requireUser, HttpError, wrap, loadShipments })
   mountLabels(r, { getDb, requireUser, HttpError, wrap })
   mountScans(r, { getDb, requireUser, HttpError, wrap })

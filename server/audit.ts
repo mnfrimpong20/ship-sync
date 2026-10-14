@@ -77,7 +77,7 @@ export async function audit(db: Db, a: { actor?: ApiUser | null; action: string;
   const u = a.actor
   const role = !u ? 'system' : u.admin ? 'admin' : u.role === 'shipper' ? (u.staffRole ?? 'owner') : 'customer'
   await db.query(`insert into audit_log (id,actor_id,actor_name,actor_email,actor_role,view_as_by,shipper_id,method,path,action,entity,entity_id,status,data,ip) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-    [id(), u?.id ?? null, u?.name ?? 'System', u?.email ?? '', role, u?.viewAsBy ?? null, a.shipperId ?? u?.shipperId ?? null, a.method ?? '', a.path ?? '', a.action.slice(0, 200), a.entity ?? '', a.entityId ?? null, a.status ?? null, a.data === undefined ? null : JSON.stringify(redact(a.data)), a.ip ?? null]).catch((e) => console.error('[audit]', e))
+    [id(), u?.id ?? null, u?.actingBy ? `${u.actingBy.name} for ${u.name}` : u?.name ?? 'System', u?.actingBy?.email ?? u?.email ?? '', role, u?.viewAsBy ?? null, a.shipperId ?? u?.shipperId ?? null, a.method ?? '', a.path ?? '', a.action.slice(0, 200), a.entity ?? '', a.entityId ?? null, a.status ?? null, a.data === undefined ? null : JSON.stringify(redact(a.data)), a.ip ?? null]).catch((e) => console.error('[audit]', e))
 }
 
 /** Logs every successful change after the response is sent. */

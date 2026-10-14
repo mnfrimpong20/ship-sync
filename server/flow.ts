@@ -60,6 +60,7 @@ export async function destinationSite(db: Db, shipperId: string, country?: strin
 /* ---------------- hooks on every status change (called from notifyShipmentStatus) ---------------- */
 
 export async function onStatusEntered(db: Db, s: Row, status: ShipmentStatus) {
+  if (status === 'delivered') void import('./customerHub').then((m) => m.onDelivered(db, s)).catch(() => {})
   void import('./integrations').then(async (m) => { await m.emitShipment(db, s.id, 'shipment.status'); if (status === 'delivered') await m.emitShipment(db, s.id, 'shipment.delivered') }).catch(() => {})
   if (status === 'ready_for_collection') await openCollection(db, s)
   if (status === 'delivered') {

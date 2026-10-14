@@ -86,7 +86,9 @@ export async function invoiceForBooking(db: Db, shipmentId: string, quote: Row) 
   const includes = (J(quote.includes) ?? []) as string[]
   const dest = countryByCode(s.destination)?.name ?? s.destination
   const items: InvoiceLine[] = [{ description: `${s.mode === 'air' ? 'Air' : 'Ocean'} freight, ${s.origin} → ${dest} — ${s.description}${includes.length ? ` (includes ${includes.join(', ')})` : ''}`, qty: 1, unit: Number(quote.price) }]
-  const inv = await createInvoice(db, { shipperId: s.shipper_id, clientId: s.client_id, shipmentId: s.id, items, dueAt: addDays(new Date().toISOString().slice(0, 10), prefs.invoiceDueDays), notes: 'Per your accepted quote. Duty and destination charges, if any, are payable at destination.', status: 'sent', send: false })
+  const { rows: po } = s.request_id ? await db.query<Row>(`select r.po_number, u.company_name from requests r join users u on u.id = r.user_id where r.id = $1`, [s.request_id]) : { rows: [] as Row[] }
+  if (po[0]?.company_name) await db.query(`update clients set company = $2 where id = $1 and company = ''`, [s.client_id, po[0].company_name])
+  const inv = await createInvoice(db, { shipperId: s.shipper_id, clientId: s.client_id, shipmentId: s.id, items, dueAt: addDays(new Date().toISOString().slice(0, 10), prefs.invoiceDueDays), notes: `${po[0]?.po_number ? `PO ${po[0].po_number}. ` : ''}Per your accepted quote. Duty and destination charges, if any, are payable at destination.`, status: 'sent', send: false })
   await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, s.origin, `Invoice ${inv.number} issued for $${inv.total.toLocaleString()}.`])
   return inv
 }

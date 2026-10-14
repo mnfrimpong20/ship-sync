@@ -151,7 +151,7 @@ export default function ShipperOverview({ firstName }: { firstName: string }) {
       </motion.section>
       <motion.div variants={fadeUp} className="card-dark grid grid-cols-2 divide-x divide-border md:grid-cols-5">
         {[
-          { l: 'New leads on your lanes', v: k.leads.value, h: k.leads.hint, i: Inbox, to: '/dashboard/leads' },
+          { l: 'New client requests', v: k.leads.value, h: k.leads.hint, i: Inbox, to: '/dashboard/leads' },
           { l: 'Avg first reply', v: k.response.value == null ? '—' : `${k.response.value}h`, h: k.response.hint, i: Clock, to: '/dashboard/leads' },
           { l: 'Delivered · 30 days', v: k.delivered.value, h: k.delivered.hint, i: Package, to: '/dashboard/shipments' },
           { l: 'Collected · 30 days', v: money(k.collected.value ?? 0), h: k.collected.delta != null ? `${k.collected.delta > 0 ? '+' : ''}${k.collected.delta}% vs last 30d` : k.collected.hint, i: Wallet, to: '/dashboard/clients?filter=owing' },
@@ -162,13 +162,13 @@ export default function ShipperOverview({ firstName }: { firstName: string }) {
       {/* charts + ops */}
       <div className="grid gap-6 xl:grid-cols-12">
         <motion.section variants={fadeUp} className="card-dark p-5 xl:col-span-7" aria-labelledby="chart-h">
-          <div className="mb-1 flex items-center justify-between"><h2 id="chart-h" className="!text-base">Quotes & wins</h2><Link to="/dashboard/shipper?view=leads" className="text-xs text-text-muted hover:text-text focus-ring">Open leads →</Link></div>
+          <div className="mb-1 flex items-center justify-between"><h2 id="chart-h" className="!text-base">Quotes & wins</h2><Link to="/dashboard/shipper?view=leads" className="text-xs text-text-muted hover:text-text focus-ring">Open requests →</Link></div>
           <WeeklyChart series={o.series} />
           <div className="mt-5 grid gap-5 border-t border-border pt-5 md:grid-cols-2">
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">Pipeline · 30 days</p>
               <ol className="flex items-center gap-2 text-sm">
-                {[['Leads', o.pipeline.leads], ['Quoted', o.pipeline.quoted], ['Won', o.pipeline.won]].map(([l, v], i) => <li key={String(l)} className="flex items-center gap-2"><span className={`rounded-lg px-3 py-1.5 ${i === 2 ? 'bg-teal/15 text-teal' : 'bg-surface-2'}`}><b className="tabular-nums">{v}</b> <span className="text-text-muted">{l}</span></span>{i < 2 && <ArrowRight size={13} className="text-text-muted" aria-hidden="true" />}</li>)}
+                {[['Requests', o.pipeline.leads], ['Quoted', o.pipeline.quoted], ['Won', o.pipeline.won]].map(([l, v], i) => <li key={String(l)} className="flex items-center gap-2"><span className={`rounded-lg px-3 py-1.5 ${i === 2 ? 'bg-teal/15 text-teal' : 'bg-surface-2'}`}><b className="tabular-nums">{v}</b> <span className="text-text-muted">{l}</span></span>{i < 2 && <ArrowRight size={13} className="text-text-muted" aria-hidden="true" />}</li>)}
               </ol>
             </div>
             <div>
@@ -209,7 +209,7 @@ export default function ShipperOverview({ firstName }: { firstName: string }) {
       {/* leads + activity */}
       <div className="grid gap-6 xl:grid-cols-12">
         <motion.section variants={fadeUp} className="card-dark p-5 xl:col-span-7" aria-labelledby="leads2-h">
-          <div className="mb-3 flex items-center justify-between"><h2 id="leads2-h" className="!text-base">Leads waiting on your lanes</h2><Link to="/dashboard/shipper?view=leads" className="text-xs text-text-muted hover:text-text focus-ring">All leads →</Link></div>
+          <div className="mb-3 flex items-center justify-between"><h2 id="leads2-h" className="!text-base">Client requests waiting for a quote</h2><Link to="/dashboard/shipper?view=leads" className="text-xs text-text-muted hover:text-text focus-ring">All requests →</Link></div>
           {o.leads.length === 0 ? <p className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-text-muted">No open requests you haven’t quoted. New ones appear here the moment a customer posts them.</p> : (
             <ul className="divide-y divide-border">{o.leads.map((l) => <li key={l.id} className="flex flex-wrap items-center gap-3 py-2.5"><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{l.origin} → {l.destination} · {l.cargo}</span><span className="block text-xs text-text-muted">{l.contact} · {fmtDateTime(l.createdAt)} · {l.competing} competing quote{l.competing === 1 ? '' : 's'}</span></span><Link to="/dashboard/shipper?view=leads" className="btn-gold !min-h-9 !px-3 text-xs"><Send size={13} aria-hidden="true" /> Quote</Link></li>)}</ul>
           )}
@@ -237,11 +237,11 @@ function TodayCard({ t }: { t: TodayBlock }) {
       <div className="mb-3 flex items-center justify-between"><h2 id="today-h" className="!text-base">Today <span className="text-xs font-normal text-text-muted">· {new Date(t.date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span></h2><Link to="/dashboard/routes" className="text-xs text-text-muted hover:text-text focus-ring">Routes →</Link></div>
       {nothing ? <p className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-text-muted">Quiet day — no pickups, runs, cut-offs or arrivals scheduled. <Link to="/dashboard/routes/new" className="text-gold-deep hover:underline">Plan a run →</Link></p> : (
         <ul className="space-y-2">
-          {t.cutoffs.map((c) => <Row key={c.id} to={`/dashboard/containers/${c.id}`} icon={Package} tone={c.daysLeft <= 0 ? 'bg-danger/10 text-danger' : 'bg-gold/15 text-gold-deep'} title={`Cut-off ${c.daysLeft <= 0 ? 'today' : c.daysLeft === 1 ? 'tomorrow' : `in ${c.daysLeft} days`} · ${c.ref}${c.number ? ` ${c.number}` : ''}`} sub={`${c.vessel || 'vessel tbc'} · ${c.loaded} order${c.loaded === 1 ? '' : 's'} loaded · ${c.status}`} />)}
+          {t.cutoffs.map((c) => <Row key={c.id} to={`/dashboard/containers/${c.id}`} icon={Package} tone={c.daysLeft <= 0 ? 'bg-danger/10 text-danger' : 'bg-gold/15 text-gold-deep'} title={`Cut-off ${c.daysLeft <= 0 ? 'today' : c.daysLeft === 1 ? 'tomorrow' : `in ${c.daysLeft} days`} · ${c.ref}${c.number ? ` ${c.number}` : ''}`} sub={`${c.vessel || 'vessel tbc'} · ${c.loaded} shipment${c.loaded === 1 ? '' : 's'} loaded · ${c.status}`} />)}
           {t.pickups.map((p) => <Row key={p.id} to="/dashboard/pickups" icon={CalendarDays} tone="bg-teal/15 text-teal" title={`Pickup ${p.window} · ${p.ref}`} sub={`${p.contact}${p.city ? ` · ${p.city}` : ''} · ${p.status}`} />)}
           {t.runs.map((r) => <Row key={r.id} to={`/dashboard/routes/${r.id}`} icon={MapPinned} tone={r.kind === 'pickup' ? 'bg-teal/15 text-teal' : 'bg-gold/15 text-gold-deep'} title={r.name} sub={`${r.driver ?? 'No driver'} · ${r.pending} of ${r.stops} stops left · ${r.status === 'in_progress' ? 'on the road' : 'planned'}`} />)}
           {t.arriving.map((a) => <Row key={a.id} to="/dashboard/shipments" icon={Ship} tone="bg-sky/10 text-sky" title={`Arriving today · ${a.ref}`} sub={`${a.customer} · ${a.status.replace(/_/g, ' ')}`} />)}
-          {t.newLeads > 0 && <Row to="/dashboard/leads" icon={Inbox} tone="bg-gold/15 text-gold-deep" title={`${t.newLeads} new lead${t.newLeads === 1 ? '' : 's'} since yesterday`} sub="Quote them before lunch — response time is visible to customers." />}
+          {t.newLeads > 0 && <Row to="/dashboard/leads" icon={Inbox} tone="bg-gold/15 text-gold-deep" title={`${t.newLeads} new client request${t.newLeads === 1 ? '' : 's'} since yesterday`} sub="Quote them before lunch — response time is visible to customers." />}
           {t.late > 0 && <Row to="/dashboard/shipments" icon={AlertTriangle} tone="bg-danger/10 text-danger" title={`${t.late} shipment${t.late === 1 ? '' : 's'} past ETA`} sub="Update the status or the ETA so customers aren’t guessing." />}
         </ul>
       )}
@@ -264,7 +264,7 @@ function Benchmarks({ b }: { b: BenchmarksT }) {
   )
   return (
     <ul className="grid gap-3 md:grid-cols-3" aria-label="Benchmarks" data-testid="benchmarks">
-      <Badge good={respGood} label="Your reply time" value={fmtH(resp.you)} target={`under ${resp.target} h`} nudge={resp.you == null ? 'Send your first quote to start the clock.' : respGood ? `Faster than the ${fmtH(resp.verifiedMedian)} median for verified shippers — customers notice.` : `Verified shippers reply in ${fmtH(resp.verifiedMedian)} on average${resp.fastWinRatePct != null ? `; quotes sent within 2 h win ${resp.fastWinRatePct}% of the time` : ''}. Turn on lead alerts and rate-card auto-send.`} />
+      <Badge good={respGood} label="Your reply time" value={fmtH(resp.you)} target={`under ${resp.target} h`} nudge={resp.you == null ? 'Send your first quote to start the clock.' : respGood ? `Faster than the ${fmtH(resp.verifiedMedian)} median for verified shippers — customers notice.` : `Verified shippers reply in ${fmtH(resp.verifiedMedian)} on average${resp.fastWinRatePct != null ? `; quotes sent within 2 h win ${resp.fastWinRatePct}% of the time` : ''}. Turn on request alerts and rate-card auto-send.`} />
       <Badge good={winGood} label="Win rate · 90 days" value={win.you == null ? '—' : `${win.you}%`} target={win.verifiedAvg != null ? `${win.verifiedAvg}% verified avg` : 'verified avg'} nudge={win.you == null ? 'No decided quotes yet.' : winGood ? 'Above the verified-shipper average. Keep quoting itemised, with transit days.' : 'Itemise what’s included, quote transit days you can keep, and reply first — those three move win rate most.'} />
       <Badge good={otGood} label="On-time deliveries" value={ot.you == null || ot.you === 0 ? '—' : `${ot.you}%`} target={`${ot.target}%+`} nudge={!b.verified ? 'Get verified — the badge alone lifts you in matching.' : otGood ? 'Customers see this on your profile; it sells for you.' : 'Update ETAs early when a sailing slips; a moved ETA counts better than a missed one.'} />
     </ul>

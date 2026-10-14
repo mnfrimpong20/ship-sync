@@ -57,6 +57,9 @@ export interface Shipper {
   about: string
   priceIndex: number // 1 = budget, 2 = mid, 3 = premium
   plan: 'starter' | 'pro' | 'enterprise'
+  /** Marketplace standing from the platform scorecard (warning / probation shows a badge; paused hides the shipper). */
+  standing?: 'good' | 'warning' | 'probation' | 'paused'
+  qualityScore?: number | null
   initials: string
   hue: string
   demo?: boolean

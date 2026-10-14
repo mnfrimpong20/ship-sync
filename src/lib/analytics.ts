@@ -56,6 +56,14 @@ export interface Analytics {
   access: { sales: boolean; operations: boolean; finance: boolean; customers: boolean }
   sales: Sales | null; operations: Operations | null; finance: Finance | null; customers: Customers | null
   insights: Insight[]
+  locked?: boolean
+  targets: { month: string; dayOfMonth: number; daysInMonth: number; canEdit: boolean; rows: { key: string; label: string; target: number | null; actual: number | null; projected: number | null; unit: '' | '$' | '%'; status: 'unset' | 'achieved' | 'on_track' | 'close' | 'behind'; pct: number | null }[] }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  profit: Record<string, any> | null
+  forecast: { history: { start: string; requests: number; forecast: number }[]; next: { start: string; requests: number; forecast: number }[]; last8: number; next8: number; changePct: number | null; expectedBookings: number; lanes: { label: string; last8: number; next8: number; changePct: number | null }[]; seasonal: boolean } | null
+  team: { id: string; name: string; role: string; quotes: number; won: number; winRate: number | null; replyMedianH: number | null; scans: number; stopsDone: number; stopsMissed: number; completionPct: number | null; lastActive: string | null; you: boolean }[]
+  teamIsManager: boolean
+  standing: { score: number | null; tier: string; standing: string; note: string; metrics: Record<string, number | null>; computedAt: string; rank: number | null; of: number | null } | null
 }
 
 export const analyticsApi = {

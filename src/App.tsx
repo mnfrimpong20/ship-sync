@@ -49,6 +49,12 @@ const Warehouse = lazy(() => import('./pages/Warehouse'))
 const LanesPage = lazy(() => import('./pages/Lanes'))
 const ShipperLanes = L(() => import('./pages/Lanes'), 'ShipperLanes')
 const AnalyticsPage = lazy(() => import('./pages/Analytics'))
+const CostsPage = lazy(() => import('./pages/Costs'))
+const CampaignsPage = lazy(() => import('./pages/Campaigns'))
+const IntegrationsPage = lazy(() => import('./pages/Integrations'))
+const BillingPage = lazy(() => import('./pages/Billing'))
+const ActivityPage = lazy(() => import('./pages/Activity'))
+const EmbedTrack = lazy(() => import('./pages/EmbedTrack'))
 const ReviewsPage = lazy(() => import('./pages/Reviews'))
 const BrandedPage = lazy(() => import('./pages/WhiteLabel'))
 const SupplierPortalPage = lazy(() => import('./pages/SupplierPortal'))
@@ -173,6 +179,11 @@ export default function App() {
               <Route path="/dashboard/warehouse" element={<Warehouse />} />
               <Route path="/dashboard/lanes" element={<ShipperLanes />} />
               <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
+              <Route path="/dashboard/costs" element={<CostsPage />} />
+              <Route path="/dashboard/campaigns" element={<CampaignsPage />} />
+              <Route path="/dashboard/integrations" element={<IntegrationsPage />} />
+              <Route path="/dashboard/billing" element={<BillingPage />} />
+              <Route path="/dashboard/activity" element={<ActivityPage />} />
               <Route path="/dashboard/reviews" element={<ReviewsPage />} />
               <Route path="/dashboard/brand" element={<BrandEditor />} />
               <Route path="/dashboard/sourcing" element={<SourcingBoard />} />
@@ -207,6 +218,7 @@ export default function App() {
             <Route path="/add-recipient/:token" element={<AddRecipient />} />
             <Route path="/order/:code" element={<OrderPage />} />
             <Route path="/t/:slug" element={<BrandedPage />} />
+            <Route path="/embed/track/:id" element={<EmbedTrack />} />
           </Routes>
           </Suspense>
         </HashRouter>

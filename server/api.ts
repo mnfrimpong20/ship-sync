@@ -268,7 +268,7 @@ async function notifyNewLead(db: Db, req: Row) {
   const done = new Set(quoted.map((q) => q.shipper_id))
   const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })).filter((m) => !done.has(m.shipper.id))
   for (const m of matches) {
-    await notifyShipperStaff(db, m.shipper.id, { kind: 'new_lead', title: `New lead: ${req.quantity} × ${req.cargo} to ${req.destination}`, body: `${req.contact_name} wants to ship from ${req.origin} (${req.mode === 'either' ? 'air or ocean' : req.mode}), ready ${String(req.ready_date).slice(0, 10)}. Send a quote before the competition does.`, link: '/dashboard/leads', dedupe: `lead:${req.id}` }, ['owner', 'dispatcher', 'agent'])
+    await notifyShipperStaff(db, m.shipper.id, { kind: 'new_lead', title: `New client request: ${req.quantity} × ${req.cargo} to ${req.destination}`, body: `${req.contact_name} wants to ship from ${req.origin} (${req.mode === 'either' ? 'air or ocean' : req.mode}), ready ${String(req.ready_date).slice(0, 10)}. Send a quote before the competition does.`, link: '/dashboard/leads', dedupe: `lead:${req.id}` }, ['owner', 'dispatcher', 'agent'])
   }
 }
 
@@ -507,7 +507,7 @@ export function apiRouter() {
       const quoted = await autoQuoteFromRates(db, rows[0], [body.preferredShipperId])
       const { rows: sh } = await db.query<Row>('select name from shippers where id = $1', [body.preferredShipperId])
       for (const q of quoted) await notify(db, { userId: user.id, kind: 'quote_received', title: `Your quote from ${sh[0]?.name ?? 'the shipper'}: $${q.price.toLocaleString()} for ${rows[0].ref}`, body: 'Priced instantly from their published rates. Open your dashboard to accept.', link: '/dashboard', dedupe: `rq:${id}:rate:${q.shipperId}` })
-      await notifyShipperStaff(db, body.preferredShipperId, { kind: 'new_lead', title: `${quoted.length ? 'Instant quote sent — ' : body.source === 'link' ? 'New order from your link — ' : body.source === 'branded' ? 'New lead from your branded page — ' : 'A customer chose you — '}${rows[0].ref}`, body: `${body.contact.name} · ${body.quantity} × ${body.cargo} · ${body.origin} → ${body.destination}${quoted.length ? ` · $${quoted[0].price.toLocaleString()} from your rate card` : '. Send a quote.'}`, link: '/dashboard/leads', dedupe: `lead:${id}` }, ['owner', 'dispatcher', 'agent'])
+      await notifyShipperStaff(db, body.preferredShipperId, { kind: 'new_lead', title: `${quoted.length ? 'Instant quote sent — ' : body.source === 'link' ? 'New order from your link — ' : body.source === 'branded' ? 'New client request from your branded page — ' : 'A customer chose you — '}${rows[0].ref}`, body: `${body.contact.name} · ${body.quantity} × ${body.cargo} · ${body.origin} → ${body.destination}${quoted.length ? ` · $${quoted[0].price.toLocaleString()} from your rate card` : '. Send a quote.'}`, link: '/dashboard/leads', dedupe: `lead:${id}` }, ['owner', 'dispatcher', 'agent'])
     } else {
       await instantQuotesFromRates(db, rows[0])
       if (DEMO_AUTO_QUOTES) await demoAutoQuotes(db, rows[0])

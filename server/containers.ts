@@ -20,7 +20,7 @@ interface Deps {
 export const CONTAINER_STAGES = ['booked', 'loading', 'gated_in', 'sailed', 'arrived', 'customs', 'devanned', 'closed'] as const
 export type ContainerStatus = (typeof CONTAINER_STAGES)[number]
 export const stageLabels: Record<ContainerStatus, string> = { booked: 'Booked with line', loading: 'Loading', gated_in: 'Gated in at port', sailed: 'Sailed', arrived: 'Arrived', customs: 'Customs', devanned: 'Devanned', closed: 'Closed' }
-/** What each container stage means for the orders inside it. */
+/** What each container stage means for the shipments inside it. */
 const CASCADE: Partial<Record<ContainerStatus, ShipmentStatus>> = { loading: 'picked_up', gated_in: 'at_origin_port', sailed: 'in_transit', arrived: 'arrived', customs: 'customs' }
 const OPEN = ['booked', 'loading', 'gated_in', 'sailed', 'arrived', 'customs']
 export const SIZES = ['20ft', '40ft', '40hc', 'reefer'] as const
@@ -59,7 +59,7 @@ async function raise(db: Db, s: Row, target: ShipmentStatus, place: string, note
   if (extra && (extra.vessel || extra.mmsi)) await db.query('update shipments set vessel_name = coalesce(nullif($2, \'\'), vessel_name), mmsi = coalesce(nullif($3, \'\'), mmsi), departed_at = coalesce(departed_at, case when $4 then now() else null end) where id = $1', [s.id, extra.vessel ?? '', extra.mmsi ?? '', target === 'in_transit'])
 }
 
-/** Move a container to a later stage and cascade to every loaded order. Returns how many orders changed status. */
+/** Move a container to a later stage and cascade to every loaded shipment. Returns how many shipments changed status. */
 export async function advanceContainer(db: Db, c: Row, status: ContainerStatus, o: { at?: Date; place?: string; note?: string; by: string; source?: 'manual' | 'carrier'; code?: string }) {
   const to = CONTAINER_STAGES.indexOf(status)
   await db.query('update containers set status = $2 where id = $1', [c.id, status])
@@ -118,7 +118,7 @@ export async function syncContainer(db: Db, c: Row): Promise<string[]> {
       const note = `${milestoneLabels[ev.code]}${ev.vesselName ? ` — ${ev.vesselName}${ev.voyage ? ` ${ev.voyage}` : ''}` : ''}${ev.note ? `. ${ev.note}` : ''} (${adapter.label})`
       if (stage && CONTAINER_STAGES.indexOf(stage) > CONTAINER_STAGES.indexOf(c.status) && !(stage === 'sailed' && !c.vessel_name)) {
         const n = await advanceContainer(db, c, stage, { at: new Date(ev.at), place: ev.place, note, by: c.line || adapter.label, source: 'carrier', code: ev.code })
-        changes.push(`${stageLabels[stage]}${n ? ` (${n} order${n === 1 ? '' : 's'} updated)` : ''}`)
+        changes.push(`${stageLabels[stage]}${n ? ` (${n} shipment${n === 1 ? '' : 's'} updated)` : ''}`)
       } else {
         await db.query('insert into container_events (container_id,status,at,place,note,by_name,source,code) values ($1,$2,$3,$4,$5,$6,\'carrier\',$7)', [c.id, c.status, new Date(ev.at), ev.place, note, c.line || adapter.label, ev.code])
         changes.push(milestoneLabels[ev.code])
@@ -183,7 +183,7 @@ export function mountContainers(r: Router, d: Deps) {
     const { rows } = await db.query<Row>(`select c.*, (select count(*) from shipments s where s.container_id = c.id)::int as loaded from containers c where c.shipper_id = $1 order by case when c.status in ('devanned','closed') then 1 else 0 end, coalesce(c.etd, c.cutoff_date, c.created_at::date) asc`, [sid])
     res.json({ containers: rows.map(containerOut) })
   }))
-  /** Ocean orders that can be loaded: not delivered, not already in an open container. */
+  /** Ocean shipments that can be loaded: not delivered, not already in an open container. */
   r.get('/containers/candidates', wrap(async (req, res) => {
     const db = await getDb(); const { sid } = await access(db, req)
     const dest = String(req.query.destination ?? '')
@@ -206,35 +206,35 @@ export function mountContainers(r: Router, d: Deps) {
     const c = await own(db, sid, String(req.params.id)); const b = zContainer.partial().parse(req.body)
     await db.query(`update containers set number=$2, size=$3, line=$4, booking_ref=$5, seal=$6, vessel_name=$7, mmsi=$8, voyage=$9, origin_port=$10, destination=$11, destination_port=$12, cutoff_date=$13, etd=$14, eta=$15, notes=$16 where id = $1`,
       [c.id, b.number ?? c.number, b.size ?? c.size, b.line ?? c.line, b.bookingRef ?? c.booking_ref, b.seal ?? c.seal, b.vesselName ?? c.vessel_name, b.mmsi ?? c.mmsi, b.voyage ?? c.voyage, b.originPort ?? c.origin_port, b.destination ?? c.destination, b.destinationPort ?? c.destination_port, b.cutoffDate === undefined ? c.cutoff_date : b.cutoffDate, b.etd === undefined ? c.etd : b.etd, b.eta === undefined ? c.eta : b.eta, b.notes ?? c.notes])
-    // Vessel details entered after sailing still flow to the loaded orders.
+    // Vessel details entered after sailing still flow to the loaded shipments.
     if ((b.vesselName || b.mmsi) && ['sailed', 'arrived', 'customs'].includes(c.status)) { const { rows } = await db.query<Row>('select * from shipments where container_id = $1', [c.id]); for (const s of rows) await raise(db, s, s.status, '', '', { vessel: b.vesselName, mmsi: b.mmsi }) }
     res.json(await detail(db, sid, c.id))
   }))
   r.post('/containers/:id/load', wrap(async (req, res) => {
     const db = await getDb(); const { sid, u } = await access(db, req)
     const c = await own(db, sid, String(req.params.id)); const b = zLoad.parse(req.body)
-    if (!OPEN.includes(c.status) || ['sailed', 'arrived', 'customs'].includes(c.status)) throw new HttpError(409, `You can’t load orders once the container has ${stageLabels[c.status as ContainerStatus].toLowerCase()}.`)
+    if (!OPEN.includes(c.status) || ['sailed', 'arrived', 'customs'].includes(c.status)) throw new HttpError(409, `You can’t load shipments once the container has ${stageLabels[c.status as ContainerStatus].toLowerCase()}.`)
     const { rows } = await db.query<Row>('select * from shipments where id = any($1::text[]) and shipper_id = $2', [b.shipmentIds, sid])
-    if (rows.length !== b.shipmentIds.length) throw new HttpError(400, 'One of those orders isn’t yours.')
+    if (rows.length !== b.shipmentIds.length) throw new HttpError(400, 'One of those shipments isn’t yours.')
     for (const s of rows) {
       if (s.mode !== 'ocean') throw new HttpError(400, `${s.ref} is an air shipment.`)
       if (s.status === 'delivered') throw new HttpError(400, `${s.ref} is already delivered.`)
       if (s.container_id && s.container_id !== c.id) { const { rows: other } = await db.query<Row>('select ref, status from containers where id = $1', [s.container_id]); if (other[0] && OPEN.includes(other[0].status)) throw new HttpError(409, `${s.ref} is already loaded in ${other[0].ref}.`) }
       await db.query('update shipments set container_id = $2 where id = $1', [s.id, c.id])
-      const target = CASCADE[c.status as ContainerStatus] ?? 'picked_up' // loading a box means the order has been collected
+      const target = CASCADE[c.status as ContainerStatus] ?? 'picked_up' // loading a box means the shipment has been collected
       await raise(db, s, target, c.origin_port || 'Origin yard', `Loaded into container ${c.ref}${c.number ? ` (${c.number})` : ''} by ${u.name}.`)
     }
-    if (c.status === 'booked') { await db.query(`update containers set status = 'loading' where id = $1`, [c.id]); await db.query('insert into container_events (container_id,status,place,note,by_name) values ($1,\'loading\',$2,$3,$4)', [c.id, c.origin_port || '', 'First orders loaded.', u.name]) }
+    if (c.status === 'booked') { await db.query(`update containers set status = 'loading' where id = $1`, [c.id]); await db.query('insert into container_events (container_id,status,place,note,by_name) values ($1,\'loading\',$2,$3,$4)', [c.id, c.origin_port || '', 'First shipments loaded.', u.name]) }
     res.json(await detail(db, sid, c.id))
   }))
   r.post('/containers/:id/unload', wrap(async (req, res) => {
     const db = await getDb(); const { sid } = await access(db, req)
     const c = await own(db, sid, String(req.params.id)); const shipmentId = String(req.body?.shipmentId ?? '')
-    if (['sailed', 'arrived', 'customs'].includes(c.status)) throw new HttpError(409, 'The container has already sailed — orders can’t be removed now.')
+    if (['sailed', 'arrived', 'customs'].includes(c.status)) throw new HttpError(409, 'The container has already sailed — shipments can’t be removed now.')
     await db.query('update shipments set container_id = null where id = $1 and container_id = $2 and shipper_id = $3', [shipmentId, c.id, sid])
     res.json(await detail(db, sid, c.id))
   }))
-  /** Move to a later stage; every loaded order follows. */
+  /** Move to a later stage; every loaded shipment follows. */
   r.post('/containers/:id/advance', wrap(async (req, res) => {
     const db = await getDb(); const { sid, u } = await access(db, req)
     const c = await own(db, sid, String(req.params.id)); const b = zAdvance.parse(req.body)

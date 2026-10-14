@@ -3,7 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Check, Copy, Ellipsis, Link2, Mail, Phone, Plus, RefreshCw, ShieldCheck, Truck, UserCheck, UserX, Users } from 'lucide-react'
 import { useStore } from '../lib/store'
-import { canManageOps, joinLink, opsApi, roleBlurb, roleLabels, type InviteInput, type Staff, type StaffRole } from '../lib/ops'
+import { AREA_LABELS, ROLE_BASE, canManageOps, joinLink, opsApi, roleBlurb, roleLabels, type Area, type InviteInput, type Staff, type StaffRole } from '../lib/ops'
 import { Empty, Pill, fmtDate } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { Chip, Confirm, Expander, Pager, SearchBox, StatCard, Th, thead, trow, usePaged } from '../components/board'
@@ -158,10 +158,10 @@ export default function Team() {
           <motion.div variants={fadeUp} className="card-dark mt-4 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px] text-sm">
-                <thead><tr className={thead}><Th className="w-8" /><Th>Member</Th><Th>Role</Th><Th>Contact</Th><Th>Works at</Th><Th>Runs</Th><Th>Status</Th>{manage && <Th className="text-right">Actions</Th>}</tr></thead>
+                <thead><tr className={thead}><Th className="w-8" /><Th>Member</Th><Th>Role</Th><Th>Contact</Th><Th>Works at</Th><Th>This week</Th><Th>Last active</Th><Th>Status</Th>{manage && <Th className="text-right">Actions</Th>}</tr></thead>
                 <tbody>
-                  {team === null && !error && <tr><td colSpan={8} className="px-3 py-10 text-center text-text-muted">Loading…</td></tr>}
-                  {team && p.rows.length === 0 && <tr><td colSpan={8} className="px-3 py-10"><Empty title={all.length ? 'No one matches' : 'Just you so far'} body={all.length ? 'Try another filter or search.' : 'Invite dispatchers, agents and drivers so everyone works from the same shipments.'} action={manage && !all.length ? <button onClick={() => setInviting(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Invite teammate</button> : undefined} /></td></tr>}
+                  {team === null && !error && <tr><td colSpan={9} className="px-3 py-10 text-center text-text-muted">Loading…</td></tr>}
+                  {team && p.rows.length === 0 && <tr><td colSpan={9} className="px-3 py-10"><Empty title={all.length ? 'No one matches' : 'Just you so far'} body={all.length ? 'Try another filter or search.' : 'Invite dispatchers, agents and drivers so everyone works from the same shipments.'} action={manage && !all.length ? <button onClick={() => setInviting(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Invite teammate</button> : undefined} /></td></tr>}
                   {p.rows.map((s) => {
                     const isMe = s.userId === user.id; const canEdit = manage && !(s.role === 'owner' && !isOwner); const isOpen = open === s.id
                     return (
@@ -172,7 +172,8 @@ export default function Team() {
                           <td className="whitespace-nowrap px-3 py-3">{canEdit && s.status !== 'inactive' ? <><label className="sr-only" htmlFor={`role-${s.id}`}>Role for {s.name}</label><select id={`role-${s.id}`} className="input-dark !min-h-8 !w-auto !py-0 text-xs" value={s.role} onChange={(e) => patch(s, { role: e.target.value as StaffRole }, `${s.name} is now ${roleLabels[e.target.value as StaffRole].toLowerCase()}.`)}>{(Object.keys(roleLabels) as StaffRole[]).filter((r) => r !== 'owner' || isOwner).map((r) => <option key={r} value={r}>{roleLabels[r]}</option>)}</select></> : <Pill tone={roleTone[s.role]}>{roleLabels[s.role]}</Pill>}</td>
                           <td className="px-3 py-3 text-xs"><p className="inline-flex items-center gap-1"><Mail size={11} aria-hidden="true" /> <a href={`mailto:${s.email}`} className="hover:text-gold-deep">{s.email}</a></p>{s.phone && <p className="inline-flex items-center gap-1 text-text-muted"><Phone size={11} aria-hidden="true" /> <a href={`tel:${s.phone}`} className="hover:text-gold-deep">{s.phone}</a></p>}</td>
                           <td className="px-3 py-3"><p>{s.city || (s.base === 'origin' ? 'Origin side' : 'Destination side')}</p><p className="text-[11px] text-text-muted">{s.base === 'origin' ? 'US / Europe' : 'West Africa'}</p></td>
-                          <td className="whitespace-nowrap px-3 py-3 tabular-nums">{s.role === 'driver' ? (s.runCount ?? 0) : <span className="text-text-muted">—</span>}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-xs tabular-nums"><Activity s={s} /></td>
+                          <td className="whitespace-nowrap px-3 py-3 text-xs text-text-muted">{s.status === 'invited' ? <span className="text-gold-deep">Never — invite not opened</span> : s.lastActiveAt ? relTime(s.lastActiveAt) : '—'}</td>
                           <td className="whitespace-nowrap px-3 py-3"><Pill tone={s.status === 'active' ? 'green' : s.status === 'invited' ? 'gold' : 'danger'}>{s.status === 'active' ? 'Active' : s.status === 'invited' ? 'Invited' : 'Deactivated'}</Pill></td>
                           {manage && (
                             <td className="px-3 py-3 text-right">
@@ -199,11 +200,12 @@ export default function Team() {
                           )}
                         </tr>
                         {isOpen && (
-                          <tr className="border-b border-border/70 bg-surface-2/30"><td /><td colSpan={7} className="px-3 pb-5 pt-2">
+                          <tr className="border-b border-border/70 bg-surface-2/30"><td /><td colSpan={8} className="px-3 pb-5 pt-2">
                             <div className="rounded-xl border border-border bg-surface p-4 text-sm">
                               <p className="text-text-muted">{roleBlurb[s.role]}</p>
                               {s.status === 'invited' && s.inviteToken && manage && <><p className="mt-3 text-xs font-semibold uppercase tracking-wider text-text-muted">Invitation</p><p className="mt-1 text-xs text-text-muted">Send {s.name.split(' ')[0]} this link on WhatsApp or email. It works once and expires when they join.</p><CopyLink token={s.inviteToken} /></>}
                               {s.status === 'inactive' && <p className="mt-3 text-xs text-danger">Signed out and blocked from signing in. Reactivate from the ⋯ menu to restore access.</p>}
+                              {canEdit && s.role !== 'owner' && <AccessEditor s={s} busy={busy} onSave={(perms) => patch(s, { perms }, `Access updated for ${s.name}.`)} />}
                             </div>
                           </td></tr>
                         )}
@@ -218,6 +220,47 @@ export default function Team() {
         </motion.div>
       </div>
       {deactivating && <Confirm title={`Deactivate ${deactivating.name}?`} body={<p>They are signed out immediately and can’t sign in until reactivated. Runs and records they worked on are kept.</p>} confirmLabel="Deactivate" busy={busy} onClose={() => setDeactivating(null)} onConfirm={() => patch(deactivating, { status: 'inactive' }, `${deactivating.name} deactivated.`)} />}
+    </div>
+  )
+}
+
+const relTime = (iso: string) => { const m = (Date.now() - new Date(iso).getTime()) / 60000; if (m < 2) return 'Just now'; if (m < 60) return `${Math.round(m)} min ago`; const h = m / 60; if (h < 24) return `${Math.round(h)} h ago`; const d = h / 24; if (d < 7) return `${Math.round(d)} d ago`; return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }
+
+/** What this person actually did in the last 7 days — the owner's view of who's carrying what. */
+function Activity({ s }: { s: Staff }) {
+  const a = s.activity
+  if (!a) return <span className="text-text-muted">—</span>
+  const bits: string[] = []
+  if (s.role === 'driver' || a.runsWeek) bits.push(`${a.runsWeek} run${a.runsWeek === 1 ? '' : 's'} · ${a.stopsWeek} stop${a.stopsWeek === 1 ? '' : 's'}`)
+  if (a.scansWeek) bits.push(`${a.scansWeek} scan${a.scansWeek === 1 ? '' : 's'}`)
+  if (a.quotesWeek || ['owner', 'dispatcher', 'agent'].includes(s.role)) bits.push(`${a.quotesWeek} quote${a.quotesWeek === 1 ? '' : 's'}${a.quotesWonWeek ? ` · ${a.quotesWonWeek} won` : ''}`)
+  return <span className={bits.length && (a.runsWeek || a.scansWeek || a.quotesWeek) ? '' : 'text-text-muted'} data-testid="activity">{bits.length ? bits.join(' · ') : 'Nothing yet'}</span>
+}
+
+/** Per-person overrides: switch areas on or off beyond what the role gives. */
+function AccessEditor({ s, busy, onSave }: { s: Staff; busy: boolean; onSave: (perms: { allow: Area[]; deny: Area[] }) => void }) {
+  const base = ROLE_BASE[s.role]
+  const areas = Object.keys(AREA_LABELS) as Area[]
+  const has = (a: Area) => { if (s.perms?.deny?.includes(a)) return false; if (s.perms?.allow?.includes(a)) return true; return base === 'all' || base.includes(a) }
+  const fromRole = (a: Area) => base === 'all' || base.includes(a)
+  const toggle = (a: Area) => {
+    const on = !has(a)
+    const allow = new Set(s.perms?.allow ?? []); const deny = new Set(s.perms?.deny ?? [])
+    allow.delete(a); deny.delete(a)
+    if (on && !fromRole(a)) allow.add(a)
+    if (!on && fromRole(a)) deny.add(a)
+    onSave({ allow: [...allow], deny: [...deny] })
+  }
+  const overrides = (s.perms?.allow?.length ?? 0) + (s.perms?.deny?.length ?? 0)
+  return (
+    <div className="mt-4" data-testid="access-editor">
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Access <span className="font-normal normal-case tracking-normal">· {roleLabels[s.role]} defaults{overrides ? `, ${overrides} override${overrides === 1 ? '' : 's'}` : ''}</span></p>
+      <p className="mt-1 text-xs text-text-muted">Three people wearing five hats? Switch areas on or off for this person without changing their role. Enforced by the server too.</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {areas.map((a) => { const on = has(a); const diff = on !== fromRole(a); return (
+          <button key={a} type="button" onClick={() => toggle(a)} disabled={busy} aria-pressed={on} className={`rounded-full border px-2.5 py-1 text-xs focus-ring disabled:opacity-60 ${on ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'} ${diff ? 'ring-1 ring-sky/60' : ''}`} title={diff ? 'Differs from the role default' : undefined} data-testid={`area-${a}`}>{on ? '✓ ' : ''}{AREA_LABELS[a]}</button>
+        ) })}
+      </div>
     </div>
   )
 }

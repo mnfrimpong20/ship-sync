@@ -6,6 +6,8 @@ import { useStore } from '../lib/store'
 import { canManageOps, opsApi, runStatusLabels, type Candidate, type Run, type RunKind, type RunStart, type Staff, type StopInput, type Vehicle } from '../lib/ops'
 import RunMap, { type MapStop } from '../components/RunMap'
 import { Pill, fmtDateTime } from '../components/ui'
+import { stopOrQueue, startQueueSync, scanQueue, SCAN_QUEUE_EVENT } from '../lib/scan'
+import { Clock, WifiOff } from 'lucide-react'
 import { statusLabels } from '../lib/data'
 import { runTone } from './Routes'
 
@@ -47,6 +49,11 @@ export default function RoutePlanner() {
   const [run, setRun] = useState<Run | null>(null)
   const [cands, setCands] = useState<Candidate[]>([])
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
+  const [late, setLate] = useState<null | { minutes: number; note: string }>(null)
+  const [queued, setQueued] = useState(0)
+  useEffect(() => { startQueueSync(); const on = () => setQueued(scanQueue.list().filter((q) => q.stop).length); on(); window.addEventListener(SCAN_QUEUE_EVENT, on); return () => window.removeEventListener(SCAN_QUEUE_EVENT, on) }, [])
+  useEffect(() => { if (!info) return; const t = setTimeout(() => setInfo(''), 5000); return () => clearTimeout(t) }, [info])
   const [busy, setBusy] = useState(false)
   const [focus, setFocus] = useState<string | null>(null)
   const [pickMode, setPickMode] = useState<'start' | null>(null)
@@ -144,7 +151,9 @@ export default function RoutePlanner() {
         </div>
       )}
       {run && !manage && user.staffRole === 'driver' && (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {run.status === 'in_progress' && <button disabled={busy} onClick={() => setLate({ minutes: 30, note: '' })} className="btn-ghost !min-h-10 !px-4 text-sm" data-testid="running-late"><Clock size={15} aria-hidden="true" /> Running late</button>}
+          {queued > 0 && <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/50 bg-gold/10 px-3 text-xs text-gold-deep" data-testid="queued-badge"><WifiOff size={12} aria-hidden="true" /> {queued} update{queued === 1 ? '' : 's'} waiting for signal</span>}
           {run.status === 'planned' && <button disabled={busy} onClick={() => act(() => opsApi.updateRun(run.id, { status: 'in_progress' }))} className="btn-gold !min-h-10 !px-4 text-sm"><Play size={15} aria-hidden="true" /> Start run</button>}
           {run.status === 'in_progress' && <button disabled={busy} onClick={() => act(() => opsApi.updateRun(run.id, { status: 'done' }))} className="btn-gold !min-h-10 !px-4 text-sm"><Flag size={15} aria-hidden="true" /> Finish run</button>}
         </div>
@@ -158,6 +167,15 @@ export default function RoutePlanner() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           {header}
           {error && <p role="alert" className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+      {info && <p role="status" className="mt-3 rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-sm">{info}</p>}
+      {late && run && (
+        <form onSubmit={async (e) => { e.preventDefault(); setBusy(true); setError(''); try { const r = await opsApi.late(run.id, late.minutes, late.note); setLate(null); setInfo(r.told ? `Told ${r.told} customer${r.told === 1 ? '' : 's'} you're running about ${late.minutes} minutes late.` : 'Noted on the run — no customers with pending stops to tell.') } catch (er) { setError(er instanceof Error ? er.message : 'Could not send.') } finally { setBusy(false) } }} className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-border p-3" aria-label="Running late" data-testid="late-form">
+          <span className="text-sm font-semibold">About how late?</span>
+          {[15, 30, 60, 120].map((m) => <button type="button" key={m} onClick={() => setLate({ ...late, minutes: m })} aria-pressed={late.minutes === m} className={`rounded-full border px-3 py-1 text-xs focus-ring ${late.minutes === m ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted'}`}>{m >= 60 ? `${m / 60} h` : `${m} min`}</button>)}
+          <input className="input-dark !min-h-9 flex-1 text-xs" placeholder="Reason (optional, customers see it)" value={late.note} onChange={(e) => setLate({ ...late, note: e.target.value })} maxLength={200} />
+          <button className="btn-gold !min-h-9 text-xs" disabled={busy} data-testid="late-send">Tell customers</button><button type="button" onClick={() => setLate(null)} className="btn-ghost !min-h-9 text-xs">Cancel</button>
+        </form>
+      )}
 
           <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
             {/* ---- left: details + stops ---- */}
@@ -239,7 +257,7 @@ export default function RoutePlanner() {
                           )}
                         </div>
                         {noteDraft?.id === s.id && run && (
-                          <form onSubmit={(e) => { e.preventDefault(); const d = noteDraft; setNoteDraft(null); act(() => opsApi.updateStop(run.id, d.id, { status: d.status, note: d.text.trim() || undefined })) }} className="mt-2 flex gap-2">
+                          <form onSubmit={(e) => { e.preventDefault(); const d = noteDraft; setNoteDraft(null); (async () => { setBusy(true); setError(''); try { const r = await stopOrQueue(run.id, d.id, { status: d.status, note: d.text.trim() || undefined }); if (r.queued) { setRun({ ...run, stops: run.stops.map((x) => (x.id === d.id ? { ...x, status: d.status, note: d.text.trim(), doneAt: new Date().toISOString() } : x)) }); setInfo('No signal — saved on this phone, it will go up when you’re back online.') } else { setRun(await opsApi.runs().then((rs) => rs.find((x) => x.id === run.id) ?? run).catch(async () => (await opsApi.myRuns()).find((x) => x.id === run.id) ?? run)) } } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong.') } finally { setBusy(false) } })() }} className="mt-2 flex gap-2">
                             <input autoFocus aria-label={noteDraft.status === 'done' ? 'Note for this stop' : 'Reason for skipping'} className="input-dark !min-h-9 flex-1 text-sm" placeholder={noteDraft.status === 'done' ? (run.kind === 'pickup' ? 'e.g. 2 pallets collected (optional)' : 'e.g. received by Yaw (optional)') : 'Why was it skipped? (optional)'} value={noteDraft.text} onChange={(e) => setNoteDraft({ ...noteDraft, text: e.target.value })} />
                             <button className="btn-gold !min-h-9 !px-3 text-xs">{noteDraft.status === 'done' ? 'Mark done' : 'Skip stop'}</button>
                             <button type="button" onClick={() => setNoteDraft(null)} className="btn-ghost !min-h-9 !px-2 text-xs" aria-label="Cancel"><X size={13} /></button>

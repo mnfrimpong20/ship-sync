@@ -3,7 +3,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Plane, Ship, Zap } from 'lucide-react'
 import { cargoTypes, countries, countryByCode, origins, type CargoType, type Mode } from '../lib/data'
-import { useStore, type Match, type NewRequest } from '../lib/store'
+import { useStore, type Match, type NewRequest, type RequestConsignee } from '../lib/store'
+import { customerApi, type Consignee } from '../lib/customer'
+import { ConsigneeForm } from '../components/CustomerHome'
 import { Avatar, ModeBadge, Rating, money } from '../components/ui'
 import { ease } from '../lib/motion'
 import { RequestVehicleFields } from '../components/VehicleCard'
@@ -30,6 +32,28 @@ export default function Quote() {
     password: '',
   })
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }))
+  const { requests } = useStore()
+  const [saved, setSaved] = useState<Consignee[]>([])
+  const [recipientMode, setRecipientMode] = useState<'none' | 'pick' | 'new'>('none')
+  const [prefilled, setPrefilled] = useState<string | null>(null)
+  // "Ship again": copy everything from a previous request except the dates.
+  useEffect(() => {
+    const again = sp.get('again'); if (!again || prefilled === again) return
+    const prev = requests.find((r) => r.id === again); if (!prev) return
+    setForm((f) => ({ ...f, origin: prev.origin, destination: prev.destination, mode: prev.mode, cargo: prev.cargo, quantity: prev.quantity, weightKg: prev.weightKg, description: prev.description, pickup: prev.pickup, delivery: prev.delivery, insurance: prev.insurance, vehicle: prev.vehicle, consignee: prev.consignee, contact: { ...f.contact, phone: prev.contact.phone || f.contact.phone } }))
+    if (prev.consignee) setRecipientMode('new')
+    setPrefilled(again)
+  }, [sp, requests, prefilled])
+  useEffect(() => {
+    if (!user || user.role !== 'customer') return
+    customerApi.consignees().then((list) => {
+      setSaved(list)
+      const pick = sp.get('consignee'); const chosen = pick ? list.find((c) => c.id === pick) : undefined
+      if (chosen) { setForm((f) => ({ ...f, destination: chosen.country as Form['destination'], delivery: true, consignee: { name: chosen.name, phone: chosen.phone, address: chosen.address, city: chosen.city, country: chosen.country, relationship: chosen.relationship } })); setRecipientMode('pick') }
+      else if (list.length && !sp.get('again')) setRecipientMode('pick')
+    }).catch(() => {})
+  }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+  const pickSaved = (c: Consignee) => { setForm((f) => ({ ...f, consignee: { name: c.name, phone: c.phone, address: c.address, city: c.city, country: c.country, relationship: c.relationship } })); setRecipientMode('pick') }
   useEffect(() => {
     let live = true
     setMatching(true)
@@ -60,7 +84,8 @@ export default function Quote() {
   const submit = async () => {
     setSubmitting(true); setSubmitError('')
     try {
-      const { password, ...rest } = form
+      const { password, consignee, ...rest0 } = form
+      const rest = { ...rest0, consignee: consignee && consignee.name.trim().length >= 2 ? consignee : undefined }
       const r = await createRequest(user ? rest : { ...rest, password })
       nav(`/dashboard?request=${r.id}`)
     } catch (err) { setSubmitError(err instanceof Error ? err.message : 'Could not send your request.'); setSubmitting(false) }
@@ -131,6 +156,13 @@ export default function Quote() {
                         <span><span className="block font-semibold text-text">{l}</span><span className="text-sm text-text-muted">{h}</span></span>
                       </label>
                     ))}
+                    <div className="rounded-[var(--radius-sm)] border border-border bg-surface-2 p-4" data-testid="recipient-section">
+                      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold text-text">Who receives it in {countryByCode(form.destination)?.name ?? 'the destination'}?</p><p className="text-xs text-text-muted">Optional now, but it lets the shipper text them when it lands and the driver find them.</p></div>{form.consignee && <button type="button" onClick={() => { set('consignee', undefined); setRecipientMode(saved.length ? 'pick' : 'none') }} className="text-xs text-text-muted underline">Clear</button>}</div>
+                      {saved.length > 0 && <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Saved recipients">{saved.map((c) => <button type="button" key={c.id} role="radio" aria-checked={form.consignee?.name === c.name && form.consignee?.phone === c.phone} onClick={() => pickSaved(c)} className={`rounded-full border px-3 py-1.5 text-sm focus-ring ${form.consignee?.name === c.name && form.consignee?.phone === c.phone ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`} data-testid="saved-recipient">{c.name}{c.city ? ` · ${c.city}` : ''}</button>)}<button type="button" onClick={() => { set('consignee', { name: '', country: form.destination }); setRecipientMode('new') }} className="rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-text-muted hover:text-text focus-ring">+ Someone else</button></div>}
+                      {saved.length === 0 && recipientMode === 'none' && <button type="button" onClick={() => { set('consignee', { name: '', country: form.destination }); setRecipientMode('new') }} className="btn-ghost mt-3 !min-h-9 text-xs" data-testid="add-recipient-inline">Add a recipient</button>}
+                      {recipientMode === 'new' && <div className="mt-3"><ConsigneeForm key={form.consignee?.name ?? 'new'} initial={{ ...(form.consignee ?? { name: '' }), country: form.consignee?.country || form.destination }} onSave={(c) => { set('consignee', c as RequestConsignee); setRecipientMode('pick') }} onCancel={() => { set('consignee', undefined); setRecipientMode(saved.length ? 'pick' : 'none') }} /></div>}
+                      {recipientMode === 'pick' && form.consignee?.name && <p className="mt-3 text-sm text-text"><Check size={14} className="inline text-teal" aria-hidden="true" /> {form.consignee.name}{form.consignee.city ? `, ${form.consignee.city}` : ''}{form.consignee.phone ? ` · ${form.consignee.phone}` : ''} <button type="button" onClick={() => setRecipientMode('new')} className="ml-1 text-xs text-text-muted underline">edit</button></p>}
+                    </div>
                   </div>
                 )}
                 {step === 3 && (

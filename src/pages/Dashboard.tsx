@@ -12,6 +12,8 @@ import { RecipientPanel } from '../components/RecipientPanel'
 import { DutyCard } from '../components/Duty'
 import { SourcingTab } from './Sourcing'
 import { InsuranceCard } from '../components/InsuranceCard'
+import { NeedsYou, NextArrivalCard, Recipients } from '../components/CustomerHome'
+import { customerApi, type AttentionItem, type NextArrival } from '../lib/customer'
 import { PaymentCard } from '../components/PaymentCard'
 import { VehicleCard } from '../components/VehicleCard'
 import { CustomsCard } from '../components/CustomsCard'
@@ -52,8 +54,8 @@ function Layout({ title, sub, children, cta }: { title: string; sub: string; chi
 export function CustomerDashboard() {
   const { ready, user, requests, shipments, acceptQuote, shipperById } = useStore()
   const [sp, setSp] = useSearchParams()
-  type Tab = 'requests' | 'shipments' | 'groupage' | 'invoices' | 'sourcing'
-  const asTab = (t: string | null): Tab => (t === 'shipments' || t === 'groupage' || t === 'invoices' || t === 'sourcing' ? t : 'requests')
+  type Tab = 'requests' | 'shipments' | 'groupage' | 'invoices' | 'sourcing' | 'recipients'
+  const asTab = (t: string | null): Tab => (t === 'shipments' || t === 'groupage' || t === 'invoices' || t === 'sourcing' || t === 'recipients' ? t : 'requests')
   const [tab, setTabState] = useState<Tab>(asTab(sp.get('tab')))
   const setTab = (t: Tab) => { setTabState(t); setSp(t === 'requests' ? {} : { tab: t }, { replace: true }) }
   useEffect(() => { setTabState(asTab(sp.get('tab'))) }, [sp])
@@ -61,6 +63,8 @@ export function CustomerDashboard() {
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
   const [busyQuote, setBusyQuote] = useState<string | null>(null)
+  const [home, setHome] = useState<{ items: AttentionItem[]; nextArrival: NextArrival | null } | null>(null)
+  useEffect(() => { if (ready && user?.role === 'customer') customerApi.attention().then(setHome).catch(() => {}) }, [ready, user, requests, shipments])
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
   if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading your dashboard…</div></div>
   if (!user) return <Navigate to="/login?next=/dashboard" replace />
@@ -90,9 +94,11 @@ export function CustomerDashboard() {
         <Stat icon={Package} label="Delivered" value={shipments.filter((s) => s.status === 'delivered').length} hint="All time" />
       </div>
 
+      {home && <NeedsYou items={home.items} />}
+      {home?.nextArrival && <NextArrivalCard s={home.nextArrival} />}
       <div className="mt-8 flex gap-1 overflow-x-auto border-b border-border" role="tablist">
-        {(['requests', 'shipments', 'groupage', 'sourcing', 'invoices'] as const).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : t === 'shipments' ? 'Shipments' : t === 'groupage' ? 'Shared barrels' : t === 'sourcing' ? 'China sourcing' : 'Invoices'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
+        {(['requests', 'shipments', 'groupage', 'sourcing', 'invoices', 'recipients'] as const).map((t) => (
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : t === 'shipments' ? 'Shipments' : t === 'groupage' ? 'Shared barrels' : t === 'sourcing' ? 'China sourcing' : t === 'recipients' ? 'Recipients' : 'Invoices'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
         ))}
       </div>
 
@@ -122,6 +128,7 @@ export function CustomerDashboard() {
                   {isOpen && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }} className="overflow-hidden">
                       <div className="border-t border-border p-5">
+                        <div className="mb-3 flex flex-wrap items-center gap-2">{r.consignee && <span className="text-xs text-text-muted">Recipient: <b className="text-text">{r.consignee.name}</b>{r.consignee.city ? `, ${r.consignee.city}` : ''}</span>}<Link to={`/quote?again=${r.id}`} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="ship-again"><Send size={13} aria-hidden="true" /> Ship again</Link></div>
                         <p className="text-sm text-text-muted">{r.description || 'No description provided.'} {r.pickup && '· Pickup'} {r.delivery && '· Door delivery'} {r.insurance && '· Insurance'}</p>
                         {r.quotes.length === 0 ? (
                           <p className="mt-4 flex items-center gap-2 rounded-lg bg-surface-2 p-4 text-sm text-text-muted"><Clock size={16} aria-hidden="true" /> Shippers usually reply within 24 hours. We’ll email you at {r.contact.email}.</p>
@@ -169,6 +176,7 @@ export function CustomerDashboard() {
       {tab === 'groupage' && <GroupageTab />}
       {tab === 'invoices' && <InvoicesTab />}
       {tab === 'sourcing' && <SourcingTab />}
+      {tab === 'recipients' && <Recipients />}
     </Layout>
   )
 }
@@ -236,7 +244,7 @@ function GroupageTab() {
 function ShipmentsTab() {
   const { shipments, shipperById } = useStore()
   const [sp] = useSearchParams()
-  const [sel, setSel] = useState<string | null>(sp.get('s') ?? shipments[0]?.id ?? null)
+  const [sel, setSel] = useState<string | null>(sp.get('s') ?? sp.get('open') ?? sp.get('recipient') ?? sp.get('review') ?? shipments[0]?.id ?? null)
   const s = shipments.find((x) => x.id === sel)
   if (shipments.length === 0) return <div className="mt-6"><Empty title="No shipments yet" body="Accept a quote on one of your requests and it will appear here with live tracking." /></div>
   return (

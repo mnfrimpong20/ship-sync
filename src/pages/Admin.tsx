@@ -14,8 +14,9 @@ import { AdminBrokers } from './Brokers'
 import { AdminDisputes } from './Reviews'
 import { AdminSourcing } from './Sourcing'
 import { AdminSystem } from '../components/AdminSystem'
+import { AdminDestinations } from '../components/AdminDestinations'
 
-const VIEWS = [['overview', 'Business'], ['attention', 'Attention'], ['shippers', 'Shippers'], ['disputes', 'Disputes'], ['payments', 'Payments'], ['brokers', 'Brokers'], ['sourcing', 'Sourcing'], ['insurance', 'Insurance'], ['system', 'System']] as const
+const VIEWS = [['overview', 'Business'], ['attention', 'Attention'], ['shippers', 'Shippers'], ['disputes', 'Disputes'], ['payments', 'Payments'], ['brokers', 'Brokers'], ['sourcing', 'Sourcing'], ['insurance', 'Insurance'], ['destinations', 'Destinations'], ['system', 'System']] as const
 type View = (typeof VIEWS)[number][0]
 
 /** Ship Sync staff: the business overview, the attention board, and every admin work queue in tabs. */
@@ -102,7 +103,7 @@ export default function Admin() {
     attention: ['What needs a person today', 'Everything stuck or waiting across the platform, most urgent first. Each card opens where you fix it.'],
     shippers: ['Shipper verification', 'Verified shippers get the badge, rank higher in matching and reassure customers. Check licence, insurance and a real office before granting it.'],
     disputes: ['Disputes', 'Customer and shipper disputes on escrow payments.'], payments: ['Money through the platform', 'Escrow, releases, holds and payouts.'], brokers: ['Customs brokers', 'Broker listings and assignments.'],
-    sourcing: ['Sourcing settings', 'Pricing, agents and commissions for the China desk.'], insurance: ['Insurance', 'Cargo cover sold on the platform.'], system: ['Health, errors & backups', 'What is wired up, what broke, and a copy of the database you can download.'],
+    sourcing: ['Sourcing settings', 'Pricing, agents and commissions for the China desk.'], insurance: ['Insurance', 'Cargo cover sold on the platform.'], destinations: ['Destinations', 'The countries customers can ship to — ports, airports, transit days and dial codes.'], system: ['Health, errors & backups', 'What is wired up, what broke, and a copy of the database you can download.'],
   }
   return (
     <div className="bg-bg text-text">
@@ -127,6 +128,7 @@ export default function Admin() {
           {view === 'brokers' && <AdminBrokers />}
           {view === 'sourcing' && <AdminSourcing />}
           {view === 'insurance' && <AdminInsurance />}
+          {view === 'destinations' && <AdminDestinations />}
           {view === 'system' && <AdminSystem />}
         </motion.div>
       </div>

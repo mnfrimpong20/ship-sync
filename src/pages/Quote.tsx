@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Plane, Ship, Zap } from 'lucide-react'
-import { cargoTypes, countries, countryByCode, origins, type CargoType, type Mode } from '../lib/data'
+import { cargoTypes, countries, countryByCode, type CargoType, type Mode } from '../lib/data'
 import { useStore, type Match, type NewRequest, type RequestConsignee } from '../lib/store'
 import { customerApi, type Consignee } from '../lib/customer'
 import { ConsigneeForm } from '../components/CustomerHome'
+import { OriginCombobox } from '../components/OriginCombobox'
 import { Avatar, ModeBadge, Rating, money } from '../components/ui'
 import { ease } from '../lib/motion'
 import { RequestVehicleFields } from '../components/VehicleCard'
@@ -123,7 +124,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                   <div className="grid gap-5">
                     <h2 className="!text-xl">Where is it going?</h2>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <div><label htmlFor="origin" className="label-dark">Shipping from</label><select id="origin" className="input-dark" value={form.origin} onChange={(e) => set('origin', e.target.value)}>{origins.map((o) => <option key={o}>{o}</option>)}</select></div>
+                      <div><label htmlFor="origin" className="label-dark">Shipping from</label><OriginCombobox id="origin" value={form.origin} onChange={(v) => set('origin', v)} /></div>
                       <div><label htmlFor="dest" className="label-dark">Shipping to</label><select id="dest" className="input-dark" value={form.destination} onChange={(e) => set('destination', e.target.value)}>{countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select></div>
                     </div>
                     <fieldset>

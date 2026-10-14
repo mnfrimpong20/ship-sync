@@ -15,8 +15,9 @@ import { AdminDisputes } from './Reviews'
 import { AdminSourcing } from './Sourcing'
 import { AdminSystem } from '../components/AdminSystem'
 import { AdminDestinations } from '../components/AdminDestinations'
+import { AdminAnnouncements, AdminAudit, AdminBilling, AdminFeatures, AdminMarketplace, AdminMessaging, AdminPlatform, AdminRisk, AdminScorecards, AdminSupport } from '../components/AdminConsole'
 
-const VIEWS = [['overview', 'Business'], ['attention', 'Attention'], ['shippers', 'Shippers'], ['disputes', 'Disputes'], ['payments', 'Payments'], ['brokers', 'Brokers'], ['sourcing', 'Sourcing'], ['insurance', 'Insurance'], ['destinations', 'Destinations'], ['system', 'System']] as const
+const VIEWS = [['overview', 'Business'], ['attention', 'Attention'], ['shippers', 'Shippers'], ['disputes', 'Disputes'], ['payments', 'Payments'], ['brokers', 'Brokers'], ['sourcing', 'Sourcing'], ['insurance', 'Insurance'], ['destinations', 'Destinations'], ['system', 'System'], ['analytics', 'Platform'], ['marketplace', 'Marketplace'], ['scorecards', 'Scorecards'], ['risk', 'Risk'], ['messaging', 'Messaging'], ['billing', 'Billing'], ['announcements', 'Announcements'], ['audit', 'Audit log'], ['support', 'View as'], ['features', 'Features']] as const
 type View = (typeof VIEWS)[number][0]
 
 /** Ship Sync staff: the business overview, the attention board, and every admin work queue in tabs. */
@@ -104,6 +105,16 @@ export default function Admin() {
     shippers: ['Shipper verification', 'Verified shippers get the badge, rank higher in matching and reassure customers. Check licence, insurance and a real office before granting it.'],
     disputes: ['Disputes', 'Customer and shipper disputes on escrow payments.'], payments: ['Money through the platform', 'Escrow, releases, holds and payouts.'], brokers: ['Customs brokers', 'Broker listings and assignments.'],
     sourcing: ['Sourcing settings', 'Pricing, agents and commissions for the China desk.'], insurance: ['Insurance', 'Cargo cover sold on the platform.'], destinations: ['Destinations', 'The countries customers can ship to — ports, airports, transit days and dial codes.'], system: ['Health, errors & backups', 'What is wired up, what broke, and a copy of the database you can download.'],
+    analytics: ['Platform analytics', 'Value booked through Ship Sync, our own revenue, growth and conversion across the marketplace.'],
+    marketplace: ['Marketplace health', 'Demand against supply on every lane — where requests go unanswered and which shippers to recruit.'],
+    scorecards: ['Shipper scorecards', 'Quality scores that drive directory ranking, warnings, probation and pauses.'],
+    risk: ['Risk & fraud', 'Patterns worth a look: withdrawn quotes, spikes, shared contact details, junk requests and off-platform attempts.'],
+    messaging: ['Message delivery', 'Email, SMS and WhatsApp sent and failed, bouncing addresses and what it costs.'],
+    billing: ['Plans & billing', 'Recurring revenue, trials, cancellations and every shipper’s plan.'],
+    announcements: ['Announcements', 'Banners and notifications to shippers, customers or everyone — by destination if needed.'],
+    audit: ['Audit log', 'Who changed what and when, searchable and exportable.'],
+    support: ['Support — view as', 'See exactly what a shipper or customer sees, read-only and logged.'],
+    features: ['Feature switches', 'Turn features on or off for everyone or for one shipper.']
   }
   return (
     <div className="bg-bg text-text">
@@ -130,6 +141,16 @@ export default function Admin() {
           {view === 'insurance' && <AdminInsurance />}
           {view === 'destinations' && <AdminDestinations />}
           {view === 'system' && <AdminSystem />}
+          {view === 'analytics' && <AdminPlatform />}
+          {view === 'marketplace' && <AdminMarketplace />}
+          {view === 'scorecards' && <AdminScorecards />}
+          {view === 'risk' && <AdminRisk />}
+          {view === 'messaging' && <AdminMessaging />}
+          {view === 'billing' && <AdminBilling />}
+          {view === 'announcements' && <AdminAnnouncements />}
+          {view === 'audit' && <AdminAudit />}
+          {view === 'support' && <AdminSupport />}
+          {view === 'features' && <AdminFeatures />}
         </motion.div>
       </div>
     </div>

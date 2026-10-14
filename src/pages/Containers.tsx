@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { LoadPlanner } from '../components/LoadPlanner'
 import { AnimatePresence, motion } from 'motion/react'
 import { Anchor, Boxes, Check, Container as ContainerIcon, Plus, Radio, Search, Ship, Waves, X } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -59,6 +60,7 @@ type Tab = 'open' | 'closed' | 'all'
 export default function Containers() {
   const { ready, user } = useStore()
   const nav = useNavigate()
+  const [sp, setSp] = useSearchParams(); const view = sp.get('view') === 'planner' ? 'planner' : 'list'
   const [list, setList] = useState<Container[] | null>(null)
   const [tab, setTab] = useState<Tab>('open')
   const [q, setQ] = useState('')
@@ -84,6 +86,12 @@ export default function Containers() {
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/containers" replace />
   if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
 
+  if (view === 'planner') return (
+    <div className="bg-bg text-text"><div className="container-x py-10 md:py-14">
+      <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow mb-1">Consolidation</p><h1 className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">Load planner</h1><p className="mt-1 max-w-2xl text-text-muted">Fill containers before cutoff and pick the right size for what’s waiting.</p></div><button type="button" onClick={() => setSp({})} className="btn-ghost">All containers</button></div>
+      <div className="mt-8"><LoadPlanner /></div>
+    </div></div>
+  )
   const all = list ?? []
   const n = (f: (c: Container) => boolean) => all.filter(f).length
   const stats = [
@@ -104,7 +112,7 @@ export default function Containers() {
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><motion.p variants={fadeUp} className="eyebrow mb-1">Consolidation</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">Containers</motion.h1><motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Book a container with the shipping line, load the customer shipments you’ve won into it, and move it through the port, the voyage and customs. Every shipment inside follows the container automatically.</motion.p></div>
-            <motion.div variants={fadeUp}><button onClick={() => { setModal(true); setError('') }} className="btn-gold"><Plus size={16} aria-hidden="true" /> Book a container</button></motion.div>
+            <motion.div variants={fadeUp} className="flex gap-2"><button type="button" onClick={() => setSp({ view: 'planner' })} className="btn-ghost" data-testid="open-planner"><Boxes size={16} aria-hidden="true" /> Load planner</button><button onClick={() => { setModal(true); setError('') }} className="btn-gold"><Plus size={16} aria-hidden="true" /> Book a container</button></motion.div>
           </div>
 
           <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

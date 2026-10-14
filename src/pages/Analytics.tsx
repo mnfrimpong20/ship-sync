@@ -7,12 +7,13 @@ import { roleAllows } from '../lib/ops'
 import { analyticsApi, type Analytics, type Insight, type RateRow, type SegRow } from '../lib/analytics'
 import { cargoLabel, type CargoType } from '../lib/data'
 import { money, fmtDate } from '../components/ui'
+import { platformApi } from '../lib/platform'
 import { fadeUp, stagger } from '../lib/motion'
 import { C, DataTable, Funnel, HBars, NoData, Panel, Stages, Stat, Trend } from '../components/Charts'
 
-type Tab = 'overview' | 'sales' | 'operations' | 'finance' | 'customers'
+type Tab = 'overview' | 'sales' | 'operations' | 'finance' | 'customers' | 'team'
 const RANGES = [{ d: 30, label: '30 days' }, { d: 90, label: '90 days' }, { d: 180, label: '6 months' }, { d: 365, label: '12 months' }]
-const TABS: { key: Tab; label: string }[] = [{ key: 'overview', label: 'Overview' }, { key: 'sales', label: 'Sales' }, { key: 'operations', label: 'Operations' }, { key: 'finance', label: 'Finance' }, { key: 'customers', label: 'Customers' }]
+const TABS: { key: Tab; label: string }[] = [{ key: 'overview', label: 'Overview' }, { key: 'sales', label: 'Sales' }, { key: 'operations', label: 'Operations' }, { key: 'finance', label: 'Finance' }, { key: 'customers', label: 'Customers' }, { key: 'team', label: 'Team' }]
 const SOURCES: Record<string, string> = { marketplace: 'Marketplace', picked: 'Picked you directly', link: 'Your order link', branded: 'Your branded page' }
 const $ = (v: number | null | undefined) => (v == null ? '—' : money(v))
 const pc = (v: number | null | undefined) => (v == null ? '—' : `${v}%`)
@@ -58,12 +59,107 @@ const segCols = (name: string, fmt?: (k: string) => string) => [
   { key: 'value' as const, label: 'Booked', align: 'right' as const, format: (v: unknown) => $(v as number) },
 ]
 
+
+/* ------------------------------ extras: targets, standing, forecast, profit, team ------------------------------ */
+const TSTATUS = { achieved: ['Achieved', 'text-teal'], on_track: ['On track', 'text-teal'], close: ['Close', 'text-gold-deep'], behind: ['Behind', 'text-danger'], unset: ['No target', 'text-text-muted'] } as const
+function Targets({ a, onSaved }: { a: Analytics; onSaved: () => void }) {
+  const t = a.targets; const [edit, setEdit] = useState(false); const [f, setF] = useState<Record<string, string>>({}); const [err, setErr] = useState('')
+  useEffect(() => { setF(Object.fromEntries(t.rows.map((r) => [r.key, r.target == null ? '' : String(r.target)]))) }, [a]) // eslint-disable-line react-hooks/exhaustive-deps
+  const fmt = (v: number | null, unit: string) => (v == null ? '—' : unit === '$' ? money(v) : `${v}${unit}`)
+  const monthName = new Date(t.month + '-15T12:00:00Z').toLocaleDateString('en-US', { month: 'long' })
+  return (
+    <Panel title={`${monthName} targets`} sub={`Day ${t.dayOfMonth} of ${t.daysInMonth} · counts and revenue are projected to month end`} testid="targets" actions={t.canEdit ? <button type="button" onClick={() => setEdit(!edit)} className="text-sm font-semibold text-gold-deep hover:underline" data-testid="targets-edit">{edit ? 'Close' : 'Set targets'}</button> : undefined}>
+      {edit ? (
+        <form className="grid gap-3 sm:grid-cols-4" onSubmit={async (e) => { e.preventDefault(); setErr(''); try { await platformApi.setTargets(Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v === '' ? null : Number(v)]))); setEdit(false); onSaved() } catch (x) { setErr(x instanceof Error ? x.message : 'Could not save.') } }}>
+          {t.rows.map((r) => <label key={r.key} className="text-sm"><span className="label-dark">{r.label}{r.unit === '%' ? ' (%)' : r.unit === '$' ? ' ($)' : ''}</span><input type="number" min={0} className="input-dark !min-h-10 text-sm" value={f[r.key] ?? ''} onChange={(e) => setF({ ...f, [r.key]: e.target.value })} data-testid={`target-${r.key}`} /></label>)}
+          {err && <p role="alert" className="text-sm text-danger sm:col-span-4">{err}</p>}
+          <div className="sm:col-span-4"><button className="btn-gold !min-h-10" data-testid="targets-save">Save targets</button></div>
+        </form>
+      ) : (
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{t.rows.map((r) => { const st = TSTATUS[r.status]; const pct = r.target ? Math.min(100, Math.round(((r.projected ?? r.actual ?? 0) / r.target) * 100)) : 0; return (
+          <li key={r.key} data-testid="target-row" data-status={r.status}>
+            <p className="flex items-baseline justify-between text-sm"><span className="text-text-muted">{r.label}</span><span className={`text-xs font-semibold ${st[1]}`}>{st[0]}</span></p>
+            <p className="mt-0.5 font-heading text-xl font-bold tabular-nums">{fmt(r.actual, r.unit)}<span className="ml-1 text-sm font-normal text-text-muted">{r.target != null ? `of ${fmt(r.target, r.unit)}` : ''}</span></p>
+            {r.target != null && <div className="mt-1 h-2 rounded-full bg-surface-2" aria-hidden="true"><div className="h-2 rounded-full" style={{ width: `${pct}%`, background: r.status === 'behind' ? C.bad : C.focus }} /></div>}
+            {r.projected != null && <p className="mt-1 text-[11px] text-text-muted">On pace for {fmt(r.projected, r.unit)}</p>}
+          </li>
+        ) })}</ul>
+      )}
+    </Panel>
+  )
+}
+function Standing({ a }: { a: Analytics }) {
+  const s = a.standing; if (!s || s.score == null) return null
+  const tone = s.standing === 'good' ? 'text-teal' : s.standing === 'warning' ? 'text-gold-deep' : 'text-danger'
+  const m = s.metrics
+  return (
+    <Panel title="Your marketplace standing" sub="Ship Sync’s 90-day quality score — it decides where you rank in the directory." testid="standing">
+      <div className="flex flex-wrap items-center gap-6">
+        <div><p className="font-heading text-4xl font-bold tabular-nums">{s.score}<span className="text-base font-normal text-text-muted">/100</span></p><p className={`text-sm font-semibold capitalize ${tone}`}>{s.standing === 'good' ? 'Good standing' : s.standing}</p>{s.rank && <p className="text-xs text-text-muted">#{s.rank} of {s.of} shippers</p>}</div>
+        <ul className="grid flex-1 grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
+          <li>Reply <b>{m.replyMedianH != null ? `${m.replyMedianH} h` : '—'}</b></li><li>On time <b>{pc(m.onTimePct)}</b></li><li>Rating <b>{m.rating ?? '—'}★</b></li>
+          <li>Win rate <b>{pc(m.winRatePct)}</b></li><li>Disputes <b>{pc(m.disputePct)}</b></li><li>Cancelled <b>{pc(m.cancelPct)}</b></li>
+        </ul>
+      </div>
+      {s.note && s.standing !== 'good' && <p className="mt-3 rounded-lg bg-danger/10 p-3 text-sm text-danger">{s.note}</p>}
+    </Panel>
+  )
+}
+function Forecast({ a }: { a: Analytics }) {
+  const f = a.forecast; if (!f) return null
+  const data = [...f.history, ...f.next]
+  return (
+    <Panel title="Demand forecast — next 8 weeks" sub={`Matching requests per week. Based on the last 8 weeks${f.seasonal ? ' and the same weeks last year' : ''}.`} testid="forecast">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <Trend data={data} bucket="week" label="Requests: last 12 weeks and forecast" series={[{ key: 'requests', label: 'Actual', color: C.context }, { key: 'forecast', label: 'Forecast', color: C.focus }]} />
+        <div>
+          <p className="font-heading text-3xl font-bold tabular-nums">{Math.round(f.next8)}<span className="ml-1 text-sm font-normal text-text-muted">requests expected</span></p>
+          <p className="text-sm text-text-muted">{f.changePct != null ? `${f.changePct > 0 ? '+' : ''}${f.changePct}% on the last 8 weeks (${f.last8})` : `${f.last8} in the last 8 weeks`} · about <b className="text-text">{f.expectedBookings}</b> bookings at your current rates</p>
+          {f.lanes.length > 0 && <div className="mt-4"><HBars label="Forecast by lane" rows={f.lanes.map((l) => ({ label: l.label, value: l.next8, display: Math.round(l.next8), note: l.changePct != null ? `${l.changePct > 0 ? '+' : ''}${l.changePct}%` : undefined }))} /></div>}
+        </div>
+      </div>
+    </Panel>
+  )
+}
+function Profit({ a }: { a: Analytics }) {
+  const p = a.profit; if (!p) return null
+  return (
+    <Panel title="Profit" sub="Shipment revenue minus what each move cost (container costs split by weight), then overhead." testid="profit" actions={<Link to="/dashboard/costs" className="text-sm font-semibold text-gold-deep hover:underline">Costs & profit →</Link>}>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div><p className="text-xs text-text-muted">Gross profit</p><p className="font-heading text-2xl font-bold tabular-nums">{money(p.grossProfit)}</p><p className="text-xs text-text-muted">{p.grossMarginPct ?? '—'}% margin</p></div>
+        <div><p className="text-xs text-text-muted">Direct costs</p><p className="font-heading text-2xl font-bold tabular-nums">{money(p.directCost)}</p><p className="text-xs text-text-muted">{p.coveragePct ?? 0}% of shipments costed</p></div>
+        <div><p className="text-xs text-text-muted">Overhead</p><p className="font-heading text-2xl font-bold tabular-nums">{money(p.overhead)}</p></div>
+        <div><p className="text-xs text-text-muted">Net profit</p><p className={`font-heading text-2xl font-bold tabular-nums ${p.netProfit < 0 ? 'text-danger' : ''}`}>{money(p.netProfit)}</p><p className="text-xs text-text-muted">{p.netMarginPct ?? '—'}% net margin</p></div>
+      </div>
+      {p.byLane.length > 0 && <div className="mt-5"><HBars label="Margin by lane" max={100} rows={p.byLane.slice(0, 6).map((l: Record<string, number | string>) => ({ label: String(l.label), value: Math.max(0, Number(l.marginPct ?? 0)), display: `${l.marginPct ?? '—'}%`, note: `${money(Number(l.profit))} on ${l.n}`, tone: Number(l.marginPct ?? 0) < 15 ? 'bad' as const : 'focus' as const }))} /></div>}
+    </Panel>
+  )
+}
+function TeamTab({ a }: { a: Analytics }) {
+  return (
+    <div className="space-y-6">
+      <Panel title={a.teamIsManager ? 'Team scorecards' : 'Your scorecard'} sub="Quotes count for whoever sent them; stops for the driver on the run; scans for whoever scanned." testid="team">
+        <DataTable rows={a.team} csvName="team-scorecards.csv" initialSort="quotes" cols={[
+          { key: 'name', label: 'Person', format: (v, r) => <span>{String(v)}{r.you ? <span className="ml-1 text-xs text-gold-deep">you</span> : null}<span className="block text-xs text-text-muted">{String(r.role)}</span></span> },
+          { key: 'quotes', label: 'Quotes', align: 'right' }, { key: 'won', label: 'Won', align: 'right' }, { key: 'winRate', label: 'Win rate', align: 'right', format: (v) => pc(v as number) },
+          { key: 'replyMedianH', label: 'Reply', align: 'right', format: (v) => hrs(v as number) }, { key: 'scans', label: 'Scans', align: 'right' },
+          { key: 'stopsDone', label: 'Stops', align: 'right' }, { key: 'completionPct', label: 'Completed', align: 'right', format: (v) => <span className={(v as number) < 90 ? 'text-danger' : ''}>{pc(v as number)}</span> },
+          { key: 'lastActive', label: 'Last active', align: 'right', format: (v) => (v ? fmtDate(String(v)) : '—') },
+        ]} />
+      </Panel>
+    </div>
+  )
+}
+
 /* ------------------------------ tabs ------------------------------ */
-function OverviewTab({ a }: { a: Analytics }) {
+function OverviewTab({ a, reload }: { a: Analytics; reload: () => void }) {
   const s = a.sales, o = a.operations, f = a.finance, c = a.customers
   return (
     <div className="space-y-6">
+      {a.locked && <p className="rounded-lg border border-gold/40 bg-gold/10 p-3 text-sm" data-testid="analytics-locked">Operations, finance and client analytics are part of the Pro plan. <Link to="/dashboard/billing" className="font-semibold text-gold-deep hover:underline">See plans</Link></p>}
+      <Targets a={a} onSaved={reload} />
       <Panel title="What the numbers say" sub="Ranked by impact. Each one links to where you can act on it." testid="insights-panel"><Insights items={a.insights} /></Panel>
+      <Standing a={a} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="headline">
         {s && <Stat label="Booked value" value={$(s.kpis.bookedValue.value)} kpi={s.kpis.bookedValue} icon={Trophy} hint={`${s.kpis.won.value ?? 0} wins`} />}
         {s && <Stat label="Win rate" value={pc(s.kpis.winRate.value)} kpi={s.kpis.winRate} icon={Gauge} />}
@@ -110,6 +206,7 @@ function SalesTab({ a }: { a: Analytics }) {
         <Panel title="Reply time by weekday" sub="Median hours, by the day the request arrived" testid="weekday"><HBars label="Median reply time by weekday" rows={s.weekday.map((w) => ({ label: w.day, value: w.medianH ?? 0, display: hrs(w.medianH), note: `${w.requests} req`, tone: (w.medianH ?? 0) > 12 ? 'bad' as const : 'focus' as const }))} /></Panel>
         <Panel title="Firm quotes vs estimates" testid="by-kind">{rateRows(s.byKind).length ? <HBars label="Win rate by quote type" max={100} rows={rateRows(s.byKind)} /> : <NoData />}<p className="mt-3 text-xs text-text-muted">Estimates are prices that may change once the cargo is weighed.</p></Panel>
       </div>
+      <Forecast a={a} />
       <Panel title="Lanes" sub="Price gap = your quote against the median competing quote on the same request" testid="sales-lanes"><DataTable<SegRow> rows={s.byLane} cols={segCols('Lane')} csvName="sales-by-lane.csv" initialSort="requests" /></Panel>
       <div className="grid gap-6 2xl:grid-cols-2">
         <Panel title="Cargo types"><DataTable<SegRow> rows={s.byCargo} cols={segCols('Cargo', cargoName).filter((c) => c.key !== 'avgQuote')} csvName="sales-by-cargo.csv" initialSort="requests" /></Panel>
@@ -183,6 +280,7 @@ function FinanceTab({ a }: { a: Analytics }) {
           <p className="mt-3 text-xs text-text-muted">Held in escrow {money(f.escrow.held)} · released {money(f.escrow.released)} · insurance commission {money(f.insurance.commission)} ({f.insurance.policies} policies)</p>
         </Panel>
       </div>
+      <Profit a={a} />
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel title="Revenue by lane"><DataTable rows={f.byLane} csvName="revenue-by-lane.csv" initialSort="revenue" cols={[{ key: 'label', label: 'Lane' }, { key: 'revenue', label: 'Revenue', align: 'right', format: (v) => money(v as number) }, { key: 'shipments', label: 'Invoices', align: 'right' }, { key: 'perShipment', label: 'Per shipment', align: 'right', format: (v) => $(v as number) }, { key: 'perKg', label: 'Per kg', align: 'right', format: (v) => (v == null ? '—' : `$${v}`) }]} /></Panel>
         <Panel title="Top clients" testid="top-clients"><DataTable rows={f.topClients} csvName="top-clients.csv" initialSort="revenue" cols={[{ key: 'name', label: 'Client', format: (v, r) => <Link to={`/dashboard/clients/${r.id}`} className="hover:underline">{String(v)}</Link> }, { key: 'revenue', label: 'Revenue', align: 'right', format: (v) => money(v as number) }, { key: 'invoices', label: 'Invoices', align: 'right' }, { key: 'outstanding', label: 'Owing', align: 'right', format: (v) => ((v as number) > 0 ? <span className="text-danger">{money(v as number)}</span> : '—') }]} /></Panel>
@@ -220,15 +318,15 @@ export default function AnalyticsPage() {
   const [sp, setSp] = useSearchParams()
   const days = Number(sp.get('days')) || 90; const origin = sp.get('origin') ?? ''; const cargo = sp.get('cargo') ?? ''
   const tab0 = (sp.get('tab') as Tab | null) ?? 'overview'
-  const [a, setA] = useState<Analytics | null>(null); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false)
+  const [a, setA] = useState<Analytics | null>(null); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false); const [tick, setTick] = useState(0)
   const set = (p: Record<string, string | undefined>) => { const n = new URLSearchParams(sp); for (const [k, v] of Object.entries(p)) { if (v) n.set(k, v); else n.delete(k) } setSp(n, { replace: true }) }
   useEffect(() => {
     if (!user || user.role !== 'shipper') return
     let live = true; setBusy(true); setErr('')
     analyticsApi.get({ days, origin, cargo }).then((r) => { if (live) setA(r) }).catch((e) => { if (live) setErr(e instanceof Error ? e.message : 'Could not load analytics.') }).finally(() => { if (live) setBusy(false) })
     return () => { live = false }
-  }, [user, days, origin, cargo])
-  const tabs = useMemo(() => TABS.filter((t) => t.key === 'overview' || (a ? a.access[t.key as keyof Analytics['access']] : true)), [a])
+  }, [user, days, origin, cargo, tick])
+  const tabs = useMemo(() => TABS.filter((t) => t.key === 'overview' || (t.key === 'team' ? !!a?.team.length : a ? a.access[t.key as keyof Analytics['access']] : true)), [a])
   const tab = tabs.some((t) => t.key === tab0) ? tab0 : 'overview'
 
   if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
@@ -264,7 +362,8 @@ export default function AnalyticsPage() {
           {!a && !err && <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <div key={i} className="card-dark h-24 animate-pulse" />)}</div>}
           {a && (
             <div className={`mt-6 transition-opacity ${busy ? 'opacity-60' : ''}`} role="tabpanel" data-testid={`panel-${tab}`}>
-              {tab === 'overview' && <OverviewTab a={a} />}
+              {tab === 'overview' && <OverviewTab a={a} reload={() => setTick((n) => n + 1)} />}
+              {tab === 'team' && <TeamTab a={a} />}
               {tab === 'sales' && a.sales && <SalesTab a={a} />}
               {tab === 'operations' && a.operations && <OperationsTab a={a} />}
               {tab === 'finance' && a.finance && <FinanceTab a={a} />}

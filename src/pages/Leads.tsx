@@ -1,3 +1,4 @@
+import { platformApi, type QuoteTemplate } from '../lib/platform'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -31,6 +32,33 @@ const inBucket = (st: Stage, b: Bucket) => b === 'all' ? true : b === 'open' ? s
 const age = (iso: string) => { const h = Math.max(0, (Date.now() - new Date(iso).getTime()) / 3600000); return h < 1 ? 'just now' : h < 24 ? `${Math.floor(h)}h ago` : `${Math.floor(h / 24)}d ago` }
 const daysUntil = (d: string) => Math.ceil((new Date(d + 'T12:00:00Z').getTime() - Date.now()) / 86400000)
 
+/** Saved quote templates + the price calculator: unit price × quantity (with a minimum), plus pickup, delivery and insurance on the declared value. */
+function TemplateBar({ r, form, setForm }: { r: QuoteRequest; form: { price: string; transit: string; notes: string; valid: string; kind: 'firm' | 'estimate'; mode: 'ocean' | 'air' }; setForm: (f: typeof form) => void }) {
+  const [list, setList] = useState<QuoteTemplate[]>([]); const [calc, setCalc] = useState<string>(''); const [naming, setNaming] = useState(false); const [name, setName] = useState(''); const [msg, setMsg] = useState('')
+  useEffect(() => { platformApi.templates().then(setList).catch(() => {}) }, [])
+  const apply = (t: QuoteTemplate) => {
+    const qty = Math.max(1, r.quantity || 1); const base = Math.max(t.minCharge, t.unitPrice * qty)
+    const pick = r.pickup ? t.pickupFee : 0; const del = r.delivery ? t.deliveryFee : 0; const ins = r.insurance && r.declaredValueUsd ? (t.insurancePct / 100) * r.declaredValueUsd : 0
+    const total = Math.round(base + pick + del + ins)
+    setForm({ ...form, price: String(total), transit: String(t.transitDays), notes: t.notes || form.notes, valid: String(t.validDays), kind: t.kind })
+    setCalc(`${qty} × ${money(t.unitPrice)}${base > t.unitPrice * qty ? ` (min ${money(t.minCharge)})` : ''}${pick ? ` + pickup ${money(pick)}` : ''}${del ? ` + delivery ${money(del)}` : ''}${ins ? ` + insurance ${money(ins)}` : ''} = ${money(total)}`)
+  }
+  const fits = list.filter((t) => (!t.cargo || t.cargo === r.cargo) && (r.mode === 'either' || t.mode === r.mode))
+  return (
+    <div className="rounded-lg border border-border px-3 py-2 text-xs" data-testid="templates">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-semibold uppercase tracking-wider text-text-muted">Templates</span>
+        {fits.map((t) => <button key={t.id} type="button" onClick={() => apply(t)} className="rounded-full border border-border px-2 py-0.5 hover:border-gold focus-ring" data-testid="template-use">{t.name}</button>)}
+        {!fits.length && <span className="text-text-muted">None for {r.cargo} yet.</span>}
+        {!naming ? <button type="button" disabled={!Number(form.price)} onClick={() => { setNaming(true); setName(`${r.cargo} ${r.origin.split(',')[0]}`) }} className="ml-auto text-gold-deep hover:underline disabled:opacity-40" data-testid="template-save-open">Save this price as a template</button>
+          : <span className="ml-auto flex items-center gap-1"><input value={name} onChange={(e) => setName(e.target.value)} className="input-dark !min-h-7 !w-40 !py-0 text-xs" aria-label="Template name" data-testid="template-name" /><button type="button" className="btn-ghost !min-h-7 !px-2 text-[11px]" onClick={async () => { try { const qty = Math.max(1, r.quantity || 1); const t = await platformApi.saveTemplate({ name, mode: form.mode, cargo: r.cargo, unitPrice: Math.round((Number(form.price) / qty) * 100) / 100, transitDays: Number(form.transit) || 30, validDays: Number(form.valid) || 14, kind: form.kind, notes: form.notes, includes: [] }); setList([...list, t]); setNaming(false); setMsg('Template saved.') } catch (e) { setMsg(e instanceof Error ? e.message : 'Could not save.') } }} data-testid="template-save">Save</button></span>}
+      </div>
+      {calc && <p className="mt-1 text-text-muted" data-testid="template-calc">{calc}</p>}
+      {msg && <p className="mt-1 text-teal">{msg}</p>}
+    </div>
+  )
+}
+
 function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (msg: string) => void; onCancel: () => void; prev?: Quote }) {
   const { sendQuote, user, shipperById } = useStore()
   const tagline = user?.shipperId ? shipperById(user.shipperId)?.tagline ?? '' : ''
@@ -58,6 +86,7 @@ function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (ms
           {String(sg.price) !== form.price && <button type="button" onClick={() => setForm({ ...form, price: String(sg.price), transit: String(sg.transitDays), notes: form.notes || sg.notes })} className="btn-ghost !min-h-7 !px-2 text-[11px]">Use suggested</button>}
         </div>
       )}
+      <TemplateBar r={r} form={form} setForm={setForm} />
       {r.mode === 'either' && <div className="flex gap-1.5" role="radiogroup" aria-label="Mode for this quote">{(['ocean', 'air'] as const).map((m) => <button key={m} type="button" role="radio" aria-checked={form.mode === m} onClick={() => setForm({ ...form, mode: m, transit: m === 'air' ? '7' : '30' })} className={`flex-1 rounded-lg border px-2 py-1.5 text-xs capitalize focus-ring ${form.mode === m ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border text-text-muted'}`} data-testid={`qf-mode-${m}`}>{m} freight</button>)}</div>}
       <div className="grid gap-3 sm:grid-cols-3">
         <div><label htmlFor={`p-${r.id}`} className="label-dark">Total price (USD)</label><input id={`p-${r.id}`} type="number" min={1} required autoFocus className="input-dark !min-h-10 tabular-nums" placeholder="590" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>

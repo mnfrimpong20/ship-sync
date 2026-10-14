@@ -58,6 +58,7 @@ export default function InvoiceView() {
             <div className="flex justify-between py-1"><dt className="text-slate-600">Subtotal</dt><dd className="tabular-nums">{money(inv.subtotal)}</dd></div>
             {inv.tax > 0 && <div className="flex justify-between py-1"><dt className="text-slate-600">Tax / fees</dt><dd className="tabular-nums">{money(inv.tax)}</dd></div>}
             <div className="flex justify-between border-t border-slate-300 py-2 text-base font-bold"><dt>Total</dt><dd className="tabular-nums">{money(inv.total)}</dd></div>
+            {d.display && d.display.currency !== 'USD' && d.display.rate ? <div className="flex justify-between py-1 text-sm text-slate-600" data-testid="local-total"><dt>≈ in {d.display.currency}</dt><dd className="tabular-nums">{new Intl.NumberFormat('en-US', { style: 'currency', currency: d.display.currency, maximumFractionDigits: 0 }).format(inv.total * d.display.rate)} <span className="text-xs">at {d.display.rate}</span></dd></div> : null}
             {inv.paid > 0 && <div className="flex justify-between py-1"><dt className="text-slate-600">Paid</dt><dd className="tabular-nums">−{money(inv.paid)}</dd></div>}
             {inv.status !== 'void' && <div className="flex justify-between border-t border-slate-300 py-2 font-bold"><dt>Balance due</dt><dd className="tabular-nums">{money(inv.balance)}</dd></div>}
           </dl></div>

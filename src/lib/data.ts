@@ -101,6 +101,8 @@ export const statusOrder: ShipmentStatus[] = ['booked', 'picked_up', 'at_origin_
 export interface TrackingEvent { status: ShipmentStatus; at: string; place: string; note?: string }
 export interface Shipment {
   id: string
+  /** Set when something other than a click will move the status next (run, container or label scans). */
+  autoBy?: { kind: 'run' | 'container' | 'scan'; label: string }
   ref: string
   shipperId: string
   mode: Mode

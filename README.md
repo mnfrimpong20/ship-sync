@@ -74,3 +74,35 @@ All of this lives in `server/flow.ts` (logic + sweeps) and `server/flowRoutes.ts
 - **Lane times.** Real median days and on-time rate per lane (`GET /shipper/lane-times`) set the booking form's ETA after 3 deliveries; the directory's on-time figure becomes the real one after 5.
 - **WhatsApp.** `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_ID` (Meta Cloud API, optional `WHATSAPP_TEMPLATE`) or `TWILIO_WHATSAPP_FROM`; WhatsApp first for recipients, SMS fallback. Shown on Admin → System.
 - **Sweeps on demand.** `POST /admin/sweeps/:name` (nudges, positions, storage, stuck, ontime) for admins.
+
+## Request lifecycle (request → quotes → booking)
+
+Routes live in `server/requestFlow.ts` (edit, cancel, open to market, withdraw, messages, sweeps). Posting, the shipper board and accept stay in `server/api.ts`. The UI is in `src/components/RequestPanel.tsx` (customer) and `src/pages/Leads.tsx` (shipper).
+
+- **Contact privacy.** Before booking, a shipper sees the client's first name and last initial only. Phone and email are revealed when their quote is accepted, or straight away when the request came through their own link or branded page.
+- **Messages.** Each request has a thread per shipper (`GET|POST /requests/:id/messages`). Until booking, emails, phone numbers and wa.me/t.me links are replaced with "[… hidden until booking]".
+- **Expiry.**
+  - A quote can't be accepted after its `validUntil` (409). Expired quotes are marked by a sweep and the shipper is told.
+  - Clients get a reminder 2 days before a quote expires.
+  - Requests close at `expires_at`: ready date + 14 days, capped at 45 days after posting, and never less than 14 days from now. The client then gets a "post it again" link.
+- **Client controls.**
+  - Edit the ready date, quantity, weight, dimensions, value, description and services. Shippers who already quoted are told, and their quote is marked "may update".
+  - Cancel, with a reason.
+  - One-shipper requests: after 24 h with no quote, the client is offered "Open to all" and the first shipper is told.
+- **Shipper controls.** A shipper can:
+  - mark a quote **firm or estimate**;
+  - toggle off included services (the client then sees a "Doesn't include …" flag);
+  - set validity in days;
+  - **withdraw** a quote with a reason, or update it.
+
+  Losing shippers get a "Not chosen" note with how their price and transit time compared.
+- **Matching.** One rule (`leadFit`): destination served + mode + cargo, if the shipper lists cargo. The board shows every eligible request, flagging ones outside the shipper's pickup area (chip "My pickup area"). New-request alerts go only to local shippers.
+- **Limits.**
+  - 20 requests per IP and 10 per account per 24 h.
+  - 15 open requests at once.
+  - The ready date can't be in the past.
+  - The board is prefiltered in SQL and capped at 400 rows.
+- **Comparison.** Quote cards are tagged Lowest price, Fastest and Best rated. "Either" requests group quotes by air and ocean, and each quote carries its own `mode`.
+- **Guest requests.** The password is optional. Without one, an account is created and a set-password link (`/#/reset?token=…&welcome=1`, valid 3 days) is emailed.
+- **New fields.** Requests have `dims` and `declared_value_usd`, both copied into the shipment's booking on accept.
+- **Sweeps.** Every 30 min: quote expiry, request expiry, no-quote alerts after 24 h, and unanswered-lead reminders to shippers after their response time (at least 6 h). Admins can run them on demand with `POST /admin/sweeps-requests`.

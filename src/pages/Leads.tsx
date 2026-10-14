@@ -124,7 +124,7 @@ export default function Leads() {
       <div className="container-x py-10 md:py-14">
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Leads & quotes</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{counts.new === 0 ? 'Inbox clear' : `${counts.new} lead${counts.new === 1 ? '' : 's'} waiting for a quote`}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">Requests matching your lanes, the quotes you’ve sent and how they went. Reply fast — customers see your response time on your profile.</motion.p></div>
+            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Requests</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{counts.new === 0 ? 'Inbox clear' : `${counts.new} client request${counts.new === 1 ? '' : 's'} waiting for a quote`}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">Clients asking for a price on your lanes, the quotes you’ve sent and how they went. When a client accepts, the request becomes a shipment under Client shipments. Reply fast — customers see your response time on your profile.</motion.p></div>
             <motion.div variants={fadeUp} className="flex gap-2"><button onClick={exportCsv} className="btn-ghost !min-h-10 !px-4 text-sm"><Download size={15} aria-hidden="true" /> Export CSV</button><Link to="/dashboard/shipper?view=profile" className="btn-ghost !min-h-10 !px-4 text-sm">Lanes & cargo</Link></motion.div>
           </div>
 
@@ -154,7 +154,7 @@ export default function Leads() {
               <table className="w-full min-w-[960px] text-sm">
                 <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="w-8 px-3 py-3" /><th className="px-3 py-3">Reference</th><th className="px-3 py-3">Route</th><th className="px-3 py-3">Cargo</th><th className="px-3 py-3">Customer</th><th className="px-3 py-3">Ready</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Competition</th><th className="px-3 py-3 text-right">Actions</th></tr></thead>
                 <tbody>
-                  {rows.length === 0 && <tr><td colSpan={9} className="px-3 py-10"><Empty title={rows0.length ? 'No leads match' : 'No leads yet'} body={rows0.length ? 'Try another filter or search.' : 'Requests matching your origins, destinations and cargo types land here and by email. Widen your lanes on the company profile to see more.'} /></td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={9} className="px-3 py-10"><Empty title={rows0.length ? 'No requests match' : 'No requests yet'} body={rows0.length ? 'Try another filter or search.' : 'Requests matching your origins, destinations and cargo types land here and by email. Widen your lanes on the company profile to see more.'} /></td></tr>}
                   {rows.map(({ r, st, mine }) => {
                     const d = countryByCode(r.destination); const isOpen = open === r.id; const days = daysUntil(r.readyDate); const sh = shipmentFor(r); const competing = r.competingQuotes ?? 0
                     return (

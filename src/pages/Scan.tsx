@@ -145,7 +145,7 @@ export default function Scan() {
             {needsContainer && <p className="w-full text-xs text-danger">Pick the container first — every loading scan puts the piece into it.</p>}
           </div>
         )}
-        <p className="mt-2 text-xs text-text-muted"><Icon size={12} className="inline text-gold-deep" aria-hidden="true" /> {scanKindLabels[kind]}: {kind === 'loading' ? 'the piece is marked loaded and its order joins the container (first scan moves the order to Picked up).' : kind === 'devanning' ? 'the piece is marked received at your destination warehouse (the order moves to Customs cleared).' : kind === 'delivery' ? 'the piece is marked delivered; when the last piece is scanned the order is Delivered and the stop on the run is ticked off.' : 'nothing changes — the piece is just recorded as seen here.'}</p>
+        <p className="mt-2 text-xs text-text-muted"><Icon size={12} className="inline text-gold-deep" aria-hidden="true" /> {scanKindLabels[kind]}: {kind === 'loading' ? 'the piece is marked loaded and its shipment joins the container (first scan moves the shipment to Picked up).' : kind === 'devanning' ? 'the piece is marked received at your destination warehouse (the shipment moves to Customs cleared).' : kind === 'delivery' ? 'the piece is marked delivered; when the last piece is scanned the shipment is Delivered and the stop on the run is ticked off.' : 'nothing changes — the piece is just recorded as seen here.'}</p>
 
         <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_320px]">
           <div>
@@ -187,7 +187,7 @@ export default function Scan() {
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold">Piece {result.piece.seq} of {result.counts.total} — {result.shipment.ref} · {scanKindLabels[kind]}</p>
                       <p className="text-sm text-text-muted">{result.shipment.description || result.shipment.cargo} · {result.shipment.customer}{result.consignee ? ` → ${result.consignee.name}` : ''}</p>
-                      <p className="mt-1 text-xs text-text-muted"><MapPin size={11} className="inline" aria-hidden="true" /> {result.place} · {fmtDateTime(result.at)}{result.moved ? ` · order now ${statusLabels[result.moved]}` : ''}</p>
+                      <p className="mt-1 text-xs text-text-muted"><MapPin size={11} className="inline" aria-hidden="true" /> {result.place} · {fmtDateTime(result.at)}{result.moved ? ` · shipment now ${statusLabels[result.moved]}` : ''}</p>
                       <div className="mt-2 flex items-center gap-2 text-xs"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-border"><span className="block h-full bg-teal" style={{ width: `${(kind === 'delivery' ? result.counts.delivered : kind === 'devanning' ? result.counts.devanned : result.counts.loaded) / Math.max(1, result.counts.total) * 100}%` }} /></span><span className="tabular-nums text-text-muted">{kind === 'delivery' ? result.counts.delivered : kind === 'devanning' ? result.counts.devanned : result.counts.loaded} of {result.counts.total} {kind === 'delivery' ? 'delivered' : kind === 'devanning' ? 'received' : 'loaded'}</span></div>
                       {result.warnings.map((w, i) => <p key={i} className="mt-2 flex items-start gap-1.5 text-xs text-gold-deep"><AlertTriangle size={12} className="mt-0.5 shrink-0" aria-hidden="true" /> {w}</p>)}
                     </div>
@@ -200,7 +200,7 @@ export default function Scan() {
           <aside className="space-y-3">
             {counts && (
               <div className="rounded-2xl border border-border bg-surface p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">This order</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">This shipment</p>
                 <p className="mt-1 font-mono text-sm text-gold-deep">{(result ?? look)!.shipment.ref}</p>
                 <ul className="mt-2 grid grid-cols-4 gap-1" aria-label="Pieces">{(result ?? look)!.pieces.map((p) => <li key={p.id} title={`Piece ${p.seq}: ${pieceStatusLabels[p.status]}`} className={`grid h-9 place-items-center rounded-lg text-xs font-semibold ${p.status === 'delivered' ? 'bg-teal text-white' : p.status === 'devanned' ? 'bg-sky/30 text-text' : p.status === 'loaded' ? 'bg-gold/30 text-text' : 'bg-surface-2 text-text-muted'}`}>{p.seq}</li>)}</ul>
                 <p className="mt-2 text-[11px] text-text-muted">{counts.loaded}/{counts.total} loaded · {counts.devanned}/{counts.total} received · {counts.delivered}/{counts.total} delivered</p>

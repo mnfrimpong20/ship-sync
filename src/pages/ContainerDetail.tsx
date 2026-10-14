@@ -40,7 +40,7 @@ function AdvanceModal({ d, onClose, onDone }: { d: Detail; onClose: () => void; 
         </div>
         <div className="mt-4 rounded-lg border border-border bg-surface-2/60 px-3 py-2.5 text-sm">
           <p className="text-text-muted">{stageBlurb[status]}</p>
-          {d.shipments.length > 0 && ['loading', 'gated_in', 'sailed', 'arrived', 'customs'].includes(status) && <p className="mt-1.5 flex items-center gap-1.5 text-teal"><Boxes size={14} aria-hidden="true" /> {d.shipments.length} loaded order{d.shipments.length === 1 ? '' : 's'} will update and each customer sees the event on their tracking page.</p>}
+          {d.shipments.length > 0 && ['loading', 'gated_in', 'sailed', 'arrived', 'customs'].includes(status) && <p className="mt-1.5 flex items-center gap-1.5 text-teal"><Boxes size={14} aria-hidden="true" /> {d.shipments.length} loaded shipment{d.shipments.length === 1 ? '' : 's'} will update and each customer sees the event on their tracking page.</p>}
           {needsVessel && <p className="mt-1.5 flex items-center gap-1.5 text-danger"><AlertTriangle size={14} aria-hidden="true" /> Add the vessel name first (Edit details) so tracking can follow the ship.</p>}
         </div>
         <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-ghost !min-h-10 !px-4 text-sm">Cancel</button><button disabled={busy || needsVessel} className="btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60"><ArrowRight size={15} aria-hidden="true" /> {busy ? 'Updating…' : `Mark ${stageLabels[status].toLowerCase()}`}</button></div>
@@ -55,7 +55,7 @@ function LoadPanel({ d, onClose, onDone }: { d: Detail; onClose: () => void; onD
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  useEffect(() => { containersApi.candidates(c.destination).then((x) => setCands([...x].sort((a, b) => Number(b.sameLane) - Number(a.sameLane)))).catch((e) => setError(e instanceof Error ? e.message : 'Could not load orders.')) }, [c.destination])
+  useEffect(() => { containersApi.candidates(c.destination).then((x) => setCands([...x].sort((a, b) => Number(b.sameLane) - Number(a.sameLane)))).catch((e) => setError(e instanceof Error ? e.message : 'Could not load shipments.')) }, [c.destination])
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const offLane = (cands ?? []).filter((x) => picked.has(x.id) && !x.sameLane).length
   const used = d.shipments.reduce((a, s) => a + (cargoCbm[s.cargo] ?? 2), 0)
@@ -63,18 +63,18 @@ function LoadPanel({ d, onClose, onDone }: { d: Detail; onClose: () => void; onD
   const cap = sizeCbm[c.size]
   const submit = async () => {
     setBusy(true); setError('')
-    try { onDone(await containersApi.load(c.id, [...picked])) } catch (e) { setError(e instanceof Error ? e.message : 'Could not load orders.') } finally { setBusy(false) }
+    try { onDone(await containersApi.load(c.id, [...picked])) } catch (e) { setError(e instanceof Error ? e.message : 'Could not load shipments.') } finally { setBusy(false) }
   }
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="card-dark p-5">
-      <div className="flex items-start justify-between gap-3"><div><h2 className="!text-lg">Load orders into {c.ref}</h2><p className="mt-1 text-sm text-text-muted">Ocean orders you’ve won that aren’t in another open container. Orders on the same lane ({countryByCode(c.destination)?.name ?? c.destination}) are listed first.</p></div><button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg text-text-muted hover:bg-surface-2 focus-ring" aria-label="Close"><X size={16} /></button></div>
+      <div className="flex items-start justify-between gap-3"><div><h2 className="!text-lg">Load shipments into {c.ref}</h2><p className="mt-1 text-sm text-text-muted">Ocean shipments you’ve won that aren’t in another open container. Shipments on the same lane ({countryByCode(c.destination)?.name ?? c.destination}) are listed first.</p></div><button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg text-text-muted hover:bg-surface-2 focus-ring" aria-label="Close"><X size={16} /></button></div>
       {error && <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
       <div className="mt-4 overflow-hidden rounded-lg border border-border">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-border bg-surface-2/60 text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="w-10 px-3 py-2" /><th className="px-3 py-2">Order</th><th className="px-3 py-2">Route</th><th className="px-3 py-2">Cargo</th><th className="px-3 py-2">Customer</th><th className="px-3 py-2">Status</th></tr></thead>
+          <thead><tr className="border-b border-border bg-surface-2/60 text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="w-10 px-3 py-2" /><th className="px-3 py-2">Shipment</th><th className="px-3 py-2">Route</th><th className="px-3 py-2">Cargo</th><th className="px-3 py-2">Customer</th><th className="px-3 py-2">Status</th></tr></thead>
           <tbody>
             {cands === null && !error && <tr><td colSpan={6} className="px-3 py-6 text-center text-text-muted">Loading…</td></tr>}
-            {cands && cands.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-text-muted">No ocean orders waiting. Win a quote or book a shipment for a client first.</td></tr>}
+            {cands && cands.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-text-muted">No ocean shipments waiting. Win a quote or book a shipment for a client first.</td></tr>}
             {(cands ?? []).map((s) => {
               const on = picked.has(s.id)
               return (
@@ -98,8 +98,8 @@ function LoadPanel({ d, onClose, onDone }: { d: Detail; onClose: () => void; onD
           <p className="mt-1 text-[11px] text-text-muted">Estimated from cargo type — a planning guide, not a manifest.</p>
         </div>
         <div className="flex items-center gap-2">
-          {offLane > 0 && <span className="text-xs text-danger">{offLane} order{offLane === 1 ? ' is' : 's are'} bound for another country</span>}
-          <button onClick={submit} disabled={busy || picked.size === 0} className="btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60"><Boxes size={15} aria-hidden="true" /> {busy ? 'Loading…' : `Load ${picked.size || ''} order${picked.size === 1 ? '' : 's'}`}</button>
+          {offLane > 0 && <span className="text-xs text-danger">{offLane} shipment{offLane === 1 ? ' is' : 's are'} bound for another country</span>}
+          <button onClick={submit} disabled={busy || picked.size === 0} className="btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60"><Boxes size={15} aria-hidden="true" /> {busy ? 'Loading…' : `Load ${picked.size || ''} shipment${picked.size === 1 ? '' : 's'}`}</button>
         </div>
       </div>
     </motion.div>
@@ -171,12 +171,12 @@ export default function ContainerDetail() {
               </div>
             </motion.div>
             <motion.div variants={fadeUp} className="flex flex-wrap gap-2">
-              {d.shipments.length > 0 && <Link to={`/dashboard/labels?shipments=${d.shipments.map((s) => s.id).join(',')}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Piece stickers for every loaded order"><Tag size={15} aria-hidden="true" /> Print labels</Link>}
+              {d.shipments.length > 0 && <Link to={`/dashboard/labels?shipments=${d.shipments.map((s) => s.id).join(',')}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Piece stickers for every loaded shipment"><Tag size={15} aria-hidden="true" /> Print labels</Link>}
               {c.mmsi && <Link to={`/live?vessel=${c.mmsi}`} className="btn-ghost !min-h-10 !px-4 text-sm"><Radar size={15} aria-hidden="true" /> Track vessel</Link>}
               {(c.status === 'booked' || c.status === 'loading') && !c.bookingRef && <Link to={`/dashboard/sailings?container=${c.id}&destination=${c.destination}&kind=container`} className="btn-ghost !min-h-10 !px-4 text-sm" data-testid="book-space"><Ship size={15} aria-hidden="true" /> Book space on a sailing</Link>}
               <button onClick={() => { setEditing((e) => !e); setError('') }} className="btn-ghost !min-h-10 !px-4 text-sm"><Pencil size={15} aria-hidden="true" /> Edit details</button>
               {canLoad(c.status) && <Link to={`/dashboard/scan?kind=loading&container=${c.id}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Scan piece stickers as they go in"><ScanLine size={15} aria-hidden="true" /> Scan to load</Link>}
-              {canLoad(c.status) ? <button onClick={() => setLoading((l) => !l)} className="btn-ghost !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Load orders</button> : <span className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-dashed border-border px-3 text-xs text-text-muted" title="Orders can only be added or removed before the container sails."><Lock size={13} aria-hidden="true" /> Loading closed{(() => { const e = d.events.find((x) => x.status === 'sailed'); return e ? ` — sailed ${fmtDate(e.at)}` : c.status === 'closed' ? ' — container closed' : '' })()}</span>}
+              {canLoad(c.status) ? <button onClick={() => setLoading((l) => !l)} className="btn-ghost !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Load shipments</button> : <span className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-dashed border-border px-3 text-xs text-text-muted" title="Shipments can only be added or removed before the container sails."><Lock size={13} aria-hidden="true" /> Loading closed{(() => { const e = d.events.find((x) => x.status === 'sailed'); return e ? ` — sailed ${fmtDate(e.at)}` : c.status === 'closed' ? ' — container closed' : '' })()}</span>}
               {next && <button onClick={() => setAdvancing(true)} className="btn-gold !min-h-10 !px-4 text-sm"><ArrowRight size={15} aria-hidden="true" /> Mark {stageLabels[next].toLowerCase()}</button>}
             </motion.div>
           </div>
@@ -193,27 +193,27 @@ export default function ContainerDetail() {
             {editing && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="card-dark mt-6 p-6">
                 <h2 className="mb-1 !text-lg">Edit {c.ref}</h2>
-                {idx >= CONTAINER_STAGES.indexOf('sailed') && <p className="mb-4 text-sm text-text-muted">The container has sailed — changing the vessel or MMSI updates every loaded order’s tracking too.</p>}
+                {idx >= CONTAINER_STAGES.indexOf('sailed') && <p className="mb-4 text-sm text-text-muted">The container has sailed — changing the vessel or MMSI updates every loaded shipment’s tracking too.</p>}
                 <div className={idx >= CONTAINER_STAGES.indexOf('sailed') ? '' : 'mt-3'}><ContainerForm initial={toInput()} onSave={save} onCancel={() => setEditing(false)} busy={busy} error={error} submitLabel="Save details" /></div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <AnimatePresence>{loading && canLoad(c.status) && <div className="mt-6"><LoadPanel d={d} onClose={() => setLoading(false)} onDone={(r) => { apply(r, `${r.shipments.length - d.shipments.length} order${r.shipments.length - d.shipments.length === 1 ? '' : 's'} loaded${r.cascaded ? ` — ${r.cascaded} updated for customers` : ''}.`); setLoading(false) }} /></div>}</AnimatePresence>
+          <AnimatePresence>{loading && canLoad(c.status) && <div className="mt-6"><LoadPanel d={d} onClose={() => setLoading(false)} onDone={(r) => { apply(r, `${r.shipments.length - d.shipments.length} shipment${r.shipments.length - d.shipments.length === 1 ? '' : 's'} loaded${r.cascaded ? ` — ${r.cascaded} updated for customers` : ''}.`); setLoading(false) }} /></div>}</AnimatePresence>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2 space-y-6">
-              <motion.section variants={fadeUp} className="card-dark overflow-hidden" aria-labelledby="orders-h">
+              <motion.section variants={fadeUp} className="card-dark overflow-hidden" aria-labelledby="shipments-h">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-                  <div><h2 id="orders-h" className="!text-lg">Loaded orders <span className="ml-1 text-sm font-normal text-text-muted">{d.shipments.length}</span></h2></div>
+                  <div><h2 id="shipments-h" className="!text-lg">Loaded shipments <span className="ml-1 text-sm font-normal text-text-muted">{d.shipments.length}</span></h2></div>
                   <div className="min-w-[200px]"><div className="flex justify-between text-[11px] text-text-muted"><span>Planned fill</span><span className="tabular-nums">{Math.round(used)} / {cap} cbm</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-border"><div className={`h-full ${used > cap ? 'bg-danger' : 'bg-teal'}`} style={{ width: `${Math.min(100, (used / cap) * 100)}%` }} /></div></div>
                 </div>
                 {d.shipments.length === 0 ? (
-                  <div className="p-6"><Empty title="Nothing loaded yet" body={canLoad(c.status) ? 'Add the ocean orders you have won for this lane. Each one moves with the container from here on.' : 'This container moved on without any orders.'} action={canLoad(c.status) ? <button onClick={() => setLoading(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Load orders</button> : undefined} /></div>
+                  <div className="p-6"><Empty title="Nothing loaded yet" body={canLoad(c.status) ? 'Add the ocean shipments you have won for this lane. Each one moves with the container from here on.' : 'This container moved on without any shipments.'} action={canLoad(c.status) ? <button onClick={() => setLoading(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Load shipments</button> : undefined} /></div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[640px] text-sm">
-                      <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="px-4 py-2.5">Order</th><th className="px-4 py-2.5">Cargo</th><th className="px-4 py-2.5">Pieces</th><th className="px-4 py-2.5">Customer</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">ETA</th><th className="px-4 py-2.5 text-right">Actions</th></tr></thead>
+                      <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="px-4 py-2.5">Shipment</th><th className="px-4 py-2.5">Cargo</th><th className="px-4 py-2.5">Pieces</th><th className="px-4 py-2.5">Customer</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">ETA</th><th className="px-4 py-2.5 text-right">Actions</th></tr></thead>
                       <tbody>
                         {d.shipments.map((s) => (
                           <tr key={s.id} className="border-b border-border/70 align-top">
@@ -268,7 +268,7 @@ export default function ContainerDetail() {
                   <div className="flex items-start justify-between gap-2"><h2 id="carrier-h" className="!text-lg">Carrier tracking</h2>{c.tracking.status !== 'off' && <Pill tone={c.tracking.status === 'live' ? 'teal' : c.tracking.status === 'error' ? 'danger' : 'muted'}>{c.tracking.status === 'live' ? 'Live' : c.tracking.status === 'error' ? 'Error' : 'Waiting for the line'}</Pill>}</div>
                   {c.tracking.status === 'off' ? (
                     <>
-                      <p className="mt-2 text-sm text-text-muted">Connect this booking to {c.line || 'the shipping line'} and Ship Sync pulls the container number, seal, vessel and voyage as they are assigned, then moves the container through Gated in → Sailed → Arrived on its own — every loaded order and its customer tracking follow.</p>
+                      <p className="mt-2 text-sm text-text-muted">Connect this booking to {c.line || 'the shipping line'} and Ship Sync pulls the container number, seal, vessel and voyage as they are assigned, then moves the container through Gated in → Sailed → Arrived on its own — every loaded shipment and its customer tracking follow.</p>
                       {provider.simulated && <p className="mt-2 text-xs text-text-muted">This server runs the built-in carrier simulator — a real line or aggregator plugs in with one setting.</p>}
                       {!c.bookingRef && !c.number && <p className="mt-2 text-xs text-danger">Add the booking reference (Edit details) first.</p>}
                       {isOpen(c.status) && <button onClick={connect} disabled={busy || (!c.bookingRef && !c.number)} className="btn-gold mt-4 !min-h-10 !px-4 text-sm disabled:opacity-60"><Radio size={15} aria-hidden="true" /> {busy ? 'Connecting…' : `Connect to ${c.line || 'carrier'}`}</button>}
@@ -291,7 +291,7 @@ export default function ContainerDetail() {
           </div>
         </motion.div>
       </div>
-      <AnimatePresence>{advancing && next && <AdvanceModal d={d} onClose={() => setAdvancing(false)} onDone={(r) => { apply(r, `${c.ref} is now ${stageLabels[r.container.status].toLowerCase()}${r.cascaded ? ` — ${r.cascaded} order${r.cascaded === 1 ? '' : 's'} updated for customers` : ''}.`); setAdvancing(false) }} />}</AnimatePresence>
+      <AnimatePresence>{advancing && next && <AdvanceModal d={d} onClose={() => setAdvancing(false)} onDone={(r) => { apply(r, `${c.ref} is now ${stageLabels[r.container.status].toLowerCase()}${r.cascaded ? ` — ${r.cascaded} shipment${r.cascaded === 1 ? '' : 's'} updated for customers` : ''}.`); setAdvancing(false) }} />}</AnimatePresence>
     </div>
   )
 }

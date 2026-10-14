@@ -87,7 +87,7 @@ export default function Containers() {
   const all = list ?? []
   const n = (f: (c: Container) => boolean) => all.filter(f).length
   const stats = [
-    { label: 'Loading now', value: n((c) => c.status === 'booked' || c.status === 'loading'), hint: 'Booked with the line, taking orders', icon: Boxes },
+    { label: 'Loading now', value: n((c) => c.status === 'booked' || c.status === 'loading'), hint: 'Booked with the line, taking shipments', icon: Boxes },
     { label: 'At the port', value: n((c) => c.status === 'gated_in'), hint: 'Gated in, waiting to sail', icon: Anchor },
     { label: 'On the water', value: n((c) => c.status === 'sailed'), hint: 'Sailed — tracked live by MMSI', icon: Waves },
     { label: 'At destination', value: n((c) => c.status === 'arrived' || c.status === 'customs'), hint: 'Discharged or clearing customs', icon: Ship },
@@ -103,7 +103,7 @@ export default function Containers() {
       <div className="container-x py-10 md:py-14">
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Consolidation</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">Containers</motion.h1><motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Book a container with the shipping line, load the customer orders you’ve won into it, and move it through the port, the voyage and customs. Every order inside follows the container automatically.</motion.p></div>
+            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Consolidation</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">Containers</motion.h1><motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Book a container with the shipping line, load the customer shipments you’ve won into it, and move it through the port, the voyage and customs. Every shipment inside follows the container automatically.</motion.p></div>
             <motion.div variants={fadeUp}><button onClick={() => { setModal(true); setError('') }} className="btn-gold"><Plus size={16} aria-hidden="true" /> Book a container</button></motion.div>
           </div>
 
@@ -121,7 +121,7 @@ export default function Containers() {
 
           <motion.ul variants={fadeUp} className="mt-6 grid gap-4 md:grid-cols-2" aria-label="Containers">
             {list === null && !error && <li className="md:col-span-2 py-10 text-center text-text-muted">Loading…</li>}
-            {list && rows.length === 0 && <li className="md:col-span-2"><Empty title={all.length ? 'No containers match' : 'No containers yet'} body={all.length ? 'Try another tab or search.' : 'Book your first container with the shipping line, then load the ocean orders you have won into it.'} action={<button onClick={() => setModal(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Book a container</button>} /></li>}
+            {list && rows.length === 0 && <li className="md:col-span-2"><Empty title={all.length ? 'No containers match' : 'No containers yet'} body={all.length ? 'Try another tab or search.' : 'Book your first container with the shipping line, then load the ocean shipments you have won into it.'} action={<button onClick={() => setModal(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Book a container</button>} /></li>}
             {rows.map((c) => {
               const d = countryByCode(c.destination)
               return (
@@ -134,7 +134,7 @@ export default function Containers() {
                     <div className="mt-4"><StageStepper status={c.status} compact /></div>
                     <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm sm:grid-cols-4">
                       <div><dt className="text-xs text-text-muted">Lane</dt><dd className="truncate">{c.originPort || '—'} → {c.destinationPort || d?.name || c.destination}</dd></div>
-                      <div><dt className="text-xs text-text-muted">Orders loaded</dt><dd className="tabular-nums">{c.loaded ?? 0}</dd></div>
+                      <div><dt className="text-xs text-text-muted">Shipments loaded</dt><dd className="tabular-nums">{c.loaded ?? 0}</dd></div>
                       <div><dt className="text-xs text-text-muted">{c.status === 'booked' || c.status === 'loading' ? 'Cut-off' : c.status === 'gated_in' ? 'ETD' : 'ETA'}</dt><dd className="tabular-nums">{(() => { const v = c.status === 'booked' || c.status === 'loading' ? c.cutoffDate : c.status === 'gated_in' ? c.etd : c.eta; return v ? fmtDate(v + 'T12:00:00Z') : '—' })()}</dd></div>
                       <div><dt className="text-xs text-text-muted">Vessel</dt><dd className="truncate">{c.vesselName || <span className="text-text-muted">Not yet</span>}</dd></div>
                     </dl>

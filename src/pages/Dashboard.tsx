@@ -303,7 +303,7 @@ export function ShipperDashboard() {
   }
 
   return (
-    <Layout title={view === 'leads' ? 'Leads & quotes' : view === 'shipments' ? 'Shipments' : view === 'profile' ? 'Company profile' : shipper.name} sub={view === 'overview' ? `${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan` : shipper.name} cta={view === 'overview' || view === 'profile' ? <div className="flex flex-wrap gap-2">{view !== 'profile' && <button onClick={() => setEditing((e) => !e)} className="btn-ghost" aria-expanded={editing}><Pencil size={16} aria-hidden="true" /> Edit profile</button>}<Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link></div> : undefined}>
+    <Layout title={view === 'leads' ? 'Requests' : view === 'shipments' ? 'Client shipments' : view === 'profile' ? 'Company profile' : shipper.name} sub={view === 'overview' ? `${user.name} · ${shipper.hq} · ${shipper.plan.charAt(0).toUpperCase() + shipper.plan.slice(1)} plan` : shipper.name} cta={view === 'overview' || view === 'profile' ? <div className="flex flex-wrap gap-2">{view !== 'profile' && <button onClick={() => setEditing((e) => !e)} className="btn-ghost" aria-expanded={editing}><Pencil size={16} aria-hidden="true" /> Edit profile</button>}<Link to={`/shippers/${me}`} className="btn-ghost">View public profile</Link></div> : undefined}>
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
       {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
       {!shipper.verified && !editing && (
@@ -317,7 +317,7 @@ export function ShipperDashboard() {
           <h2 id="leads-h" className="!text-xl">Shipment requests for your lanes</h2>
           <p className="mt-1 text-sm text-text-muted">Reply fast — customers see response time on your profile.</p>
           <div className="mt-4 space-y-3">
-            {leads.length === 0 && <Empty title="No open leads right now" body="New requests matching your origins, destinations and cargo types will appear here and by email." />}
+            {leads.length === 0 && <Empty title="No open requests right now" body="New requests matching your origins, destinations and cargo types will appear here and by email." />}
             {leads.map((r) => {
               const d = countryByCode(r.destination)!
               const mine = r.quotes.find((q) => q.shipperId === me)

@@ -51,3 +51,26 @@ See `DESIGN.md` for the design brief (palette, type, sections, motion rules).
 ## Vocabulary (one word per stage)
 
 **Request** — a client asking for a price (menu: Requests, route `/dashboard/leads`). **Shipment** — one client's booking with an SS- reference, from an accepted quote or booked directly (menu: Client shipments). **Container** — holds many shipments. "Order" is kept only for the shareable order link and for China sourcing (factory purchase orders). Marketing copy for shippers may still say "leads".
+
+## Shipment flow automation (booking → handover)
+
+All of this lives in `server/flow.ts` (logic + sweeps) and `server/flowRoutes.ts` (routes); settings are under Client shipments → Automation (`shippers.prefs`).
+
+- **Two handover paths.** New status `ready_for_collection`. Each shipment has `handover` = `collection` (Booked → … → Customs → Ready for collection → Delivered) or `delivery` (… → Customs → Out for delivery → Delivered). `flowFor/nextStatus/prevStatus/flowIndex` in `src/lib/data.ts`. Default per shipper (`defaultHandover`, collection unless set), chosen on the booking form, a quote request with door delivery → `delivery`, switchable under Manage.
+- **ETA cascade.** A container's ETA change (carrier sync or office edit) updates every loaded shipment and tells each client once per new date; `eta_original` is kept for on-time stats.
+- **Unloading.** Container → *Unloaded at warehouse* (office, carrier or partner) puts pieces in the destination yard; collection shipments go to Ready for collection (6-digit code texted to the recipient, also in the client's notifications), delivery ones are flagged ready and appear in **Routes → Suggested delivery runs** grouped by town. A full devanning scan does the same per shipment.
+- **Collection with a code.** Manage → Hand over (or the partner page) checks the code (5 tries), owners/dispatchers can release without a code after an ID check (reason logged). `POST /shipments/:id/collect`, `/collection-code/resend`.
+- **Release check.** `holdUnpaid` = warn (driver stop shows "Collect $X"), block (driver stops, delivery scans, manual delivery and collection refuse until paid; owner/dispatcher/finance can override with a reason), or off. Owed = sent invoices − payments − online payments + storage due.
+- **Pickups.** Booking-form pickups go straight onto that day's pickup run; optional `autoConfirmPickups` does the same for customer-requested slots.
+- **Air & vessel-only arrivals.** Every 10 min: air shipments with a flight number move to In transit when seen airborne (ADS-B) and to Arrived when on the ground at the destination airport; ocean shipments with an MMSI but no container move to Arrived at the port (AIS).
+- **Warehouse check-in.** Manage → Check in at warehouse: actual pieces/weight (extra labels created), Picked up, optional invoice adjustment. Manage → Add a charge adds any line to the open invoice (or raises a new one if paid).
+- **Recipient nudges.** No recipient → after 10 min the client is asked (notification, or email if they have no account) with a no-login link `/#/add-recipient/:token`; up to 3 reminders 48 h apart. The recipient gets the intro text once added.
+- **Stuck.** Days in the current status vs this shipper's median for the lane (defaults until 5 samples); board bucket "Stuck", overview card, one office alert per status.
+- **Destination partner.** Container page → Destination partner: no-login link `/#/p/:token` with the manifest (recipients, phones, pieces), buttons for arrived / customs / unloaded, handover with the code, notes. Pre-alert email with the link when the container sails. Printable manifest at `/dashboard/containers/:id/manifest`.
+- **Documents.** Packing list generated (shared) at booking; commercial invoice (office-only) when a declared value is given (`autoDocuments`).
+- **Cancellation.** Manage → Cancel shipment (after Booked): unload if the container hasn't left the yard, remove run stops and pickups, void unpaid invoices, refund held online payments, tell the client; record kept (hidden from boards, shown on the client page and tracking).
+- **Storage.** Pieces in the destination yard past the site's free days accrue storage (site rates); the recipient/client is warned the day before; the amount counts toward the release check and is added to the invoice at handover.
+- **Offers.** Door delivery (`doorDeliveryUsd`) to collection shipments from In transit on; duty prepayment once customs is confirmed (local amount ÷ `GHS_PER_USD`/`NGN_PER_USD`). One tap on the customer's shipment → invoice line + office alert.
+- **Lane times.** Real median days and on-time rate per lane (`GET /shipper/lane-times`) set the booking form's ETA after 3 deliveries; the directory's on-time figure becomes the real one after 5.
+- **WhatsApp.** `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_ID` (Meta Cloud API, optional `WHATSAPP_TEMPLATE`) or `TWILIO_WHATSAPP_FROM`; WhatsApp first for recipients, SMS fallback. Shown on Admin → System.
+- **Sweeps on demand.** `POST /admin/sweeps/:name` (nudges, positions, storage, stuck, ontime) for admins.

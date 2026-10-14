@@ -32,6 +32,7 @@ import { mountBusiness } from './business'
 import { mountSupplierPortal } from './supplierPortal'
 import { mountOnboarding, onVerified } from './onboarding'
 import { consigneeToClient, mountCustomer, rememberConsignee, zConsignee } from './customer'
+import { isActiveDestination, mountGeoMeta, bustOrigins } from './geoMeta'
 import { mountBooking } from './booking'
 import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
@@ -309,14 +310,13 @@ const zTransit = z.object({
   flight: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3,8}$/, 'Use the ICAO flight callsign, e.g. CLX775 or BAW75.').optional().or(z.literal('').transform(() => undefined)),
   departedAt: z.string().datetime().optional(),
 })
-const COUNTRY_CODES = ['GH', 'NG', 'LR', 'TG', 'CI', 'SL', 'SN'] as const
 const zProfile = z.object({
   name: z.string().trim().min(2, 'Company name is too short.').max(80),
   tagline: z.string().trim().max(120).default(''),
   hq: z.string().trim().max(80).default(''),
   founded: z.number().int().min(1900).max(new Date().getFullYear()),
   modes: z.array(z.enum(['air', 'ocean'])).min(1, 'Choose at least one mode.'),
-  destinations: z.array(z.enum(COUNTRY_CODES)).min(1, 'Choose at least one destination.'),
+  destinations: z.array(z.string().trim().length(2).toUpperCase()).min(1, 'Choose at least one destination.'),
   origins: z.array(z.string().trim().min(2).max(60)).max(25),
   cargo: z.array(z.enum(['barrels', 'boxes', 'pallets', 'vehicle', 'container20', 'container40', 'commercial'])).min(1, 'Choose at least one cargo type.'),
   services: z.array(z.string().trim().min(2).max(60)).max(12),
@@ -392,6 +392,8 @@ export function apiRouter() {
     const db = await getDb(); const user = await requireUser(db, req)
     if (user.role !== 'shipper' || !user.shipperId) throw new HttpError(403, 'Only shipper accounts have a company profile.')
     const b = zProfile.parse(req.body)
+    for (const c of b.destinations) if (!(await isActiveDestination(db, c))) throw new HttpError(400, `${c} is not a destination Ship Sync serves yet.`)
+    bustOrigins()
     await db.query(
       `update shippers set name=$2, tagline=$3, hq=$4, founded=$5, modes=$6, destinations=$7, origins=$8, cargo=$9, services=$10, about=$11, price_index=$12, response_hours=$13, initials=$14 where id = $1`,
       [user.shipperId, b.name, b.tagline, b.hq, b.founded, JSON.stringify(b.modes), JSON.stringify([...new Set(b.destinations)]), JSON.stringify([...new Set(b.origins)]), JSON.stringify([...new Set(b.cargo)]), JSON.stringify([...new Set(b.services)]), b.about, b.priceIndex, b.responseHours, initialsOf(b.name)],
@@ -451,6 +453,7 @@ export function apiRouter() {
   }))
   r.post('/requests', wrap(async (req, res) => {
     const db = await getDb(); const body = zRequest.parse(req.body)
+    if (!(await isActiveDestination(db, body.destination))) throw new HttpError(400, 'We don’t ship to that destination yet.')
     let user = await currentUser(db, req)
     if (!user) {
       if (!body.password) throw new HttpError(401, 'Create a password to save your request and receive quotes.')
@@ -602,6 +605,7 @@ export function apiRouter() {
   mountSupplierPortal(r, { getDb, requireUser, HttpError, wrap })
   mountOnboarding(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountCustomer(r, { getDb, requireUser, HttpError, wrap })
+  mountGeoMeta(r, { getDb, requireAdmin, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

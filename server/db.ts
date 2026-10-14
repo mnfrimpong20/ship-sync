@@ -6,6 +6,7 @@ import { extraShippers } from './seedShippers'
 import { seedRatesDemo } from './rates'
 import { seedPickupsDemo } from './pickups'
 import { seedPaymentsDemo } from './payments'
+import { seedDestinations } from './geoMeta'
 
 /** HIDE_DEMO_SHIPPERS=true removes the fictional seed shippers from every public list (directory, matching, home stats) without deleting them. */
 export const hideDemoShippers = () => /^(1|true|yes)$/i.test(process.env.HIDE_DEMO_SHIPPERS ?? '')
@@ -57,6 +58,7 @@ export async function getDb(): Promise<Db> {
   await rollSchedule(db)
   await seedWarehouseDemo(db)
   await seedSourcingDemo(db)
+  await seedDestinations(db)
   return db
 }
 
@@ -968,6 +970,19 @@ alter table sourcing_requests add column if not exists recurring jsonb;
 alter table sourcing_requests add column if not exists parent_id text;
 alter table sourcing_quotes add column if not exists tiers jsonb;
 alter table sourcing_quotes add column if not exists base_price_cny numeric;
+create table if not exists destinations (
+  code text primary key,
+  name text not null,
+  flag text not null default '',
+  ports jsonb not null default '[]',
+  airports jsonb not null default '[]',
+  ocean_days text not null default '',
+  air_days text not null default '',
+  note text not null default '',
+  dial_code text not null default '',
+  active boolean not null default true,
+  sort int not null default 0
+);
 create table if not exists customer_consignees (
   id text primary key,
   user_id text not null references users(id) on delete cascade,

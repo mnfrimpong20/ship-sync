@@ -11,7 +11,8 @@
  * Phone numbers are normalised to E.164 using the consignee's country before sending.
  */
 
-const COUNTRY_CODES: Record<string, string> = { GH: '233', NG: '234', LR: '231', TG: '228', CI: '225', SL: '232', SN: '221', US: '1', GB: '44', CA: '1' }
+/** Dial codes for phone normalisation. Destination countries also live in the `destinations` table (admin-editable); this map is the fallback plus origin countries. */
+const COUNTRY_CODES: Record<string, string> = { GH: '233', NG: '234', LR: '231', TG: '228', CI: '225', SL: '232', SN: '221', CM: '237', GM: '220', GN: '224', BJ: '229', BF: '226', ML: '223', US: '1', GB: '44', CA: '1', DE: '49', NL: '31', FR: '33', AE: '971', CN: '86' }
 
 /** "024 555 0190" + GH → "+233245550190"; already-international numbers pass through. */
 export function normalisePhone(raw: string, country = 'GH'): string | null {

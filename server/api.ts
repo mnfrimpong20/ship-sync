@@ -80,7 +80,7 @@ const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.
 const requestOut = (r: Row, quotes: Row[]) => ({
   id: r.id, ref: r.ref, userId: r.user_id, createdAt: ISO(r.created_at), origin: r.origin, destination: r.destination, mode: r.mode, cargo: r.cargo, quantity: r.quantity, weightKg: r.weight_kg ?? undefined,
   description: r.description, pickup: r.pickup, delivery: r.delivery, insurance: r.insurance, readyDate: DATE(r.ready_date),
-  contact: { name: r.contact_name, email: r.contact_email, phone: r.contact_phone }, status: r.status, quotes: quotes.map(quoteOut), vehicle: r.vehicle ? J(r.vehicle) : undefined, consignee: r.consignee ? J(r.consignee) : undefined, preferredShipperId: r.preferred_shipper_id ?? undefined,
+  contact: { name: r.contact_name, email: r.contact_email, phone: r.contact_phone }, status: r.status, quotes: quotes.map(quoteOut), vehicle: r.vehicle ? J(r.vehicle) : undefined, consignee: r.consignee ? J(r.consignee) : undefined, source: r.source ?? 'marketplace', preferredShipperId: r.preferred_shipper_id ?? undefined,
 })
 const shipmentOut = (r: Row, events: Row[]) => ({
   id: r.id, ref: r.ref, shipperId: r.shipper_id, mode: r.mode, origin: r.origin, destination: r.destination, cargo: r.cargo, description: r.description, status: r.status, eta: DATE(r.eta), customer: r.customer,
@@ -300,6 +300,8 @@ const zRequest = zMatch.extend({
   preferredShipperId: z.string().max(80).optional(),
   /** Who receives it at destination — saved to the customer's recipients and handed to the shipper on booking. */
   consignee: zConsignee.optional(),
+  /** How the request reached a specific shipper: picked in the form, the shipper's order link, or their branded page. */
+  source: z.enum(['marketplace', 'picked', 'link', 'branded']).optional(),
 })
 const zTransit = z.object({
   vesselName: z.string().trim().max(80).optional().or(z.literal('').transform(() => undefined)),
@@ -458,9 +460,9 @@ export function apiRouter() {
     if (user.role !== 'customer') throw new HttpError(403, 'Shipper accounts cannot post shipment requests.')
     const id = uid()
     await db.query(
-      `insert into requests (id,ref,user_id,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,vehicle,preferred_shipper_id,consignee)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
-      [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone, body.cargo === 'vehicle' && body.vehicle ? JSON.stringify(body.vehicle) : null, body.preferredShipperId ?? null, body.consignee ? JSON.stringify(body.consignee) : null],
+      `insert into requests (id,ref,user_id,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,vehicle,preferred_shipper_id,consignee,source)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+      [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone, body.cargo === 'vehicle' && body.vehicle ? JSON.stringify(body.vehicle) : null, body.preferredShipperId ?? null, body.consignee ? JSON.stringify(body.consignee) : null, body.preferredShipperId ? (body.source ?? 'picked') : 'marketplace'],
     )
     if (body.consignee) await rememberConsignee(db, user.id, body.consignee)
     const { rows } = await db.query<Row>('select * from requests where id = $1', [id])
@@ -469,7 +471,7 @@ export function apiRouter() {
       const quoted = await autoQuoteFromRates(db, rows[0], [body.preferredShipperId])
       const { rows: sh } = await db.query<Row>('select name from shippers where id = $1', [body.preferredShipperId])
       for (const q of quoted) await notify(db, { userId: user.id, kind: 'quote_received', title: `Your quote from ${sh[0]?.name ?? 'the shipper'}: $${q.price.toLocaleString()} for ${rows[0].ref}`, body: 'Priced instantly from their published rates. Open your dashboard to accept.', link: '/dashboard', dedupe: `rq:${id}:rate:${q.shipperId}` })
-      await notifyShipperStaff(db, body.preferredShipperId, { kind: 'new_lead', title: `${quoted.length ? 'Instant quote sent — ' : 'New lead from your branded page — '}${rows[0].ref}`, body: `${body.contact.name} · ${body.quantity} × ${body.cargo} · ${body.origin} → ${body.destination}${quoted.length ? ` · $${quoted[0].price.toLocaleString()} from your rate card` : '. Send a quote.'}`, link: '/dashboard/leads', dedupe: `lead:${id}` }, ['owner', 'dispatcher', 'agent'])
+      await notifyShipperStaff(db, body.preferredShipperId, { kind: 'new_lead', title: `${quoted.length ? 'Instant quote sent — ' : body.source === 'link' ? 'New order from your link — ' : body.source === 'branded' ? 'New lead from your branded page — ' : 'A customer chose you — '}${rows[0].ref}`, body: `${body.contact.name} · ${body.quantity} × ${body.cargo} · ${body.origin} → ${body.destination}${quoted.length ? ` · $${quoted[0].price.toLocaleString()} from your rate card` : '. Send a quote.'}`, link: '/dashboard/leads', dedupe: `lead:${id}` }, ['owner', 'dispatcher', 'agent'])
     } else {
       await instantQuotesFromRates(db, rows[0])
       if (DEMO_AUTO_QUOTES) await demoAutoQuotes(db, rows[0])

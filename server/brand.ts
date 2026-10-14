@@ -68,6 +68,27 @@ export function mountBrand(r: Router, d: Deps) {
     res.json({ brand: next })
   }))
 
+  /** Public: the shipper behind an order link (`/#/order/<slug-or-id>`), enough to show who the customer is ordering from. */
+  r.get('/order/:code', wrap(async (req, res) => {
+    const db = await getDb(); const code = String(req.params.code).toLowerCase()
+    let { rows } = await db.query<Row>('select * from shippers where id = $1', [code]); let sh = rows[0]
+    if (!sh) sh = await bySlug(db, code)
+    const b = brandOf(sh)
+    const { rows: rates } = await db.query<Row>(`select count(*)::int as n from rate_cards where shipper_id = $1 and active`, [sh.id])
+    res.set('Cache-Control', 'public, max-age=120')
+    res.json({ shipper: { id: sh.id, name: sh.name, tagline: sh.tagline, hq: sh.hq, verified: !!sh.verified, rating: Number(sh.rating), reviews: Number(sh.reviews), modes: J(sh.modes), destinations: J(sh.destinations), origins: J(sh.origins), cargo: J(sh.cargo), initials: sh.initials, hue: sh.hue, responseHours: Number(sh.response_hours), onTime: Number(sh.on_time) }, instantQuotes: rates[0].n > 0, brand: { logo: b.logo, accent: b.accent, phone: b.phone, whatsapp: b.whatsapp, email: b.email, slug: b.slug }, poweredBy: true })
+  }))
+  /** Office: the company's order link, ready to share (every shipper has one — no setup needed). */
+  r.get('/shipper/order-link', wrap(async (req, res) => {
+    const db = await getDb(); const u = await requireUser(db, req)
+    if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.')
+    const { rows } = await db.query<Row>('select * from shippers where id = $1', [u.shipperId]); const sh = rows[0]; const b = brandOf(sh)
+    const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')
+    const { rows: c } = await db.query<Row>(`select count(*)::int as n, count(*) filter (where created_at > now() - interval '30 days')::int as n30 from requests where preferred_shipper_id = $1 and source in ('link','branded')`, [u.shipperId])
+    res.set('Cache-Control', 'no-store')
+    res.json({ url: `${base}/#/order/${b.slug}`, slug: b.slug, shipperName: sh.name, viaLink: c[0].n, viaLink30: c[0].n30, brandedEnabled: !!b.enabled, brandedUrl: b.enabled ? `${base}/#/t/${b.slug}` : null })
+  }))
+
   /** Public: everything the branded page needs. */
   r.get('/t/:slug', wrap(async (req, res) => {
     const db = await getDb(); const sh = await bySlug(db, String(req.params.slug).toLowerCase()); const b = brandOf(sh)

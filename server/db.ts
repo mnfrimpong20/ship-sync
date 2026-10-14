@@ -982,6 +982,7 @@ create table if not exists customer_consignees (
   created_at timestamptz not null default now()
 );
 alter table requests add column if not exists consignee jsonb;
+alter table requests add column if not exists source text not null default 'marketplace';
 alter table staff add column if not exists perms jsonb not null default '{}';
 alter table staff add column if not exists last_active_at timestamptz;
 alter table quotes add column if not exists sent_by text;

@@ -9,7 +9,7 @@ const POLL_MS = 45_000
 /** Small tinted dot per kind so the list scans quickly. */
 export const kindTone: Record<NotifyKind, string> = {
   quote_received: 'bg-gold', booking_confirmed: 'bg-teal', shipment_status: 'bg-sky', document: 'bg-sky', pickup: 'bg-gold', insurance: 'bg-teal', payment: 'bg-gold', groupage: 'bg-sky', customs: 'bg-gold', review: 'bg-teal', dispute: 'bg-danger', sourcing: 'bg-gold', quote_accepted: 'bg-teal',
-  new_lead: 'bg-gold', container_update: 'bg-sky', invoice_overdue: 'bg-danger', system: 'bg-text-muted',
+  new_lead: 'bg-gold', container_update: 'bg-sky', invoice_overdue: 'bg-danger', quote_lost: 'bg-text-muted', request_update: 'bg-sky', system: 'bg-text-muted',
 }
 
 export function NotificationBell() {

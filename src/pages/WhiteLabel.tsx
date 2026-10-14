@@ -28,7 +28,7 @@ export default function BrandedPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setSending(true); setQError('')
     try {
-      const body: NewRequest & { preferredShipperId: string } = { origin: q.origin, destination: q.destination, mode: s.modes.length === 1 ? (s.modes[0] as Mode) : 'either', cargo: q.cargo, quantity: q.quantity, description: q.description, pickup: true, delivery: true, insurance: false, readyDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), contact: { name: q.name, email: q.email, phone: q.phone }, password: user ? undefined : q.password, preferredShipperId: s.id }
+      const body: NewRequest & { preferredShipperId: string; source: 'branded' } = { origin: q.origin, destination: q.destination, mode: s.modes.length === 1 ? (s.modes[0] as Mode) : 'either', cargo: q.cargo, quantity: q.quantity, description: q.description, pickup: true, delivery: true, insurance: false, readyDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), contact: { name: q.name, email: q.email, phone: q.phone }, password: user ? undefined : q.password, preferredShipperId: s.id, source: 'branded' }
       const r = await createRequest(body); const mine = r.quotes.find((x) => x.shipperId === s.id); setSent({ ref: r.ref, price: mine?.price })
     } catch (err) { setQError(err instanceof Error ? err.message : 'Could not send.') } finally { setSending(false) }
   }

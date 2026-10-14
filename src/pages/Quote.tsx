@@ -14,7 +14,10 @@ import { congestionLabel, useCongestion } from '../lib/useCongestion'
 type Form = NewRequest
 const stepsMeta = ['Route', 'Cargo', 'Services', 'Contact']
 
-export default function Quote() {
+/** Public shape of the shipper behind an order link (from GET /api/order/:code). */
+export interface OrderShipper { id: string; name: string; tagline: string; hq: string; verified: boolean; rating: number; reviews: number; modes: Mode[]; destinations: string[]; origins: string[]; cargo: string[]; initials: string; hue: string; responseHours: number; onTime: number }
+
+export default function Quote({ locked }: { locked?: { shipper: OrderShipper; instantQuotes: boolean } } = {}) {
   const [sp] = useSearchParams()
   const nav = useNavigate()
   const { user, createRequest, matchShippers, shipperById } = useStore()
@@ -64,6 +67,11 @@ export default function Quote() {
   }, [form.origin, form.destination, form.mode, form.cargo, form.quantity, form.weightKg, form.pickup, form.delivery, form.insurance, matchShippers])
   useEffect(() => { if (user) setForm((f) => ({ ...f, contact: { ...f.contact, name: f.contact.name || user.name, email: f.contact.email || user.email } })) }, [user])
   const preferred = sp.get('shipper') ? shipperById(sp.get('shipper')!) : undefined
+  // Who receives the request: every matching shipper, or one the customer chose (from a profile, the picker here, or an order link).
+  const [only, setOnly] = useState<string | null>(locked?.shipper.id ?? sp.get('shipper') ?? null)
+  useEffect(() => { const sid = sp.get('shipper'); if (sid && !locked) setOnly(sid) }, [sp, locked])
+  useEffect(() => { if (locked) setForm((f) => ({ ...f, destination: (locked.shipper.destinations[0] as Form['destination']) ?? f.destination, origin: locked.shipper.origins[0] ?? f.origin, mode: locked.shipper.modes.length === 1 ? locked.shipper.modes[0] : 'either' })) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const onlyShipper: { id: string; name: string; initials: string; hue: string; verified: boolean; rating: number; modes: Mode[] } | undefined = locked ? locked.shipper : only ? (matches.find((m) => m.shipper.id === only)?.shipper ?? shipperById(only)) : undefined
   const cg = useCongestion()
   const portNow = cg?.enabled && form.mode !== 'air' ? congestionLabel(cg.congestion[form.destination]) : null
   useEffect(() => { window.scrollTo({ top: 0 }) }, [step])
@@ -85,7 +93,7 @@ export default function Quote() {
     setSubmitting(true); setSubmitError('')
     try {
       const { password, consignee, ...rest0 } = form
-      const rest = { ...rest0, consignee: consignee && consignee.name.trim().length >= 2 ? consignee : undefined }
+      const rest = { ...rest0, consignee: consignee && consignee.name.trim().length >= 2 ? consignee : undefined, preferredShipperId: only ?? undefined, source: locked ? ('link' as const) : only ? ('picked' as const) : undefined }
       const r = await createRequest(user ? rest : { ...rest, password })
       nav(`/dashboard?request=${r.id}`)
     } catch (err) { setSubmitError(err instanceof Error ? err.message : 'Could not send your request.'); setSubmitting(false) }
@@ -95,9 +103,9 @@ export default function Quote() {
     <div className="bg-bg text-text">
       <div className="container-x grid gap-10 py-10 md:py-16 lg:grid-cols-12">
         <div className="lg:col-span-7">
-          <p className="eyebrow mb-2">Request quotes</p>
-          <h1 className="!text-[clamp(2rem,4vw,3rem)]">Tell shippers what you’re sending</h1>
-          <p className="mt-2 text-text-muted">Free. Matching shippers reply with itemised quotes — usually within 24 hours.</p>
+          <p className="eyebrow mb-2">{locked ? `Order from ${locked.shipper.name}` : 'Request quotes'}</p>
+          <h1 className="!text-[clamp(2rem,4vw,3rem)]">{locked ? 'Tell us what you’re sending' : 'Tell shippers what you’re sending'}</h1>
+          <p className="mt-2 text-text-muted">{locked ? (locked.instantQuotes ? `${locked.shipper.name} will price this instantly from their published rates.` : `${locked.shipper.name} will reply with an itemised quote — usually within 24 hours.`) : 'Free. Matching shippers reply with itemised quotes — usually within 24 hours.'}</p>
 
           <ol className="mt-8 flex gap-2" aria-label="Progress">
             {stepsMeta.map((s, i) => (
@@ -198,9 +206,22 @@ export default function Quote() {
         <aside className="lg:col-span-5" aria-label="Matching shippers">
           <div className="sticky top-24">
             <div className="card-dark p-6">
-              <div className="flex items-center justify-between"><h2 className="!text-lg">Matching shippers</h2><span className="rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold">{matches.length} match{matches.length === 1 ? '' : 'es'}</span></div>
-              <p className="mt-1 text-sm text-text-muted">Updates as you fill in the form. These companies will receive your request.</p>
-              {preferred && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-sm text-text">You started from <strong>{preferred.name}</strong>’s profile — they’ll be notified first.</p>}
+              {locked ? (
+                <div data-testid="locked-shipper">
+                  <p className="eyebrow mb-2">You’re ordering from</p>
+                  <div className="flex items-start gap-3"><Avatar initials={locked.shipper.initials} hue={locked.shipper.hue} size={48} /><div className="min-w-0"><p className="flex items-center gap-1 text-base font-semibold">{locked.shipper.name}{locked.shipper.verified && <BadgeCheck size={16} className="text-gold" aria-label="Verified" />}</p><p className="text-sm text-text-muted">{locked.shipper.tagline || locked.shipper.hq}</p><div className="mt-1 flex flex-wrap items-center gap-1.5">{locked.shipper.modes.map((md) => <ModeBadge key={md} mode={md} />)}<Rating value={locked.shipper.rating} count={locked.shipper.reviews} /></div></div></div>
+                  <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-text-muted">Ships to</dt><dd>{locked.shipper.destinations.map((c) => countryByCode(c)?.name ?? c).join(', ')}</dd></div><div><dt className="text-xs text-text-muted">Collects from</dt><dd>{locked.shipper.origins.slice(0, 3).join(', ') || '—'}</dd></div>{locked.shipper.onTime > 0 && <div><dt className="text-xs text-text-muted">On time</dt><dd>{locked.shipper.onTime}%</dd></div>}<div><dt className="text-xs text-text-muted">Replies in</dt><dd>~{locked.shipper.responseHours} h</dd></div></dl>
+                  <p className="mt-4 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">This request goes only to {locked.shipper.name}. You’ll get a Ship Sync account to track it, and payment is held in escrow until the goods are on their way.</p>
+                </div>
+              ) : (
+              <>
+              <div className="flex items-center justify-between"><h2 className="!text-lg">Who gets this?</h2><span className="rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold">{matches.length} match{matches.length === 1 ? '' : 'es'}</span></div>
+              <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-border bg-surface-2 p-1 text-sm" role="radiogroup" aria-label="Send to">
+                <button type="button" role="radio" aria-checked={!only} onClick={() => setOnly(null)} className={`min-h-9 rounded-full px-3 focus-ring ${!only ? 'bg-gold font-semibold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid="send-all">All matching</button>
+                <button type="button" role="radio" aria-checked={!!only} onClick={() => setOnly(only ?? matches[0]?.shipper.id ?? preferred?.id ?? null)} className={`min-h-9 rounded-full px-3 focus-ring ${only ? 'bg-gold font-semibold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid="send-one">One shipper</button>
+              </div>
+              <p className="mt-2 text-sm text-text-muted">{only ? (onlyShipper ? <>Only <strong className="text-text">{onlyShipper.name}</strong> will see this request{preferred && preferred.id === only ? ' — you started from their profile' : ''}.</> : 'Pick a shipper from the list.') : 'Every matching shipper gets your request and competes on price and transit time.'}</p>
+              {only && onlyShipper && !matches.some((m) => m.shipper.id === only) && <p className="mt-2 rounded-lg border border-gold/40 bg-gold/10 p-3 text-xs">{onlyShipper.name} doesn’t list this lane, but they’ll still receive your request and can quote it.</p>}
               <ul className="mt-4 space-y-3">
                 <AnimatePresence initial={false}>
                   {matches.length === 0 && !matching && (
@@ -209,8 +230,8 @@ export default function Quote() {
                   {matches.length === 0 && matching && (
                     <motion.li initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 rounded-lg border border-dashed border-border p-4 text-sm text-text-muted"><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Finding shippers on this lane…</motion.li>
                   )}
-                  {matches.slice(0, 5).map((m) => (
-                    <motion.li key={m.shipper.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="flex items-start gap-3 rounded-lg border border-border bg-surface-2 p-3">
+                  {!locked && [...matches].sort((a, b) => (only ? (b.shipper.id === only ? 1 : 0) - (a.shipper.id === only ? 1 : 0) : 0)).slice(0, only ? 8 : 5).map((m) => (
+                    <motion.li key={m.shipper.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} onClick={only ? () => setOnly(m.shipper.id) : undefined} role={only ? 'radio' : undefined} aria-checked={only ? only === m.shipper.id : undefined} tabIndex={only ? 0 : undefined} onKeyDown={only ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOnly(m.shipper.id) } } : undefined} data-testid="match-row" className={`${only ? 'cursor-pointer ' : ''}${only === m.shipper.id ? 'border-gold ring-1 ring-gold/50 ' : ''}flex items-start gap-3 rounded-lg border border-border bg-surface-2 p-3`}>
                       <Avatar initials={m.shipper.initials} hue={m.shipper.hue} size={40} />
                       <div className="min-w-0 flex-1">
                         <p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{m.shipper.name}{m.shipper.verified && <BadgeCheck size={14} className="text-gold" aria-label="Verified" />}</p>
@@ -222,12 +243,14 @@ export default function Quote() {
                   ))}
                 </AnimatePresence>
               </ul>
+              </>
+              )}
               {portNow && (
                 <p className={`mt-4 rounded-lg border p-3 text-xs ${portNow.level === 'heavy' ? 'border-danger/40 bg-danger/10 text-danger' : portNow.level === 'busy' ? 'border-gold/40 bg-gold/10 text-gold' : 'border-border bg-surface-2 text-text-muted'}`}>
                   {countryByCode(form.destination)?.ports[0]} right now: {portNow.text}.{portNow.level !== 'clear' ? ' Shippers may quote longer transit.' : ''}
                 </p>
               )}
-              {matches.length > 0 && (
+              {matches.length > 0 && !locked && (
                 <p className="mt-4 border-t border-border pt-4 text-xs text-text-muted">{matches.some((m) => m.estimate?.instant) ? `${matches.filter((m) => m.estimate?.instant).length} of these will quote instantly when you submit. ` : ''}Estimated range {money(estimate(form).lo)}–{money(estimate(form).hi)} based on recent quotes on this lane. Final prices come from shippers.</p>
               )}
             </div>

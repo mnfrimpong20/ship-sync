@@ -176,7 +176,7 @@ export function ResetPassword() {
     try { const u = await resetPassword(token, pw); nav(u.role === 'shipper' ? '/dashboard/shipper' : '/dashboard') } catch (err) { setErr(err instanceof Error ? err.message : 'Could not reset the password.'); setBusy(false) }
   }
   return (
-    <Shell title="Choose a new password" sub="You’ll be signed in here and signed out everywhere else." aside={<Aside />}>
+    <Shell title={sp.get('welcome') ? 'Set your password' : 'Choose a new password'} sub={sp.get('welcome') ? 'So you can sign back in to compare and book your quotes from any device.' : 'You’ll be signed in here and signed out everywhere else.'} aside={<Aside />}>
       {!token ? (
         <p className="text-sm text-text-muted">This link is missing its token. <Link to="/forgot" className="text-gold hover:underline">Request a new reset link</Link>.</p>
       ) : (

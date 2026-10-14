@@ -84,7 +84,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
       if (form.contact.name.trim().length < 2) e.name = 'Please enter your name.'
       if (!/^\S+@\S+\.\S+$/.test(form.contact.email)) e.email = 'Enter a valid email.'
       if (form.contact.phone.replace(/\D/g, '').length < 7) e.phone = 'Enter a phone number shippers can reach.'
-      if (!user && (form.password ?? '').length < 8) e.password = 'Choose a password of at least 8 characters.'
+      if (!user && form.password && form.password.length < 8) e.password = 'Use at least 8 characters, or leave it blank and we’ll email you a link.'
     }
     setErrors(e)
     return Object.keys(e).length === 0
@@ -95,7 +95,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
     try {
       const { password, consignee, ...rest0 } = form
       const rest = { ...rest0, consignee: consignee && consignee.name.trim().length >= 2 ? consignee : undefined, preferredShipperId: only ?? undefined, source: locked ? ('link' as const) : only ? ('picked' as const) : undefined }
-      const r = await createRequest(user ? rest : { ...rest, password })
+      const r = await createRequest(user ? rest : { ...rest, password: password || undefined })
       nav(`/dashboard?request=${r.id}`)
     } catch (err) { setSubmitError(err instanceof Error ? err.message : 'Could not send your request.'); setSubmitting(false) }
   }
@@ -152,6 +152,11 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                       <div><label htmlFor="qty" className="label-dark">Quantity</label><input id="qty" type="number" min={1} className="input-dark" value={form.quantity} onChange={(e) => set('quantity', Number(e.target.value))} aria-invalid={!!errors.quantity} />{errors.quantity && <p className="mt-1 text-xs text-danger">{errors.quantity}</p>}</div>
                       <div><label htmlFor="wt" className="label-dark">Approx. total weight (kg, optional)</label><input id="wt" type="number" min={0} className="input-dark" value={form.weightKg ?? ''} onChange={(e) => set('weightKg', e.target.value ? Number(e.target.value) : undefined)} placeholder="e.g. 380" /></div>
                     </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div><label htmlFor="dims" className="label-dark">Dimensions (optional)</label><input id="dims" className="input-dark" value={form.dims ?? ''} onChange={(e) => set('dims', e.target.value)} placeholder="e.g. barrels 55 gal, or 120×80×100 cm" maxLength={80} data-testid="q-dims" /></div>
+                      <div><label htmlFor="dval" className="label-dark">Value of the goods, USD (optional)</label><input id="dval" type="number" min={0} className="input-dark" value={form.declaredValueUsd ?? ''} onChange={(e) => set('declaredValueUsd', e.target.value ? Number(e.target.value) : undefined)} placeholder="For insurance and customs" data-testid="q-value" /></div>
+                    </div>
+                    <p className="-mt-2 text-xs text-text-muted">Weight, size and value help shippers send a firm price instead of an estimate.</p>
                     {form.cargo === 'vehicle' && <RequestVehicleFields value={form.vehicle ?? { vin: '', year: null, make: '', model: '', running: true, method: 'roro', titleStatus: 'clean' }} onChange={(v) => set('vehicle', v)} />}
                     <div><label htmlFor="desc" className="label-dark">Describe the shipment</label><textarea id="desc" rows={3} className="input-dark py-2.5" placeholder="e.g. 4 sealed barrels — clothing, provisions, small appliances. Deliver to Kumasi." value={form.description} onChange={(e) => set('description', e.target.value)} /></div>
                   </div>
@@ -184,9 +189,9 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                     </div>
                     {!user && (
                       <div>
-                        <label htmlFor="cpw" className="label-dark">Create a password</label>
+                        <label htmlFor="cpw" className="label-dark">Create a password <span className="font-normal text-text-muted">(optional)</span></label>
                         <input id="cpw" type="password" className="input-dark" value={form.password ?? ''} onChange={(e) => set('password', e.target.value)} aria-invalid={!!errors.password} autoComplete="new-password" />
-                        {errors.password ? <p className="mt-1 text-xs text-danger">{errors.password}</p> : <p className="mt-1 text-xs text-text-muted">We’ll create your free Ship Sync account so you can compare quotes and book. Already have one? <Link to="/login?next=/quote" className="text-gold hover:underline">Sign in</Link>.</p>}
+                        {errors.password ? <p className="mt-1 text-xs text-danger">{errors.password}</p> : <p className="mt-1 text-xs text-text-muted">Leave it blank and we’ll email you a link to set one — your quotes are waiting either way. Already have one? <Link to="/login?next=/quote" className="text-gold hover:underline">Sign in</Link>.</p>}
                       </div>
                     )}
                     {submitError && <p role="alert" className="text-sm text-danger">{submitError}</p>}

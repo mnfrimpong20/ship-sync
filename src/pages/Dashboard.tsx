@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Pencil, PlusCircle, Send, Ship, X } from 'lucide-react'
 import { cargoLabel, countryByCode, statusLabels, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
-import { Avatar, Empty, ModeBadge, Pill, Rating, fmtDate, money } from '../components/ui'
+import { Empty, ModeBadge, Pill, fmtDate, money } from '../components/ui'
 import { ShipmentDetail } from './Track'
 import { DocumentsPanel } from '../components/DocumentsPanel'
 import { PickupCard } from '../components/PickupCard'
@@ -15,6 +15,7 @@ import { InsuranceCard } from '../components/InsuranceCard'
 import { NeedsYou, NextArrivalCard, Recipients } from '../components/CustomerHome'
 import { customerApi, type AttentionItem, type NextArrival } from '../lib/customer'
 import { PaymentCard } from '../components/PaymentCard'
+import { QuoteList, RequestManage } from '../components/RequestPanel'
 import { CollectionNotice, OffersCard } from '../components/FlowCards'
 import { VehicleCard } from '../components/VehicleCard'
 import { CustomsCard } from '../components/CustomsCard'
@@ -60,7 +61,7 @@ export function CustomerDashboard() {
   const [tab, setTabState] = useState<Tab>(asTab(sp.get('tab')))
   const setTab = (t: Tab) => { setTabState(t); setSp(t === 'requests' ? {} : { tab: t }, { replace: true }) }
   useEffect(() => { setTabState(asTab(sp.get('tab'))) }, [sp])
-  const [openReq, setOpenReq] = useState<string | null>(sp.get('request'))
+  const [openReq, setOpenReq] = useState<string | null>(sp.get('request') ?? (sp.get('tab') ? null : sp.get('open')))
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
   const [busyQuote, setBusyQuote] = useState<string | null>(null)
@@ -121,7 +122,7 @@ export function CustomerDashboard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {r.status === 'booked' ? <Pill tone="green">Booked · {shipperById(accepted?.shipperId ?? '')?.name}</Pill> : <Pill tone={r.quotes.length ? 'gold' : 'muted'}>{r.quotes.length ? `${r.quotes.length} quote${r.quotes.length > 1 ? 's' : ''}` : 'Awaiting quotes'}</Pill>}
+                    {r.status === 'cancelled' ? <Pill tone="muted">Cancelled</Pill> : r.status === 'expired' ? <Pill tone="muted">Expired</Pill> : r.status === 'booked' ? <Pill tone="green">Booked · {shipperById(accepted?.shipperId ?? '')?.name}</Pill> : <Pill tone={r.quotes.length ? 'gold' : 'muted'}>{r.quotes.length ? `${r.quotes.length} quote${r.quotes.length > 1 ? 's' : ''}` : 'Awaiting quotes'}</Pill>}
                     <ChevronRight size={18} className={`text-text-muted transition-transform ${isOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
                   </div>
                 </button>
@@ -132,37 +133,9 @@ export function CustomerDashboard() {
                         <div className="mb-3 flex flex-wrap items-center gap-2">{r.consignee && <span className="text-xs text-text-muted">Recipient: <b className="text-text">{r.consignee.name}</b>{r.consignee.city ? `, ${r.consignee.city}` : ''}</span>}<Link to={`/quote?again=${r.id}`} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="ship-again"><Send size={13} aria-hidden="true" /> Ship again</Link></div>
                         <p className="text-sm text-text-muted">{r.description || 'No description provided.'} {r.pickup && '· Pickup'} {r.delivery && '· Door delivery'} {r.insurance && '· Insurance'}</p>
                         {r.quotes.length === 0 ? (
-                          <p className="mt-4 flex items-center gap-2 rounded-lg bg-surface-2 p-4 text-sm text-text-muted"><Clock size={16} aria-hidden="true" /> Shippers usually reply within 24 hours. We’ll email you at {r.contact.email}.</p>
-                        ) : (
-                          <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            <div className="no-print flex justify-end md:col-span-2"><button onClick={() => window.print()} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="print-quotes">Print / save quotes as PDF</button></div>
-                            {[...r.quotes].sort((a, b) => a.price - b.price).map((q, i) => {
-                              const s = shipperById(q.shipperId) ?? { id: q.shipperId, name: 'Shipper', initials: 'SS', hue: '#E3B54A', rating: 0, reviews: 0, verified: false }
-                              const best = i === 0 && r.status === 'open'
-                              return (
-                                <div key={q.id} className={`relative rounded-[var(--radius-md)] border p-4 ${q.status === 'accepted' ? 'border-teal bg-teal/5' : q.status === 'declined' ? 'border-border opacity-50' : best ? 'border-gold' : 'border-border bg-surface-2'}`}>
-                                  {best && <span className="absolute -top-2.5 left-4 rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent">Lowest price</span>}
-                                  <div className="flex items-start gap-3">
-                                    <Avatar initials={s.initials} hue={s.hue} size={40} />
-                                    <div className="min-w-0 flex-1">
-                                      <p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{s.name}{s.verified && <BadgeCheck size={14} className="text-gold" aria-label="Verified" />}</p>
-                                      <div className="mt-1 flex flex-wrap gap-1.5"><Rating value={s.rating} count={s.reviews} /></div>
-                                    </div>
-                                    <div className="text-right"><p className="font-heading text-2xl font-bold text-text">{money(q.price)}</p><p className="text-xs text-text-muted">~{q.transitDays} days</p></div>
-                                  </div>
-                                  <ul className="mt-3 flex flex-wrap gap-1.5">{q.includes.map((x) => <li key={x} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted">{x}</li>)}</ul>
-                                  <p className="mt-3 text-xs text-text-muted">{q.notes}</p>
-                                  <div className="mt-4 flex items-center justify-between gap-2">
-                                    <p className="text-xs text-text-muted">Valid until {fmtDate(q.validUntil)}</p>
-                                    {q.status === 'accepted' ? <Pill tone="green">Accepted</Pill> : q.status === 'declined' ? <Pill tone="muted">Declined</Pill> : (
-                                      <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => accept(r, q.id)} disabled={busyQuote !== null} className="btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60">{busyQuote === q.id ? 'Booking…' : 'Accept & book'}</motion.button>
-                                    )}
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
+                          <p className="mt-4 flex items-center gap-2 rounded-lg bg-surface-2 p-4 text-sm text-text-muted"><Clock size={16} aria-hidden="true" /> {r.status === 'open' ? `Shippers usually reply within 24 hours. We’ll email you at ${r.contact.email}.` : 'No quotes came in.'}</p>
+                        ) : <QuoteList r={r} accept={accept} busyQuote={busyQuote} threadFor={sp.get('open') === r.id ? sp.get('thread') : null} />}
+                        <RequestManage r={r} wantMarket={sp.get('open') === r.id && sp.get('market') === '1'} />
                       </div>
                     </motion.div>
                   )}

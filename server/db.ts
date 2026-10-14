@@ -1056,6 +1056,33 @@ create table if not exists partner_links (
 );
 create index if not exists idx_partner_links_container on partner_links(container_id);
 update pieces set label_code = substring(label_code from '^(.*)-[0-9]{3}$') || '-P' || seq where label_code ~ '-[0-9]{3}$';
+alter table requests add column if not exists dims text not null default '';
+alter table requests add column if not exists declared_value_usd numeric;
+alter table requests add column if not exists expires_at timestamptz;
+alter table requests add column if not exists updated_at timestamptz;
+alter table requests add column if not exists cancelled_at timestamptz;
+alter table requests add column if not exists cancel_reason text;
+alter table requests add column if not exists no_quote_notified_at timestamptz;
+alter table requests add column if not exists opened_to_market_at timestamptz;
+-- Requests that existed before expiry was introduced get at least two more weeks.
+update requests set expires_at = greatest(least(ready_date + 14, created_at::date + 45), current_date + 14) where expires_at is null;
+alter table quotes add column if not exists kind text not null default 'firm';
+alter table quotes add column if not exists mode text;
+alter table quotes add column if not exists updated_at timestamptz;
+alter table quotes add column if not exists expiry_reminded_at timestamptz;
+alter table quotes add column if not exists closed_notified_at timestamptz;
+create table if not exists request_messages (
+  id text primary key,
+  request_id text not null references requests(id) on delete cascade,
+  shipper_id text not null references shippers(id) on delete cascade,
+  author_role text not null,
+  author_name text not null default '',
+  body text not null,
+  masked boolean not null default false,
+  created_at timestamptz not null default now(),
+  read_at timestamptz
+);
+create index if not exists idx_request_messages on request_messages(request_id, shipper_id, created_at);
 update shipments set eta_original = eta where eta_original is null;
 update shipments set delivered_at = (select min(at) from shipment_events e where e.shipment_id = shipments.id and e.status = 'delivered') where status = 'delivered' and delivered_at is null;
 create table if not exists supplier_links (

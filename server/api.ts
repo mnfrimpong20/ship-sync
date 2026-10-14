@@ -36,6 +36,7 @@ import { isActiveDestination, mountGeoMeta, bustOrigins } from './geoMeta'
 import { afterBooking, invoiceForBooking, mountShipmentOps } from './shipmentOps'
 import { assertRelease, stuckFor } from './flow'
 import { mountFlow } from './flowRoutes'
+import { mountRequestFlow, startRequestSweeps, sweepRequests } from './requestFlow'
 import { mountBooking } from './booking'
 import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
@@ -80,11 +81,14 @@ const shipperOut = (r: Row) => ({
   rating: Number(r.rating), reviews: r.reviews, verified: r.verified, responseHours: r.response_hours, onTime: r.on_time, services: J(r.services), about: r.about,
   priceIndex: r.price_index, plan: r.plan, initials: r.initials, hue: r.hue, demo: r.demo, verifiedAt: r.verified_at ? ISO(r.verified_at) : undefined, createdAt: r.created_at ? ISO(r.created_at) : undefined,
 })
-const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.shipper_id, price: r.price, currency: r.currency, transitDays: r.transit_days, validUntil: DATE(r.valid_until), notes: r.notes, includes: J(r.includes), status: r.status, sentAt: ISO(r.sent_at) })
+const quoteMode = (r: Row) => (r.mode === 'air' || r.mode === 'ocean' ? r.mode : (J(r.includes) as string[] ?? []).includes('Air freight') ? 'air' : 'ocean')
+const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.shipper_id, price: r.price, currency: r.currency, transitDays: r.transit_days, validUntil: DATE(r.valid_until), notes: r.notes, includes: J(r.includes), status: r.status, sentAt: ISO(r.sent_at), updatedAt: r.updated_at ? ISO(r.updated_at) : undefined,
+  kind: (r.kind ?? 'firm') as 'firm' | 'estimate', mode: quoteMode(r) as 'air' | 'ocean', expired: r.status === 'sent' && DATE(r.valid_until) < new Date().toISOString().slice(0, 10) })
 const requestOut = (r: Row, quotes: Row[]) => ({
   id: r.id, ref: r.ref, userId: r.user_id, createdAt: ISO(r.created_at), origin: r.origin, destination: r.destination, mode: r.mode, cargo: r.cargo, quantity: r.quantity, weightKg: r.weight_kg ?? undefined,
   description: r.description, pickup: r.pickup, delivery: r.delivery, insurance: r.insurance, readyDate: DATE(r.ready_date),
-  contact: { name: r.contact_name, email: r.contact_email, phone: r.contact_phone }, status: r.status, quotes: quotes.map(quoteOut), vehicle: r.vehicle ? J(r.vehicle) : undefined, consignee: r.consignee ? J(r.consignee) : undefined, source: r.source ?? 'marketplace', preferredShipperId: r.preferred_shipper_id ?? undefined,
+  contact: { name: r.contact_name, email: r.contact_email, phone: r.contact_phone }, status: r.status, quotes: quotes.map((q) => ({ ...quoteOut(q), stale: !!r.updated_at && new Date(q.updated_at ?? q.sent_at) < new Date(r.updated_at) })),
+  dims: r.dims ?? '', declaredValueUsd: r.declared_value_usd == null ? undefined : Number(r.declared_value_usd), expiresAt: r.expires_at ? ISO(r.expires_at) : undefined, updatedAt: r.updated_at ? ISO(r.updated_at) : undefined, cancelReason: r.cancel_reason ?? undefined, openedToMarket: !!r.opened_to_market_at, vehicle: r.vehicle ? J(r.vehicle) : undefined, consignee: r.consignee ? J(r.consignee) : undefined, source: r.source ?? 'marketplace', preferredShipperId: r.preferred_shipper_id ?? undefined,
 })
 const shipmentOut = (r: Row, events: Row[]) => ({
   id: r.id, ref: r.ref, shipperId: r.shipper_id, mode: r.mode, origin: r.origin, destination: r.destination, cargo: r.cargo, description: r.description, status: r.status, eta: DATE(r.eta), customer: r.customer,
@@ -187,6 +191,14 @@ async function loadUserWithCompany(db: Db, id: string) {
   return userOut(rows[0], rows[0].company ?? undefined)
 }
 
+/** New customers who posted without a password get a link to set one (valid 3 days). */
+async function sendSetPasswordLink(db: Db, userId: string, name: string, email: string, req: Request) {
+  const token = randomBytes(24).toString('base64url')
+  await db.query(`insert into password_resets (token,user_id,expires_at) values ($1,$2,now() + interval '3 days')`, [token, userId])
+  const link = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/#/reset?token=${token}&welcome=1`
+  if (emailProvider().id === 'off') { console.log('[auth] set-password link (email off):', link); return false }
+  try { await sendEmail(email, 'Your Ship Sync quotes — set a password', emailTemplate({ name, title: 'Your request is in', body: 'Shippers are pricing your shipment now. Quotes appear in your dashboard and we email you as each one arrives. Set a password so you can sign back in from any device.', link, cta: 'Set my password' })); return true } catch (e) { console.error('[auth] set-password email', e); return false }
+}
 async function signupUser(db: Db, input: { name: string; email: string; password: string; role: 'customer' | 'shipper'; company?: string }) {
   const email = input.email.trim().toLowerCase()
   const { rows: existing } = await db.query('select id from users where email = $1', [email])
@@ -210,6 +222,18 @@ async function signupUser(db: Db, input: { name: string; email: string; password
 
 /* ---------------- matching ---------------- */
 type MatchInput = { origin: string; destination: string; mode: 'air' | 'ocean' | 'either'; cargo: CargoType }
+/**
+ * The one lead rule, used by alerts, the Requests board and the customer's matching list:
+ *   eligible = serves the destination, offers the mode (or the request says either), handles the cargo type.
+ *   local    = also collects in that city or state ("Houston, TX" covers "Katy, TX"). Alerts go to local shippers;
+ *              the board shows every eligible lead and flags the ones outside the shipper's pickup area.
+ */
+export function leadFit(shipper: { destinations: string[]; modes: string[]; cargo: string[]; origins: string[] }, r: { destination: string; mode: string; cargo: string; origin: string }) {
+  const eligible = shipper.destinations.includes(r.destination) && (r.mode === 'either' || shipper.modes.includes(r.mode)) && (!shipper.cargo.length || shipper.cargo.includes(r.cargo))
+  const region = (o: string) => (o.split(',')[1] ?? '').trim().toUpperCase()
+  const local = shipper.origins.includes(r.origin) || (!!region(r.origin) && shipper.origins.some((o) => region(o) === region(r.origin)))
+  return { eligible, local }
+}
 async function matchShippers(db: Db, r: MatchInput) {
   const { rows } = await db.query<Row>(`select * from shippers where ${publicShipperSql()}`)
   return rows
@@ -221,7 +245,8 @@ async function matchShippers(db: Db, r: MatchInput) {
       score += 40; reasons.push('Serves this destination')
       if (r.mode !== 'either') { if (shipper.modes.includes(r.mode)) { score += 20; reasons.push(`Offers ${r.mode} freight`) } else return { shipper, score: -1, reasons } }
       else score += 10
-      if (shipper.cargo.includes(r.cargo)) { score += 20; reasons.push('Handles this cargo type') } else score -= 30
+      if (shipper.cargo.length && !shipper.cargo.includes(r.cargo)) return { shipper, score: -1, reasons }
+      score += 20; reasons.push('Handles this cargo type')
       if (shipper.origins.includes(r.origin)) { score += 15; reasons.push('Regular pickups from your area') }
       else if (shipper.origins.some((o: string) => o.split(', ')[1] === r.origin.split(', ')[1])) { score += 6; reasons.push('Operates in your country') }
       if (shipper.verified) { score += 5; reasons.push('Verified') }
@@ -268,15 +293,21 @@ async function instantQuotesFromRates(db: Db, req: Row) {
 async function notifyNewLead(db: Db, req: Row) {
   const { rows: quoted } = await db.query<Row>('select shipper_id from quotes where request_id = $1', [req.id])
   const done = new Set(quoted.map((q) => q.shipper_id))
-  const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })).filter((m) => !done.has(m.shipper.id))
+  const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })).filter((m) => !done.has(m.shipper.id) && leadFit(m.shipper, req as never).local)
   for (const m of matches) {
     await notifyShipperStaff(db, m.shipper.id, { kind: 'new_lead', title: `New client request: ${req.quantity} × ${req.cargo} to ${req.destination}`, body: `${req.contact_name} wants to ship from ${req.origin} (${req.mode === 'either' ? 'air or ocean' : req.mode}), ready ${String(req.ready_date).slice(0, 10)}. Send a quote before the competition does.`, link: '/dashboard/leads', dedupe: `lead:${req.id}` }, ['owner', 'dispatcher', 'agent'])
   }
 }
 
 /* ---------------- loaders ---------------- */
-async function loadRequests(db: Db, where: string, params: unknown[]) {
-  const { rows } = await db.query<Row>(`select * from requests where ${where} order by created_at desc`, params)
+/** Before booking a shipper sees the client's first name and initial only — contact details unlock when their quote is accepted (their own link/branded-page clients excepted). */
+function contactFor(q: { contact: { name: string; email: string; phone: string }; source?: string; preferredShipperId?: string }, shipperId: string, won: boolean) {
+  if (won || ((q.source === 'link' || q.source === 'branded') && q.preferredShipperId === shipperId)) return { ...q.contact, hidden: false }
+  const [first, ...rest] = q.contact.name.trim().split(/\s+/)
+  return { name: `${first}${rest.length ? ` ${rest[rest.length - 1][0]}.` : ''}`, email: '', phone: '', hidden: true }
+}
+async function loadRequests(db: Db, where: string, params: unknown[], opts: { limit?: number } = {}) {
+  const { rows } = await db.query<Row>(`select * from requests where ${where} order by created_at desc${opts.limit ? ` limit ${Number(opts.limit)}` : ''}`, params)
   if (!rows.length) return []
   const ids = rows.map((r) => r.id)
   const { rows: quotes } = await db.query<Row>(`select * from quotes where request_id = any($1::text[]) order by sent_at asc`, [ids])
@@ -340,6 +371,7 @@ const zMatch = z.object({ origin: z.string().min(1), destination: z.string().len
 const zMatchPriced = zMatch.extend({ quantity: z.number().int().min(1).max(10_000).optional(), weightKg: z.number().min(0).optional(), pickup: z.boolean().optional(), delivery: z.boolean().optional(), insurance: z.boolean().optional() })
 const zRequest = zMatch.extend({
   quantity: z.number().int().min(1), weightKg: z.number().int().min(0).optional(), description: z.string().max(2000).default(''), pickup: z.boolean(), delivery: z.boolean(), insurance: z.boolean(),
+  dims: z.string().trim().max(80).default(''), declaredValueUsd: z.number().min(0).max(5_000_000).optional(),
   readyDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), contact: z.object({ name: z.string().trim().min(2), email: z.string().trim().email(), phone: z.string().trim().min(7) }),
   password: z.string().min(8).optional(),
   vehicle: zRequestVehicle.optional(),
@@ -371,7 +403,7 @@ const zProfile = z.object({
   responseHours: z.number().int().min(1).max(168),
 })
 const zVerify = z.object({ verified: z.boolean(), plan: z.enum(['starter', 'pro', 'enterprise']).optional(), note: z.string().trim().max(500).optional() })
-const zQuote = z.object({ price: z.number().int().min(1), transitDays: z.number().int().min(1), notes: z.string().max(2000).default(''), includes: z.array(z.string()).default([]), validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() })
+const zQuote = z.object({ price: z.number().int().min(1), transitDays: z.number().int().min(1), notes: z.string().max(2000).default(''), includes: z.array(z.string()).default([]), validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), kind: z.enum(['firm', 'estimate']).default('firm'), mode: z.enum(['air', 'ocean']).optional() })
 
 /* ---------------- router ---------------- */
 export function apiRouter() {
@@ -483,17 +515,18 @@ export function apiRouter() {
   r.get('/requests', wrap(async (req, res) => {
     const db = await getDb(); const user = await requireUser(db, req)
     if (user.role === 'customer') return res.json({ requests: await loadRequests(db, 'user_id = $1', [user.id]) })
-    // shipper: open requests matching lanes + anything they've quoted
-    const all = await loadRequests(db, `(status = 'open' and (preferred_shipper_id is null or preferred_shipper_id = $1)) or id in (select request_id from quotes where shipper_id = $1)`, [user.shipperId])
+    // shipper: eligible open requests (one rule: leadFit) + anything they've quoted. Filtered in SQL first so it scales.
     const { rows: me } = await db.query<Row>('select * from shippers where id = $1', [user.shipperId])
     const s = shipperOut(me[0])
-    const mine = all.filter((q) => q.preferredShipperId === user.shipperId || q.quotes.some((x) => x.shipperId === user.shipperId) || (!q.preferredShipperId && s.destinations.includes(q.destination) && (q.mode === 'either' || s.modes.includes(q.mode))))
-    // hide other shippers' prices from competitors — keep only count + own quote
+    const all = await loadRequests(db, `(status = 'open' and (preferred_shipper_id = $1 or (preferred_shipper_id is null and destination = any($2::text[]) and (mode = 'either' or mode = any($3::text[])) and (cardinality($4::text[]) = 0 or cargo = any($4::text[]))))) or id in (select request_id from quotes where shipper_id = $1)`, [user.shipperId, s.destinations, s.modes, s.cargo], { limit: 400 })
     const out = []
-    for (const q of mine) {
+    let priced = 0
+    for (const q of all) {
       const mineQ = q.quotes.filter((x) => x.shipperId === user.shipperId)
-      const suggested = q.status === 'open' && !mineQ.length ? await instantQuote(db, user.shipperId!, { origin: q.origin, destination: q.destination, mode: q.mode, cargo: q.cargo, quantity: q.quantity, weightKg: q.weightKg, pickup: q.pickup, delivery: q.delivery, insurance: q.insurance }) : null
-      out.push({ ...q, quotes: mineQ, competingQuotes: q.quotes.filter((x) => x.shipperId !== user.shipperId).length, suggested: suggested ? { price: suggested.price, transitDays: suggested.transitDays, notes: suggested.notes, includes: suggested.includes, breakdown: suggested.breakdown } : null })
+      const fit = leadFit(s, q)
+      const suggested = q.status === 'open' && !mineQ.length && priced++ < 40 ? await instantQuote(db, user.shipperId!, { origin: q.origin, destination: q.destination, mode: q.mode, cargo: q.cargo, quantity: q.quantity, weightKg: q.weightKg, pickup: q.pickup, delivery: q.delivery, insurance: q.insurance }).catch(() => null) : null
+      const won = mineQ.some((x) => x.status === 'accepted')
+      out.push({ ...q, contact: contactFor(q, user.shipperId!, won), quotes: mineQ, competingQuotes: q.quotes.filter((x) => x.shipperId !== user.shipperId).length, outsideArea: q.status === 'open' && !fit.local && q.preferredShipperId !== user.shipperId, suggested: suggested ? { price: suggested.price, transitDays: suggested.transitDays, notes: suggested.notes, includes: suggested.includes, breakdown: suggested.breakdown } : null })
     }
     res.json({ requests: out })
   }))
@@ -501,17 +534,26 @@ export function apiRouter() {
     const db = await getDb(); const body = zRequest.parse(req.body)
     if (!(await isActiveDestination(db, body.destination))) throw new HttpError(400, 'We don’t ship to that destination yet.')
     let user = await currentUser(db, req)
+    throttle(`request:ip:${clientIp(req)}`, 20, 24 * 3600_000, HttpError)
+    let passwordLinkSent = false
     if (!user) {
-      if (!body.password) throw new HttpError(401, 'Create a password to save your request and receive quotes.')
-      user = await signupUser(db, { name: body.contact.name, email: body.contact.email, password: body.password, role: 'customer' })
+      // No password needed to get quotes: we open the account and email a link to set one.
+      const password = body.password ?? randomBytes(18).toString('base64url')
+      user = await signupUser(db, { name: body.contact.name, email: body.contact.email, password, role: 'customer' })
       await createSession(db, res, user.id)
+      if (!body.password) passwordLinkSent = await sendSetPasswordLink(db, user.id, user.name, body.contact.email.trim().toLowerCase(), req)
     }
     if (user.role !== 'customer') throw new HttpError(403, 'Shipper accounts cannot post shipment requests.')
+    throttle(`request:user:${user.id}`, 10, 24 * 3600_000, HttpError)
+    const { rows: openN } = await db.query<Row>(`select count(*)::int as n from requests where user_id = $1 and status = 'open'`, [user.id])
+    if (Number(openN[0].n) >= 15) throw new HttpError(429, 'You have 15 open requests. Book or cancel some before posting more.')
+    const today = new Date().toISOString().slice(0, 10)
+    if (body.readyDate < today) throw new HttpError(400, 'The ready date is in the past.')
     const id = uid()
     await db.query(
-      `insert into requests (id,ref,user_id,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,vehicle,preferred_shipper_id,consignee,source)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
-      [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone, body.cargo === 'vehicle' && body.vehicle ? JSON.stringify(body.vehicle) : null, body.preferredShipperId ?? null, body.consignee ? JSON.stringify(body.consignee) : null, body.preferredShipperId ? (body.source ?? 'picked') : 'marketplace'],
+      `insert into requests (id,ref,user_id,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,vehicle,preferred_shipper_id,consignee,source,dims,declared_value_usd,expires_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,least($14::date + 14, current_date + 45))`,
+      [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone, body.cargo === 'vehicle' && body.vehicle ? JSON.stringify(body.vehicle) : null, body.preferredShipperId ?? null, body.consignee ? JSON.stringify(body.consignee) : null, body.preferredShipperId ? (body.source ?? 'picked') : 'marketplace', body.dims, body.declaredValueUsd ?? null],
     )
     if (body.consignee) await rememberConsignee(db, user.id, body.consignee)
     const { rows } = await db.query<Row>('select * from requests where id = $1', [id])
@@ -527,7 +569,7 @@ export function apiRouter() {
       await notifyNewLead(db, rows[0])
     }
     const [request] = await loadRequests(db, 'id = $1', [id])
-    res.status(201).json({ request, user })
+    res.status(201).json({ request, user, passwordLinkSent })
   }))
 
   // quotes
@@ -539,11 +581,19 @@ export function apiRouter() {
     const { rows } = await db.query<Row>('select * from requests where id = $1', [req.params.id])
     if (!rows[0]) throw new HttpError(404, 'Request not found.')
     if (rows[0].status !== 'open') throw new HttpError(409, 'This request is no longer open.')
+    if (rows[0].preferred_shipper_id && rows[0].preferred_shipper_id !== user.shipperId) throw new HttpError(403, 'This client asked another shipper.')
+    const today = new Date().toISOString().slice(0, 10)
+    if (body.validUntil && body.validUntil < today) throw new HttpError(400, 'The quote can’t be valid until a date in the past.')
+    const qMode = rows[0].mode === 'either' ? body.mode ?? (body.includes.includes('Air freight') ? 'air' : 'ocean') : rows[0].mode
+    if (rows[0].mode !== 'either' && body.mode && body.mode !== rows[0].mode) throw new HttpError(400, `The client asked for ${rows[0].mode} freight.`)
+    const prev = await db.query<Row>('select status from quotes where request_id = $1 and shipper_id = $2', [req.params.id, user.shipperId])
+    if (prev.rows[0]?.status === 'withdrawn' || prev.rows[0]?.status === 'expired') await db.query(`update quotes set status = 'sent' where request_id = $1 and shipper_id = $2`, [req.params.id, user.shipperId])
     await db.query('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes,sent_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict (request_id, shipper_id) do update set price = excluded.price, transit_days = excluded.transit_days, valid_until = excluded.valid_until, notes = excluded.notes, includes = excluded.includes, sent_at = now(), sent_by = excluded.sent_by',
       [uid(), req.params.id, user.shipperId, body.price, body.transitDays, body.validUntil ?? new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), body.notes, JSON.stringify(body.includes), user.staffId ?? null])
+    await db.query(`update quotes set kind = $3, mode = $4, updated_at = now(), status = case when status in ('withdrawn','expired') then 'sent' else status end, expiry_reminded_at = null where request_id = $1 and shipper_id = $2`, [req.params.id, user.shipperId, body.kind, qMode])
     await notify(db, { userId: rows[0].user_id, kind: 'quote_received', title: `${user.company ?? 'A shipper'} quoted $${body.price.toLocaleString()} on ${rows[0].ref}`, body: `${body.transitDays} days transit${body.includes.length ? ` · ${body.includes.join(', ')}` : ''}. Open your dashboard to compare and accept.`, link: '/dashboard', dedupe: `rq:${rows[0].id}:q:${user.shipperId}:${Date.now()}` })
     const [request] = await loadRequests(db, 'id = $1', [req.params.id])
-    res.status(201).json({ request: { ...request, quotes: request.quotes.filter((x) => x.shipperId === user.shipperId), competingQuotes: request.quotes.filter((x) => x.shipperId !== user.shipperId).length } })
+    res.status(201).json({ request: { ...request, contact: contactFor(request, user.shipperId!, false), quotes: request.quotes.filter((x) => x.shipperId === user.shipperId), competingQuotes: request.quotes.filter((x) => x.shipperId !== user.shipperId).length } })
   }))
   r.post('/quotes/:id/accept', wrap(async (req, res) => {
     const db = await getDb(); const user = await requireUser(db, req)
@@ -551,24 +601,35 @@ export function apiRouter() {
     const q = qs[0]
     if (!q) throw new HttpError(404, 'Quote not found.')
     if (q.owner !== user.id) throw new HttpError(403, 'You can only accept quotes on your own requests.')
+    if (q.status === 'withdrawn') throw new HttpError(409, 'The shipper withdrew this quote.')
     if (q.status !== 'sent') throw new HttpError(409, 'This quote is no longer available.')
+    if (DATE(q.valid_until) < new Date().toISOString().slice(0, 10)) throw new HttpError(409, `This quote expired on ${DATE(q.valid_until)}. Message the shipper for an updated price.`)
     const { rows: rs } = await db.query<Row>('select * from requests where id = $1', [q.request_id])
     const r0 = rs[0]
-    if (r0.status !== 'open') throw new HttpError(409, 'This request has already been booked.')
+    if (r0.status !== 'open') throw new HttpError(409, r0.status === 'booked' ? 'This request has already been booked.' : `This request is ${r0.status}.`)
     const { rows: ss } = await db.query<Row>('select * from shippers where id = $1', [q.shipper_id])
     const shipper = shipperOut(ss[0])
     const includes: string[] = J(q.includes)
-    const mode = includes.includes('Air freight') ? 'air' : 'ocean'
+    const mode = q.mode === 'air' || q.mode === 'ocean' ? q.mode : includes.includes('Air freight') ? 'air' : 'ocean'
+    void includes
     const sid = uid()
     await db.query(`update quotes set status = case when id = $1 then 'accepted' else 'declined' end where request_id = $2`, [q.id, q.request_id])
     await db.query(`update requests set status = 'booked' where id = $1`, [q.request_id])
+    const { rows: losers } = await db.query<Row>(`select * from quotes where request_id = $1 and id <> $2 and status = 'declined'`, [q.request_id, q.id])
     await db.query('insert into shipments (id,ref,request_id,shipper_id,user_id,mode,origin,destination,cargo,description,status,eta,customer) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
       [sid, r0.ref, r0.id, q.shipper_id, user.id, mode, r0.origin, r0.destination, r0.cargo, r0.description || `${r0.quantity} × ${r0.cargo}`, 'booked', new Date(Date.now() + (q.transit_days + 4) * 86400000).toISOString().slice(0, 10), r0.contact_name])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, 'booked', r0.origin, `Booking confirmed with ${shipper.name}. Quote accepted at $${q.price}.`])
     await attachShipmentToClient(db, q.shipper_id, user.id, sid, r0.contact_name, r0.contact_email)
     await consigneeToClient(db, sid, r0.consignee ? J(r0.consignee) : null)
     if (r0.cargo === 'vehicle') await vehicleFromRequest(db, r0.id, sid)
+    await db.query('update shipments set booking = $2 where id = $1', [sid, JSON.stringify({ quantity: r0.quantity, weightKg: r0.weight_kg ?? null, dims: r0.dims ?? '', declaredValueUsd: r0.declared_value_usd == null ? null : Number(r0.declared_value_usd), readyDate: DATE(r0.ready_date), quoteKind: q.kind ?? 'firm', bookedBy: r0.contact_name })])
+    if (q.kind === 'estimate') await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, 'booked', r0.origin, 'Price is an estimate — final amount confirmed when the pieces are weighed at check-in.'])
     await invoiceForBooking(db, sid, q).catch((e) => console.error('[invoice] auto', e))
+    // Shippers who didn't win hear how they compared — no names, no exact winning price.
+    for (const l of losers) {
+      const diff = Math.round(((Number(l.price) - Number(q.price)) / Number(q.price)) * 100)
+      await notifyShipperStaff(db, l.shipper_id, { kind: 'quote_lost', title: `Not chosen — ${r0.ref}`, body: `The client booked another quote. Yours was ${diff === 0 ? 'about the same price' : `${Math.abs(diff)}% ${diff > 0 ? 'higher' : 'lower'}`}${Number(l.transit_days) !== Number(q.transit_days) ? ` and ${Math.abs(Number(l.transit_days) - Number(q.transit_days))} days ${Number(l.transit_days) > Number(q.transit_days) ? 'slower' : 'faster'}` : ''}.`, link: '/dashboard/leads?b=lost', dedupe: `lost:${l.id}` }, ['owner', 'dispatcher', 'agent'])
+    }
     await afterBooking(db, sid, { delivery: !!r0.delivery }).catch((e) => console.error('[booking] after', e))
     await notify(db, { userId: user.id, kind: 'booking_confirmed', title: `Booking confirmed — ${r0.ref}`, body: `${shipper.name} will handle your ${r0.origin} → ${r0.destination} shipment for $${Number(q.price).toLocaleString()}. Track it any time with reference ${r0.ref}.`, link: `/track?ref=${r0.ref}`, dedupe: `ship:${sid}:booked` })
     await notifyShipperStaff(db, q.shipper_id, { kind: 'quote_accepted', title: `${r0.contact_name} accepted your quote — ${r0.ref}`, body: `$${Number(q.price).toLocaleString()} · ${r0.quantity} × ${r0.cargo} · ${r0.origin} → ${r0.destination}. The order is now booked; arrange pickup or drop-off.`, link: '/dashboard/shipments', dedupe: `ship:${sid}:accepted` }, ['owner', 'dispatcher', 'agent'])
@@ -659,6 +720,16 @@ export function apiRouter() {
   mountGeoMeta(r, { getDb, requireAdmin, HttpError, wrap })
   mountShipmentOps(r, { getDb, requireUser, HttpError, wrap, loadShipments })
   mountFlow(r, { getDb, requireUser, HttpError, wrap, loadShipments })
+  const requestDeps = {
+    leadShippers: async (db: Db, row: Row) => {
+      if (row.preferred_shipper_id) { const { rows } = await db.query<Row>('select id, response_hours from shippers where id = $1', [row.preferred_shipper_id]); return rows.map((x) => ({ id: x.id, responseHours: Number(x.response_hours ?? 24) })) }
+      return (await matchShippers(db, { origin: row.origin, destination: row.destination, mode: row.mode, cargo: row.cargo })).filter((m) => leadFit(m.shipper, row as never).local).map((m) => ({ id: m.shipper.id, responseHours: Number(m.shipper.responseHours ?? 24) }))
+    },
+  }
+  mountRequestFlow(r, { getDb, requireUser, HttpError, wrap, loadRequests: loadRequests as never, ...requestDeps,
+    announce: async (db, row) => { await instantQuotesFromRates(db, row); if (DEMO_AUTO_QUOTES) await demoAutoQuotes(db, row); await notifyNewLead(db, row) } })
+  startRequestSweeps(getDb, requestDeps)
+  r.post('/admin/sweeps-requests', wrap(async (req, res) => { const db = await getDb(); await requireAdmin(db, req); await sweepRequests(db, requestDeps); res.json({ ok: true }) }))
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

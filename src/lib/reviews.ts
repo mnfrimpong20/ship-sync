@@ -14,7 +14,7 @@ export const reviewsApi = {
   mine: () => api<{ reviews: Review[]; rating: number; count: number; awaiting: number }>('/reviews'),
   hide: (id: string, status: 'published' | 'hidden') => api<{ ok: true }>(`/admin/reviews/${id}`, { method: 'PATCH', json: { status } }),
   dispute: (shipmentId: string) => api<{ dispute: Dispute | null; canOpen: boolean; reasons: { id: DisputeReason; label: string }[]; role: 'office' | 'customer' | 'admin' }>(`/shipments/${shipmentId}/dispute`),
-  openDispute: (shipmentId: string, b: { reason: DisputeReason; description: string; amountClaimedUsd?: number }) => api<{ dispute: Dispute }>(`/shipments/${shipmentId}/dispute`, { json: b }).then((r) => r.dispute),
+  openDispute: (shipmentId: string, b: { reason: DisputeReason; description: string; amountClaimedUsd?: number; photos?: string[] }) => api<{ dispute: Dispute }>(`/shipments/${shipmentId}/dispute`, { json: b }).then((r) => r.dispute),
   message: (id: string, text: string) => api<{ dispute: Dispute }>(`/disputes/${id}/message`, { json: { text } }).then((r) => r.dispute),
   withdraw: (id: string) => api<{ dispute: Dispute }>(`/disputes/${id}/withdraw`, { json: {} }).then((r) => r.dispute),
   resolve: (id: string, b: { outcome: 'refund_full' | 'refund_partial' | 'release' | 'no_action'; amountUsd?: number; note: string }) => api<{ dispute: Dispute }>(`/disputes/${id}/resolve`, { json: b }).then((r) => r.dispute),

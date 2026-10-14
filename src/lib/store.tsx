@@ -5,7 +5,7 @@ import type { PositionPayload } from '../components/LiveMap'
 import { hydrateCountries, hydrateOrigins, type Country } from './data'
 
 export type Role = 'customer' | 'shipper'
-export interface User { id: string; name: string; email: string; role: Role; company?: string; shipperId?: string; admin?: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: { allow?: string[]; deny?: string[] }; staffId?: string; readOnly?: boolean; viewAsBy?: string }
+export interface User { id: string; name: string; email: string; role: Role; company?: string; shipperId?: string; admin?: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: { allow?: string[]; deny?: string[] }; staffId?: string; readOnly?: boolean; viewAsBy?: string; actingBy?: { id: string; name: string; email: string } }
 export type ShipperProfileInput = Pick<Shipper, 'name' | 'tagline' | 'hq' | 'founded' | 'modes' | 'destinations' | 'origins' | 'cargo' | 'services' | 'about' | 'priceIndex' | 'responseHours'>
 export type AdminShipper = Shipper & { owner: { email: string; name: string } | null; quoteCount: number; shipmentCount: number; docCount: number; docsPending: number; verificationRequestedAt: string | null }
 
@@ -70,7 +70,7 @@ export interface Quote {
 }
 
 export type Match = { shipper: Shipper; score: number; reasons: string[]; estimate?: { price: number; transitDays: number; mode: 'air' | 'ocean'; instant: boolean } | null }
-export type NewRequest = Omit<QuoteRequest, 'id' | 'ref' | 'createdAt' | 'status' | 'quotes' | 'competingQuotes'> & { password?: string }
+export type NewRequest = Omit<QuoteRequest, 'id' | 'ref' | 'createdAt' | 'status' | 'quotes' | 'competingQuotes'> & { password?: string; poNumber?: string }
 
 interface Store {
   ready: boolean
@@ -82,7 +82,7 @@ interface Store {
   shipments: Shipment[]
   shipperById: (id: string) => Shipper | undefined
   login: (email: string, password: string) => Promise<User>
-  signup: (u: { name: string; email: string; password: string; role: Role; company?: string }) => Promise<User>
+  signup: (u: { name: string; email: string; password: string; role: Role; company?: string; ref?: string }) => Promise<User>
   resetPassword: (token: string, password: string) => Promise<User>
   logout: () => Promise<void>
   refresh: () => Promise<void>

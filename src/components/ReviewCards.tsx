@@ -53,6 +53,7 @@ export function DisputeCard({ shipmentId }: { shipmentId: string }) {
   const [f, setF] = useState<{ reason: DisputeReason; description: string; amount: string }>({ reason: 'damaged', description: '', amount: '' })
   const [msg, setMsg] = useState('')
   const [withdrawing, setWithdrawing] = useState(false)
+  const [photos, setPhotos] = useState<string[]>([])
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [toast, setToast] = useState('')
   const load = () => reviewsApi.dispute(shipmentId).then(setD).catch((e) => setError(e instanceof Error ? e.message : 'Could not load.'))
   useEffect(() => { void load() }, [shipmentId]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -72,6 +73,7 @@ export function DisputeCard({ shipmentId }: { shipmentId: string }) {
           <p><strong>{dp.reasonLabel}</strong>{dp.amountClaimedUsd ? ` · claims ${money(dp.amountClaimedUsd)}` : ''} · opened by {dp.openedBy} ({roleLabel[dp.openedByRole]}) {fmt(dp.createdAt)}</p>
           {dp.paymentId && <p className="text-xs text-text-muted">{dp.status === 'open' ? `${money(dp.paymentAmountUsd ?? 0)} in escrow is on hold until this is resolved.` : `Payment: ${dp.paymentStatus}.`}</p>}
           <ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto text-xs">{dp.messages.map((m, i) => <li key={i} className={`rounded-lg px-3 py-2 ${m.role === 'shipsync' ? 'border border-gold/40 bg-gold/10' : 'bg-surface-2/40'}`}><span className="font-semibold">{m.by}</span> <span className="text-text-muted">· {roleLabel[m.role] ?? m.role} · {fmt(m.at)}</span><p className="mt-0.5 whitespace-pre-line">{m.text}</p></li>)}</ul>
+          {(dp as { photos?: string[] }).photos?.length ? <div className="mt-2 flex flex-wrap gap-1.5" data-testid="dispute-photo-list">{(dp as { photos?: string[] }).photos!.map((p, i) => <a key={i} href={p} target="_blank" rel="noreferrer"><img src={p} alt={`Photo ${i + 1}`} className="h-16 w-16 rounded object-cover" /></a>)}</div> : null}
           {dp.resolution && dp.status === 'resolved' && <p className="mt-2 rounded-lg border border-teal/40 bg-teal/10 px-3 py-2 text-xs"><strong>Resolution ({dp.resolution.by}):</strong> {outcomeLabels[dp.resolution.outcome]}{dp.resolution.amountUsd ? ` ${money(dp.resolution.amountUsd)}` : ''} — {dp.resolution.note}</p>}
           {dp.status === 'open' && (
             <form onSubmit={(e) => { e.preventDefault(); void act(() => reviewsApi.message(dp.id, msg), 'Message sent.'); setMsg('') }} className="mt-2 flex gap-2"><input required aria-label="Message" className="input-dark !min-h-9 flex-1 text-sm" placeholder="Reply…" value={msg} onChange={(e) => setMsg(e.target.value)} /><button disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60"><MessageSquare size={12} aria-hidden="true" /> Send</button></form>
@@ -86,9 +88,10 @@ export function DisputeCard({ shipmentId }: { shipmentId: string }) {
         </div>
       )}
       {opening && (
-        <form onSubmit={(e) => { e.preventDefault(); void act(() => reviewsApi.openDispute(shipmentId, { reason: f.reason, description: f.description, amountClaimedUsd: f.amount ? Number(f.amount) : undefined }), 'Dispute opened — Ship Sync has been notified.') }} className="mt-3 grid gap-2 rounded-lg border border-border bg-surface-2/40 p-3" aria-label="Open a dispute" data-testid="dispute-form">
+        <form onSubmit={(e) => { e.preventDefault(); void act(() => reviewsApi.openDispute(shipmentId, { reason: f.reason, description: f.description, amountClaimedUsd: f.amount ? Number(f.amount) : undefined, photos }), 'Dispute opened — Ship Sync has been notified.') }} className="mt-3 grid gap-2 rounded-lg border border-border bg-surface-2/40 p-3" aria-label="Open a dispute" data-testid="dispute-form">
           <select aria-label="Reason" className="input-dark !min-h-9 text-sm" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value as DisputeReason })}>{d.reasons.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select>
           <textarea required minLength={10} rows={3} aria-label="What happened" className="input-dark py-2 text-sm" placeholder="What happened, which pieces, when you noticed…" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
+          <label className="text-xs text-text-muted">Photos (up to 4)<input type="file" accept="image/*" multiple className="mt-1 block text-xs" data-testid="dispute-photos" onChange={async (e) => { const fs = [...(e.target.files ?? [])].slice(0, 4); const { readImage } = await import('../lib/customerHub'); setPhotos(await Promise.all(fs.map((x) => readImage(x)))) }} />{photos.length > 0 && <span className="mt-1 flex gap-1">{photos.map((p, i) => <img key={i} src={p} alt="" className="h-12 w-12 rounded object-cover" />)}</span>}</label>
           <input type="number" min={0} aria-label="Amount claimed (USD)" className="input-dark !min-h-9 text-sm tabular-nums" placeholder="Amount you’re asking for (USD, optional)" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
           <div className="flex justify-end gap-2"><button type="button" onClick={() => setOpening(false)} className="btn-ghost !min-h-8 !px-3 text-xs">Cancel</button><button disabled={busy} className="inline-flex min-h-8 items-center rounded-lg bg-danger px-3 text-xs font-semibold text-white disabled:opacity-60">{busy ? 'Opening…' : 'Open dispute'}</button></div>
         </form>

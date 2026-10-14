@@ -11,7 +11,8 @@ import { clientsApi } from '../lib/clients'
 import { SOURCING_SHIPPER } from '../lib/sourcing'
 import { roleAllows, roleHome } from '../lib/ops'
 import { scanQueue, startQueueSync, SCAN_QUEUE_EVENT } from '../lib/scan'
-import { WifiOff, CloudUpload } from 'lucide-react'
+import { WifiOff, CloudUpload, CalendarDays, MessageSquare, FolderArchive, Repeat, AlertTriangle, CircleUser } from 'lucide-react'
+import { hubApi } from '../lib/customerHub'
 
 interface Item { to: string; label: string; icon: typeof Inbox; end?: boolean; badge?: number; group?: string }
 
@@ -87,7 +88,14 @@ export default function AppShell() {
         { to: '/dashboard?tab=shipments', label: 'Shipments', icon: Package, badge: active },
         { to: '/dashboard?tab=groupage', label: 'Shared barrels', icon: Boxes },
         { to: '/dashboard?tab=sourcing', label: 'China sourcing', icon: Globe2 },
+        { to: '/dashboard?tab=money', label: 'Money', icon: Wallet },
+        { to: '/dashboard?tab=week', label: 'This week', icon: CalendarDays },
+        { to: '/dashboard?tab=inbox', label: 'Messages', icon: MessageSquare },
+        { to: '/dashboard?tab=documents', label: 'Documents', icon: FolderArchive },
+        { to: '/dashboard?tab=plans', label: 'Saved & repeat', icon: Repeat },
         { to: '/dashboard?tab=invoices', label: 'Invoices', icon: Receipt },
+        { to: '/dashboard?tab=issues', label: 'Problems', icon: AlertTriangle },
+        { to: '/dashboard?tab=account', label: 'Account', icon: CircleUser },
         { to: '/quote', label: 'New request', icon: PlusCircle },
       ]
   const visible = items.filter(allowed)
@@ -176,6 +184,7 @@ export default function AppShell() {
           </div>
         </header>
         <PlatformBanners />
+        {user?.actingBy && <div data-testid="acting-banner" role="status" className="flex flex-wrap items-center justify-center gap-3 border-b border-gold/40 bg-gold/10 px-4 py-2 text-sm"><span>You’re using <b>{user.name}</b>’s account as {user.actingBy.name}.</span><button data-testid="acting-exit" onClick={() => { hubApi.switchTo(null).finally(() => { window.location.hash = '#/dashboard'; window.location.reload() }) }} className="rounded-md border border-gold/50 px-2.5 py-1 text-xs font-semibold text-gold hover:bg-gold/10 focus-ring">Switch back to my account</button></div>}
         <main id="main" className="ss-app flex-1">
           <AnimatePresence mode="wait">
             <motion.div key={loc.pathname} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>

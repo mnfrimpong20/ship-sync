@@ -6,6 +6,7 @@ import { insightsApi, type AttentionItem, type Benchmarks as BenchmarksT, type K
 import { fmtDateTime, money } from './ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { OnboardingChecklist } from './Onboarding'
+import { OrderLinkCard } from './OrderLink'
 import { useStore } from '../lib/store'
 
 /* ---------- small pieces ---------- */
@@ -191,6 +192,7 @@ export default function ShipperOverview({ firstName }: { firstName: string }) {
         <div className="space-y-6 xl:col-span-5">
           <motion.section variants={fadeUp} className="hidden xl:block" aria-labelledby="today-h-xl"><TodayCard t={o.today} /></motion.section>
 
+          <motion.section variants={fadeUp} aria-label="Order link"><OrderLinkCard /></motion.section>
           <motion.section variants={fadeUp} className="card-dark p-5" aria-labelledby="qa-h">
             <h2 id="qa-h" className="mb-3 !text-base">Quick actions</h2>
             <div className="grid grid-cols-2 gap-2 text-sm">

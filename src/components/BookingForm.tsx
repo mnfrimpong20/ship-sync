@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Car, Check, FileText, MapPin, Package, Truck, UserRound, Zap } from 'lucide-react'
+import { Car, Check, FileText, MapPin, Package, Store, Truck, UserRound, Zap } from 'lucide-react'
 import { cargoTypes, countries, countryByCode, type CargoType, type Mode } from '../lib/data'
 import type { Client, Consignee } from '../lib/clients'
-import { shipmentOpsApi, type FullBooking } from '../lib/shipmentOps'
+import { shipmentOpsApi, type FullBooking, type LaneTimes } from '../lib/shipmentOps'
 import { OriginCombobox } from './OriginCombobox'
 import { money } from './ui'
 
@@ -51,20 +51,26 @@ export function BookingForm({ client, consignees, onDone, onCancel }: { client: 
   const [invoice, setInvoice] = useState(true); const [sendInvoice, setSendInvoice] = useState(true)
   const [labels, setLabels] = useState(true); const [sendTracking, setSendTracking] = useState(true)
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
+  const [handover, setHandover] = useState<'delivery' | 'collection'>('collection')
+  const [lanes, setLanes] = useState<LaneTimes | null>(null)
 
-  useEffect(() => { shipmentOpsApi.prefs().then((p) => { setDueDays(p.invoiceDueDays); setLabels(p.autoLabels); setSendTracking(p.autoTrackingLink) }).catch(() => {}) }, [])
+  useEffect(() => { shipmentOpsApi.prefs().then((p) => { setDueDays(p.invoiceDueDays); setLabels(p.autoLabels); setSendTracking(p.autoTrackingLink); setHandover(p.defaultHandover) }).catch(() => {}); shipmentOpsApi.laneTimes().then(setLanes).catch(() => {}) }, [])
+  /** Your own median door-to-door days on this lane once there are 3+ deliveries, else the typical range. */
+  const learned = lanes?.lanes.find((l) => l.mode === mode && l.destination === destination && l.shipments >= 3)
+  const laneDays = learned ? learned.medianDays : transitDays(mode, destination)
   // ETA follows the ready date and lane until someone edits it by hand.
-  useEffect(() => { if (!etaTouched) setEta(plusDays(transitDays(mode, destination), readyDate || today())) }, [mode, destination, readyDate, etaTouched])
+  useEffect(() => { if (!etaTouched) setEta(plusDays(laneDays, readyDate || today())) }, [laneDays, readyDate, etaTouched])
   useEffect(() => { if (wantPickup) setPickup((p) => ({ ...p, date: readyDate || p.date })) }, [readyDate, wantPickup])
 
   const total = useMemo(() => num(price.freight) + num(price.pickup) + num(price.delivery) + num(price.insurance) + num(price.other) + num(price.tax), [price])
   const qty = Math.max(1, Math.round(num(quantity)))
   const isVehicle = cargo === 'vehicle'
   const steps = [
-    rcpMode !== 'later' && 'recipient gets arrival texts',
+    rcpMode !== 'later' ? (handover === 'collection' ? 'recipient gets arrival texts and a collection code' : 'recipient gets arrival texts') : 'client asked for the recipient',
     wantPickup && `pickup on ${pickup.date} goes on the pickup board`,
     labels && !isVehicle && `${qty} label${qty === 1 ? '' : 's'} — scans move the status`,
     invoice && total > 0 && `invoice for ${money(total)}${sendInvoice ? ' sent to the client' : ' saved'}`,
+    'packing list generated',
     sendTracking && client.userId && 'client gets the tracking link',
     isVehicle && 'vehicle export checklist starts',
   ].filter(Boolean) as string[]
@@ -83,7 +89,7 @@ export function BookingForm({ client, consignees, onDone, onCancel }: { client: 
       pickup: wantPickup ? pickup : undefined,
       vehicle: isVehicle ? { ...veh, year: veh.year ? Number(veh.year) : null } : undefined,
       price: num(price.freight) > 0 ? { freightUsd: num(price.freight), pickupUsd: num(price.pickup), deliveryUsd: num(price.delivery), insuranceUsd: num(price.insurance), otherUsd: num(price.other), otherLabel: price.otherLabel, taxUsd: num(price.tax), dueDays, createInvoice: invoice, sendInvoice } : undefined,
-      labels: labels && !isVehicle, sendTracking,
+      labels: labels && !isVehicle, sendTracking, handover,
     }
     setBusy(true)
     try { const r = await shipmentOpsApi.book(client.id, b); await onDone(`${r.shipment.ref} booked${r.did.length ? ` — ${r.did.join(', ')}` : ''}.`) }
@@ -105,7 +111,7 @@ export function BookingForm({ client, consignees, onDone, onCancel }: { client: 
           <L label="Description" className="md:col-span-2"><input className="input-dark !min-h-10" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={isVehicle ? '2017 Honda Accord, keys + spare tyre' : '3 blue barrels of provisions and clothing'} data-testid="bk-desc" /></L>
           <L label="Dimensions (optional)"><input className="input-dark !min-h-10" value={dims} onChange={(e) => setDims(e.target.value)} placeholder="L×W×H, e.g. 90×60×60 cm" /></L>
           <L label="Ready to collect"><input type="date" min={today()} className="input-dark !min-h-10" value={readyDate} onChange={(e) => setReadyDate(e.target.value)} /></L>
-          <L label="ETA at destination"><input type="date" required min={today()} className="input-dark !min-h-10" value={eta} onChange={(e) => { setEta(e.target.value); setEtaTouched(true) }} data-testid="bk-eta" /></L>
+          <L label={learned ? `ETA — your median on this lane is ${learned.medianDays} days (${learned.onTimeRate}% on time)` : 'ETA at destination'}><input type="date" required min={today()} className="input-dark !min-h-10" value={eta} onChange={(e) => { setEta(e.target.value); setEtaTouched(true) }} data-testid="bk-eta" /></L>
           <L label="Declared value, USD (optional)"><input inputMode="decimal" className="input-dark !min-h-10" value={declared} onChange={(e) => setDeclared(e.target.value.replace(/[^\d.]/g, ''))} placeholder="For insurance & customs" /></L>
         </div>
       </Section>
@@ -140,7 +146,12 @@ export function BookingForm({ client, consignees, onDone, onCancel }: { client: 
             <L label="Relationship (optional)"><input className="input-dark !min-h-10" value={rcp.relationship} onChange={(e) => setRcp({ ...rcp, relationship: e.target.value })} placeholder="Brother" /></L>
           </div>
         )}
-        {rcpMode === 'later' && <p className="text-xs text-text-muted">You can add it on the shipment any time — it’s flagged until you do.</p>}
+        {rcpMode === 'later' && <p className="text-xs text-text-muted">We’ll ask {client.name.split(' ')[0]} for it{client.email || client.userId ? '' : ' (add their email so we can)'} — and it’s flagged on the shipment until it’s in.</p>}
+        <div className="grid gap-1 text-xs"><span className="text-text-muted">At destination</span>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Handover at destination">
+            {(['collection', 'delivery'] as const).map((h) => <button key={h} type="button" role="radio" aria-checked={handover === h} onClick={() => setHandover(h)} className={`flex flex-1 items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs focus-ring ${handover === h ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted'}`} data-testid={`bk-handover-${h}`}>{h === 'collection' ? <Store size={14} aria-hidden="true" /> : <Truck size={14} aria-hidden="true" />}<span><span className="block font-semibold">{h === 'collection' ? 'Recipient collects' : 'Door delivery'}</span><span className="block">{h === 'collection' ? 'From your warehouse with a 6-digit code' : 'A driver brings it; recipient confirms'}</span></span></button>)}
+          </div>
+        </div>
       </Section>
 
       <Section icon={Truck} title="Pickup" hint="Collecting from the client? It goes straight on the pickup board, ready for a run." aside={<label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-gold" checked={wantPickup} onChange={(e) => setWantPickup(e.target.checked)} data-testid="bk-pickup" /> We collect it</label>}>

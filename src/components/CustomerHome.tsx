@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { AlertTriangle, Bell, Check, Globe2, Info, MapPin, MessageCircle, Package, Pencil, Phone, Plane, Plus, Receipt, Ship, Star, Trash2, UserRound } from 'lucide-react'
 import { customerApi, type AttentionItem, type Consignee, type ConsigneeInput, type NextArrival } from '../lib/customer'
-import { countries, countryByCode, statusLabels, statusOrder, type ShipmentStatus } from '../lib/data'
+import { countries, countryByCode, flowFor, statusLabels, type ShipmentStatus } from '../lib/data'
 import { Pill, fmtDate, fmtDateTime } from './ui'
 
 const sevCls = { critical: 'border-l-danger', warning: 'border-l-gold', info: 'border-l-sky' } as const
@@ -50,7 +50,7 @@ export function NextArrivalCard({ s }: { s: NextArrival }) {
         <Pill tone={s.status === 'out_for_delivery' ? 'green' : s.status === 'customs' ? 'gold' : 'teal'}>{statusLabels[s.status as ShipmentStatus]}</Pill>
       </div>
       <ol className="mt-5 flex items-center gap-1" aria-label="Progress">
-        {statusOrder.map((st, i) => <li key={st} className={`h-1.5 flex-1 rounded-full ${i <= s.stepIndex ? 'bg-gold' : 'bg-surface-2'}`} title={statusLabels[st]} />)}
+        {flowFor(s.handover).map((st, i) => <li key={st} className={`h-1.5 flex-1 rounded-full ${i <= s.stepIndex ? 'bg-gold' : 'bg-surface-2'}`} title={statusLabels[st]} />)}
       </ol>
       <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
         <div className="flex items-center gap-2"><Icon size={16} className="text-gold-deep" aria-hidden="true" /><span><span className="block text-xs text-text-muted">{s.mode === 'air' ? 'Flight' : 'Vessel'}</span>{s.vessel ?? s.flight ?? 'To be assigned'}</span></div>

@@ -34,7 +34,8 @@ function SystemCard() {
           <ul className="mt-3 divide-y divide-border">
             <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>Database</span><span className={`text-xs ${info.database.startsWith('postgres') ? 'text-text-muted' : 'text-danger'}`}>{info.database}</span></li>
             <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>Email</span><Pill tone={info.email === 'resend' ? 'green' : 'danger'}>{info.email}</Pill></li>
-            <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>SMS / WhatsApp</span><Pill tone={info.sms === 'off' ? 'muted' : 'green'}>{info.sms}</Pill></li>
+            <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>SMS</span><Pill tone={info.sms === 'off' ? 'muted' : 'green'}>{info.sms}</Pill></li>
+            <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>WhatsApp <span className="text-xs text-text-muted">(WHATSAPP_TOKEN + WHATSAPP_PHONE_ID, or TWILIO_WHATSAPP_FROM)</span></span><Pill tone={!info.whatsapp || info.whatsapp === 'off' ? 'muted' : 'green'}>{info.whatsapp ?? 'off'}</Pill></li>
             <Flag on={info.stripe} label="Stripe payments" warn />
             <Flag on={info.ais} label="Live vessel positions (AIS)" />
             <Flag on={info.terminal49} label="Container tracking (Terminal49)" />

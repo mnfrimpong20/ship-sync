@@ -106,3 +106,34 @@ Routes live in `server/requestFlow.ts` (edit, cancel, open to market, withdraw, 
 - **Guest requests.** The password is optional. Without one, an account is created and a set-password link (`/#/reset?token=…&welcome=1`, valid 3 days) is emailed.
 - **New fields.** Requests have `dims` and `declared_value_usd`, both copied into the shipment's booking on accept.
 - **Sweeps.** Every 30 min: quote expiry, request expiry, no-quote alerts after 24 h, and unanswered-lead reminders to shippers after their response time (at least 6 h). Admins can run them on demand with `POST /admin/sweeps-requests`.
+
+## Shipper analytics (`/dashboard/analytics`)
+
+`server/analytics.ts` serves `GET /shipper/analytics?days=30|90|180|365&origin=&cargo=`. It compares the chosen period with the one before it. The page is `src/pages/Analytics.tsx`, and the charts come from `src/components/Charts.tsx`: inline SVG, theme tokens, hover tooltips and CSV export on every table.
+
+- **Overview.** Ranked insights (act now / worth fixing / opportunity / going well), each linking to the page where it can be fixed. Eight headline numbers with change against the prior period, plus the quotes/wins and invoiced/collected trends.
+- **Sales.**
+  - The funnel: matching requests → quoted → won → delivered.
+  - Quote rate, win rate, booked value, average deal, median and p90 reply time, share of replies within 2 h, and the value of unanswered requests.
+  - Win rate by reply speed, by price position (against the cheapest competing quote), and firm vs estimate.
+  - Why quotes were lost, and reply time by weekday.
+  - Lane, cargo and source tables, including the price gap against competitors.
+- **Operations.**
+  - Booked and delivered counts, on time against the ETA promised at booking, and door-to-door median and p90.
+  - The live board by status, with age.
+  - Time in each stage (median, p90, platform median), with the bottleneck flagged.
+  - On time by lane.
+  - Drivers: runs, stops, completion and km, plus why stops were missed.
+  - Pickups, containers, warehouse dwell and disputes.
+- **Finance.**
+  - Invoiced, collected, collection rate, days to get paid, outstanding and overdue, and revenue per kg.
+  - Aging buckets, and revenue by service, by lane and by client.
+  - Payment methods, largest balances, escrow and insurance commission.
+- **Customers.**
+  - Active, new, returning and repeat rate.
+  - Rating distribution and trend, and review tags.
+  - Bookings by source, and clients to win back (2+ shipments, none in 90 days).
+- **Access.**
+  - The new area is `analytics`. Owners, dispatchers, agents, finance and warehouse staff get it by default; drivers don't.
+  - Each tab also needs its own area: leads for sales, shipments for operations, payments for finance, clients for customers.
+- **Demo history.** `server/analyticsSeed.ts` seeds a year of Gold Coast history (ids `ra_*`): requests with competing quotes, delivered shipments with stage events, invoices, payments, reviews and past runs. All of it is terminal, so no sweep acts on it. Set `DEMO_HISTORY=false` to skip it (the local test scripts do).

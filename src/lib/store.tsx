@@ -10,6 +10,7 @@ export type AdminShipper = Shipper & { owner: { email: string; name: string } | 
 export interface RequestConsignee { name: string; phone?: string; address?: string; city?: string; country?: string; relationship?: string }
 export interface QuoteRequest {
   consignee?: RequestConsignee
+  source?: 'marketplace' | 'picked' | 'link' | 'branded'
   id: string
   ref: string
   createdAt: string

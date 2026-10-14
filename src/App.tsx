@@ -48,6 +48,7 @@ const PublicSailings = L(() => import('./pages/Sailings'), 'PublicSailings')
 const Warehouse = lazy(() => import('./pages/Warehouse'))
 const LanesPage = lazy(() => import('./pages/Lanes'))
 const ShipperLanes = L(() => import('./pages/Lanes'), 'ShipperLanes')
+const AnalyticsPage = lazy(() => import('./pages/Analytics'))
 const ReviewsPage = lazy(() => import('./pages/Reviews'))
 const BrandedPage = lazy(() => import('./pages/WhiteLabel'))
 const SupplierPortalPage = lazy(() => import('./pages/SupplierPortal'))
@@ -171,6 +172,7 @@ export default function App() {
               <Route path="/dashboard/sailings" element={<Sailings />} />
               <Route path="/dashboard/warehouse" element={<Warehouse />} />
               <Route path="/dashboard/lanes" element={<ShipperLanes />} />
+              <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
               <Route path="/dashboard/reviews" element={<ReviewsPage />} />
               <Route path="/dashboard/brand" element={<BrandEditor />} />
               <Route path="/dashboard/sourcing" element={<SourcingBoard />} />

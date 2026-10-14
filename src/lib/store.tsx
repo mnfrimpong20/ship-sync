@@ -27,8 +27,17 @@ export interface QuoteRequest {
   delivery: boolean
   insurance: boolean
   readyDate: string
-  contact: { name: string; email: string; phone: string }
-  status: 'open' | 'booked' | 'closed'
+  /** Shipper view: hidden=true until their quote is accepted (name is first name + initial). */
+  contact: { name: string; email: string; phone: string; hidden?: boolean }
+  status: 'open' | 'booked' | 'closed' | 'cancelled' | 'expired'
+  dims?: string
+  declaredValueUsd?: number
+  expiresAt?: string
+  updatedAt?: string
+  cancelReason?: string
+  openedToMarket?: boolean
+  /** Shipper view: eligible but outside their pickup cities/state. */
+  outsideArea?: boolean
   quotes: Quote[]
   /** White-label: the request was sent to this shipper only. */
   preferredShipperId?: string
@@ -49,8 +58,15 @@ export interface Quote {
   validUntil: string
   notes: string
   includes: string[]
-  status: 'sent' | 'accepted' | 'declined'
+  status: 'sent' | 'accepted' | 'declined' | 'withdrawn' | 'expired'
   sentAt: string
+  updatedAt?: string
+  kind?: 'firm' | 'estimate'
+  mode?: 'air' | 'ocean'
+  /** Past valid-until but not yet swept. */
+  expired?: boolean
+  /** The request changed after this quote was sent. */
+  stale?: boolean
 }
 
 export type Match = { shipper: Shipper; score: number; reasons: string[]; estimate?: { price: number; transitDays: number; mode: 'air' | 'ocean'; instant: boolean } | null }
@@ -72,7 +88,7 @@ interface Store {
   refresh: () => Promise<void>
   createRequest: (r: NewRequest) => Promise<QuoteRequest>
   acceptQuote: (requestId: string, quoteId: string) => Promise<Shipment>
-  sendQuote: (requestId: string, q: { price: number; transitDays: number; notes: string; includes: string[] }) => Promise<void>
+  sendQuote: (requestId: string, q: { price: number; transitDays: number; notes: string; includes: string[]; validUntil?: string; kind?: 'firm' | 'estimate'; mode?: 'air' | 'ocean' }) => Promise<void>
   advanceShipment: (id: string, note?: string) => Promise<void>
   matchShippers: (r: Pick<QuoteRequest, 'origin' | 'destination' | 'mode' | 'cargo'> & Partial<Pick<QuoteRequest, 'quantity' | 'weightKg' | 'pickup' | 'delivery' | 'insurance'>>) => Promise<Match[]>
   track: (ref: string) => Promise<Shipment | null>

@@ -38,7 +38,7 @@ export async function shrinkPhoto(file: File, max = 1100, quality = 0.72): Promi
  * A driver in a yard with no signal still scans; failed submissions wait in localStorage and go up
  * when the phone is back online (or on the next visit). The original scan time travels with them. */
 const QUEUE_KEY = 'ss-scan-queue'
-export interface QueuedScan { id: string; input: ScanInput; at: string; tries: number; error?: string }
+export interface QueuedScan { id: string; input: ScanInput; at: string; tries: number; error?: string; stop?: { runId: string; stopId: string; patch: { status?: 'done' | 'skipped' | 'pending'; note?: string } } }
 export const SCAN_QUEUE_EVENT = 'ss:scan-queue'
 const readQueue = (): QueuedScan[] => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]') } catch { return [] } }
 const writeQueue = (q: QueuedScan[]) => { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)) } catch { /* storage blocked */ } window.dispatchEvent(new Event(SCAN_QUEUE_EVENT)) }
@@ -51,7 +51,7 @@ export const scanQueue = {
   async flush(): Promise<{ sent: number; left: number }> {
     let sent = 0
     for (const item of readQueue()) {
-      try { await scanApi.scan(item.input); this.remove(item.id); sent++ } catch (e) {
+      try { if (item.stop) await api(`/runs/${item.stop.runId}/stops/${item.stop.stopId}`, { method: 'PATCH', json: item.stop.patch }); else await scanApi.scan(item.input); this.remove(item.id); sent++ } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         const q = readQueue(); const it = q.find((x) => x.id === item.id)
         if (it) { it.tries++; it.error = msg }
@@ -69,6 +69,16 @@ export async function scanOrQueue(input: ScanInput): Promise<{ queued: true; ite
   try { return { queued: false, result: await scanApi.scan(input) } } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     if (/failed to fetch|networkerror|load failed|network request failed|fetch failed/i.test(msg)) return { queued: true, item: scanQueue.add(input) }
+    throw e
+  }
+}
+/** Mark a run stop done/skipped now if we can, otherwise queue it with the same offline rules as scans. */
+export async function stopOrQueue(runId: string, stopId: string, patch: { status?: 'done' | 'skipped' | 'pending'; note?: string }): Promise<{ queued: boolean }> {
+  const add = () => { const q = readQueue(); q.push({ id: Math.random().toString(36).slice(2, 10), input: { code: `stop:${stopId}`, kind: 'delivery' }, at: new Date().toISOString(), tries: 0, stop: { runId, stopId, patch } }); writeQueue(q); return { queued: true } }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return add()
+  try { await api(`/runs/${runId}/stops/${stopId}`, { method: 'PATCH', json: patch }); return { queued: false } } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (/failed to fetch|networkerror|load failed|network request failed|fetch failed/i.test(msg)) return add()
     throw e
   }
 }

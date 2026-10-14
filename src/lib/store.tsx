@@ -3,11 +3,13 @@ import { shippers as seedShippers, type CargoType, type Mode, type Shipment, typ
 import type { PositionPayload } from '../components/LiveMap'
 
 export type Role = 'customer' | 'shipper'
-export interface User { id: string; name: string; email: string; role: Role; company?: string; shipperId?: string; admin?: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver' }
+export interface User { id: string; name: string; email: string; role: Role; company?: string; shipperId?: string; admin?: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: { allow?: string[]; deny?: string[] }; staffId?: string }
 export type ShipperProfileInput = Pick<Shipper, 'name' | 'tagline' | 'hq' | 'founded' | 'modes' | 'destinations' | 'origins' | 'cargo' | 'services' | 'about' | 'priceIndex' | 'responseHours'>
 export type AdminShipper = Shipper & { owner: { email: string; name: string } | null; quoteCount: number; shipmentCount: number; docCount: number; docsPending: number; verificationRequestedAt: string | null }
 
+export interface RequestConsignee { name: string; phone?: string; address?: string; city?: string; country?: string; relationship?: string }
 export interface QuoteRequest {
+  consignee?: RequestConsignee
   id: string
   ref: string
   createdAt: string

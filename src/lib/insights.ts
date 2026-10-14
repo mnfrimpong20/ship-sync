@@ -4,7 +4,11 @@ import type { ShipmentStatus } from './data'
 export interface Kpi { value: number | null; prev?: number; delta?: number | null; hint: string }
 export interface WeekPoint { week: string; quotes: number; won: number; booked: number; invoiced: number }
 export interface AttentionItem { kind: 'lead' | 'shipment' | 'invoice' | 'run' | 'followup' | 'vehicle' | 'profile'; severity: 'critical' | 'warning' | 'info'; title: string; body: string; to: string; at?: string | null }
+export interface TodayBlock { date: string; pickups: { id: string; ref: string; window: string; city: string; contact: string; status: string }[]; runs: { id: string; name: string; kind: string; status: string; driver: string | null; stops: number; pending: number }[]; cutoffs: { id: string; ref: string; number: string; vessel: string; cutoff: string; daysLeft: number; loaded: number; status: string }[]; arriving: { id: string; ref: string; customer: string; destination: string; status: string }[]; newLeads: number; late: number }
+export interface Benchmarks { responseHours: { you: number | null; verifiedMedian: number | null; target: number; fastWinRatePct: number | null }; winRatePct: { you: number | null; verifiedAvg: number | null }; onTimePct: { you: number | null; target: number }; verified: boolean }
 export interface Overview {
+  today: TodayBlock
+  benchmarks: Benchmarks
   period: { from: string; to: string }
   kpis: { leads: Kpi; quotes: Kpi; winRate: Kpi; response: Kpi; active: Kpi; delivered: Kpi; invoiced: Kpi; collected: Kpi; outstanding: Kpi; clients: Kpi }
   series: WeekPoint[]

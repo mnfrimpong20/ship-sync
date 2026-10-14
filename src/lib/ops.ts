@@ -3,7 +3,10 @@ import type { Mode, ShipmentStatus } from './data'
 
 export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'
 export type StaffBase = 'origin' | 'destination'
-export interface Staff { id: string; shipperId: string; userId?: string; name: string; email: string; phone: string; role: StaffRole; status: 'invited' | 'active' | 'inactive'; base: StaffBase; city: string; inviteToken?: string; createdAt: string; runCount?: number }
+export type Area = 'leads' | 'rates' | 'lanes' | 'groupage' | 'brand' | 'shipments' | 'containers' | 'sailings' | 'pickups' | 'routes' | 'warehouse' | 'clients' | 'payments' | 'collections' | 'reviews' | 'fleet' | 'team' | 'verification' | 'sourcing'
+export interface StaffPerms { allow?: Area[]; deny?: Area[] }
+export interface StaffActivity { runsWeek: number; stopsWeek: number; scansWeek: number; quotesWeek: number; quotesWonWeek: number; lastScanAt: string | null }
+export interface Staff { id: string; shipperId: string; userId?: string; name: string; email: string; phone: string; role: StaffRole; status: 'invited' | 'active' | 'inactive'; base: StaffBase; city: string; inviteToken?: string; createdAt: string; runCount?: number; perms?: StaffPerms; lastActiveAt?: string | null; activity?: StaffActivity }
 export interface InviteInput { name: string; email: string; phone?: string; role: StaffRole; base: StaffBase; city?: string }
 export type VehicleType = 'van' | 'truck' | 'box_truck' | 'pickup' | 'trailer' | 'car' | 'motorbike'
 export type VehicleStatus = 'available' | 'on_run' | 'maintenance' | 'retired'
@@ -34,21 +37,38 @@ export const vehicleStatusLabels: Record<VehicleStatus, string> = { available: '
 export const runStatusLabels: Record<RunStatus, string> = { planned: 'Planned', in_progress: 'In progress', done: 'Done', cancelled: 'Cancelled' }
 export const canManageOps = (role?: StaffRole) => role === 'owner' || role === 'dispatcher'
 /** Which /dashboard areas each role gets. Owners and dispatchers see everything; the lists are prefixes of pathnames. */
-export const ROLE_AREAS: Record<StaffRole, string[] | 'all'> = {
+/** Which /dashboard areas each role gets by default; a person's `perms` add (allow) or remove (deny) areas on top. */
+export const AREA_PATHS: Record<Area, string> = { leads: '/dashboard/leads', rates: '/dashboard/rates', lanes: '/dashboard/lanes', groupage: '/dashboard/groupage', brand: '/dashboard/brand', shipments: '/dashboard/shipments', containers: '/dashboard/containers', sailings: '/dashboard/sailings', pickups: '/dashboard/pickups', routes: '/dashboard/routes', warehouse: '/dashboard/warehouse', clients: '/dashboard/clients', payments: '/dashboard/payments', collections: '/dashboard/collections', reviews: '/dashboard/reviews', fleet: '/dashboard/fleet', team: '/dashboard/team', verification: '/dashboard/verification', sourcing: '/dashboard/sourcing' }
+export const AREA_LABELS: Record<Area, string> = { leads: 'Leads & quotes', rates: 'Rate cards', lanes: 'Lane intelligence', groupage: 'Fill a barrel', brand: 'Branded page', shipments: 'Shipments', containers: 'Containers', sailings: 'Book a sailing', pickups: 'Pickups', routes: 'Routes', warehouse: 'Warehouse', clients: 'Clients', payments: 'Payments', collections: 'Collections', reviews: 'Reviews', fleet: 'Fleet', team: 'Team', verification: 'Verification', sourcing: 'Sourcing' }
+export const ROLE_BASE: Record<StaffRole, Area[] | 'all'> = {
   owner: 'all', dispatcher: 'all',
-  agent: ['/dashboard/shipper', '/dashboard/leads', '/dashboard/rates', '/dashboard/lanes', '/dashboard/groupage', '/dashboard/shipments', '/dashboard/containers', '/dashboard/sailings', '/dashboard/pickups', '/dashboard/routes', '/dashboard/warehouse', '/dashboard/clients', '/dashboard/reviews', '/dashboard/team', '/dashboard/documents', '/dashboard/invoices', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/sourcing', '/dashboard/suppliers', '/dashboard/verification'],
-  finance: ['/dashboard/shipper', '/dashboard/clients', '/dashboard/payments', '/dashboard/collections', '/dashboard/invoices', '/dashboard/reviews', '/dashboard/shipments', '/dashboard/team', '/dashboard/documents', '/dashboard/notifications'],
-  warehouse: ['/dashboard/warehouse', '/dashboard/containers', '/dashboard/pickups', '/dashboard/shipments', '/dashboard/scan', '/dashboard/labels', '/dashboard/team', '/dashboard/notifications', '/dashboard/documents'],
-  driver: ['/dashboard/runs', '/dashboard/team', '/dashboard/notifications', '/dashboard/scan'],
+  agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing'],
+  finance: ['clients', 'payments', 'collections', 'reviews', 'shipments', 'team'],
+  warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team'],
+  driver: ['routes', 'team'],
+}
+const ALWAYS = ['/dashboard/shipper', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/documents', '/dashboard/invoices', '/dashboard/runs', '/dashboard/suppliers']
+/** Effective areas for a person: role defaults + allow − deny. */
+export function areasFor(role: StaffRole | undefined, perms?: StaffPerms): Area[] | 'all' {
+  const base = ROLE_BASE[role ?? 'owner']
+  if (base === 'all') return perms?.deny?.length ? (Object.keys(AREA_PATHS) as Area[]).filter((a) => !perms.deny!.includes(a)) : 'all'
+  const set = new Set<Area>([...base, ...(perms?.allow ?? [])]); for (const d of perms?.deny ?? []) set.delete(d)
+  return [...set]
 }
 export const roleHome: Record<StaffRole, string> = { owner: '/dashboard/shipper', dispatcher: '/dashboard/shipper', agent: '/dashboard/shipper', finance: '/dashboard/shipper', warehouse: '/dashboard/warehouse', driver: '/dashboard/runs' }
-export const roleAllows = (role: StaffRole | undefined, pathname: string) => { const a = ROLE_AREAS[role ?? 'owner']; return a === 'all' || a.some((p) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p + '?')) }
+export const roleAllows = (role: StaffRole | undefined, pathname: string, perms?: StaffPerms) => {
+  const hit = (p: string) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p + '?')
+  if (role === 'driver' && hit('/dashboard/shipper')) return false
+  if (ALWAYS.some(hit)) return true
+  const a = areasFor(role, perms); if (a === 'all') return true
+  return a.some((x) => hit(AREA_PATHS[x]))
+}
 
 export const opsApi = {
   me: () => api<{ staff: Staff }>('/team/me').then((r) => r.staff),
   team: () => api<{ team: Staff[] }>('/team').then((r) => r.team),
   invite: (i: InviteInput) => api<{ staff: Staff }>('/team/invite', { json: i }).then((r) => r.staff),
-  updateStaff: (id: string, p: Partial<Pick<Staff, 'role' | 'status' | 'phone' | 'base' | 'city' | 'name'>>) => api<{ staff: Staff }>(`/team/${id}`, { method: 'PATCH', json: p }).then((r) => r.staff),
+  updateStaff: (id: string, p: Partial<Pick<Staff, 'role' | 'status' | 'phone' | 'base' | 'city' | 'name'>> & { perms?: { allow: Area[]; deny: Area[] } }) => api<{ staff: Staff }>(`/team/${id}`, { method: 'PATCH', json: p }).then((r) => r.staff),
   reinvite: (id: string) => api<{ staff: Staff }>(`/team/${id}/reinvite`, { method: 'POST' }).then((r) => r.staff),
   joinInfo: (token: string) => api<{ invite: JoinInvite }>(`/join/${encodeURIComponent(token)}`).then((r) => r.invite),
   join: (token: string, b: { name: string; password: string }) => api<{ user: unknown }>(`/join/${encodeURIComponent(token)}`, { json: b }),
@@ -63,6 +83,7 @@ export const opsApi = {
   updateRun: (id: string, p: Partial<Omit<RunInput, 'stops' | 'kind'>> & { status?: RunStatus }) => api<{ run: Run }>(`/runs/${id}`, { method: 'PATCH', json: p }).then((r) => r.run),
   optimise: (id: string) => api<{ run: Run }>(`/runs/${id}/optimise`, { method: 'POST' }).then((r) => r.run),
   addStop: (id: string, s: StopInput) => api<{ run: Run }>(`/runs/${id}/stops`, { json: s }).then((r) => r.run),
+  late: (id: string, minutes: number, note = '') => api<{ ok: true; told: number; pending: number }>(`/runs/${id}/late`, { json: { minutes, note } }),
   updateStop: (id: string, sid: string, p: Partial<StopInput> & { status?: RunStop['status']; note?: string; seq?: number }) => api<{ run: Run }>(`/runs/${id}/stops/${sid}`, { method: 'PATCH', json: p }).then((r) => r.run),
   deleteStop: (id: string, sid: string) => api<{ run: Run }>(`/runs/${id}/stops/${sid}`, { method: 'DELETE' }).then((r) => r.run),
 }

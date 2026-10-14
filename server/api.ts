@@ -33,6 +33,7 @@ import { mountSupplierPortal } from './supplierPortal'
 import { mountOnboarding, onVerified } from './onboarding'
 import { consigneeToClient, mountCustomer, rememberConsignee, zConsignee } from './customer'
 import { isActiveDestination, mountGeoMeta, bustOrigins } from './geoMeta'
+import { invoiceForBooking, mountShipmentOps } from './shipmentOps'
 import { mountBooking } from './booking'
 import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
@@ -522,6 +523,7 @@ export function apiRouter() {
     await attachShipmentToClient(db, q.shipper_id, user.id, sid, r0.contact_name, r0.contact_email)
     await consigneeToClient(db, sid, r0.consignee ? J(r0.consignee) : null)
     if (r0.cargo === 'vehicle') await vehicleFromRequest(db, r0.id, sid)
+    await invoiceForBooking(db, sid, q).catch((e) => console.error('[invoice] auto', e))
     await notify(db, { userId: user.id, kind: 'booking_confirmed', title: `Booking confirmed — ${r0.ref}`, body: `${shipper.name} will handle your ${r0.origin} → ${r0.destination} shipment for $${Number(q.price).toLocaleString()}. Track it any time with reference ${r0.ref}.`, link: `/track?ref=${r0.ref}`, dedupe: `ship:${sid}:booked` })
     await notifyShipperStaff(db, q.shipper_id, { kind: 'quote_accepted', title: `${r0.contact_name} accepted your quote — ${r0.ref}`, body: `$${Number(q.price).toLocaleString()} · ${r0.quantity} × ${r0.cargo} · ${r0.origin} → ${r0.destination}. The order is now booked; arrange pickup or drop-off.`, link: '/dashboard/shipments', dedupe: `ship:${sid}:accepted` }, ['owner', 'dispatcher', 'agent'])
     const [shipment] = await loadShipments(db, 'id = $1', [sid])
@@ -606,6 +608,7 @@ export function apiRouter() {
   mountOnboarding(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountCustomer(r, { getDb, requireUser, HttpError, wrap })
   mountGeoMeta(r, { getDb, requireAdmin, HttpError, wrap })
+  mountShipmentOps(r, { getDb, requireUser, HttpError, wrap, loadShipments })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

@@ -1020,6 +1020,8 @@ create table if not exists company_documents (
 alter table shippers add column if not exists verification_requested_at timestamptz;
 alter table shippers add column if not exists verification_note text;
 alter table shippers add column if not exists onboarding_dismissed_at timestamptz;
+alter table shippers add column if not exists prefs jsonb not null default '{}';
+alter table shipments add column if not exists booking jsonb;
 create table if not exists supplier_links (
   token text primary key,
   sourcing_id text not null references sourcing_requests(id) on delete cascade,

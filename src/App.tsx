@@ -52,6 +52,7 @@ const ReviewsPage = lazy(() => import('./pages/Reviews'))
 const BrandedPage = lazy(() => import('./pages/WhiteLabel'))
 const SupplierPortalPage = lazy(() => import('./pages/SupplierPortal'))
 const Verification = lazy(() => import('./pages/Verification'))
+const OrderPage = lazy(() => import('./pages/Order'))
 const BrandEditor = L(() => import('./pages/WhiteLabel'), 'BrandEditor')
 const SourcingPage = lazy(() => import('./pages/Sourcing'))
 const SourcingNew = L(() => import('./pages/Sourcing'), 'SourcingNew')
@@ -196,6 +197,7 @@ export default function App() {
             <Route path="/r/:token" element={<Receive />} />
             <Route path="/broker/:token" element={<BrokerPortal />} />
             <Route path="/s/:token" element={<SupplierPortalPage />} />
+            <Route path="/order/:code" element={<OrderPage />} />
             <Route path="/t/:slug" element={<BrandedPage />} />
           </Routes>
           </Suspense>

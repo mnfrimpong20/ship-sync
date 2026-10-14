@@ -968,6 +968,23 @@ alter table sourcing_requests add column if not exists recurring jsonb;
 alter table sourcing_requests add column if not exists parent_id text;
 alter table sourcing_quotes add column if not exists tiers jsonb;
 alter table sourcing_quotes add column if not exists base_price_cny numeric;
+create table if not exists customer_consignees (
+  id text primary key,
+  user_id text not null references users(id) on delete cascade,
+  name text not null,
+  phone text not null default '',
+  address text not null default '',
+  city text not null default '',
+  country text not null default 'GH',
+  relationship text not null default '',
+  is_default boolean not null default false,
+  last_used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+alter table requests add column if not exists consignee jsonb;
+alter table staff add column if not exists perms jsonb not null default '{}';
+alter table staff add column if not exists last_active_at timestamptz;
+alter table quotes add column if not exists sent_by text;
 create table if not exists company_documents (
   id text primary key,
   shipper_id text not null references shippers(id) on delete cascade,

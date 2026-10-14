@@ -109,7 +109,35 @@ export function mountInsights(r: Router, d: Deps) {
     const sevRank = { critical: 0, warning: 1, info: 2 }
     attention.sort((a, b) => sevRank[a.severity] - sevRank[b.severity])
 
+    // ---- today: what the ops person checks at 7am on a phone
+    const { rows: pickupsToday } = await db.query<Row>(`select p.id, p.window_start, p.window_end, p.city, p.contact_name, p.status, s.ref from pickup_requests p join shipments s on s.id = p.shipment_id where p.shipper_id = $1 and p.pickup_date = $2 and p.status in ('requested','confirmed') order by p.window_start`, [sid, today])
+    const { rows: cutoffs } = await db.query<Row>(`select id, ref, number, vessel_name, cutoff_date, status, (select count(*) from shipments x where x.container_id = containers.id)::int as loaded from containers where shipper_id = $1 and status in ('booked','stuffing') and cutoff_date between $2 and ($2::date + 2) order by cutoff_date`, [sid, today])
+    const { rows: arrivingToday } = await db.query<Row>(`select id, ref, customer, destination, status from shipments where shipper_id = $1 and status <> 'delivered' and eta = $2`, [sid, today])
+    const { rows: unquotedToday } = await db.query<Row>(`select count(*)::int as n from requests r where r.status = 'open' and r.created_at > now() - interval '24 hours' and not exists (select 1 from quotes q where q.request_id = r.id and q.shipper_id = $1)`, [sid])
+    const todayBlock = {
+      date: today,
+      pickups: pickupsToday.map((p) => ({ id: p.id, ref: p.ref, window: `${p.window_start}–${p.window_end}`, city: p.city, contact: p.contact_name, status: p.status })),
+      runs: runsToday.map((x) => ({ id: x.id, name: x.name, kind: x.kind, status: x.status, driver: x.driver_name ?? null, stops: x.stops, pending: x.pending })),
+      cutoffs: cutoffs.map((c) => ({ id: c.id, ref: c.ref, number: c.number, vessel: c.vessel_name, cutoff: dateOnly(c.cutoff_date), daysLeft: Math.round((new Date(dateOnly(c.cutoff_date) + 'T12:00:00Z').getTime() - new Date(today + 'T12:00:00Z').getTime()) / DAY), loaded: c.loaded, status: c.status })),
+      arriving: arrivingToday.map((a) => ({ id: a.id, ref: a.ref, customer: a.customer, destination: a.destination, status: a.status })),
+      newLeads: leads.filter((l) => now.getTime() - new Date(l.created_at).getTime() < DAY).length,
+      late: late.length,
+    }
+    // ---- benchmarks: how verified shippers on the platform perform, so the numbers have a target
+    const { rows: bench } = await db.query<Row>(`select
+        coalesce(percentile_cont(0.5) within group (order by extract(epoch from (q.sent_at - r.created_at)) / 3600), 0)::float as median_response_h,
+        count(*) filter (where q.status = 'accepted')::float / nullif(count(*) filter (where q.status in ('accepted','declined')), 0) as win_rate
+      from quotes q join requests r on r.id = q.request_id join shippers s on s.id = q.shipper_id where s.verified and q.sent_at > now() - interval '90 days' and q.shipper_id <> $1`, [sid])
+    const { rows: fastWin } = await db.query<Row>(`select count(*) filter (where q.status = 'accepted')::float / nullif(count(*) filter (where q.status in ('accepted','declined')), 0) as win_rate from quotes q join requests r on r.id = q.request_id where q.sent_at > now() - interval '90 days' and extract(epoch from (q.sent_at - r.created_at)) / 3600 <= 2`)
+    const benchmarks = {
+      responseHours: { you: avgResponse, verifiedMedian: Math.round(num(bench[0]?.median_response_h) * 10) / 10 || null, target: 2, fastWinRatePct: fastWin[0]?.win_rate != null ? Math.round(num(fastWin[0].win_rate) * 100) : null },
+      winRatePct: { you: winRate, verifiedAvg: bench[0]?.win_rate != null ? Math.round(num(bench[0].win_rate) * 100) : null },
+      onTimePct: { you: Number(me.on_time) || null, target: 95 },
+      verified: !!me.verified,
+    }
+
     res.json({
+      today: todayBlock, benchmarks,
       period: { from: t30.toISOString(), to: now.toISOString() },
       kpis: {
         leads: { value: leads.length, hint: `${staleLeads.length} waiting > 24h` },

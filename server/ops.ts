@@ -10,7 +10,7 @@ import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { countryByCode, statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
 import { distanceKm } from '../src/lib/geo'
-import { notifyShipmentStatus } from './notify'
+import { notify, notifyShipmentStatus } from './notify'
 
 type Row = Record<string, any>
 export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'
@@ -25,10 +25,11 @@ interface Deps {
 }
 
 const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v))
+const J = (v: unknown) => (v == null ? null : typeof v === 'string' ? JSON.parse(v) : v)
 const DATE = (v: unknown) => (v == null ? null : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10))
 const num = (v: unknown) => (v == null ? undefined : Number(v))
 
-export const staffOut = (r: Row) => ({ id: r.id, shipperId: r.shipper_id, userId: r.user_id ?? undefined, name: r.name, email: r.email, phone: r.phone, role: r.role as StaffRole, status: r.status as 'invited' | 'active' | 'inactive', base: r.base as 'origin' | 'destination', city: r.city, inviteToken: r.invite_token ?? undefined, createdAt: ISO(r.created_at), runCount: r.run_count != null ? Number(r.run_count) : undefined })
+export const staffOut = (r: Row) => ({ id: r.id, shipperId: r.shipper_id, userId: r.user_id ?? undefined, name: r.name, email: r.email, phone: r.phone, role: r.role as StaffRole, status: r.status as 'invited' | 'active' | 'inactive', base: r.base as 'origin' | 'destination', city: r.city, inviteToken: r.invite_token ?? undefined, createdAt: ISO(r.created_at), runCount: r.run_count != null ? Number(r.run_count) : undefined, perms: (J(r.perms) ?? {}) as { allow?: string[]; deny?: string[] }, lastActiveAt: ISO(r.last_active_at), activity: r.runs_week != null ? { runsWeek: Number(r.runs_week), stopsWeek: Number(r.stops_week), scansWeek: Number(r.scans_week), quotesWeek: Number(r.quotes_week), quotesWonWeek: Number(r.quotes_won_week), lastScanAt: ISO(r.last_scan_at) } : undefined })
 const vehicleOut = (r: Row) => ({ id: r.id, name: r.name, type: r.type, plate: r.plate, capacityKg: num(r.capacity_kg), capacityNote: r.capacity_note, base: r.base as 'origin' | 'destination', city: r.city, country: r.country, status: r.status as 'available' | 'on_run' | 'maintenance' | 'retired', driverId: r.driver_id ?? undefined, notes: r.notes, createdAt: ISO(r.created_at) })
 const stopOut = (r: Row) => ({ id: r.id, runId: r.run_id, seq: Number(r.seq), shipmentId: r.shipment_id ?? undefined, label: r.label, address: r.address, lat: num(r.lat), lon: num(r.lon), contact: r.contact, phone: r.phone, status: r.status as 'pending' | 'done' | 'skipped', doneAt: r.done_at ? ISO(r.done_at) : undefined, note: r.note, shipmentRef: r.shipment_ref ?? undefined, shipmentStatus: r.shipment_status ?? undefined })
 const runOut = (r: Row, stops: Row[]) => ({
@@ -42,7 +43,8 @@ const runOut = (r: Row, stops: Row[]) => ({
 const zRole = z.enum(['owner', 'dispatcher', 'agent', 'finance', 'warehouse', 'driver'])
 const zBase = z.enum(['origin', 'destination'])
 const zInvite = z.object({ name: z.string().trim().min(2).max(80), email: z.string().trim().email('Enter a valid email.'), phone: z.string().trim().max(30).default(''), role: zRole.default('agent'), base: zBase.default('origin'), city: z.string().trim().max(60).default('') })
-const zStaffPatch = z.object({ role: zRole.optional(), status: z.enum(['active', 'inactive']).optional(), phone: z.string().trim().max(30).optional(), base: zBase.optional(), city: z.string().trim().max(60).optional(), name: z.string().trim().min(2).max(80).optional() })
+const zArea = z.enum(['leads', 'rates', 'lanes', 'groupage', 'brand', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'payments', 'collections', 'reviews', 'fleet', 'team', 'verification', 'sourcing'])
+const zStaffPatch = z.object({ role: zRole.optional(), status: z.enum(['active', 'inactive']).optional(), phone: z.string().trim().max(30).optional(), base: zBase.optional(), city: z.string().trim().max(60).optional(), name: z.string().trim().min(2).max(80).optional(), perms: z.object({ allow: z.array(zArea).max(30).default([]), deny: z.array(zArea).max(30).default([]) }).optional() })
 const zJoin = z.object({ name: z.string().trim().min(2).max(80), password: z.string().min(8, 'Password must be at least 8 characters.') })
 const zVehicle = z.object({
   name: z.string().trim().min(2).max(60), type: z.enum(['van', 'truck', 'box_truck', 'pickup', 'trailer', 'car', 'motorbike']).default('van'), plate: z.string().trim().max(20).default(''),
@@ -135,7 +137,14 @@ export function mountOps(r: Router, d: Deps) {
   // ---- team
   r.get('/team', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId } = await staffOf(db, req)
-    const { rows } = await db.query<Row>(`select s.*, (select count(*) from runs r where r.driver_id = s.id)::int as run_count from staff s where s.shipper_id = $1 order by case s.role when 'owner' then 0 when 'dispatcher' then 1 when 'agent' then 2 when 'finance' then 3 when 'warehouse' then 4 else 5 end, s.name`, [shipperId])
+    const { rows } = await db.query<Row>(`select s.*, (select count(*) from runs r where r.driver_id = s.id)::int as run_count,
+        (select count(*) from runs r where r.driver_id = s.id and r.run_date >= current_date - 6)::int as runs_week,
+        (select count(*) from run_stops rs join runs r on r.id = rs.run_id where r.driver_id = s.id and rs.status = 'done' and rs.done_at >= now() - interval '7 days')::int as stops_week,
+        (select count(*) from scans sc where sc.by_staff_id = s.id and sc.at >= now() - interval '7 days')::int as scans_week,
+        (select max(sc.at) from scans sc where sc.by_staff_id = s.id) as last_scan_at,
+        (select count(*) from quotes q where q.sent_by = s.id and q.sent_at >= now() - interval '7 days')::int as quotes_week,
+        (select count(*) from quotes q where q.sent_by = s.id and q.sent_at >= now() - interval '30 days' and q.status = 'accepted')::int as quotes_won_week
+      from staff s where s.shipper_id = $1 order by case s.role when 'owner' then 0 when 'dispatcher' then 1 when 'agent' then 2 when 'finance' then 3 when 'warehouse' then 4 else 5 end, s.name`, [shipperId])
     res.json({ team: rows.map(staffOut) })
   }))
   r.post('/team/invite', wrap(async (req, res) => {
@@ -163,6 +172,7 @@ export function mountOps(r: Router, d: Deps) {
       const { rows: owners } = await db.query<{ n: string }>(`select count(*)::text as n from staff where shipper_id = $1 and role = 'owner' and status = 'active' and id <> $2`, [shipperId, me.id])
       if (Number(owners[0].n) === 0) throw new HttpError(409, 'Add another owner before stepping down.')
     }
+    if (b.perms) await db.query('update staff set perms = $2 where id = $1', [s.id, JSON.stringify(b.perms)])
     await db.query('update staff set role=$2, status=$3, phone=$4, base=$5, city=$6, name=$7 where id = $1', [s.id, b.role ?? s.role, b.status ?? (s.status === 'invited' ? 'invited' : s.status), b.phone ?? s.phone, b.base ?? s.base, b.city ?? s.city, b.name ?? s.name])
     if (b.status === 'inactive' && s.user_id) await db.query('delete from sessions where user_id = $1', [s.user_id])
     const { rows: out } = await db.query<Row>('select * from staff where id = $1', [s.id])
@@ -312,6 +322,23 @@ export function mountOps(r: Router, d: Deps) {
     if (b.lat != null || b.lon != null || b.seq != null) await db.query('update runs set distance_km = $2 where id = $1', [run.id, runDistance(updated.start, updated.stops)])
     if (updated.stops.length && updated.stops.every((s) => s.status !== 'pending') && updated.status === 'in_progress') { await db.query(`update runs set status = 'done' where id = $1`, [run.id]); if (run.vehicleId) await db.query(`update vehicles set status = 'available' where id = $1 and status = 'on_run'`, [run.vehicleId]) }
     res.json({ run: await ownRun(db, shipperId, run.id) })
+  }))
+  /** Driver on the road: "running ~N minutes late" — every customer with a pending stop on this run is told, once per message. */
+  r.post('/runs/:id/late', wrap(async (req, res) => {
+    const db = await getDb(); const { shipperId, me, role } = await staffOf(db, req)
+    const run = await ownRun(db, shipperId, String(req.params.id))
+    if (role === 'driver' && run.driverId !== me.id) throw new HttpError(403, 'Not your run.')
+    const b = z.object({ minutes: z.number().int().min(5).max(480), note: z.string().trim().max(200).default('') }).parse(req.body)
+    const pending = run.stops.filter((st) => st.status === 'pending' && st.shipmentId)
+    let told = 0
+    for (const st of pending) {
+      const { rows } = await db.query<Row>('select id, ref, user_id, status from shipments where id = $1', [st.shipmentId]); const sh = rows[0]; if (!sh) continue
+      const human = b.minutes >= 60 ? `${Math.round(b.minutes / 60 * 10) / 10} hour${b.minutes >= 90 ? 's' : ''}` : `${b.minutes} minutes`
+      await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sh.id, sh.status, st.label || '', `Driver ${me.name} is running about ${human} late${b.note ? ` — ${b.note}` : '.'}`])
+      if (sh.user_id) { await notify(db, { userId: sh.user_id, kind: 'shipment_status', title: `${sh.ref}: your ${run.kind === 'pickup' ? 'pickup' : 'delivery'} is running about ${human} late`, body: `${me.name} will be there as soon as possible${b.note ? ` — ${b.note}` : '.'} You'll get another update when they're close.`, link: `/dashboard?tab=shipments&open=${sh.id}`, dedupe: `late:${run.id}:${sh.id}:${Date.now().toString().slice(0, -5)}` }); told++ }
+    }
+    await db.query('update runs set notes = $2 where id = $1', [run.id, `${run.notes ? run.notes + '\n' : ''}${new Date().toISOString().slice(11, 16)} running ~${b.minutes} min late${b.note ? ` — ${b.note}` : ''}`])
+    res.json({ ok: true, told, pending: pending.length })
   }))
   r.delete('/runs/:id/stops/:sid', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId } = await staffOf(db, req, ...MANAGE)

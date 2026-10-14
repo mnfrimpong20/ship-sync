@@ -31,6 +31,7 @@ import { errorRecorder, mountSystem } from './system'
 import { mountBusiness } from './business'
 import { mountSupplierPortal } from './supplierPortal'
 import { mountOnboarding, onVerified } from './onboarding'
+import { consigneeToClient, mountCustomer, rememberConsignee, zConsignee } from './customer'
 import { mountBooking } from './booking'
 import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
@@ -38,7 +39,27 @@ import { mountReviews } from './reviews'
 import { mountBrand } from './brand'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
-export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver' }
+export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: StaffPerms; staffId?: string }
+export interface StaffPerms { allow?: Area[]; deny?: Area[] }
+/** Areas a company can grant or withhold per person on top of their role. Mirrors ROLE_AREAS in src/lib/ops.ts. */
+export const AREAS = ['leads', 'rates', 'lanes', 'groupage', 'brand', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'payments', 'collections', 'reviews', 'fleet', 'team', 'verification', 'sourcing'] as const
+export type Area = (typeof AREAS)[number]
+const ROLE_BASE: Record<string, Area[] | 'all'> = {
+  owner: 'all', dispatcher: 'all',
+  agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing'],
+  finance: ['clients', 'payments', 'collections', 'reviews', 'shipments', 'team'],
+  warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team'],
+  driver: ['routes', 'team'],
+}
+/** Role + per-person overrides → may this staff member use this area? Admins and customers are handled by callers. */
+export function can(u: ApiUser, area: Area): boolean {
+  if (u.role !== 'shipper') return false
+  const role = u.staffRole ?? 'owner'
+  if (u.perms?.deny?.includes(area)) return false
+  if (u.perms?.allow?.includes(area)) return true
+  const base = ROLE_BASE[role] ?? []
+  return base === 'all' || base.includes(area)
+}
 type Row = Record<string, any>
 
 const SESSION_COOKIE = 'ss_session'
@@ -59,7 +80,7 @@ const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.
 const requestOut = (r: Row, quotes: Row[]) => ({
   id: r.id, ref: r.ref, userId: r.user_id, createdAt: ISO(r.created_at), origin: r.origin, destination: r.destination, mode: r.mode, cargo: r.cargo, quantity: r.quantity, weightKg: r.weight_kg ?? undefined,
   description: r.description, pickup: r.pickup, delivery: r.delivery, insurance: r.insurance, readyDate: DATE(r.ready_date),
-  contact: { name: r.contact_name, email: r.contact_email, phone: r.contact_phone }, status: r.status, quotes: quotes.map(quoteOut), vehicle: r.vehicle ? J(r.vehicle) : undefined, preferredShipperId: r.preferred_shipper_id ?? undefined,
+  contact: { name: r.contact_name, email: r.contact_email, phone: r.contact_phone }, status: r.status, quotes: quotes.map(quoteOut), vehicle: r.vehicle ? J(r.vehicle) : undefined, consignee: r.consignee ? J(r.consignee) : undefined, preferredShipperId: r.preferred_shipper_id ?? undefined,
 })
 const shipmentOut = (r: Row, events: Row[]) => ({
   id: r.id, ref: r.ref, shipperId: r.shipper_id, mode: r.mode, origin: r.origin, destination: r.destination, cargo: r.cargo, description: r.description, status: r.status, eta: DATE(r.eta), customer: r.customer,
@@ -115,7 +136,7 @@ export async function resolvePosition(r: Row, events: Row[]) {
       : phase === 'pre' ? 'Not yet departed.' : 'Arrived at destination.',
   }
 }
-const userOut = (r: Row, company?: string): ApiUser => ({ id: r.id, name: r.name, email: r.email, role: r.role, shipperId: r.shipper_id ?? undefined, company, admin: !!r.is_admin, staffRole: r.shipper_id ? (r.staff_role ?? 'owner') : undefined })
+const userOut = (r: Row, company?: string): ApiUser => ({ id: r.id, name: r.name, email: r.email, role: r.role, shipperId: r.shipper_id ?? undefined, company, admin: !!r.is_admin, staffRole: r.shipper_id ? (r.staff_role ?? 'owner') : undefined, perms: r.shipper_id ? ((J(r.staff_perms) ?? {}) as StaffPerms) : undefined, staffId: r.staff_id ?? undefined })
 
 class HttpError extends Error {
   status: number
@@ -128,9 +149,12 @@ async function currentUser(db: Db, req: Request): Promise<ApiUser | null> {
   const sid = req.cookies?.[SESSION_COOKIE]
   if (!sid) return null
   const { rows } = await db.query<Row>(
-    `select u.*, s.name as company, st.role as staff_role from sessions se join users u on u.id = se.user_id left join shippers s on s.id = u.shipper_id left join staff st on st.user_id = u.id and st.shipper_id = u.shipper_id where se.id = $1 and se.expires_at > now()`, [sid],
+    `select u.*, s.name as company, st.role as staff_role, st.perms as staff_perms, st.id as staff_id, st.last_active_at from sessions se join users u on u.id = se.user_id left join shippers s on s.id = u.shipper_id left join staff st on st.user_id = u.id and st.shipper_id = u.shipper_id where se.id = $1 and se.expires_at > now()`, [sid],
   )
-  return rows[0] ? userOut(rows[0], rows[0].company ?? undefined) : null
+  const r = rows[0]; if (!r) return null
+  // Staff "last active" — touched at most every 10 minutes so the team page can show who's really using the app.
+  if (r.staff_id && (!r.last_active_at || Date.now() - new Date(r.last_active_at).getTime() > 10 * 60_000)) db.query('update staff set last_active_at = now() where id = $1', [r.staff_id]).catch(() => {})
+  return userOut(r, r.company ?? undefined)
 }
 
 async function createSession(db: Db, res: Response, userId: string) {
@@ -155,7 +179,7 @@ const requireAdmin = async (db: Db, req: Request) => { const u = await requireUs
 const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'SS'
 
 async function loadUserWithCompany(db: Db, id: string) {
-  const { rows } = await db.query<Row>('select u.*, s.name as company, st.role as staff_role from users u left join shippers s on s.id = u.shipper_id left join staff st on st.user_id = u.id and st.shipper_id = u.shipper_id where u.id = $1', [id])
+  const { rows } = await db.query<Row>('select u.*, s.name as company, st.role as staff_role, st.perms as staff_perms, st.id as staff_id from users u left join shippers s on s.id = u.shipper_id left join staff st on st.user_id = u.id and st.shipper_id = u.shipper_id where u.id = $1', [id])
   return userOut(rows[0], rows[0].company ?? undefined)
 }
 
@@ -274,6 +298,8 @@ const zRequest = zMatch.extend({
   vehicle: zRequestVehicle.optional(),
   /** White-label: lead goes only to this shipper. */
   preferredShipperId: z.string().max(80).optional(),
+  /** Who receives it at destination — saved to the customer's recipients and handed to the shipper on booking. */
+  consignee: zConsignee.optional(),
 })
 const zTransit = z.object({
   vesselName: z.string().trim().max(80).optional().or(z.literal('').transform(() => undefined)),
@@ -432,10 +458,11 @@ export function apiRouter() {
     if (user.role !== 'customer') throw new HttpError(403, 'Shipper accounts cannot post shipment requests.')
     const id = uid()
     await db.query(
-      `insert into requests (id,ref,user_id,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,vehicle,preferred_shipper_id)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
-      [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone, body.cargo === 'vehicle' && body.vehicle ? JSON.stringify(body.vehicle) : null, body.preferredShipperId ?? null],
+      `insert into requests (id,ref,user_id,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,vehicle,preferred_shipper_id,consignee)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+      [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone, body.cargo === 'vehicle' && body.vehicle ? JSON.stringify(body.vehicle) : null, body.preferredShipperId ?? null, body.consignee ? JSON.stringify(body.consignee) : null],
     )
+    if (body.consignee) await rememberConsignee(db, user.id, body.consignee)
     const { rows } = await db.query<Row>('select * from requests where id = $1', [id])
     if (body.preferredShipperId) {
       // White-label lead: only that shipper sees it; price it from their rate cards if they have them.
@@ -456,13 +483,13 @@ export function apiRouter() {
   r.post('/requests/:id/quotes', wrap(async (req, res) => {
     const db = await getDb(); const user = await requireUser(db, req)
     if (user.role !== 'shipper' || !user.shipperId) throw new HttpError(403, 'Only shipper accounts can send quotes.')
-    if (user.staffRole === 'driver' || user.staffRole === 'warehouse' || user.staffRole === 'finance') throw new HttpError(403, 'Your role can’t send quotes — ask an owner, dispatcher or agent.')
+    if (!can(user, 'leads')) throw new HttpError(403, 'Your role can’t send quotes — ask an owner or dispatcher to give you Leads access.')
     const body = zQuote.parse(req.body)
     const { rows } = await db.query<Row>('select * from requests where id = $1', [req.params.id])
     if (!rows[0]) throw new HttpError(404, 'Request not found.')
     if (rows[0].status !== 'open') throw new HttpError(409, 'This request is no longer open.')
-    await db.query('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes) values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict (request_id, shipper_id) do update set price = excluded.price, transit_days = excluded.transit_days, valid_until = excluded.valid_until, notes = excluded.notes, includes = excluded.includes, sent_at = now()',
-      [uid(), req.params.id, user.shipperId, body.price, body.transitDays, body.validUntil ?? new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), body.notes, JSON.stringify(body.includes)])
+    await db.query('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes,sent_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict (request_id, shipper_id) do update set price = excluded.price, transit_days = excluded.transit_days, valid_until = excluded.valid_until, notes = excluded.notes, includes = excluded.includes, sent_at = now(), sent_by = excluded.sent_by',
+      [uid(), req.params.id, user.shipperId, body.price, body.transitDays, body.validUntil ?? new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), body.notes, JSON.stringify(body.includes), user.staffId ?? null])
     await notify(db, { userId: rows[0].user_id, kind: 'quote_received', title: `${user.company ?? 'A shipper'} quoted $${body.price.toLocaleString()} on ${rows[0].ref}`, body: `${body.transitDays} days transit${body.includes.length ? ` · ${body.includes.join(', ')}` : ''}. Open your dashboard to compare and accept.`, link: '/dashboard', dedupe: `rq:${rows[0].id}:q:${user.shipperId}:${Date.now()}` })
     const [request] = await loadRequests(db, 'id = $1', [req.params.id])
     res.status(201).json({ request: { ...request, quotes: request.quotes.filter((x) => x.shipperId === user.shipperId), competingQuotes: request.quotes.filter((x) => x.shipperId !== user.shipperId).length } })
@@ -488,6 +515,7 @@ export function apiRouter() {
       [sid, r0.ref, r0.id, q.shipper_id, user.id, mode, r0.origin, r0.destination, r0.cargo, r0.description || `${r0.quantity} × ${r0.cargo}`, 'booked', new Date(Date.now() + (q.transit_days + 4) * 86400000).toISOString().slice(0, 10), r0.contact_name])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, 'booked', r0.origin, `Booking confirmed with ${shipper.name}. Quote accepted at $${q.price}.`])
     await attachShipmentToClient(db, q.shipper_id, user.id, sid, r0.contact_name, r0.contact_email)
+    await consigneeToClient(db, sid, r0.consignee ? J(r0.consignee) : null)
     if (r0.cargo === 'vehicle') await vehicleFromRequest(db, r0.id, sid)
     await notify(db, { userId: user.id, kind: 'booking_confirmed', title: `Booking confirmed — ${r0.ref}`, body: `${shipper.name} will handle your ${r0.origin} → ${r0.destination} shipment for $${Number(q.price).toLocaleString()}. Track it any time with reference ${r0.ref}.`, link: `/track?ref=${r0.ref}`, dedupe: `ship:${sid}:booked` })
     await notifyShipperStaff(db, q.shipper_id, { kind: 'quote_accepted', title: `${r0.contact_name} accepted your quote — ${r0.ref}`, body: `$${Number(q.price).toLocaleString()} · ${r0.quantity} × ${r0.cargo} · ${r0.origin} → ${r0.destination}. The order is now booked; arrange pickup or drop-off.`, link: '/dashboard/shipments', dedupe: `ship:${sid}:accepted` }, ['owner', 'dispatcher', 'agent'])
@@ -571,6 +599,7 @@ export function apiRouter() {
   mountBusiness(r, { getDb, requireAdmin, wrap })
   mountSupplierPortal(r, { getDb, requireUser, HttpError, wrap })
   mountOnboarding(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  mountCustomer(r, { getDb, requireUser, HttpError, wrap })
 
   r.get('/live/region', wrap(async (_req, res) => {
     // Compact wire format: with Europe + US subscribed this is thousands of ships polled every 30s.

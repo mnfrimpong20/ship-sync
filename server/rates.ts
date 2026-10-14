@@ -9,7 +9,7 @@
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
 import { uid, type Db } from './db'
-import type { ApiUser } from './api'
+import { can, type ApiUser } from './api'
 import { cargoLabel, countryByCode, type CargoType } from '../src/lib/data'
 
 type Row = Record<string, any>
@@ -109,8 +109,8 @@ export function mountRates(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
   const staff = async (db: Db, req: Request, edit = false) => {
     const u = await requireUser(db, req)
-    if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Shipper office staff only.')
-    if (edit && (u.staffRole === 'agent' || u.staffRole === 'finance' || u.staffRole === 'warehouse')) throw new HttpError(403, 'Only owners and dispatchers can change rate cards.')
+    if (u.role !== 'shipper' || !u.shipperId || !can(u, 'rates')) throw new HttpError(403, 'Rate-card access is needed for this.')
+    if (edit && !['owner', 'dispatcher'].includes(u.staffRole ?? 'owner') && !u.perms?.allow?.includes('rates')) throw new HttpError(403, 'Only owners and dispatchers can change rate cards.')
     return u
   }
   const own = async (db: Db, shipperId: string, id: string) => {

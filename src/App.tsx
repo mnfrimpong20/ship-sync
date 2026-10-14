@@ -63,6 +63,9 @@ const QcReportPage = L(() => import('./pages/Sourcing'), 'QcReportPage')
 const AgentToday = L(() => import('./pages/Sourcing'), 'AgentToday')
 const Containers = lazy(() => import('./pages/Containers'))
 const ContainerDetail = lazy(() => import('./pages/ContainerDetail'))
+const ManifestPage = lazy(() => import('./pages/Manifest'))
+const PartnerPortal = lazy(() => import('./pages/PartnerPortal'))
+const AddRecipient = lazy(() => import('./pages/AddRecipient'))
 const Join = lazy(() => import('./pages/Join'))
 const CustomerDashboard = L(() => import('./pages/Dashboard'), 'CustomerDashboard')
 const ShipperDashboard = L(() => import('./pages/Dashboard'), 'ShipperDashboard')
@@ -179,6 +182,7 @@ export default function App() {
               <Route path="/dashboard/sourcing/:id/qc" element={<QcReportPage />} />
               <Route path="/dashboard/containers" element={<Containers />} />
               <Route path="/dashboard/containers/:id" element={<ContainerDetail />} />
+              <Route path="/dashboard/containers/:id/manifest" element={<ManifestPage />} />
               <Route path="/dashboard/clients" element={<Clients />} />
               <Route path="/dashboard/clients/:id" element={<ClientDetailPage />} />
               <Route path="/dashboard/invoices/:id" element={<InvoiceView />} />
@@ -197,6 +201,8 @@ export default function App() {
             <Route path="/r/:token" element={<Receive />} />
             <Route path="/broker/:token" element={<BrokerPortal />} />
             <Route path="/s/:token" element={<SupplierPortalPage />} />
+            <Route path="/p/:token" element={<PartnerPortal />} />
+            <Route path="/add-recipient/:token" element={<AddRecipient />} />
             <Route path="/order/:code" element={<OrderPage />} />
             <Route path="/t/:slug" element={<BrandedPage />} />
           </Routes>

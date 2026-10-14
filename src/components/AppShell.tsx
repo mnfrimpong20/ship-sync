@@ -9,6 +9,8 @@ import { useStore } from '../lib/store'
 import { clientsApi } from '../lib/clients'
 import { SOURCING_SHIPPER } from '../lib/sourcing'
 import { roleAllows, roleHome } from '../lib/ops'
+import { scanQueue, startQueueSync, SCAN_QUEUE_EVENT } from '../lib/scan'
+import { WifiOff, CloudUpload } from 'lucide-react'
 
 interface Item { to: string; label: string; icon: typeof Inbox; end?: boolean; badge?: number; group?: string }
 
@@ -33,7 +35,7 @@ export default function AppShell() {
   if (!ready) return <div className="grid min-h-screen place-items-center bg-bg text-text-muted">Loading…</div>
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
   // Staff see only their area: a warehouse clerk who lands on the owner's overview goes to the warehouse, a finance user asking for Fleet goes home.
-  if (user.role === 'shipper' && user.staffRole && !user.admin && loc.pathname.startsWith('/dashboard') && !roleAllows(user.staffRole, loc.pathname)) return <Navigate to={roleHome[user.staffRole]} replace />
+  if (user.role === 'shipper' && user.staffRole && !user.admin && loc.pathname.startsWith('/dashboard') && !roleAllows(user.staffRole, loc.pathname, user.perms as never)) return <Navigate to={roleHome[user.staffRole]} replace />
 
   const isShipper = user.role === 'shipper'
   const openLeads = isShipper ? requests.filter((r) => r.status === 'open' && !r.quotes.some((q) => q.shipperId === user.shipperId)).length : requests.reduce((n, r) => n + (r.status === 'open' ? r.quotes.length : 0), 0)
@@ -42,7 +44,7 @@ export default function AppShell() {
   const staffRole = user.staffRole ?? 'owner'
   const isDriver = isShipper && staffRole === 'driver'
   const canManage = isShipper && (staffRole === 'owner' || staffRole === 'dispatcher')
-  const allowed = (it: Item) => !isShipper || user.admin || roleAllows(staffRole, it.to.split('?')[0]) || !it.to.startsWith('/dashboard')
+  const allowed = (it: Item) => !isShipper || user.admin || roleAllows(staffRole, it.to.split('?')[0], user.perms as never) || !it.to.startsWith('/dashboard')
   const sourcingTeam = !!user.admin || (isShipper && user.shipperId === SOURCING_SHIPPER && !isDriver)
   const items: Item[] = isDriver
     ? [
@@ -147,6 +149,7 @@ export default function AppShell() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeSwitcher compact />
+            {isShipper && <SyncBadge />}
             <NotificationBell />
             <div className="relative">
               <button onClick={() => setMenu((m) => !m)} className="btn-ghost !min-h-10 !px-2 text-sm sm:!px-3" aria-expanded={menu} aria-haspopup="menu">
@@ -175,5 +178,27 @@ export default function AppShell() {
         </main>
       </div>
     </div>
+  )
+}
+
+/** Offline / pending-sync indicator for field staff: shows only when there is something to say. */
+function SyncBadge() {
+  const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)
+  const [queued, setQueued] = useState(0)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    startQueueSync()
+    const onQ = () => setQueued(scanQueue.list().length); onQ()
+    const on = () => setOnline(true), off = () => setOnline(false)
+    window.addEventListener(SCAN_QUEUE_EVENT, onQ); window.addEventListener('online', on); window.addEventListener('offline', off)
+    return () => { window.removeEventListener(SCAN_QUEUE_EVENT, onQ); window.removeEventListener('online', on); window.removeEventListener('offline', off) }
+  }, [])
+  if (online && queued === 0) return null
+  const flush = async () => { setBusy(true); try { await scanQueue.flush() } finally { setBusy(false) } }
+  return (
+    <button onClick={flush} disabled={!online || busy} className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs focus-ring ${online ? 'border-gold/50 bg-gold/10 text-gold-deep' : 'border-border bg-surface-2 text-text-muted'}`} title={online ? 'Tap to sync now' : 'You are offline — scans and stop updates are saved on this phone'} data-testid="sync-badge">
+      {online ? <CloudUpload size={13} aria-hidden="true" /> : <WifiOff size={13} aria-hidden="true" />}
+      {online ? `${queued} to sync` : queued ? `Offline · ${queued} saved` : 'Offline'}
+    </button>
   )
 }

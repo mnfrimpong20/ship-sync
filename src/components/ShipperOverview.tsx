@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { AlertTriangle, ArrowRight, Bell, CalendarDays, Clock, FileText, Inbox, Info, MapPinned, Package, Send, Ship, TrendingDown, TrendingUp, Truck, UserPlus, Users, Wallet } from 'lucide-react'
-import { insightsApi, type AttentionItem, type Kpi, type Overview, type WeekPoint } from '../lib/insights'
+import { insightsApi, type AttentionItem, type Benchmarks as BenchmarksT, type Kpi, type Overview, type TodayBlock, type WeekPoint } from '../lib/insights'
 import { fmtDateTime, money } from './ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { OnboardingChecklist } from './Onboarding'
@@ -135,6 +135,12 @@ export default function ShipperOverview({ firstName }: { firstName: string }) {
         <Attention items={o.attention} />
       </motion.section>
 
+      {/* today — first thing on a phone, a side column on desktop */}
+      <motion.section variants={fadeUp} aria-labelledby="today-h" className="xl:hidden"><TodayCard t={o.today} /></motion.section>
+
+      {/* performance vs. the platform */}
+      <motion.section variants={fadeUp} aria-label="How you compare"><Benchmarks b={o.benchmarks} /></motion.section>
+
       {/* KPIs */}
       <motion.section variants={fadeUp} aria-label="Key numbers" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Tile label="Invoiced · 30 days" kpi={{ ...k.invoiced, hint: `${money(k.collected.value ?? 0)} collected · ${money(k.outstanding.value ?? 0)} outstanding` }} format={money} spark={o.series.map((s) => s.invoiced)} icon={Wallet} to="/dashboard/clients?filter=owing" />
@@ -183,17 +189,7 @@ export default function ShipperOverview({ firstName }: { firstName: string }) {
         </motion.section>
 
         <div className="space-y-6 xl:col-span-5">
-          <motion.section variants={fadeUp} className="card-dark p-5" aria-labelledby="ops-h">
-            <div className="mb-3 flex items-center justify-between"><h2 id="ops-h" className="!text-base">Today’s operations</h2><Link to="/dashboard/routes" className="text-xs text-text-muted hover:text-text focus-ring">Routes →</Link></div>
-            {o.ops.runsToday.length === 0 ? <p className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-text-muted">No runs on the road today. <Link to="/dashboard/routes/new" className="text-gold-deep hover:underline">Plan one →</Link></p> : (
-              <ul className="space-y-2">{o.ops.runsToday.map((r) => <li key={r.id}><Link to={`/dashboard/routes/${r.id}`} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 hover:border-gold/40 focus-ring"><span className={`grid h-8 w-8 place-items-center rounded-lg ${r.kind === 'pickup' ? 'bg-teal/15 text-teal' : 'bg-gold/15 text-gold-deep'}`}><MapPinned size={15} aria-hidden="true" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{r.name}</span><span className="block text-xs text-text-muted">{r.driver ?? 'No driver'} · {r.pending} of {r.stops} stops left · {r.status === 'in_progress' ? 'on the road' : 'planned'}</span></span></Link></li>)}</ul>
-            )}
-            <dl className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-              <Link to="/dashboard/fleet" className="rounded-lg bg-surface-2 px-2 py-2.5 hover:bg-surface-2/70 focus-ring"><dt className="text-text-muted">Vehicles free</dt><dd className="font-heading text-lg font-bold tabular-nums">{o.ops.vehicles.available}<span className="text-xs font-normal text-text-muted">/{o.ops.vehicles.total}</span></dd></Link>
-              <Link to="/dashboard/team" className="rounded-lg bg-surface-2 px-2 py-2.5 hover:bg-surface-2/70 focus-ring"><dt className="text-text-muted">Drivers active</dt><dd className="font-heading text-lg font-bold tabular-nums">{o.ops.team.drivers}</dd></Link>
-              <Link to="/dashboard/clients" className="rounded-lg bg-surface-2 px-2 py-2.5 hover:bg-surface-2/70 focus-ring"><dt className="text-text-muted">Follow-ups due</dt><dd className={`font-heading text-lg font-bold tabular-nums ${o.ops.followupsDue ? 'text-gold-deep' : ''}`}>{o.ops.followupsDue}</dd></Link>
-            </dl>
-          </motion.section>
+          <motion.section variants={fadeUp} className="hidden xl:block" aria-labelledby="today-h-xl"><TodayCard t={o.today} /></motion.section>
 
           <motion.section variants={fadeUp} className="card-dark p-5" aria-labelledby="qa-h">
             <h2 id="qa-h" className="mb-3 !text-base">Quick actions</h2>
@@ -225,5 +221,50 @@ export default function ShipperOverview({ firstName }: { firstName: string }) {
       </div>
       <motion.p variants={fadeUp} className="flex items-center gap-1.5 text-[11px] text-text-muted"><CalendarDays size={12} aria-hidden="true" /> 30-day figures compare with the previous 30 days. Win rate and response time use the last 90 days.</motion.p>
     </motion.div>
+  )
+}
+
+/* ---------- today ---------- */
+function TodayCard({ t }: { t: TodayBlock }) {
+  const nothing = !t.pickups.length && !t.runs.length && !t.cutoffs.length && !t.arriving.length && !t.newLeads && !t.late
+  const Row = ({ to, icon: I, tone, title, sub }: { to: string; icon: typeof Inbox; tone: string; title: string; sub: string }) => (
+    <li><Link to={to} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 hover:border-gold/40 focus-ring"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${tone}`}><I size={15} aria-hidden="true" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{title}</span><span className="block truncate text-xs text-text-muted">{sub}</span></span><ArrowRight size={14} className="shrink-0 text-text-muted" aria-hidden="true" /></Link></li>
+  )
+  return (
+    <div className="card-dark p-5" data-testid="today-card">
+      <div className="mb-3 flex items-center justify-between"><h2 id="today-h" className="!text-base">Today <span className="text-xs font-normal text-text-muted">· {new Date(t.date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span></h2><Link to="/dashboard/routes" className="text-xs text-text-muted hover:text-text focus-ring">Routes →</Link></div>
+      {nothing ? <p className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-text-muted">Quiet day — no pickups, runs, cut-offs or arrivals scheduled. <Link to="/dashboard/routes/new" className="text-gold-deep hover:underline">Plan a run →</Link></p> : (
+        <ul className="space-y-2">
+          {t.cutoffs.map((c) => <Row key={c.id} to={`/dashboard/containers/${c.id}`} icon={Package} tone={c.daysLeft <= 0 ? 'bg-danger/10 text-danger' : 'bg-gold/15 text-gold-deep'} title={`Cut-off ${c.daysLeft <= 0 ? 'today' : c.daysLeft === 1 ? 'tomorrow' : `in ${c.daysLeft} days`} · ${c.ref}${c.number ? ` ${c.number}` : ''}`} sub={`${c.vessel || 'vessel tbc'} · ${c.loaded} order${c.loaded === 1 ? '' : 's'} loaded · ${c.status}`} />)}
+          {t.pickups.map((p) => <Row key={p.id} to="/dashboard/pickups" icon={CalendarDays} tone="bg-teal/15 text-teal" title={`Pickup ${p.window} · ${p.ref}`} sub={`${p.contact}${p.city ? ` · ${p.city}` : ''} · ${p.status}`} />)}
+          {t.runs.map((r) => <Row key={r.id} to={`/dashboard/routes/${r.id}`} icon={MapPinned} tone={r.kind === 'pickup' ? 'bg-teal/15 text-teal' : 'bg-gold/15 text-gold-deep'} title={r.name} sub={`${r.driver ?? 'No driver'} · ${r.pending} of ${r.stops} stops left · ${r.status === 'in_progress' ? 'on the road' : 'planned'}`} />)}
+          {t.arriving.map((a) => <Row key={a.id} to="/dashboard/shipments" icon={Ship} tone="bg-sky/10 text-sky" title={`Arriving today · ${a.ref}`} sub={`${a.customer} · ${a.status.replace(/_/g, ' ')}`} />)}
+          {t.newLeads > 0 && <Row to="/dashboard/leads" icon={Inbox} tone="bg-gold/15 text-gold-deep" title={`${t.newLeads} new lead${t.newLeads === 1 ? '' : 's'} since yesterday`} sub="Quote them before lunch — response time is visible to customers." />}
+          {t.late > 0 && <Row to="/dashboard/shipments" icon={AlertTriangle} tone="bg-danger/10 text-danger" title={`${t.late} shipment${t.late === 1 ? '' : 's'} past ETA`} sub="Update the status or the ETA so customers aren’t guessing." />}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/* ---------- benchmarks ---------- */
+function Benchmarks({ b }: { b: BenchmarksT }) {
+  const fmtH = (h: number | null) => (h == null ? '—' : h < 1 ? `${Math.round(h * 60)} min` : h < 48 ? `${Math.round(h * 10) / 10} h` : `${Math.round(h / 24)} d`)
+  const resp = b.responseHours; const win = b.winRatePct; const ot = b.onTimePct
+  const respGood = resp.you != null && resp.you <= resp.target
+  const winGood = win.you != null && win.verifiedAvg != null && win.you >= win.verifiedAvg
+  const otGood = ot.you != null && ot.you >= ot.target
+  const Badge = ({ good, label, value, target, nudge }: { good: boolean; label: string; value: string; target: string; nudge: string }) => (
+    <li className={`flex items-start gap-3 rounded-xl border p-4 ${good ? 'border-teal/40 bg-teal/5' : 'border-border'}`}>
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${good ? 'bg-teal/15 text-teal' : 'bg-gold/15 text-gold-deep'}`}>{good ? <TrendingUp size={16} aria-hidden="true" /> : <Clock size={16} aria-hidden="true" />}</span>
+      <div className="min-w-0"><p className="text-sm text-text-muted">{label}</p><p className="font-heading text-xl font-bold leading-tight tabular-nums">{value} <span className="text-xs font-normal text-text-muted">· target {target}</span></p><p className="mt-1 text-xs text-text-muted">{nudge}</p></div>
+    </li>
+  )
+  return (
+    <ul className="grid gap-3 md:grid-cols-3" aria-label="Benchmarks" data-testid="benchmarks">
+      <Badge good={respGood} label="Your reply time" value={fmtH(resp.you)} target={`under ${resp.target} h`} nudge={resp.you == null ? 'Send your first quote to start the clock.' : respGood ? `Faster than the ${fmtH(resp.verifiedMedian)} median for verified shippers — customers notice.` : `Verified shippers reply in ${fmtH(resp.verifiedMedian)} on average${resp.fastWinRatePct != null ? `; quotes sent within 2 h win ${resp.fastWinRatePct}% of the time` : ''}. Turn on lead alerts and rate-card auto-send.`} />
+      <Badge good={winGood} label="Win rate · 90 days" value={win.you == null ? '—' : `${win.you}%`} target={win.verifiedAvg != null ? `${win.verifiedAvg}% verified avg` : 'verified avg'} nudge={win.you == null ? 'No decided quotes yet.' : winGood ? 'Above the verified-shipper average. Keep quoting itemised, with transit days.' : 'Itemise what’s included, quote transit days you can keep, and reply first — those three move win rate most.'} />
+      <Badge good={otGood} label="On-time deliveries" value={ot.you == null || ot.you === 0 ? '—' : `${ot.you}%`} target={`${ot.target}%+`} nudge={!b.verified ? 'Get verified — the badge alone lifts you in matching.' : otGood ? 'Customers see this on your profile; it sells for you.' : 'Update ETAs early when a sailing slips; a moved ETA counts better than a missed one.'} />
+    </ul>
   )
 }

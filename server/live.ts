@@ -46,21 +46,23 @@ class AisSocket {
   lastError = ''
   constructor(private key: string, private sub: () => object | null, private onMsg: (m: any) => void) {}
   start() { this.stopped = false; this.connect() }
-  resubscribe() { if (this.ws?.readyState === WebSocket.OPEN) this.send() }
-  private send() {
+  resubscribe() { if (this.ws?.readyState === WebSocket.OPEN) this.send(this.ws) }
+  /** Sends on the socket that is actually open (an older socket's 'open' must never write to a newer, still-connecting one). */
+  private send(ws: WebSocket | null) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
     const body = this.sub()
-    if (!body) { this.ws?.close(); return }
-    this.ws?.send(JSON.stringify({ APIKey: this.key, FilterMessageTypes: ['PositionReport', 'ShipStaticData'], ...body }))
+    if (!body) { ws.close(); return }
+    try { ws.send(JSON.stringify({ APIKey: this.key, FilterMessageTypes: ['PositionReport', 'ShipStaticData'], ...body })) } catch (e) { this.lastError = (e as Error).message }
   }
   private connect() {
     if (this.stopped || !this.sub()) { this.status = 'off'; return }
     this.status = 'connecting'
     try {
       const ws = new WebSocket(AIS_URL); this.ws = ws
-      ws.on('open', () => { this.status = 'live'; this.backoff = 5000; this.send() })
+      ws.on('open', () => { if (this.ws !== ws) { ws.close(); return } this.status = 'live'; this.backoff = 5000; this.send(ws) })
       ws.on('message', (buf) => { try { this.onMsg(JSON.parse(buf.toString())) } catch { /* ignore */ } })
       ws.on('error', (e) => { this.lastError = e.message; this.status = 'error' })
-      ws.on('close', () => { if (this.stopped) return; this.status = 'connecting'; setTimeout(() => this.connect(), this.backoff); this.backoff = Math.min(this.backoff * 2, 120_000) })
+      ws.on('close', () => { if (this.stopped || this.ws !== ws) return; this.status = 'connecting'; setTimeout(() => this.connect(), this.backoff); this.backoff = Math.min(this.backoff * 2, 120_000) })
     } catch (e) { this.lastError = (e as Error).message; this.status = 'error' }
   }
 }

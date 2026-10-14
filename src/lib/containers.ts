@@ -5,19 +5,19 @@ export const CONTAINER_STAGES = ['booked', 'loading', 'gated_in', 'sailed', 'arr
 export type ContainerStatus = (typeof CONTAINER_STAGES)[number]
 export const stageLabels: Record<ContainerStatus, string> = { booked: 'Booked with line', loading: 'Loading', gated_in: 'Gated in at port', sailed: 'Sailed', arrived: 'Arrived', customs: 'Customs', devanned: 'Devanned', closed: 'Closed' }
 export const stageBlurb: Record<ContainerStatus, string> = {
-  booked: 'You have a booking with the shipping line. Start loading orders.',
-  loading: 'Orders are being loaded at your yard. Loaded orders show as Picked up.',
-  gated_in: 'Container delivered to the port. Orders show as At origin port.',
-  sailed: 'On the vessel. Orders show as In transit and inherit the vessel & MMSI for live tracking.',
-  arrived: 'Discharged at the destination port. Orders show as Arrived.',
-  customs: 'Clearing customs. Orders show as Customs clearance.',
-  devanned: 'Unloaded at your destination warehouse. Deliver orders with runs.',
+  booked: 'You have a booking with the shipping line. Start loading shipments.',
+  loading: 'Shipments are being loaded at your yard. Loaded shipments show as Picked up.',
+  gated_in: 'Container delivered to the port. Shipments show as At origin port.',
+  sailed: 'On the vessel. Shipments show as In transit and inherit the vessel & MMSI for live tracking.',
+  arrived: 'Discharged at the destination port. Shipments show as Arrived.',
+  customs: 'Clearing customs. Shipments show as Customs clearance.',
+  devanned: 'Unloaded at your destination warehouse. Deliver shipments with runs.',
   closed: 'All done — container returned to the line.',
 }
 export const SIZES = ['20ft', '40ft', '40hc', 'reefer'] as const
 export type ContainerSize = (typeof SIZES)[number]
 export const sizeLabels: Record<ContainerSize, string> = { '20ft': '20ft standard', '40ft': '40ft standard', '40hc': '40ft high-cube', reefer: '40ft reefer' }
-/** Rough planning capacity so the load bar has meaning (cbm). Orders are estimated per cargo type. */
+/** Rough planning capacity so the load bar has meaning (cbm). Shipments are estimated per cargo type. */
 export const sizeCbm: Record<ContainerSize, number> = { '20ft': 33, '40ft': 67, '40hc': 76, reefer: 60 }
 export const cargoCbm: Record<string, number> = { barrels: 1.2, boxes: 0.8, pallets: 2.2, vehicle: 14, container20: 33, container40: 67, commercial: 4 }
 

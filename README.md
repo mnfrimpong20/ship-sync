@@ -137,3 +137,76 @@ Routes live in `server/requestFlow.ts` (edit, cancel, open to market, withdraw, 
   - The new area is `analytics`. Owners, dispatchers, agents, finance and warehouse staff get it by default; drivers don't.
   - Each tab also needs its own area: leads for sales, shipments for operations, payments for finance, clients for customers.
 - **Demo history.** `server/analyticsSeed.ts` seeds a year of Gold Coast history (ids `ra_*`): requests with competing quotes, delivered shipments with stage events, invoices, payments, reviews and past runs. All of it is terminal, so no sweep acts on it. Set `DEMO_HISTORY=false` to skip it (the local test scripts do).
+
+## Platform tools (shippers + admins)
+
+**For shippers:**
+
+- **Costs & profit** (`/dashboard/costs`, `server/costs.ts`). A cost can be attached to:
+  - one shipment;
+  - a container (split across the shipments loaded in it by weight, or evenly if weights are missing);
+  - the company (counted as overhead).
+
+  Analytics → Finance → Profit then shows gross and net margin by lane, client and container. The demo seed adds costs (`rac_*`).
+- **Targets.** Monthly goals for bookings, revenue, win rate and on-time (`PUT /shipper/targets`), shown with projected month-end pace on the Analytics Overview.
+- **Monday report** (`server/growth.ts`). Mondays from 12:00 UTC, owners get last week's numbers and the top three insights by email, plus WhatsApp if a number is set. A preview can be sent any time from Integrations.
+- **Campaigns** (`/dashboard/campaigns`). Email, SMS or WhatsApp to win-back, recent or all clients, with `{name}`, `{company}`, `{shipper}` and `{link}` placeholders. Limited to 5 a day. A client who books within 30 days counts as a win.
+- **Load planner** (Containers → Load planner):
+  - estimated m³ and kg for each waiting ocean shipment;
+  - how full each open container is;
+  - greedy fill suggestions;
+  - the right size for a selection;
+  - a daily alert for containers under 60% full within 5 days of cutoff.
+- **Demand forecast.** The next 8 weeks per lane: the recent 8-week average scaled by last year's seasonality.
+- **Team scorecards** (Analytics → Team). Per person: quotes, wins, reply time, scans and stops. Owners and dispatchers see everyone; other staff see only themselves.
+- **Quote templates + price calculator.** In the quote form: unit price × quantity (with a minimum) plus pickup, delivery and insurance on the declared value.
+- **Integrations** (`/dashboard/integrations`, `server/integrations.ts`):
+  - QuickBooks and Xero CSV export;
+  - GHS/NGN equivalent on invoices (`GHS_PER_USD` / `NGN_PER_USD`);
+  - an embeddable tracking box (`/api/widget.js?s=ID`, `/#/embed/track/ID`) that only finds that shipper's shipments;
+  - signed webhooks (`X-ShipSync-Signature: t=…,v1=HMAC-SHA256(secret,"t.body")`) for shipment.booked / status / delivered, invoice.paid and request.received. Retries back off from 1 minute to 6 hours; 20 failures in a row switch the hook off.
+- **Activity log** (`/dashboard/activity`). The company's audit trail, for owners and dispatchers.
+- **Plan & billing** (`/dashboard/billing`, `server/billing.ts`, `server/features.ts`):
+
+  | Plan | Price | Team | Includes |
+  |---|---|---|---|
+  | Starter | free | 3 | basics |
+  | Pro | $149 | 15 | branded page, full analytics, campaigns, load planner, accounting export |
+  | Enterprise | $499 | unlimited | Pro + webhooks |
+
+  New shippers get a 14-day Pro trial; existing Starter shippers got 30 days. Upgrades go through Stripe Checkout in subscription mode (confirmed on return or by webhook); cancellation takes effect at the end of the period. Admins can set plans and prices by hand.
+
+**For admins** (new tabs on `/admin`):
+
+- **Platform.** GMV, Ship Sync revenue (take rate, pro-rated subscriptions, sourcing fees, insurance commission), sign-ups, returning customers, and conversion by destination and source.
+- **Marketplace.** Requests vs serving shippers for each lane, unanswered share, quotes per request and time to first quote. Gaps are flagged: recruit / unanswered / thin.
+- **Scorecards** (`server/adminInsights.ts`):
+  - **Score:** a 90-day 0–100 score — reply 20, on time 25, rating 20, disputes 10, cancellations 10, withdrawn quotes 5, win rate 10. Recomputed every 6 hours.
+  - **Ranking:** it feeds directory ranking.
+  - **Standing:** automatic warning and probation (the rules are editable). Pausing is manual: paused shippers are hidden from the directory and matching, and can't quote.
+- **Risk.** Flags for:
+  - quote-then-withdraw;
+  - cancellation, dispute and refund spikes;
+  - one phone number on 3+ accounts;
+  - request bursts;
+  - junk requests;
+  - unusually large payments;
+  - repeated contact-sharing attempts in masked messages.
+
+  Flags can be dismissed with a note.
+- **Messaging.** Email, SMS and WhatsApp sent and failed by type, bouncing addresses, and estimated cost (per-message rates are editable).
+- **Billing.** MRR and ARR, plans, trials, cancellations, and per-shipper plan changes.
+- **Announcements.** Banners for everyone, shippers or customers, optionally limited to one destination and optionally sent as notifications. Users can dismiss them.
+- **Audit log** (`server/audit.ts`):
+  - every successful change by a signed-in person is logged by middleware, with a redacted body;
+  - it can be searched and exported as CSV;
+  - companies see their own entries under Activity log.
+- **View as.** A read-only, 2-hour session as any user, with a banner and exit. Every request in that session is blocked from making changes and logged.
+- **Features.** Global switches and per-shipper overrides for:
+  - instant quotes, WhatsApp, insurance, shared barrels;
+  - analytics, Monday report, campaigns;
+  - webhooks and the tracking widget.
+
+  Changes apply within 20 seconds.
+
+On-demand sweeps: `POST /admin/sweeps/{weekly|halfEmpty|scorecards|billing|webhooks}`.

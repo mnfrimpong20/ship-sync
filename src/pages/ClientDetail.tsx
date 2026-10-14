@@ -2,12 +2,14 @@ import { Fragment, useEffect, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { AlertTriangle, ArrowLeft, Ban, Bell, Check, ChevronDown, ChevronRight, Ellipsis, FileText, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Printer, RotateCcw, Search, Send, Ship, Star, Trash2, Wallet, X } from 'lucide-react'
-import { cargoLabel, cargoTypes, countries, countryByCode, origins, statusLabels, type CargoType, type Mode } from '../lib/data'
+import { cargoLabel, countries, countryByCode, statusLabels } from '../lib/data'
 import { useStore } from '../lib/store'
-import { activityLabel, clientsApi, paymentMethods, type Activity, type ActivityType, type BookingInput, type ClientDetail as Detail, type Consignee, type ConsigneeInput, type Invoice, type InvoiceItem } from '../lib/clients'
+import { activityLabel, clientsApi, paymentMethods, type Activity, type ActivityType, type ClientDetail as Detail, type Consignee, type ConsigneeInput, type Invoice, type InvoiceItem } from '../lib/clients'
 import { ClientAvatar, ClientForm, waLink } from './Clients'
 import { collectionsApi } from '../lib/collections'
 import { ModeBadge, Pill, fmtDate, fmtDateTime, money } from '../components/ui'
+import { BookingForm } from '../components/BookingForm'
+import { ShipmentManage } from '../components/ShipmentTools'
 
 type Tab = 'overview' | 'shipments' | 'invoices' | 'activity'
 const today = () => new Date().toISOString().slice(0, 10)
@@ -80,9 +82,9 @@ export default function ClientDetailPage() {
           <div className="card-dark p-4"><p className="text-xs text-text-muted">Client since</p><p className="font-heading text-2xl font-bold">{fmtDate(c.createdAt)}</p><p className="text-xs text-text-muted">{c.lastActivityAt ? `Last touch ${fmtDate(c.lastActivityAt)}` : ''}</p></div>
         </div>
 
-        <div className="mt-8 flex gap-1 border-b border-border" role="tablist">
+        <div className="mt-8 flex gap-1 overflow-x-auto border-b border-border [scrollbar-width:none]" role="tablist">
           {([['overview', 'Overview'], ['shipments', `Shipments (${d.shipments.length})`], ['invoices', `Invoices (${d.invoices.length})`], ['activity', `Activity (${d.activities.length})`]] as [Tab, string][]).map(([t, label]) => (
-            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 px-4 text-sm font-medium focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{label}{tab === t && <motion.span layoutId="ctab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium focus-ring rounded-t sm:px-4 ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{label}{tab === t && <motion.span layoutId="ctab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
           ))}
         </div>
 
@@ -164,44 +166,41 @@ function Overview({ d, busy, run, reload }: Common) {
 function Shipments({ d, busy, run, reload, advance }: Common & { advance: (id: string) => Promise<void> }) {
   const c = d.client
   const [open, setOpen] = useState(() => new URLSearchParams(location.hash.split('?')[1] ?? '').get('book') === '1')
-  const def = d.consignees.find((k) => k.isDefault) ?? d.consignees[0]
-  const [f, setF] = useState<BookingInput>({ mode: 'ocean', origin: c.city || origins[0], destination: (def?.country ?? 'GH'), cargo: 'barrels', description: '', eta: plusDays(35), consigneeId: def?.id, note: '' })
+  const [manage, setManage] = useState<string | null>(null)
+  const [note, setNote] = useState('')
+  const say = async (m: string) => { await reload(); setNote(m) }
+  useEffect(() => { if (note) { const t = setTimeout(() => setNote(''), 5000); return () => clearTimeout(t) } }, [note])
   return (
     <div className="mt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-text-muted">Bookings made here get a Ship Sync reference the client can track publicly — no quote request needed.</p>
-        <button onClick={() => setOpen((o) => !o)} className="btn-gold !min-h-10 !px-4 text-sm" aria-expanded={open}><Plus size={15} aria-hidden="true" /> New shipment</button>
+        <button onClick={() => setOpen((o) => !o)} className="btn-gold !min-h-10 !px-4 text-sm" aria-expanded={open} data-testid="new-shipment"><Plus size={15} aria-hidden="true" /> New shipment</button>
       </div>
-      <AnimatePresence>
-        {open && (
-          <motion.form initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} onSubmit={(e) => { e.preventDefault(); run(async () => { await clientsApi.book(c.id, f); await reload(); setOpen(false) }, 'Shipment booked — the client can track it with the new reference.') }} className="mt-4 card-dark grid gap-3 p-5 md:grid-cols-3">
-            <div><span className="label-dark">Mode</span><div className="flex gap-2">{(['ocean', 'air'] as Mode[]).map((m) => <button type="button" key={m} onClick={() => setF({ ...f, mode: m, eta: plusDays(m === 'air' ? 6 : 35) })} aria-pressed={f.mode === m} className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize focus-ring ${f.mode === m ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted'}`}>{m}</button>)}</div></div>
-            <div><label className="label-dark" htmlFor="b-origin">Origin</label><input id="b-origin" list="origin-list" className="input-dark !min-h-10" required value={f.origin} onChange={(e) => setF({ ...f, origin: e.target.value })} /><datalist id="origin-list">{origins.map((o) => <option key={o} value={o} />)}</datalist></div>
-            <div><label className="label-dark" htmlFor="b-dest">Destination</label><select id="b-dest" className="input-dark !min-h-10" value={f.destination} onChange={(e) => setF({ ...f, destination: e.target.value })}>{countries.map((k) => <option key={k.code} value={k.code}>{k.flag} {k.name}</option>)}</select></div>
-            <div><label className="label-dark" htmlFor="b-cargo">Cargo</label><select id="b-cargo" className="input-dark !min-h-10" value={f.cargo} onChange={(e) => setF({ ...f, cargo: e.target.value as CargoType })}>{cargoTypes.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</select></div>
-            <div><label className="label-dark" htmlFor="b-eta">ETA</label><input id="b-eta" type="date" className="input-dark !min-h-10" required min={today()} value={f.eta} onChange={(e) => setF({ ...f, eta: e.target.value })} /></div>
-            <div><label className="label-dark" htmlFor="b-cons">Consignee</label><select id="b-cons" className="input-dark !min-h-10" value={f.consigneeId ?? ''} onChange={(e) => setF({ ...f, consigneeId: e.target.value || undefined })}><option value="">— none —</option>{d.consignees.map((k) => <option key={k.id} value={k.id}>{k.name} · {k.city}</option>)}</select></div>
-            <div className="md:col-span-3"><label className="label-dark" htmlFor="b-desc">Description</label><input id="b-desc" className="input-dark !min-h-10" placeholder="e.g. 2017 Honda Accord + 2 barrels of provisions" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></div>
-            <div className="md:col-span-3 flex justify-end gap-2"><button type="button" onClick={() => setOpen(false)} className="btn-ghost !min-h-9 !px-3 text-xs">Cancel</button><button disabled={busy} className="btn-gold !min-h-9 !px-4 text-xs disabled:opacity-60">{busy ? 'Booking…' : 'Book shipment'}</button></div>
-          </motion.form>
-        )}
-      </AnimatePresence>
+      {note && <p role="status" className="mt-4 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal" data-testid="ship-toast"><Check size={16} aria-hidden="true" />{note}</p>}
+      {open && <BookingForm client={c} consignees={d.consignees} onCancel={() => setOpen(false)} onDone={async (m) => { setOpen(false); await say(m) }} />}
       <ul className="mt-4 space-y-2">
         {d.shipments.length === 0 && <li className="card-dark p-8 text-center text-sm text-text-muted">No shipments for this client yet.</li>}
         {d.shipments.map((s) => {
           const dest = countryByCode(s.destination)
           const cons = d.consignees.find((k) => k.id === s.consigneeId)
+          const inv = d.invoices.find((i) => i.shipmentId === s.id && i.status !== 'void')
+          const isOpen = manage === s.id
           return (
-            <li key={s.id} className="card-dark flex flex-wrap items-center gap-4 p-4">
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-2"><Link to={`/track?ref=${s.ref}`} className="font-mono text-xs text-gold hover:underline focus-ring rounded">{s.ref}</Link><ModeBadge mode={s.mode} /><Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill></p>
-                <p className="mt-1 text-sm font-semibold text-text">{s.origin} → {dest?.flag} {dest?.name}</p>
-                <p className="text-xs text-text-muted">{s.description} · {cargoLabel(s.cargo)}{cons ? ` · to ${cons.name}, ${cons.city}` : ''} · ETA {fmtDate(s.eta)}</p>
+            <li key={s.id} className="card-dark p-4" data-testid="client-shipment">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-2"><Link to={`/track?ref=${s.ref}`} className="font-mono text-xs text-gold hover:underline focus-ring rounded">{s.ref}</Link><ModeBadge mode={s.mode} /><Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill>{!s.consigneeId && <Pill tone="danger">No recipient</Pill>}{inv && <Pill tone={inv.status === 'paid' ? 'green' : 'gold'}>{inv.number} · {money(inv.total)}</Pill>}</p>
+                  <p className="mt-1 text-sm font-semibold text-text">{s.origin} → {dest?.flag} {dest?.name}</p>
+                  <p className="text-xs text-text-muted">{s.description} · {cargoLabel(s.cargo)}{cons ? ` · to ${cons.name}${cons.city ? `, ${cons.city}` : ''}` : ''} · ETA {fmtDate(s.eta)}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {!s.consigneeId && <button onClick={() => setManage(s.id)} className="btn-ghost !min-h-9 !px-3 text-xs text-danger">Add recipient</button>}
+                  {s.status !== 'delivered' && <button onClick={() => run(async () => { await advance(s.id); await reload() }, `${s.ref} updated.`)} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60">Mark next step <ChevronRight size={13} aria-hidden="true" /></button>}
+                  <button onClick={() => setManage(isOpen ? null : s.id)} className="btn-ghost !min-h-9 !px-3 text-xs" aria-expanded={isOpen} data-testid="manage-toggle"><Ellipsis size={13} aria-hidden="true" /> Manage</button>
+                  <Link to={`/track?ref=${s.ref}`} className="btn-ghost !min-h-9 !px-3 text-xs"><Ship size={13} aria-hidden="true" /> Track</Link>
+                </div>
               </div>
-              <div className="flex gap-2">
-                {s.status !== 'delivered' && <button onClick={() => run(async () => { await advance(s.id); await reload() }, `${s.ref} updated.`)} disabled={busy} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60">Mark next step <ChevronRight size={13} aria-hidden="true" /></button>}
-                <Link to={`/track?ref=${s.ref}`} className="btn-ghost !min-h-9 !px-3 text-xs"><Ship size={13} aria-hidden="true" /> Track</Link>
-              </div>
+              {isOpen && <div className="mt-3"><ShipmentManage s={s} consignees={d.consignees} onChanged={say} onDeleted={async (m) => { setManage(null); await say(m) }} /></div>}
             </li>
           )
         })}

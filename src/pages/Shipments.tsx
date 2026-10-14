@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { AlertTriangle, ChevronDown, Container, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Filter, Package, Plane, Plus, Radar, Search, Ship, Tag, X } from 'lucide-react'
+import { AlertTriangle, Bot, ChevronDown, Container, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Filter, Package, Plane, Plus, Radar, Search, Ship, Tag, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { countries, countryByCode, statusLabels, statusOrder, type Mode, type Shipment, type ShipmentStatus } from '../lib/data'
 import { clientsApi, type Client } from '../lib/clients'
@@ -18,6 +18,7 @@ import { PaymentCard } from '../components/PaymentCard'
 import { VehicleCard } from '../components/VehicleCard'
 import { CustomsCard } from '../components/CustomsCard'
 import { DisputeCard, ReviewCard } from '../components/ReviewCards'
+import { AutomationPrefs, ShipmentManage } from '../components/ShipmentTools'
 
 type Bucket = 'all' | 'active' | 'pickup' | 'transit' | 'destination' | 'late' | 'untracked' | 'delivered'
 type Sort = 'newest' | 'eta' | 'status' | 'ref'
@@ -79,7 +80,8 @@ function NewShipmentModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function Shipments() {
-  const { ready, user, shipments, advanceShipment } = useStore()
+  const { ready, user, shipments, advanceShipment, refresh } = useStore()
+  const [prefsOpen, setPrefsOpen] = useState(false)
   const [sp, setSp] = useSearchParams()
   const bucket = (sp.get('b') as Bucket | null) ?? 'active'
   const q = sp.get('q') ?? ''; const mode = (sp.get('mode') as Mode | null) ?? ''; const dest = sp.get('destination') ?? ''; const sort = (sp.get('sort') as Sort | null) ?? 'newest'; const page = Math.max(1, Number(sp.get('page') ?? 1))
@@ -124,9 +126,10 @@ export default function Shipments() {
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><motion.p variants={fadeUp} className="eyebrow mb-1">Shipments</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{counts.active} active shipment{counts.active === 1 ? '' : 's'}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">Every booking on one board. Status updates go straight to the customer’s tracking page.</motion.p></div>
-            <motion.div variants={fadeUp} className="flex gap-2"><Link to={`/dashboard/labels?shipments=${rows.filter((s) => s.status !== 'delivered').map((s) => s.id).join(',')}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Labels for every active shipment on this page"><Tag size={15} aria-hidden="true" /> Print labels</Link><button onClick={exportCsv} className="btn-ghost !min-h-10 !px-4 text-sm"><Download size={15} aria-hidden="true" /> Export CSV</button><button onClick={() => setModal(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> New shipment</button></motion.div>
+            <motion.div variants={fadeUp} className="flex gap-2"><Link to={`/dashboard/labels?shipments=${rows.filter((s) => s.status !== 'delivered').map((s) => s.id).join(',')}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Labels for every active shipment on this page"><Tag size={15} aria-hidden="true" /> Print labels</Link><button onClick={exportCsv} className="btn-ghost !min-h-10 !px-4 text-sm"><Download size={15} aria-hidden="true" /> Export CSV</button>{user.staffRole !== 'driver' && <button onClick={() => setPrefsOpen((v) => !v)} aria-expanded={prefsOpen} className="btn-ghost !min-h-10 !px-4 text-sm" data-testid="prefs-toggle"><Bot size={15} aria-hidden="true" /> Automation</button>}<button onClick={() => setModal(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> New shipment</button></motion.div>
           </div>
 
+          {prefsOpen && <div className="mt-6 max-w-2xl"><AutomationPrefs onClose={() => setPrefsOpen(false)} /></div>}
           <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-text">{toast}</motion.p>}</AnimatePresence>
           {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
 
@@ -165,7 +168,7 @@ export default function Shipments() {
                           <td className="whitespace-nowrap px-3 py-3"><p className="font-semibold">{s.origin}</p><p className="text-xs text-text-muted">→ {d?.name ?? s.destination}</p></td>
                           <td className="max-w-[260px] px-3 py-3"><p className="truncate" title={s.description}>{s.description || '—'}</p><p className="text-xs capitalize text-text-muted">{s.cargo.replace('container', 'container ')}</p></td>
                           <td className="px-3 py-3">{s.clientId ? <Link to={`/dashboard/clients/${s.clientId}`} className="hover:text-gold-deep focus-ring">{s.customer}</Link> : s.customer}</td>
-                          <td className="px-3 py-3"><Pill tone={s.status === 'delivered' ? 'green' : late ? 'danger' : 'teal'}>{statusLabels[s.status]}</Pill><div className="mt-1.5"><Progress status={s.status} /></div></td>
+                          <td className="px-3 py-3"><Pill tone={s.status === 'delivered' ? 'green' : late ? 'danger' : 'teal'}>{statusLabels[s.status]}</Pill><div className="mt-1.5"><Progress status={s.status} /></div>{!s.consigneeId && s.status !== 'delivered' && <button onClick={() => setOpen(s.id)} className="mt-1.5 block text-[11px] font-medium text-danger hover:underline focus-ring" data-testid="no-recipient">No recipient — add</button>}</td>
                           <td className="whitespace-nowrap px-3 py-3 tabular-nums">{s.eta ? <span className={late ? 'font-semibold text-danger' : ''}>{fmtDate(s.eta + 'T12:00:00Z')}{late && <span className="block text-[11px] font-normal">past ETA</span>}</span> : '—'}</td>
                           <td className="px-3 py-3 text-xs">{(s.documents ?? 0) > 0 && <span className="mb-1 mr-1 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted" title={`${s.documents} document${s.documents === 1 ? '' : 's'}`}><FileText size={11} aria-hidden="true" /> {s.documents}</span>}{(() => { const c = containerOf(s); return <>{c && <Link to={`/dashboard/containers/${c.id}`} className="mb-1 inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold-deep hover:border-gold focus-ring"><Container size={11} aria-hidden="true" /> {c.ref}</Link>}{c && <br />}{s.flight || s.vesselName ? <span className="inline-flex items-center gap-1">{s.mode === 'air' ? <Plane size={13} className="text-sky" aria-hidden="true" /> : <Ship size={13} className="text-teal" aria-hidden="true" />}{s.flight ?? s.vesselName}{s.mmsi ? <span className="text-text-muted"> · {s.mmsi}</span> : ''}</span> : c ? <span className="text-text-muted">Follows container</span> : s.status !== 'delivered' ? <button onClick={() => { setOpen(s.id); setTracking(s.id) }} className="text-gold-deep hover:underline focus-ring">Add tracking</button> : <span className="text-text-muted">—</span>}</> })()}</td>
                           <td className="px-3 py-3 text-right"><div className="inline-flex gap-1.5">{s.status !== 'delivered' && <button onClick={() => advance(s)} disabled={busy} className="btn-ghost !min-h-8 whitespace-nowrap !px-2.5 text-xs disabled:opacity-60">Next step <ChevronRight size={13} aria-hidden="true" /></button>}<Link to={`/dashboard/labels?shipments=${s.id}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Print labels for ${s.ref}`} title="Print labels"><Tag size={13} /></Link><Link to={`/track?ref=${s.ref}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Open tracking page for ${s.ref}`} title="Tracking page"><ExternalLink size={13} /></Link></div></td>
@@ -178,11 +181,12 @@ export default function Shipments() {
                                 <DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} />
                               </div>
                               <div className="space-y-4">
+                                <ShipmentManage s={s} onChanged={async (m) => { await refresh(); setToast(m) }} onDeleted={async (m) => { setOpen(null); await refresh(); setToast(m) }} />
                                 <ReviewCard shipmentId={s.id} /><DisputeCard shipmentId={s.id} />
                                 <PaymentCard shipmentId={s.id} />
                                 {s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}
                                 <PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} />
-                                <RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} />
+                                <RecipientPanel key={s.consigneeId ?? 'none'} shipmentId={s.id} shipmentRef={s.ref} status={s.status} />
                                 <InsuranceCard shipmentId={s.id} cargo={s.cargo} />
                                 <CustomsCard shipmentId={s.id} destination={s.destination} />
                                 <DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} />

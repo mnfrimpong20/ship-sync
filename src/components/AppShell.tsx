@@ -1,8 +1,9 @@
 import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Anchor, BarChart3, LineChart, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X } from 'lucide-react'
+import { Anchor, BarChart3, LineChart, Calculator, Megaphone, Plug, CreditCard, History, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X } from 'lucide-react'
 import { Logo } from './ui'
+import { PlatformBanners } from './PlatformBanners'
 import ThemeSwitcher from './ThemeSwitcher'
 import { NotificationBell } from './NotificationBell'
 import { useStore } from '../lib/store'
@@ -60,6 +61,7 @@ export default function AppShell() {
         { to: '/dashboard/rates', label: 'Rate cards', icon: Tags, group: 'Sell' },
         { to: '/dashboard/lanes', label: 'Lane intelligence', icon: BarChart3, group: 'Sell' },
         { to: '/dashboard/groupage', label: 'Fill a barrel', icon: Boxes, group: 'Sell' },
+        ...(['owner', 'dispatcher', 'agent'].includes(staffRole) ? [{ to: '/dashboard/campaigns', label: 'Campaigns', icon: Megaphone, group: 'Sell' } as Item] : []),
         ...(canManage ? [{ to: '/dashboard/brand', label: 'Branded page', icon: Globe, group: 'Sell' } as Item] : []),
         { to: '/dashboard/shipments', label: 'Client shipments', icon: Ship, badge: active, group: 'Operate' },
         { to: '/dashboard/containers', label: 'Containers', icon: Container, group: 'Operate' },
@@ -70,9 +72,12 @@ export default function AppShell() {
         { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders, group: 'Money' },
         { to: '/dashboard/payments', label: 'Payments', icon: Wallet, group: 'Money' },
         { to: '/dashboard/collections', label: 'Collections', icon: Receipt, group: 'Money' },
+        ...(['owner', 'dispatcher', 'finance'].includes(staffRole) ? [{ to: '/dashboard/costs', label: 'Costs & profit', icon: Calculator, group: 'Money' } as Item] : []),
         { to: '/dashboard/reviews', label: 'Reviews', icon: Star, group: 'Money' },
         ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck, group: 'Company' } as Item] : []),
         { to: '/dashboard/team', label: 'Team', icon: UsersRound, group: 'Company' },
+        ...(canManage ? [{ to: '/dashboard/integrations', label: 'Integrations', icon: Plug, group: 'Company' } as Item, { to: '/dashboard/activity', label: 'Activity log', icon: History, group: 'Company' } as Item] : []),
+        ...(['owner', 'finance'].includes(staffRole) ? [{ to: '/dashboard/billing', label: 'Plan & billing', icon: CreditCard, group: 'Company' } as Item] : []),
         ...(canManage ? [{ to: '/dashboard/verification', label: 'Verification', icon: ShieldCheck, group: 'Company' } as Item] : []),
         ...(staffRole === 'owner' ? [{ to: '/dashboard/shipper?view=profile', label: 'Company profile', icon: UserCog, group: 'Company' } as Item] : []),
       ]
@@ -170,6 +175,7 @@ export default function AppShell() {
             </div>
           </div>
         </header>
+        <PlatformBanners />
         <main id="main" className="ss-app flex-1">
           <AnimatePresence mode="wait">
             <motion.div key={loc.pathname} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>

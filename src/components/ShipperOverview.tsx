@@ -163,7 +163,7 @@ export default function ShipperOverview({ firstName }: { firstName: string }) {
       {/* charts + ops */}
       <div className="grid gap-6 xl:grid-cols-12">
         <motion.section variants={fadeUp} className="card-dark p-5 xl:col-span-7" aria-labelledby="chart-h">
-          <div className="mb-1 flex items-center justify-between"><h2 id="chart-h" className="!text-base">Quotes & wins</h2><Link to="/dashboard/shipper?view=leads" className="text-xs text-text-muted hover:text-text focus-ring">Open requests →</Link></div>
+          <div className="mb-1 flex items-center justify-between"><h2 id="chart-h" className="!text-base">Quotes & wins</h2><span className="flex gap-3"><Link to="/dashboard/analytics" className="text-xs font-semibold text-gold-deep hover:underline focus-ring" data-testid="overview-analytics">Full analytics →</Link><Link to="/dashboard/shipper?view=leads" className="text-xs text-text-muted hover:text-text focus-ring">Open requests →</Link></span></div>
           <WeeklyChart series={o.series} />
           <div className="mt-5 grid gap-5 border-t border-border pt-5 md:grid-cols-2">
             <div>

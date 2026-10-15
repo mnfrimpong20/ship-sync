@@ -19,6 +19,7 @@ export const JOB_STEPS: JobStep[] = ['requested', 'accepted', 'documents', 'asse
 export type BrokerInput = Omit<Broker, 'id' | 'countryName' | 'rating' | 'reviews' | 'initials' | 'hue' | 'jobs' | 'feeUsd'>
 
 export const brokersApi = {
+  profile: (id: string) => api<{ broker: Broker; stats: { jobs: number; done: number; open: number; avgClearDays: number | null; byCargo: { cargo: string; n: number }[] }; others: Broker[] }>(`/brokers/${id}`),
   list: (destination?: string) => api<{ brokers: Broker[] }>(`/brokers${destination ? `?destination=${destination}` : ''}`).then((r) => r.brokers),
   forShipment: (id: string) => api<{ job: BrokerJob | null; brokers: Broker[]; supported: boolean; canBook: boolean; canManage: boolean; steps: { id: JobStep; label: string }[] }>(`/shipments/${id}/customs`),
   book: (id: string, brokerId: string, note: string) => api<{ job: BrokerJob; portalLink: string }>(`/shipments/${id}/customs`, { json: { brokerId, note } }),

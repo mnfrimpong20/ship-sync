@@ -102,6 +102,17 @@ export function mountBrokers(r: Router, d: Deps) {
     res.set('Cache-Control', 'no-store'); res.json({ brokers: rows.map((b) => brokerOut(b, false)) })
   }))
 
+  r.get('/brokers/:id', wrap(async (req, res) => {
+    const db = await getDb()
+    const { rows } = await db.query<Row>(`${BROKER_SELECT} where b.id = $1 and b.active`, [req.params.id]); const b = rows[0]; if (!b) throw new HttpError(404, 'Broker not found.')
+    const { rows: jobs } = await db.query<Row>(`select j.status, j.created_at, j.timeline, s.cargo from broker_jobs j join shipments s on s.id = j.shipment_id where j.broker_id = $1 and j.status not in ('cancelled','declined')`, [b.id])
+    const days = jobs.filter((j) => j.status === 'done').map((j) => { const t = (J(j.timeline) as Row[] | null) ?? []; const end = t.find((x) => x.status === 'done')?.at; return end ? (new Date(end).getTime() - new Date(j.created_at).getTime()) / 86400000 : null }).filter((x): x is number => x != null && x >= 0)
+    const byCargo = new Map<string, number>(); for (const j of jobs) byCargo.set(j.cargo, (byCargo.get(j.cargo) ?? 0) + 1)
+    const { rows: others } = await db.query<Row>(`${BROKER_SELECT} where b.active and b.country = $1 and b.id <> $2 order by b.verified desc, b.rating desc limit 3`, [b.country, b.id])
+    res.set('Cache-Control', 'no-store')
+    res.json({ broker: brokerOut(b, false), stats: { jobs: jobs.length, done: jobs.filter((j) => j.status === 'done').length, open: jobs.filter((j) => j.status !== 'done').length, avgClearDays: days.length ? Math.round((days.reduce((a, x) => a + x, 0) / days.length) * 10) / 10 : null, byCargo: [...byCargo].map(([cargo, n]) => ({ cargo, n })).sort((a, c) => c.n - a.n) }, others: others.map((o) => brokerOut(o, false)) })
+  }))
+
   /* ---- per shipment ---- */
   r.get('/shipments/:id/customs', wrap(async (req, res) => {
     const db = await getDb(); const { s, office, owner } = await access(db, req, String(req.params.id))

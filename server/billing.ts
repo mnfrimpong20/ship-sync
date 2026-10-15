@@ -94,6 +94,21 @@ export function mountBilling(r: Router, d: Deps) {
   const { getDb, requireUser, requireAdmin, HttpError, wrap } = d
   const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || !['owner', 'finance'].includes(u.staffRole ?? 'owner')) throw new HttpError(403, 'Owners and finance only.'); return u }
 
+  /** Public: what Ship Sync costs, for the /pricing page. Live numbers from settings. */
+  r.get('/pricing', wrap(async (_req, res) => {
+    const db = await getDb(); const prices = await planPrices(db)
+    const { getSettings } = await import('./payments'); const pay = await getSettings(db)
+    const { getProduct } = await import('./insurance'); const ins = await getProduct(db)
+    const { sourcingSettings } = await import('./sourcing'); const src = await sourcingSettings(db)
+    res.set('Cache-Control', 'no-store')
+    res.json({
+      plans: PLAN_ORDER.map((p) => ({ key: p, label: PLANS[p].label, priceUsd: prices[p], team: PLANS[p].team, blurb: PLANS[p].blurb, perks: PLANS[p].perks.map((k) => PERK_LABELS[k]) })), trialDays: 30,
+      payments: { enabled: pay.enabled, takeRatePct: pay.takeRatePct, releaseOn: pay.releaseOn },
+      insurance: { enabled: ins.enabled, rates: ins.rates, minPremiumUsd: ins.minPremiumUsd, maxValueUsd: ins.maxValueUsd, deductiblePct: ins.deductiblePct },
+      sourcing: { enabled: src.enabled, servicePct: src.servicePct, minFeeUsd: src.minFeeUsd, findFeeUsd: src.findFeeUsd, inspectionUsd: src.inspectionUsd, handlingUsd: src.handlingUsd, depositPct: src.depositPct },
+    })
+  }))
+
   r.get('/billing', wrap(async (req, res) => {
     const db = await getDb(); const u = await office(db, req)
     const { rows: [s] } = await db.query<Row>('select id, plan, trial_ends_at from shippers where id = $1', [u.shipperId])

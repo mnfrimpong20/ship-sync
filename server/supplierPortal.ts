@@ -49,7 +49,7 @@ export function mountSupplierPortal(r: Router, d: Deps) {
   const isAgent = (u: ApiUser) => !!u.admin || (u.role === 'shipper' && u.shipperId === SOURCING_SHIPPER && u.staffRole !== 'driver')
   const jobFor = async (db: Db, id: string) => { const { rows } = await db.query<Row>('select * from sourcing_requests where id = $1 or ref = $1', [id]); if (!rows[0]) throw new HttpError(404, 'Sourcing request not found.'); return rows[0] }
   const byToken = async (db: Db, token: string) => {
-    const { rows } = await db.query<Row>(`select l.*, j.ref, j.title, j.description, j.quantity, j.unit, j.status as job_status, j.po, j.agent_user_id, j.destination, j.id as job_id, sp.name as sup_name, sp.contact as sup_contact, q.unit_price_cny, q.lead_days, q.qty as q_qty, q.title as q_title, q.notes as q_notes, q.tiers, q.moq
+    const { rows } = await db.query<Row>(`select l.*, j.ref, j.title, j.description, j.quantity, j.unit, j.status as job_status, j.po, j.agent_user_id, j.destination, j.id as job_id, sp.name as sup_name, sp.contact as sup_contact, q.unit_price_cny, q.currency, j.origin_country, q.lead_days, q.qty as q_qty, q.title as q_title, q.notes as q_notes, q.tiers, q.moq
       from supplier_links l join sourcing_requests j on j.id = l.sourcing_id left join suppliers sp on sp.id = l.supplier_id left join sourcing_quotes q on q.id = j.accepted_quote_id where l.token = $1`, [token])
     const l = rows[0]
     if (!l || l.revoked_at) throw new HttpError(404, 'This link is no longer valid. Ask your Ship Sync agent for a new one.')
@@ -97,7 +97,7 @@ export function mountSupplierPortal(r: Router, d: Deps) {
       supplier: { name: l.sup_name, contact: l.sup_contact },
       job: { ref: l.ref, title: l.title, description: l.description, quantity: Number(l.q_qty || l.quantity), unit: l.unit, status: l.job_status, destination: l.destination },
       po: po ? { number: po.number, incoterm: po.incoterm, readyBy: po.readyBy, leadDays: po.leadDays, placedAt: po.placedAt, confirmedAt: po.confirmedAt ?? null, confirmedBy: po.confirmedBy ?? null, readyAt: po.readyAt ?? null, pct: po.pct ?? null } : null,
-      quote: l.unit_price_cny != null ? { title: l.q_title, unitPriceCny: Number(l.unit_price_cny), leadDays: Number(l.lead_days), notes: l.q_notes, moq: l.moq != null ? Number(l.moq) : null } : null,
+      quote: l.unit_price_cny != null ? { title: l.q_title, unitPriceCny: Number(l.unit_price_cny), currency: l.currency ?? 'CNY', origin: l.origin_country ?? 'CN', leadDays: Number(l.lead_days), notes: l.q_notes, moq: l.moq != null ? Number(l.moq) : null } : null,
       agent: agent[0]?.name ?? 'Ship Sync Sourcing',
       updates: ups.map(updateOut),
       photos: photos.map((p) => ({ id: p.id, title: p.title, by: p.uploaded_by, at: ISO(p.created_at), url: `/api/s/${l.token}/files/${p.id}` })),

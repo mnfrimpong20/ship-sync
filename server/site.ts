@@ -25,7 +25,7 @@ export function siteConfig() {
     email: e('CONTACT_EMAIL'), phone: e('CONTACT_PHONE'), whatsapp: wa, whatsappUrl: wa ? `https://wa.me/${wa}` : '', address: e('CONTACT_ADDRESS'),
     social: Object.fromEntries((['linkedin', 'instagram', 'facebook', 'x', 'tiktok', 'youtube'] as const).map((k) => [k, e(`SOCIAL_${k.toUpperCase()}`)]).filter(([, v]) => v)) as Record<string, string>,
     demoHidden: hideDemoShippers(),
-    hoursNote: e('CONTACT_HOURS') || 'Mon–Fri 9:00–18:00 US Central · China team Mon–Sat 9:00–18:00 CST',
+    hoursNote: e('CONTACT_HOURS') || 'Mon–Fri 9:00–18:00 US Central · UK team Mon–Fri 9:00–17:30 UK time · China team Mon–Sat 9:00–18:00 CST',
   }
 }
 

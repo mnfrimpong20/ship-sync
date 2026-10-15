@@ -975,6 +975,9 @@ alter table sourcing_requests add column if not exists recurring jsonb;
 alter table sourcing_requests add column if not exists parent_id text;
 alter table sourcing_quotes add column if not exists tiers jsonb;
 alter table sourcing_quotes add column if not exists base_price_cny numeric;
+alter table sourcing_requests add column if not exists origin_country text not null default 'CN';
+alter table suppliers add column if not exists country text not null default 'CN';
+alter table sourcing_quotes add column if not exists currency text not null default 'CNY';
 create table if not exists destinations (
   code text primary key,
   name text not null,

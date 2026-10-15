@@ -265,3 +265,21 @@ Ship Sync Sourcing buys in three countries. `src/lib/sourcingOrigins.ts` (shared
   - receiving and shipping use that country's warehouse and city, so a UK order ships from "London, GB" and its status reads "Received at our London warehouse";
   - the status id stays `received_cn` for compatibility.
 - **Sourcing board:** a country filter, and flags on every card.
+
+## Customs broker directory and pricing page
+
+- **`/brokers`** (`src/pages/Brokers.tsx`) is laid out like the shipper directory:
+  - a hero with search and quick chips;
+  - a "how it works" strip;
+  - filters for country, port and cargo (each card then shows that cargo's fee), "licence checked" and "can pay the duty";
+  - sort by recommended, rating, lowest fee or fastest reply.
+- **`/brokers/:id`** is a public profile (`GET /api/brokers/:id` — no contacts) with:
+  - licence, ports and reply time;
+  - jobs handled and average days to clear;
+  - fees for every cargo type;
+  - a booking box and other brokers in the same country.
+- **`/pricing`** (`src/pages/Pricing.tsx`) has tabs for customers, shippers and extras. The numbers come live from `GET /api/pricing`: plan prices and perks, the 30-day Pro trial, the online-payment platform fee, insurance rates, broker "from" fees and sourcing fees. The home page pricing cards use the same live prices and the real plan features.
+- **Hash links fixed:** links like `/#pricing`, `/#how` and `/#faq` don't work with the hash router (they opened a 404).
+  - Menus now use `/pricing`, `/?s=how` and `/?s=faq`; the home page scrolls to `?s=<section id>`.
+  - `/how` and `/faq` redirect to those home sections.
+  - In-page buttons scroll instead of changing the route.

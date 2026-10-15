@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { localPrice } from '../lib/sourcingOrigins'
 import { useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { AlertTriangle, Camera, Check, ClipboardCheck, Clock, Loader2, PackageCheck, Percent } from 'lucide-react'
@@ -69,7 +70,7 @@ export default function SupplierPortalPage() {
             {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <div><dt className="text-xs text-text-muted"><L k="qty" /></dt><dd className="font-semibold tabular-nums">{d.job.quantity.toLocaleString()} {d.job.unit}</dd></div>
-              {d.quote && <div><dt className="text-xs text-text-muted"><L k="unit" /></dt><dd className="font-semibold tabular-nums">¥{d.quote.unitPriceCny.toLocaleString()} / {d.job.unit}{d.quote.moq ? <span className="text-xs font-normal text-text-muted"> · MOQ {d.quote.moq.toLocaleString()}</span> : null}</dd></div>}
+              {d.quote && <div><dt className="text-xs text-text-muted"><L k="unit" /></dt><dd className="font-semibold tabular-nums">{localPrice(d.quote.unitPriceCny, d.quote.origin ?? 'CN')} / {d.job.unit}{d.quote.moq ? <span className="text-xs font-normal text-text-muted"> · MOQ {d.quote.moq.toLocaleString()}</span> : null}</dd></div>}
               {d.po?.incoterm && <div><dt className="text-xs text-text-muted"><L k="incoterm" /></dt><dd className="font-semibold">{d.po.incoterm}</dd></div>}
               {d.po?.readyBy && <div><dt className="text-xs text-text-muted"><L k="readyBy" /></dt><dd className="font-semibold">{fmtDate(d.po.readyBy)}{d.po.pct != null && !d.po.readyAt && <span className="ml-2 text-xs font-normal text-text-muted">{d.po.pct}%</span>}</dd></div>}
               {d.quote && <div><dt className="text-xs text-text-muted"><L k="lead" /></dt><dd className="font-semibold">{d.quote.leadDays} days · 天</dd></div>}

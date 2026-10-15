@@ -60,7 +60,7 @@ export function CustomerDashboard() {
   const [sp, setSp] = useSearchParams()
   const TABS = ['requests', 'shipments', 'money', 'week', 'inbox', 'documents', 'plans', 'groupage', 'sourcing', 'invoices', 'recipients', 'issues', 'account'] as const
   type Tab = typeof TABS[number]
-  const TAB_LABEL: Record<Tab, string> = { requests: 'Quote requests', shipments: 'Shipments', money: 'Money', week: 'This week', inbox: 'Messages', documents: 'Documents', plans: 'Saved & repeat', groupage: 'Shared barrels', sourcing: 'China sourcing', invoices: 'Invoices', recipients: 'Recipients', issues: 'Problems', account: 'Account' }
+  const TAB_LABEL: Record<Tab, string> = { requests: 'Quote requests', shipments: 'Shipments', money: 'Money', week: 'This week', inbox: 'Messages', documents: 'Documents', plans: 'Saved & repeat', groupage: 'Shared barrels', sourcing: 'Sourcing', invoices: 'Invoices', recipients: 'Recipients', issues: 'Problems', account: 'Account' }
   const asTab = (t: string | null): Tab => ((TABS as readonly string[]).includes(t ?? '') ? t as Tab : 'requests')
   const [tab, setTabState] = useState<Tab>(asTab(sp.get('tab')))
   const setTab = (t: Tab) => { setTabState(t); setSp(t === 'requests' ? {} : { tab: t }, { replace: true }) }

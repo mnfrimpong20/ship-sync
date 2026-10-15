@@ -210,3 +210,36 @@ Routes live in `server/requestFlow.ts` (edit, cancel, open to market, withdraw, 
   Changes apply within 20 seconds.
 
 On-demand sweeps: `POST /admin/sweeps/{weekly|halfEmpty|scorecards|billing|webhooks}`.
+
+## Customer dashboard (`/dashboard?tab=…`)
+
+`server/customerHub.ts` (routes listed in its header), UI in `src/components/CustomerTabs.tsx` and `src/components/ShipmentExtras.tsx`.
+
+- **Money** (`tab=money`):
+  - spend by year, month, destination and shipper;
+  - what comparing quotes saved (accepted price vs the median of the other quotes);
+  - average cost per unit;
+  - yearly/monthly statements (HTML to print, or CSV);
+  - one checkout for several invoices, part payments ($20 minimum), instalment plans of 2–4 parts. The shipper is told about a plan, and reminders go out before each part.
+- **This week** (`tab=week`): pickups, container cutoffs, arrivals, instalments, collection days, shared-space closing dates and repeat reminders.
+- **Shipment extras** (Shipments tab):
+  - *what happens next*, plus the ETA-change history;
+  - a packing list per shipment, with prohibited/restricted warnings for GH/NG (banned items alert the shipper; the list locks once goods leave the warehouse);
+  - share with family: a receiver link, a WhatsApp message and the collection code;
+  - an early duty estimate from the packing list;
+  - messages with the shipper after booking (photos allowed).
+
+  Shippers see the packing list and the chat in the expanded row on Client shipments.
+- **Messages** (`tab=inbox`): request threads from before booking and shipment threads from after it, in one list.
+- **Documents** (`tab=documents`): every shared document and invoice, plus *Download everything* (`/api/me/documents.zip`).
+- **Saved & repeat** (`tab=plans`):
+  - favourite shippers (the heart on a profile) with one-tap rebook;
+  - repeat plans copied from a past request (reminder 7 days ahead, then *Post now*);
+  - price-drop, shared-space and cutoff alerts (checked every 3 h).
+- **Problems** (`tab=issues`): disputes with up to 4 photos.
+- **Account** (`tab=account`):
+  - email/text choice per update type: SMS or WhatsApp, with quiet hours;
+  - a referral link: both people get `REFERRAL_CREDIT_USD` (default 15) when the friend's first shipment is delivered, and the credit comes off the next online payment;
+  - family/team members who can act as the owner (a banner shows while acting, and actions are logged as "member for owner");
+  - business details (company, tax ID, billing address, PO number required on every request — it goes on the invoice and the statement).
+- On the quote form, a rough duty figure appears once a value is entered (GH/NG).

@@ -6,8 +6,8 @@ import { useSiteConfig } from '../lib/site'
 
 const cols = [
   { title: 'Ship', links: [['Get a quote', '/quote'], ['Fill a barrel', '/groupage'], ['Source from China, UK & USA', '/sourcing'], ['Track a shipment', '/track'], ['Duty estimator', '/duty'], ['Customs brokers', '/brokers'], ['Sailing schedule', '/sailings'], ['Lane prices', '/lanes'], ['Live map', '/live']] },
-  { title: 'Shippers', links: [['List your company', '/signup?role=shipper'], ['Pricing', '/#pricing'], ['How verification works', '/about'], ['Shipper agreement', '/shipper-agreement'], ['Shipper dashboard', '/dashboard/shipper']] },
-  { title: 'Company', links: [['About', '/about'], ['Contact', '/contact'], ['FAQ', '/#faq'], ['Privacy policy', '/privacy'], ['Terms of service', '/terms']] },
+  { title: 'Shippers', links: [['List your company', '/signup?role=shipper'], ['Pricing', '/pricing'], ['How verification works', '/about'], ['Shipper agreement', '/shipper-agreement'], ['Shipper dashboard', '/dashboard/shipper']] },
+  { title: 'Company', links: [['About', '/about'], ['Contact', '/contact'], ['FAQ', '/?s=faq'], ['Privacy policy', '/privacy'], ['Terms of service', '/terms']] },
 ]
 const SOCIAL_LABELS: Record<string, string> = { linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook', x: 'X', tiktok: 'TikTok', youtube: 'YouTube' }
 

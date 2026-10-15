@@ -11,7 +11,7 @@ const primary = [
   { to: '/quote', label: 'Ship' },
   { to: '/shippers', label: 'Shippers' },
   { to: '/track', label: 'Track' },
-  { to: '/#pricing', label: 'Pricing' },
+  { to: '/pricing', label: 'Pricing' },
 ]
 type Service = { to: string; label: string; blurb: string; icon: typeof Boxes }
 const services: { title: string; items: Service[] }[] = [
@@ -27,7 +27,7 @@ const services: { title: string; items: Service[] }[] = [
   ] },
   { title: 'Follow along', items: [
     { to: '/live', label: 'Live map', blurb: 'Ships and flights on the Gulf of Guinea', icon: Radar },
-    { to: '/#how', label: 'How it works', blurb: 'Post, compare, book and track', icon: Route },
+    { to: '/?s=how', label: 'How it works', blurb: 'Post, compare, book and track', icon: Route },
   ] },
 ]
 

@@ -80,10 +80,10 @@ export function DutyEarly({ shipmentId }: { shipmentId: string }) {
   if (!d || !d.supported) return null
   const conf = d.confirmed as { amountLocal?: number; currency?: string; paid?: boolean } | null
   return (
-    <div className={card} data-testid="duty-card">
+    <div className={card} data-testid="duty-early">
       <p className="inline-flex items-center gap-1.5 font-semibold"><Landmark size={15} aria-hidden="true" /> Duty at destination</p>
       {conf?.amountLocal ? <p className="mt-1 text-sm">Customs assessed <b>{conf.currency} {Math.round(conf.amountLocal).toLocaleString()}</b>{conf.paid ? ' — paid.' : ' — pay it to release your goods.'}</p>
-        : d.estimate ? <><p className="mt-1 text-sm">Estimated <b data-testid="duty-estimate">{d.estimate.currency} {d.estimate.local.toLocaleString()}</b> (about {money(d.estimate.usd)}), from your {d.estimate.basis} of {money(d.valueUsd)}.</p><p className="mt-1 text-xs text-text-muted">An estimate only — customs sets the final amount on arrival.</p></>
+        : d.estimate ? <><p className="mt-1 text-sm">Estimated <b data-testid="duty-early-estimate">{d.estimate.currency} {d.estimate.local.toLocaleString()}</b> (about {money(d.estimate.usd)}), from your {d.estimate.basis} of {money(d.valueUsd)}.</p><p className="mt-1 text-xs text-text-muted">An estimate only — customs sets the final amount on arrival.</p></>
         : <p className="mt-1 text-sm text-text-muted">{d.valueUsd > 0 ? `At ${money(d.valueUsd)} declared, expect little or no duty — customs has the final say.` : 'Add what’s inside with values to see an estimate.'}</p>}
     </div>
   )

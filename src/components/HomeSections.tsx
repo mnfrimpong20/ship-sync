@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowRight, BadgeCheck, Car, Check, ChevronDown, ClipboardList, Container, FileCheck2, Handshake, MapPinned, Minus, Plane, Radar, Scale, Ship, Truck, Users } from 'lucide-react'
@@ -109,7 +109,7 @@ export function ForShippers() {
           </ul>
           <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-3 sm:flex-row">
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/signup?role=shipper" className="btn-gold w-full sm:w-auto">List your company <ArrowRight size={18} aria-hidden="true" /></Link></motion.div>
-            <a href="#pricing" className="btn-ghost">See shipper pricing</a>
+            <Link to="/pricing" className="btn-ghost">See shipper pricing</Link>
           </motion.div>
         </div>
         <motion.div variants={fadeUp} className="card-dark p-6 md:p-8">
@@ -176,12 +176,15 @@ export function Testimonials() {
 }
 
 /* ---------- Pricing ---------- */
+// Kept in line with server/features.ts PLANS; prices are refreshed from /api/pricing.
 const plans = [
-  { name: 'Starter', price: 0, per: '/month', tag: 'For new or small forwarders', features: ['Directory listing', 'Up to 15 quote responses / month', 'Basic verification badge', 'Email lead alerts'], missing: ['Priority placement', 'Branded tracking page'] },
-  { name: 'Pro', price: 149, per: '/month', tag: 'Most popular', highlight: true, features: ['Everything in Starter', 'Unlimited quote responses', 'Priority placement in matches', 'Branded tracking page', 'Analytics dashboard', 'WhatsApp & SMS lead alerts'], missing: [] },
-  { name: 'Enterprise', price: 499, per: '/month', tag: 'Multi-lane operators', features: ['Everything in Pro', 'Multiple warehouses & teams', 'API & TMS integration', 'Dedicated account manager', 'Featured on destination pages'], missing: [] },
+  { key: 'starter', name: 'Starter', price: 0, per: '/month', tag: 'For new or small forwarders', features: ['Directory listing', 'Customer requests, quotes & messages', 'Shipments, tracking & invoices', 'Up to 3 team members'], missing: ['Branded page', 'Full analytics'] },
+  { key: 'pro', name: 'Pro', price: 149, per: '/month', tag: 'Most popular', highlight: true, features: ['Everything in Starter', 'Branded page', 'Full analytics', 'Win-back campaigns', 'Container load planner & accounting export', 'Up to 15 team members'], missing: [] },
+  { key: 'enterprise', name: 'Enterprise', price: 499, per: '/month', tag: 'Multi-lane operators', features: ['Everything in Pro', 'Webhooks', 'Unlimited team members', 'Featured placement in the directory'], missing: [] },
 ]
 export function Pricing() {
+  const [live, setLive] = useState<Record<string, number>>({})
+  useEffect(() => { fetch('/api/pricing').then((r) => r.json()).then((d: { plans?: { key: string; priceUsd: number }[] }) => setLive(Object.fromEntries((d.plans ?? []).map((p) => [p.key, p.priceUsd])))).catch(() => {}) }, [])
   return (
     <Section id="pricing" light>
       <SectionHeader light eyebrow="Pricing" title="Free for customers. Simple plans for shippers." body="Customers never pay Ship Sync. Shippers pay a flat monthly fee for leads and tools; a small platform fee applies only when a customer pays you through Ship Sync's escrow." />
@@ -191,7 +194,7 @@ export function Pricing() {
             {p.highlight && <span className="absolute -top-3 left-7 rounded-full bg-gold px-3 py-1 text-xs font-bold text-on-accent">{p.tag}</span>}
             <h3 className={p.highlight ? 'text-text' : 'text-ink'}>{p.name}</h3>
             <p className={`text-sm ${p.highlight ? 'text-text-muted' : 'text-ink-muted'}`}>{p.highlight ? 'Growing forwarders' : p.tag}</p>
-            <p className="mt-4 flex items-baseline gap-1"><span className={`font-heading text-5xl font-bold ${p.highlight ? 'text-gold' : 'text-ink'}`}>${p.price}</span><span className={p.highlight ? 'text-text-muted' : 'text-ink-muted'}>{p.per}</span></p>
+            <p className="mt-4 flex items-baseline gap-1"><span className={`font-heading text-5xl font-bold ${p.highlight ? 'text-gold' : 'text-ink'}`}>${live[p.key] ?? p.price}</span><span className={p.highlight ? 'text-text-muted' : 'text-ink-muted'}>{p.per}</span></p>
             <ul className="mt-6 flex-1 space-y-2.5 text-sm">
               {p.features.map((f) => <li key={f} className={`flex gap-2 ${p.highlight ? 'text-text' : 'text-ink'}`}><Check size={16} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" />{f}</li>)}
               {p.missing.map((f) => <li key={f} className="flex gap-2 text-ink-muted/70"><Minus size={16} className="mt-0.5 shrink-0" aria-hidden="true" />{f}</li>)}
@@ -200,7 +203,7 @@ export function Pricing() {
           </motion.div>
         ))}
       </div>
-      <motion.p variants={fadeUp} className="mt-8 flex items-center justify-center gap-2 text-center text-sm text-ink-muted"><Users size={16} aria-hidden="true" /> Customers: requesting quotes, booking and tracking is always free.</motion.p>
+      <motion.p variants={fadeUp} className="mt-8 flex items-center justify-center gap-2 text-center text-sm text-ink-muted"><Users size={16} aria-hidden="true" /> Customers: requesting quotes, booking and tracking is always free. <Link to="/pricing" className="font-semibold text-gold-deep hover:underline">Full pricing →</Link></motion.p>
     </Section>
   )
 }

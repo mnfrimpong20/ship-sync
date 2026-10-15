@@ -243,3 +243,25 @@ On-demand sweeps: `POST /admin/sweeps/{weekly|halfEmpty|scorecards|billing|webho
   - family/team members who can act as the owner (a banner shows while acting, and actions are logged as "member for owner");
   - business details (company, tax ID, billing address, PO number required on every request — it goes on the invoice and the statement).
 - On the quote form, a rough duty figure appears once a value is entered (GH/NG).
+
+## Sourcing from China, the UK and the USA (`/sourcing`)
+
+Ship Sync Sourcing buys in three countries. `src/lib/sourcingOrigins.ts` (shared by the server and the app) holds each country's currency, warehouse and wording.
+
+| | China (`CN`) | United Kingdom (`GB`) | United States (`US`) |
+|---|---|---|---|
+| Buys from | factories, wholesale markets | UK brands, retailers, wholesalers | US stores, wholesalers, auctions |
+| Prices in | ¥ (`CNY_PER_USD`, default 7.2) | £ (`GBP_PER_USD`, default 0.79) | $ (no conversion) |
+| Warehouse | Guangzhou (`site_cn_gz`) | London (`site_uk_lon`) | Houston (`site_us_hou`) |
+| Demo agent | `china@shipsync.demo` | `uk@shipsync.demo` | `usa@shipsync.demo` |
+
+- **Requests:**
+  - customers pick **Buy from** on the form (`/sourcing/new?from=GB`);
+  - pasting a link sets the country for them: 1688/Alibaba → China; Amazon UK, Argos, Currys, John Lewis, Boots, Tesco, eBay UK, any `.co.uk` → UK; Walmart, Home Depot, Best Buy, Costco, Amazon.com and others → USA;
+  - the country is stored as `sourcing_requests.origin_country` (old requests default to `CN`).
+- **Quotes:** agents enter the unit price in that country's currency (`unitPrice`; `unitPriceCny` still works). Each quote stores its `currency`, and the price is converted to dollars with the rate for that country. Admin → Sourcing sets both the ¥ and £ rates.
+- **Suppliers** have a `country`: the directory and the quote form filter by it, and UK/US suppliers show WhatsApp instead of WeChat. Customers see a supplier's name as "Supplier XYZ" (China: "Factory XYZ") until they pay.
+- **Warehouse and hand-off:**
+  - receiving and shipping use that country's warehouse and city, so a UK order ships from "London, GB" and its status reads "Received at our London warehouse";
+  - the status id stays `received_cn` for compatibility.
+- **Sourcing board:** a country filter, and flags on every card.

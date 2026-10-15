@@ -21,6 +21,7 @@
   "include": [
     "server",
     "src/lib/data.ts",
-    "src/lib/geo.ts"
+    "src/lib/geo.ts",
+    "src/lib/sourcingOrigins.ts"
   ]
 }

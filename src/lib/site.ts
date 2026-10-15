@@ -36,7 +36,7 @@ const TITLES: [RegExp, string, string?][] = [
   [/^\/quote/, 'Get freight quotes', 'Post your shipment once and let verified shippers compete with itemised quotes.'],
   [/^\/shippers\/[^/]+/, 'Shipper profile'], [/^\/shippers/, 'Verified shippers directory'], [/^\/track/, 'Track a shipment'], [/^\/duty/, 'Duty & landed-cost estimator'],
   [/^\/groupage/, 'Fill a barrel — shared barrels & containers'], [/^\/brokers/, 'Customs brokers'], [/^\/sailings/, 'Sailing schedule'], [/^\/lanes/, 'Lane prices'], [/^\/live/, 'Live map'],
-  [/^\/sourcing\/new/, 'Start a sourcing request'], [/^\/sourcing\/[^/]+/, 'Sourcing request'], [/^\/sourcing/, 'Source from China', 'Our own team in Guangzhou finds the factory, buys in Ship Sync’s name, inspects and ships it to you.'],
+  [/^\/sourcing\/new/, 'Start a sourcing request'], [/^\/sourcing\/[^/]+/, 'Sourcing request'], [/^\/sourcing/, 'Source from China, the UK and the USA', 'Our own team finds the factory, wholesaler or store, buys in Ship Sync’s name, inspects and ships it to you.'],
   [/^\/about/, 'About Ship Sync'], [/^\/contact/, 'Contact us'], [/^\/privacy/, 'Privacy policy'], [/^\/terms/, 'Terms of service'], [/^\/shipper-agreement/, 'Shipper agreement'],
   [/^\/s\//, 'Supplier portal · 供应商门户'], [/^\/order\//, 'Place your order'], [/^\/login/, 'Sign in'], [/^\/forgot/, 'Reset your password'], [/^\/reset/, 'Choose a new password'], [/^\/signup/, 'Create an account'], [/^\/dashboard\/shipper/, 'Shipper workspace'], [/^\/dashboard\/sourcing/, 'Sourcing board'], [/^\/dashboard\/verification/, 'Verification'], [/^\/dashboard\/(\w+)/, 'Workspace'], [/^\/dashboard/, 'My dashboard'], [/^\/admin/, 'Admin'],
 ]

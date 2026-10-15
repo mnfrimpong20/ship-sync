@@ -1,4 +1,6 @@
 import { api } from './store'
+import type { Origin, OriginInfo } from './sourcingOrigins'
+export { ORIGINS, ORIGIN_CODES, localPrice, asOrigin, type Origin, type OriginInfo } from './sourcingOrigins'
 
 export type Tier = 'find' | 'order' | 'door'
 export type Step = 'requested' | 'assigned' | 'sourcing' | 'quoted' | 'deposit_paid' | 'ordered' | 'in_production' | 'inspected' | 'balance_paid' | 'received_cn' | 'shipped' | 'delivered' | 'closed'
@@ -7,27 +9,28 @@ export const STEPS: Step[] = ['requested', 'assigned', 'sourcing', 'quoted', 'de
 export const FIND_STEPS: Step[] = ['requested', 'assigned', 'sourcing', 'quoted', 'closed']
 export const stepLabels: Record<JobStatus, string> = {
   requested: 'Request received', assigned: 'Agent assigned', sourcing: 'Finding suppliers', quoted: 'Quotes ready', deposit_paid: 'Deposit paid', ordered: 'Order placed', in_production: 'In production', inspected: 'Quality inspected',
-  balance_paid: 'Balance paid', received_cn: 'At our China warehouse', shipped: 'Shipped', delivered: 'Delivered', closed: 'Closed', cancelled: 'Cancelled',
+  balance_paid: 'Balance paid', received_cn: 'At our warehouse', shipped: 'Shipped', delivered: 'Delivered', closed: 'Closed', cancelled: 'Cancelled',
 }
 export const tierLabels: Record<Tier, string> = { find: 'Find me a supplier', order: 'Order & inspect', door: 'Door to door' }
 
 export interface Audit { id?: string; auditor?: string; date: string; score: number; result: 'pass' | 'conditional' | 'fail'; findings?: string; categories?: Record<string, number> }
-export interface Supplier { id: string; name: string; city: string; province: string; products: string[]; verified: boolean; rating: number; jobs: number; notes: string; contact: string; wechat: string; phone: string; website: string; storefront: string; active: boolean; createdAt: string | null; lastAudit: Audit | null }
+export interface Supplier { id: string; name: string; country: Origin; city: string; province: string; products: string[]; verified: boolean; rating: number; jobs: number; notes: string; contact: string; wechat: string; phone: string; website: string; storefront: string; active: boolean; createdAt: string | null; lastAudit: Audit | null }
 export type SupplierInput = Omit<Supplier, 'id' | 'jobs' | 'createdAt' | 'lastAudit'>
 export interface Quote {
-  id: string; sourcingId: string; supplierId: string; supplier: Supplier | null; title: string; unitPriceCny: number; qty: number; moq: number; leadDays: number; factoryUsd: number; serviceFeeUsd: number; inspectionUsd: number; handlingUsd: number; freightUsd: number; insuranceUsd: number; dutyEstUsd: number
+  id: string; sourcingId: string; supplierId: string; supplier: Supplier | null; title: string; unitPriceCny: number; currency: string; qty: number; moq: number; leadDays: number; factoryUsd: number; serviceFeeUsd: number; inspectionUsd: number; handlingUsd: number; freightUsd: number; insuranceUsd: number; dutyEstUsd: number
   totalUsd: number; depositUsd: number; balanceUsd: number; tiers: PriceBreak[]; notes: string; sampleAvailable: boolean; status: 'proposed' | 'accepted' | 'rejected'; createdAt: string | null
 }
 export interface QuoteInput { supplierId: string; title: string; unitPriceCny: number; qty: number; moq?: number; leadDays: number; freightUsd?: number; insuranceUsd?: number; dutyEstUsd?: number; inspectionUsd?: number; handlingUsd?: number; serviceFeeUsd?: number; notes?: string; sampleAvailable?: boolean; tiers?: PriceBreak[] }
 export interface Job {
   id: string; ref: string; tier: Tier; tierLabel: string; title: string; description: string; links: string[]; quantity: number; unit: string; targetPriceUsd: number | null; destination: string; destinationName: string; destinationCity: string; mode: 'ocean' | 'air' | 'either'; deadline: string | null
+  origin: Origin; originName: string; currency: string
   customer?: { id: string; name: string; email: string; phone: string; company: string }; status: JobStatus; statusLabel: string; agent: { id: string; name: string; city: string } | null
   acceptedQuoteId: string | null; po: { number: string; incoterm: string; leadDays: number; readyBy: string; factoryPaidCny: number | null; supplier: string; placedAt: string; placedBy: string } | null; qc: { result?: 'pass' | 'rework' | 'fail'; checked?: number; defects?: number; notes?: string; at?: string; by?: string; items?: QcItem[]; sampleSize?: number; aql?: Aql } | null
   sample: Sample | null; reference: Reference | null; recurring: Recurring | null; parentId: string | null; parentRef: string | null; receipt: { cartons: number; grossKg: number; cbm: number; marks: string; siteName: string; receivedAt: string; by: string } | null; containerId: string | null; containerRef: string | null
   shipmentId: string | null; shipmentRef: string | null; shipmentStatus: string | null; supplierRevealed: boolean; timeline: { at: string; status: string; note: string; by: string }[]; createdAt: string | null; updatedAt: string | null; closedAt: string | null
 }
 export type Stage = 'fee' | 'deposit' | 'balance' | 'sample'
-export interface Reference { url: string; platform: string; productId: string; title: string; image: string; priceCny: number | null; priceUsd: number | null; moq: number | null }
+export interface Reference { url: string; platform: string; productId: string; title: string; image: string; priceCny: number | null; priceUsd: number | null; price?: number | null; currency?: string; origin?: Origin | null; moq: number | null }
 export interface Recurring { active: boolean; everyWeeks: number; nextAt: string; quantity: number; placed: number; lastChildId?: string }
 export interface PriceBreak { minQty: number; unitPriceCny: number }
 export interface TodayItem extends Job { action: { label: string; step?: Step; kind: 'step' | 'quote' | 'sample' | 'assign' | 'wait' | 'reply' }; lastMessage: { author: string; role: string; body: string; at: string } | null; photos: number }
@@ -41,9 +44,9 @@ export interface Payment { id: string; stage: Stage; amountUsd: number; status: 
 export interface Message { id: string; author: string; role: 'customer' | 'agent' | 'admin'; body: string; at: string; mine: boolean }
 export interface SFile { id: string; kind: 'photo' | 'document' | 'qc'; title: string; mime: string; size: number; by: string; role: string; at: string; url: string }
 export interface Due { stage: Stage; amountUsd: number; items: { description: string; amountUsd: number; kind: string }[] }
-export interface Pricing { servicePct: number; minFeeUsd: number; findFeeUsd: number; depositPct: number; inspectionUsd: number; handlingUsd: number; cnyPerUsd: number; note: string; agentCommissionPct?: number; sampleHandlingUsd?: number }
+export interface Pricing { servicePct: number; minFeeUsd: number; findFeeUsd: number; depositPct: number; inspectionUsd: number; handlingUsd: number; cnyPerUsd: number; gbpPerUsd: number; note: string; agentCommissionPct?: number; sampleHandlingUsd?: number }
 export interface Detail { job: Job; quotes: Quote[]; payments: Payment[]; messages: Message[]; files: SFile[]; due: Due | null; canPay: boolean; online: boolean; steps: { id: Step; label: string }[]; settings: Pricing }
-export interface RequestInput { tier: Tier; title: string; description: string; links: string[]; quantity: number; unit: string; targetPriceUsd: number | null; destination: string; destinationCity: string; mode: 'ocean' | 'air' | 'either'; deadline: string | null; contactName: string; contactEmail: string; contactPhone: string; company: string; reference?: Reference | null }
+export interface RequestInput { tier: Tier; origin: Origin; title: string; description: string; links: string[]; quantity: number; unit: string; targetPriceUsd: number | null; destination: string; destinationCity: string; mode: 'ocean' | 'air' | 'either'; deadline: string | null; contactName: string; contactEmail: string; contactPhone: string; company: string; reference?: Reference | null }
 export interface StepInput { status: JobStatus; note?: string; po?: { number?: string; leadDays?: number; readyBy?: string; incoterm?: 'EXW' | 'FOB' | 'CIF' | 'DDP'; factoryPaidCny?: number }; qc?: { result: 'pass' | 'rework' | 'fail'; checked?: number; defects?: number; notes?: string; items?: QcItem[] }; receipt?: { cartons?: number; grossKg?: number; cbm?: number; marks?: string }; containerId?: string; ship?: { mode: 'ocean' | 'air'; originCity?: string; cargo?: string; eta: string; vesselName?: string; flight?: string; description?: string }; refund?: boolean }
 export interface Settings extends Pricing { enabled: boolean; agentCommissionPct: number; sampleHandlingUsd: number }
 export const QC_ITEMS: { id: string; label: string }[] = [
@@ -61,7 +64,7 @@ export interface SupplierPortal {
   supplier: { name: string | null; contact: string | null }
   job: { ref: string; title: string; description: string; quantity: number; unit: string; status: string; destination: string }
   po: { number: string; incoterm: string; readyBy: string; leadDays: number; placedAt: string; confirmedAt: string | null; confirmedBy: string | null; readyAt: string | null; pct: number | null } | null
-  quote: { title: string; unitPriceCny: number; leadDays: number; notes: string; moq: number | null } | null
+  quote: { title: string; unitPriceCny: number; currency?: string; origin?: Origin; leadDays: number; notes: string; moq: number | null } | null
   agent: string
   updates: SupplierUpdate[]
   photos: { id: string; title: string; by: string; at: string; url: string }[]
@@ -75,12 +78,12 @@ export const sourcingApi = {
   supplierLink: (id: string) => api<{ link: SupplierLink | null; updates: SupplierUpdate[] }>(`/sourcing/${id}/supplier-link`),
   createSupplierLink: (id: string) => api<{ link: SupplierLink; reused: boolean }>(`/sourcing/${id}/supplier-link`, { json: {} }),
   revokeSupplierLink: (id: string) => api<{ ok: true }>(`/sourcing/${id}/supplier-link`, { method: 'DELETE' }),
-  config: () => api<{ enabled: boolean; tiers: { id: Tier; label: string; blurb: string }[]; pricing: Pricing; stats: { agents: number; suppliers: number; verifiedSuppliers: number; completed: number }; steps: { id: Step; label: string }[] }>('/sourcing/config'),
+  config: () => api<{ enabled: boolean; tiers: { id: Tier; label: string; blurb: string }[]; pricing: Pricing; origins: (OriginInfo & { perUsd: number })[]; stats: { agents: number; suppliers: number; verifiedSuppliers: number; completed: number }; steps: { id: Step; label: string }[] }>('/sourcing/config'),
   create: (b: RequestInput) => api<Detail>('/sourcing', { json: b }),
   mine: () => api<{ requests: Job[] }>('/sourcing/mine').then((r) => r.requests),
   get: (id: string) => api<Detail>(`/sourcing/${id}`),
   accept: (id: string, quoteId: string, qty?: number) => api<Detail>(`/sourcing/${id}/accept`, { json: { quoteId, qty } }),
-  importLink: (url: string) => api<{ reference: Reference; description: string; fetched: boolean; blocked: boolean; hint: string }>(`/sourcing/tools/import?url=${encodeURIComponent(url)}`),
+  importLink: (url: string) => api<{ reference: Reference; origin: Origin | null; description: string; fetched: boolean; blocked: boolean; hint: string }>(`/sourcing/tools/import?url=${encodeURIComponent(url)}`),
   reorder: (id: string, quantity?: number) => api<Detail>(`/sourcing/${id}/reorder`, { json: { quantity } }),
   recurring: (id: string, b: { active: boolean; everyWeeks: number; nextAt?: string }) => api<Detail>(`/sourcing/${id}/recurring`, { method: 'PUT', json: b }),
   today: () => api<{ items: TodayItem[]; me: string; name: string }>('/sourcing/team/today'),
@@ -96,7 +99,7 @@ export const sourcingApi = {
   addQuote: (id: string, q: QuoteInput) => api<Detail>(`/sourcing/${id}/quotes`, { json: q }),
   removeQuote: (id: string, qid: string) => api<Detail>(`/sourcing/${id}/quotes/${qid}`, { method: 'DELETE' }),
   step: (id: string, b: StepInput) => api<Detail>(`/sourcing/${id}/step`, { json: b }),
-  suppliers: (q?: string) => api<{ suppliers: Supplier[] }>(`/suppliers${q ? `?q=${encodeURIComponent(q)}` : ''}`).then((r) => r.suppliers),
+  suppliers: (q?: string, country?: Origin) => api<{ suppliers: Supplier[] }>(`/suppliers?${new URLSearchParams({ ...(q ? { q } : {}), ...(country ? { country } : {}) })}`).then((r) => r.suppliers),
   addSupplier: (b: Partial<SupplierInput> & { name: string }) => api<{ supplier: Supplier }>('/suppliers', { json: b }).then((r) => r.supplier),
   updateSupplier: (id: string, b: Partial<SupplierInput>) => api<{ supplier: Supplier }>(`/suppliers/${id}`, { method: 'PATCH', json: b }).then((r) => r.supplier),
   sampleRequest: (id: string, note: string, address: string) => api<Detail>(`/sourcing/${id}/sample`, { json: { note, address } }),

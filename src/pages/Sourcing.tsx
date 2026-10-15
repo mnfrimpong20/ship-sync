@@ -30,7 +30,7 @@ export default function SourcingPage() {
           <motion.p variants={fadeUp} className="eyebrow mb-2">Ship Sync Sourcing · China · UK · USA</motion.p>
           <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4.5vw,3.4rem)]">Buy it in China, the UK or the USA. We check it and ship it to you.</motion.h1>
           <motion.p variants={fadeUp} className="mt-3 text-text-muted">Tell us what you want — a description, a photo or a link from 1688, Alibaba, Amazon, Argos or Walmart. Our own team finds vetted factories, wholesalers and stores, places the order in Ship Sync's name, inspects it at our warehouse, and hands it to the ocean or air leg. One timeline, one price, your money in escrow.</motion.p>
-          <motion.div variants={fadeUp} className="mt-6 flex flex-wrap justify-center gap-3"><Link to="/sourcing/new" className="btn-gold" data-testid="sourcing-cta">Start a sourcing request</Link><a href="#how" className="btn-ghost">How it works</a></motion.div>
+          <motion.div variants={fadeUp} className="mt-6 flex flex-wrap justify-center gap-3"><Link to="/sourcing/new" className="btn-gold" data-testid="sourcing-cta">Start a sourcing request</Link><button type="button" onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })} className="btn-ghost">How it works</button></motion.div>
           {cfg && <motion.p variants={fadeUp} className="mt-4 text-xs text-text-muted">{cfg.stats.agents} agent{cfg.stats.agents === 1 ? '' : 's'} on the ground · {cfg.stats.verifiedSuppliers} verified suppliers in 3 countries · {cfg.stats.completed} orders shipped</motion.p>}
         </motion.div>
         <section className="mx-auto mt-12 max-w-5xl" data-testid="origins">

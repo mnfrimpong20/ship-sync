@@ -268,7 +268,7 @@ export default function Directory() {
           <div className="container-fluid py-8">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gold"><Crown size={14} aria-hidden="true" /> Featured shippers{dest ? ` · ${countryByCode(dest)?.name}` : ''}</p><p className="mt-1 text-sm text-text-muted">Enterprise partners with priority placement. Sponsored.</p></div>
-              <Link to="/#pricing" className="text-sm text-text-muted underline-offset-4 hover:text-gold hover:underline focus-ring">Get your company featured →</Link>
+              <Link to="/pricing" className="text-sm text-text-muted underline-offset-4 hover:text-gold hover:underline focus-ring">Get your company featured →</Link>
             </div>
             <FeaturedCarousel items={featured} />
           </div>

@@ -25,6 +25,8 @@ import { collectionsApi, type InvoiceFull } from '../lib/collections'
 import ProfileEditor from '../components/ProfileEditor'
 import { fadeUp, stagger } from '../lib/motion'
 import ShipperOverview from '../components/ShipperOverview'
+import { AccountTab, DocumentsTab, InboxTab, IssuesTab, MoneyTab, SavedTab, WeekTab } from '../components/CustomerTabs'
+import { DutyEarly, FamilyShare, NextStep, PackingList, ShipmentChat } from '../components/ShipmentExtras'
 
 function Stat({ icon: Icon, label, value, hint }: { icon: typeof Inbox; label: string; value: string | number; hint?: string }) {
   return (
@@ -56,8 +58,10 @@ function Layout({ title, sub, children, cta }: { title: string; sub: string; chi
 export function CustomerDashboard() {
   const { ready, user, requests, shipments, acceptQuote, shipperById } = useStore()
   const [sp, setSp] = useSearchParams()
-  type Tab = 'requests' | 'shipments' | 'groupage' | 'invoices' | 'sourcing' | 'recipients'
-  const asTab = (t: string | null): Tab => (t === 'shipments' || t === 'groupage' || t === 'invoices' || t === 'sourcing' || t === 'recipients' ? t : 'requests')
+  const TABS = ['requests', 'shipments', 'money', 'week', 'inbox', 'documents', 'plans', 'groupage', 'sourcing', 'invoices', 'recipients', 'issues', 'account'] as const
+  type Tab = typeof TABS[number]
+  const TAB_LABEL: Record<Tab, string> = { requests: 'Quote requests', shipments: 'Shipments', money: 'Money', week: 'This week', inbox: 'Messages', documents: 'Documents', plans: 'Saved & repeat', groupage: 'Shared barrels', sourcing: 'China sourcing', invoices: 'Invoices', recipients: 'Recipients', issues: 'Problems', account: 'Account' }
+  const asTab = (t: string | null): Tab => ((TABS as readonly string[]).includes(t ?? '') ? t as Tab : 'requests')
   const [tab, setTabState] = useState<Tab>(asTab(sp.get('tab')))
   const setTab = (t: Tab) => { setTabState(t); setSp(t === 'requests' ? {} : { tab: t }, { replace: true }) }
   useEffect(() => { setTabState(asTab(sp.get('tab'))) }, [sp])
@@ -69,7 +73,7 @@ export function CustomerDashboard() {
   useEffect(() => { if (ready && user?.role === 'customer') customerApi.attention().then(setHome).catch(() => {}) }, [ready, user, requests, shipments])
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
   if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading your dashboard…</div></div>
-  if (!user) return <Navigate to="/login?next=/dashboard" replace />
+  if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/dashboard${sp.toString() ? `?${sp}` : ''}`)}`} replace />
   if (user.role === 'shipper') return <Navigate to="/dashboard/shipper" replace />
 
   const open = requests.filter((r) => r.status === 'open')
@@ -99,8 +103,8 @@ export function CustomerDashboard() {
       {home && <NeedsYou items={home.items} />}
       {home?.nextArrival && <NextArrivalCard s={home.nextArrival} />}
       <div className="mt-8 flex gap-1 overflow-x-auto border-b border-border" role="tablist">
-        {(['requests', 'shipments', 'groupage', 'sourcing', 'invoices', 'recipients'] as const).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{t === 'requests' ? 'Quote requests' : t === 'shipments' ? 'Shipments' : t === 'groupage' ? 'Shared barrels' : t === 'sourcing' ? 'China sourcing' : t === 'recipients' ? 'Recipients' : 'Invoices'}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
+        {TABS.map((t) => (
+          <button key={t} role="tab" data-testid={`ctab-${t}`} aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{TAB_LABEL[t]}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
         ))}
       </div>
 
@@ -151,6 +155,13 @@ export function CustomerDashboard() {
       {tab === 'invoices' && <InvoicesTab />}
       {tab === 'sourcing' && <SourcingTab />}
       {tab === 'recipients' && <Recipients />}
+      {tab === 'money' && <MoneyTab />}
+      {tab === 'week' && <WeekTab />}
+      {tab === 'inbox' && <InboxTab />}
+      {tab === 'documents' && <DocumentsTab />}
+      {tab === 'plans' && <SavedTab />}
+      {tab === 'issues' && <IssuesTab />}
+      {tab === 'account' && <AccountTab />}
     </Layout>
   )
 }
@@ -238,7 +249,7 @@ function ShipmentsTab() {
           )
         })}
       </ul>
-      <div className="min-w-0 lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}{s && <div className="mt-6 space-y-4"><CollectionNotice s={s} /><OffersCard s={s} /><ReviewCard shipmentId={s.id} shipperName={shipperById(s.shipperId)?.name} /><DisputeCard shipmentId={s.id} /><PaymentCard shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}<PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><CustomsCard shipmentId={s.id} destination={s.destination} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /><DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} /></div>}</div>
+      <div className="min-w-0 lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}{s && <div className="mt-6 space-y-4"><NextStep shipmentId={s.id} /><CollectionNotice s={s} /><FamilyShare shipmentId={s.id} /><ShipmentChat shipmentId={s.id} /><PackingList shipmentId={s.id} destination={s.destination} /><DutyEarly shipmentId={s.id} /><OffersCard s={s} /><ReviewCard shipmentId={s.id} shipperName={shipperById(s.shipperId)?.name} /><DisputeCard shipmentId={s.id} /><PaymentCard shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}<PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><CustomsCard shipmentId={s.id} destination={s.destination} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /><DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} /></div>}</div>
     </div>
   )
 }

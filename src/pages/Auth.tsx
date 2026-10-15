@@ -69,7 +69,7 @@ export function Login() {
         <div><div className="flex items-baseline justify-between"><label htmlFor="pw" className="label-dark">Password</label><Link to="/forgot" className="text-xs text-gold hover:underline">Forgot password?</Link></div><input id="pw" type="password" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" /></div>
         {err && <p role="alert" className="text-sm text-danger">{err}</p>}
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Signing in</> : 'Sign in'}</motion.button>
-        <p className="text-center text-sm text-text-muted">New here? <Link to={`/signup?role=${role}`} className="text-gold hover:underline">Create an account</Link></p>
+        <p className="text-center text-sm text-text-muted">New here? <Link to={`/signup?role=${role}${sp.get('next') ? `&next=${encodeURIComponent(sp.get('next')!)}` : ''}`} className="text-gold hover:underline">Create an account</Link></p>
         <DemoNote role={role} />
       </form>
     </Shell>
@@ -93,7 +93,7 @@ export function Signup() {
     if (!f.agree) return setErr('Please accept the terms to continue.')
     setErr(''); setBusy(true)
     try {
-      await signup({ name: f.name, email: f.email, password: f.pw, role, company: role === 'shipper' ? f.company : undefined })
+      await signup({ name: f.name, email: f.email, password: f.pw, role, company: role === 'shipper' ? f.company : undefined, ref: role === 'customer' ? (sp.get('ref') ?? undefined) : undefined })
       nav(sp.get('next') || (role === 'shipper' ? '/dashboard/shipper' : '/dashboard'))
     } catch (err) { setErr(err instanceof Error ? err.message : 'Sign up failed.'); setBusy(false) }
   }

@@ -1,13 +1,23 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { ArrowLeft, BadgeCheck, Building2, CalendarDays, Check, Clock, MapPin, Star } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, Building2, CalendarDays, Check, Clock, Heart, MapPin, Star } from 'lucide-react'
 import { cargoLabel, countryByCode } from '../lib/data'
 import { useStore } from '../lib/store'
 import { fadeUp, stagger } from '../lib/motion'
 import { ShipperReviews } from '../components/ReviewCards'
 import { Avatar, Empty, ModeBadge, Rating } from '../components/ui'
 import { ShippingBackdrop } from '../components/ShippingBackdrop'
+import { hubApi } from '../lib/customerHub'
+
+function FavButton({ shipperId }: { shipperId: string }) {
+  const { user } = useStore()
+  const [on, setOn] = useState<boolean | null>(null)
+  useEffect(() => { if (user?.role === 'customer') hubApi.favorites().then((r) => setOn(r.favorites.some((f) => f.shipperId === shipperId))).catch(() => setOn(false)) }, [user, shipperId])
+  if (user?.role !== 'customer' || on === null) return null
+  const toggle = async () => { const next = !on; setOn(next); try { await hubApi.favorite(shipperId, next) } catch { setOn(!next) } }
+  return <button data-testid="fav-toggle" aria-pressed={on} onClick={toggle} className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold focus-ring ${on ? 'border-danger/50 bg-danger/10 text-danger' : 'border-border text-text-muted hover:text-text'}`}><Heart size={14} fill={on ? 'currentColor' : 'none'} aria-hidden="true" />{on ? 'Saved' : 'Save shipper'}</button>
+}
 
 export function ShipperProfile() {
   const { id } = useParams()
@@ -36,7 +46,7 @@ export function ShipperProfile() {
                 <div className="flex-1">
                   <h1 className="flex flex-wrap items-center gap-2 !text-3xl">{s.name}{s.verified && <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold"><BadgeCheck size={14} aria-hidden="true" /> Verified</span>}</h1>
                   <p className="mt-1 text-text-muted">{s.tagline}</p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">{s.modes.map((m) => <ModeBadge key={m} mode={m} />)}<Rating value={s.rating} count={s.reviews} /></div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">{s.modes.map((m) => <ModeBadge key={m} mode={m} />)}<Rating value={s.rating} count={s.reviews} /><FavButton shipperId={s.id} /></div>
                   <ul className="mt-4 grid gap-2 text-sm text-text-muted sm:grid-cols-2">
                     <li className="flex items-center gap-2"><Building2 size={15} aria-hidden="true" /> HQ {s.hq}</li>
                     <li className="flex items-center gap-2"><CalendarDays size={15} aria-hidden="true" /> Operating since {s.founded}</li>

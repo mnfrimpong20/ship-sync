@@ -11,6 +11,7 @@ import { Avatar, ModeBadge, Rating, money } from '../components/ui'
 import { ease } from '../lib/motion'
 import { RequestVehicleFields } from '../components/VehicleCard'
 import { congestionLabel, useCongestion } from '../lib/useCongestion'
+import { hubApi } from '../lib/customerHub'
 
 type Form = NewRequest
 const stepsMeta = ['Route', 'Cargo', 'Services', 'Contact']
@@ -74,6 +75,15 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
   useEffect(() => { if (locked) setForm((f) => ({ ...f, destination: (locked.shipper.destinations[0] as Form['destination']) ?? f.destination, origin: locked.shipper.origins[0] ?? f.origin, mode: locked.shipper.modes.length === 1 ? locked.shipper.modes[0] : 'either' })) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const onlyShipper: { id: string; name: string; initials: string; hue: string; verified: boolean; rating: number; modes: Mode[] } | undefined = locked ? locked.shipper : only ? (matches.find((m) => m.shipper.id === only)?.shipper ?? shipperById(only)) : undefined
   const cg = useCongestion()
+  const [poRequired, setPoRequired] = useState(false)
+  const [po, setPo] = useState('')
+  useEffect(() => { if (user?.role === 'customer') hubApi.business().then((b) => setPoRequired(!!b.poRequired)).catch(() => {}) }, [user])
+  const [dutyHint, setDutyHint] = useState<{ usd: number; local: number; currency: string } | null>(null)
+  useEffect(() => {
+    if (!user || !(form.destination === 'GH' || form.destination === 'NG') || !form.declaredValueUsd) { setDutyHint(null); return }
+    const t = setTimeout(() => { hubApi.dutyPreview({ destination: form.destination, cargo: form.cargo, valueUsd: form.declaredValueUsd! }).then((r) => setDutyHint(r.estimate)).catch(() => setDutyHint(null)) }, 400)
+    return () => clearTimeout(t)
+  }, [user, form.destination, form.cargo, form.declaredValueUsd])
   const portNow = cg?.enabled && form.mode !== 'air' ? congestionLabel(cg.congestion[form.destination]) : null
   useEffect(() => { window.scrollTo({ top: 0 }) }, [step])
 
@@ -84,6 +94,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
       if (form.contact.name.trim().length < 2) e.name = 'Please enter your name.'
       if (!/^\S+@\S+\.\S+$/.test(form.contact.email)) e.email = 'Enter a valid email.'
       if (form.contact.phone.replace(/\D/g, '').length < 7) e.phone = 'Enter a phone number shippers can reach.'
+      if (poRequired && !po.trim()) e.po = 'Your business account needs a purchase order number.'
       if (!user && form.password && form.password.length < 8) e.password = 'Use at least 8 characters, or leave it blank and we’ll email you a link.'
     }
     setErrors(e)
@@ -94,7 +105,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
     setSubmitting(true); setSubmitError('')
     try {
       const { password, consignee, ...rest0 } = form
-      const rest = { ...rest0, consignee: consignee && consignee.name.trim().length >= 2 ? consignee : undefined, preferredShipperId: only ?? undefined, source: locked ? ('link' as const) : only ? ('picked' as const) : undefined }
+      const rest = { ...rest0, consignee: consignee && consignee.name.trim().length >= 2 ? consignee : undefined, preferredShipperId: only ?? undefined, source: locked ? ('link' as const) : only ? ('picked' as const) : undefined, poNumber: po.trim() || undefined }
       const r = await createRequest(user ? rest : { ...rest, password: password || undefined })
       nav(`/dashboard?request=${r.id}`)
     } catch (err) { setSubmitError(err instanceof Error ? err.message : 'Could not send your request.'); setSubmitting(false) }
@@ -157,6 +168,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                       <div><label htmlFor="dval" className="label-dark">Value of the goods, USD (optional)</label><input id="dval" type="number" min={0} className="input-dark" value={form.declaredValueUsd ?? ''} onChange={(e) => set('declaredValueUsd', e.target.value ? Number(e.target.value) : undefined)} placeholder="For insurance and customs" data-testid="q-value" /></div>
                     </div>
                     <p className="-mt-2 text-xs text-text-muted">Weight, size and value help shippers send a firm price instead of an estimate.</p>
+                    {dutyHint && <p data-testid="q-duty-hint" className="-mt-2 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-text-muted">Rough duty at {form.destination === 'GH' ? 'Tema' : 'Lagos'}: <b className="text-text">{dutyHint.currency} {dutyHint.local.toLocaleString()}</b> (about {money(dutyHint.usd)}). Customs sets the final amount.</p>}
                     {form.cargo === 'vehicle' && <RequestVehicleFields value={form.vehicle ?? { vin: '', year: null, make: '', model: '', running: true, method: 'roro', titleStatus: 'clean' }} onChange={(v) => set('vehicle', v)} />}
                     <div><label htmlFor="desc" className="label-dark">Describe the shipment</label><textarea id="desc" rows={3} className="input-dark py-2.5" placeholder="e.g. 4 sealed barrels — clothing, provisions, small appliances. Deliver to Kumasi." value={form.description} onChange={(e) => set('description', e.target.value)} /></div>
                   </div>
@@ -187,6 +199,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                       <div><label htmlFor="cemail" className="label-dark">Email</label><input id="cemail" type="email" className="input-dark" value={form.contact.email} onChange={(e) => set('contact', { ...form.contact, email: e.target.value })} aria-invalid={!!errors.email} autoComplete="email" />{errors.email && <p className="mt-1 text-xs text-danger">{errors.email}</p>}</div>
                       <div><label htmlFor="cphone" className="label-dark">Phone / WhatsApp</label><input id="cphone" type="tel" className="input-dark" value={form.contact.phone} onChange={(e) => set('contact', { ...form.contact, phone: e.target.value })} aria-invalid={!!errors.phone} autoComplete="tel" placeholder="+1 …" />{errors.phone && <p className="mt-1 text-xs text-danger">{errors.phone}</p>}</div>
                     </div>
+                    {poRequired && <div><label htmlFor="cpo" className="label-dark">Purchase order number</label><input id="cpo" data-testid="q-po" className="input-dark" value={po} onChange={(e) => setPo(e.target.value)} maxLength={40} aria-invalid={!!errors.po} />{errors.po ? <p className="mt-1 text-xs text-danger">{errors.po}</p> : <p className="mt-1 text-xs text-text-muted">Your business account asks for a PO on every booking. It goes on the invoice.</p>}</div>}
                     {!user && (
                       <div>
                         <label htmlFor="cpw" className="label-dark">Create a password <span className="font-normal text-text-muted">(optional)</span></label>

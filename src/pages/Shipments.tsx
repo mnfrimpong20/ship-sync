@@ -10,6 +10,7 @@ import { ShipmentDetail } from './Track'
 import { fadeUp, stagger } from '../lib/motion'
 import { containersApi, type Container as ContainerRec } from '../lib/containers'
 import { DocumentsPanel } from '../components/DocumentsPanel'
+import { PackingList, ShipmentChat } from '../components/ShipmentExtras'
 import { PickupCard } from '../components/PickupCard'
 import { RecipientPanel } from '../components/RecipientPanel'
 import { DutyCard } from '../components/Duty'
@@ -179,6 +180,8 @@ export default function Shipments() {
                               <div className="space-y-4">
                                 <div className="rounded-xl border border-border bg-surface p-4"><ShipmentDetail s={s} compact /></div>
                                 <DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} />
+                                <PackingList shipmentId={s.id} destination={s.destination} />
+                                <ShipmentChat shipmentId={s.id} office />
                               </div>
                               <div className="space-y-4">
                                 <ShipmentManage s={s} onChanged={async (m) => { await refresh(); setToast(m) }} onDeleted={async (m) => { setOpen(null); await refresh(); setToast(m) }} />

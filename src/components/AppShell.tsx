@@ -87,7 +87,7 @@ export default function AppShell() {
         { to: '/dashboard?tab=requests', label: 'Quote requests', icon: FileText, badge: openLeads },
         { to: '/dashboard?tab=shipments', label: 'Shipments', icon: Package, badge: active },
         { to: '/dashboard?tab=groupage', label: 'Shared barrels', icon: Boxes },
-        { to: '/dashboard?tab=sourcing', label: 'China sourcing', icon: Globe2 },
+        { to: '/dashboard?tab=sourcing', label: 'Sourcing', icon: Globe2 },
         { to: '/dashboard?tab=money', label: 'Money', icon: Wallet },
         { to: '/dashboard?tab=week', label: 'This week', icon: CalendarDays },
         { to: '/dashboard?tab=inbox', label: 'Messages', icon: MessageSquare },

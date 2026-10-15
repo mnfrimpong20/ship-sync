@@ -5,7 +5,7 @@ import { countries } from '../lib/data'
 import { useSiteConfig } from '../lib/site'
 
 const cols = [
-  { title: 'Ship', links: [['Get a quote', '/quote'], ['Fill a barrel', '/groupage'], ['Source from China', '/sourcing'], ['Track a shipment', '/track'], ['Duty estimator', '/duty'], ['Customs brokers', '/brokers'], ['Sailing schedule', '/sailings'], ['Lane prices', '/lanes'], ['Live map', '/live']] },
+  { title: 'Ship', links: [['Get a quote', '/quote'], ['Fill a barrel', '/groupage'], ['Source from China, UK & USA', '/sourcing'], ['Track a shipment', '/track'], ['Duty estimator', '/duty'], ['Customs brokers', '/brokers'], ['Sailing schedule', '/sailings'], ['Lane prices', '/lanes'], ['Live map', '/live']] },
   { title: 'Shippers', links: [['List your company', '/signup?role=shipper'], ['Pricing', '/#pricing'], ['How verification works', '/about'], ['Shipper agreement', '/shipper-agreement'], ['Shipper dashboard', '/dashboard/shipper']] },
   { title: 'Company', links: [['About', '/about'], ['Contact', '/contact'], ['FAQ', '/#faq'], ['Privacy policy', '/privacy'], ['Terms of service', '/terms']] },
 ]
@@ -25,7 +25,7 @@ export default function Footer() {
       <div className="container-fluid grid gap-10 py-14 md:grid-cols-12">
         <div className="md:col-span-4">
           <Logo />
-          <p className="mt-4 max-w-xs text-sm text-text-muted">The marketplace for air and ocean freight to West Africa. Verified shippers, transparent quotes, tracked deliveries — and our own sourcing team in China.</p>
+          <p className="mt-4 max-w-xs text-sm text-text-muted">The marketplace for air and ocean freight to West Africa. Verified shippers, transparent quotes, tracked deliveries — and our own sourcing team buying in China, the UK and the USA.</p>
           <ul className="mt-4 space-y-1 text-sm text-text-muted">
             {cfg?.email && <li><a href={`mailto:${cfg.email}`} className="hover:text-gold">{cfg.email}</a></li>}
             {cfg?.phone && <li><a href={`tel:${cfg.phone.replace(/[^+\d]/g, '')}`} className="hover:text-gold">{cfg.phone}</a></li>}

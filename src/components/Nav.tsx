@@ -17,7 +17,7 @@ type Service = { to: string; label: string; blurb: string; icon: typeof Boxes }
 const services: { title: string; items: Service[] }[] = [
   { title: 'Ways to ship', items: [
     { to: '/groupage', label: 'Fill a barrel', blurb: 'Share a barrel or container, pay for the space you use', icon: Boxes },
-    { to: '/sourcing', label: 'Source from China', blurb: 'We find, buy, inspect and ship it for you', icon: Globe2 },
+    { to: '/sourcing', label: 'Sourcing: China, UK, USA', blurb: 'We find, buy, inspect and ship it for you', icon: Globe2 },
     { to: '/sailings', label: 'Sailing schedule', blurb: 'Next departures to West Africa', icon: Anchor },
   ] },
   { title: 'Plan & clear', items: [

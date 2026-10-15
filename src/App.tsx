@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
-import { HashRouter, Link, Route, Routes, useLocation, useOutlet } from 'react-router-dom'
+import { HashRouter, Link, Navigate, Route, Routes, useLocation, useOutlet } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
@@ -43,6 +43,8 @@ const Pay = lazy(() => import('./pages/Pay'))
 const Collections = lazy(() => import('./pages/Collections'))
 const BrokersPage = lazy(() => import('./pages/Brokers'))
 const BrokerPortal = L(() => import('./pages/Brokers'), 'BrokerPortal')
+const BrokerProfile = L(() => import('./pages/Brokers'), 'BrokerProfile')
+const PricingPage = lazy(() => import('./pages/Pricing'))
 const Sailings = lazy(() => import('./pages/Sailings'))
 const PublicSailings = L(() => import('./pages/Sailings'), 'PublicSailings')
 const Warehouse = lazy(() => import('./pages/Warehouse'))
@@ -100,9 +102,9 @@ function MarketingLayout() {
   const outlet = useOutlet() // captured per location so the exiting page keeps rendering itself, not the next route
   return (
     <div className="flex min-h-screen flex-col">
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-gold focus:px-4 focus:py-2 focus:text-on-accent">Skip to content</a>
+      <a href="#main" onClick={(e) => { e.preventDefault(); const m = document.getElementById('main'); m?.focus(); m?.scrollIntoView() }} className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-gold focus:px-4 focus:py-2 focus:text-on-accent">Skip to content</a>
       <Nav />
-      <main id="main" className="flex-1">
+      <main id="main" tabIndex={-1} className="flex-1 outline-none">
         <AnimatePresence mode="wait">
           <motion.div key={loc.pathname} variants={page} initial="initial" animate="animate" exit="exit">
             <Suspense fallback={<PageLoading />}>{outlet}</Suspense>
@@ -145,6 +147,10 @@ export default function App() {
               <Route path="/duty" element={<Duty />} />
               <Route path="/groupage" element={<GroupagePage />} />
               <Route path="/brokers" element={<BrokersPage />} />
+              <Route path="/brokers/:id" element={<BrokerProfile />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/how" element={<Navigate to="/?s=how" replace />} />
+              <Route path="/faq" element={<Navigate to="/?s=faq" replace />} />
               <Route path="/sailings" element={<PublicSailings />} />
               <Route path="/lanes" element={<LanesPage />} />
               <Route path="/sourcing" element={<SourcingPage />} />

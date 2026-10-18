@@ -13,7 +13,16 @@ export type ShipperProfileInput = Pick<Shipper, 'name' | 'tagline' | 'hq' | 'fou
 export type AdminShipper = Shipper & { owner: { email: string; name: string } | null; quoteCount: number; shipmentCount: number; docCount: number; docsPending: number; verificationRequestedAt: string | null }
 
 export interface RequestConsignee { name: string; phone?: string; address?: string; city?: string; country?: string; relationship?: string }
+export type PackingKind = 'barrel' | 'box' | 'lock' | 'tape' | 'other'
+export interface SupplyNeed { kind: PackingKind; qty: number }
+export interface SupplyAddress { name: string; line1: string; line2?: string; city: string; state?: string; zip?: string; country?: string; phone?: string }
+export interface QuoteSupplyLine { kind: PackingKind; qty: number; source: 'shipper' | 'ntemtem' | 'none'; supplyId?: string; productId?: string; name?: string; unitUsd?: number }
 export interface QuoteRequest {
+  /** Packing supplies the customer needs before pickup. */
+  supplies?: SupplyNeed[]
+  suppliesAddress?: Partial<SupplyAddress>
+  /** Shipper view: how the supplies would be priced by default (own list, else Ntemtem). */
+  suggestedSupplies?: QuoteSupplyLine[]
   consignee?: RequestConsignee
   source?: 'marketplace' | 'picked' | 'link' | 'branded'
   id: string
@@ -70,6 +79,8 @@ export interface Quote {
   expired?: boolean
   /** The request changed after this quote was sent. */
   stale?: boolean
+  supplies?: QuoteSupplyLine[]
+  suppliesUsd?: number
 }
 
 export type Match = { shipper: Shipper; score: number; reasons: string[]; estimate?: { price: number; transitDays: number; mode: 'air' | 'ocean'; instant: boolean } | null }
@@ -91,7 +102,7 @@ interface Store {
   refresh: () => Promise<void>
   createRequest: (r: NewRequest) => Promise<QuoteRequest>
   acceptQuote: (requestId: string, quoteId: string) => Promise<Shipment>
-  sendQuote: (requestId: string, q: { price: number; transitDays: number; notes: string; includes: string[]; validUntil?: string; kind?: 'firm' | 'estimate'; mode?: 'air' | 'ocean' }) => Promise<void>
+  sendQuote: (requestId: string, q: { price: number; transitDays: number; notes: string; includes: string[]; validUntil?: string; kind?: 'firm' | 'estimate'; mode?: 'air' | 'ocean'; supplies?: QuoteSupplyLine[] }) => Promise<void>
   advanceShipment: (id: string, note?: string) => Promise<void>
   matchShippers: (r: Pick<QuoteRequest, 'origin' | 'destination' | 'mode' | 'cargo'> & Partial<Pick<QuoteRequest, 'quantity' | 'weightKg' | 'pickup' | 'delivery' | 'insurance'>>) => Promise<Match[]>
   track: (ref: string) => Promise<Shipment | null>

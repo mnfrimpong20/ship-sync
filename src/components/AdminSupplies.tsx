@@ -6,8 +6,8 @@ import { fmtDate } from './ui'
 import { StatCard, Th, thead, trow } from './board'
 
 const tone: Record<Order['status'], string> = { awaiting_payment: 'bg-gold/15 text-gold-deep', paid: 'bg-sky/15 text-sea', packed: 'bg-sky/15 text-sea', shipped: 'bg-sky/15 text-sea', delivered: 'bg-teal/15 text-teal', cancelled: 'bg-surface-2 text-text-muted' }
-const toInput = (p?: Product): ProductInput => p ? { name: p.name, sku: p.sku, category: p.category, blurb: p.blurb, specs: p.specs, priceUsd: p.priceUsd, rentUsd: p.rentUsd, reorderLevel: p.reorderLevel, labelsPerUnit: p.labelsPerUnit, kit: p.kit.map(({ productId, qty }) => ({ productId, qty })), includedWith: p.includedWith, active: p.active, sort: p.sort }
-  : { name: '', sku: '', category: 'accessory', blurb: '', specs: [], priceUsd: 0, rentUsd: null, reorderLevel: 5, labelsPerUnit: 0, kit: [], includedWith: [], active: true, sort: 50 }
+const toInput = (p?: Product): ProductInput => p ? { audience: p.audience ?? 'shipper', packingKind: p.packingKind ?? null, name: p.name, sku: p.sku, category: p.category, blurb: p.blurb, specs: p.specs, priceUsd: p.priceUsd, rentUsd: p.rentUsd, reorderLevel: p.reorderLevel, labelsPerUnit: p.labelsPerUnit, kit: p.kit.map(({ productId, qty }) => ({ productId, qty })), includedWith: p.includedWith, active: p.active, sort: p.sort }
+  : { audience: 'shipper', packingKind: null, name: '', sku: '', category: 'accessory', blurb: '', specs: [], priceUsd: 0, rentUsd: null, reorderLevel: 5, labelsPerUnit: 0, kit: [], includedWith: [], active: true, sort: 50 }
 
 /** Admin: Ntemtem's equipment stock, orders to pack and ship, and rentals out with shipping companies. */
 export function AdminSupplies() {
@@ -29,7 +29,7 @@ export function AdminSupplies() {
     <section className="mt-14" data-testid="admin-supplies">
       <p className="eyebrow mb-1">Supplies</p>
       <h2 className="!text-[clamp(1.5rem,3vw,2rem)]">Equipment stock, orders and rentals</h2>
-      <p className="mt-1 text-text-muted">Printers, scanners and labels Ntemtem sells and rents to shipping companies. Stock is held back when an order is placed and goes back on the shelf if it’s cancelled or a rental comes home. Kits use the stock of the parts inside them.</p>
+      <p className="mt-1 text-text-muted">Printers, scanners and labels Ntemtem sells and rents to shipping companies, and the packing supplies Ntemtem sends to customers whose shipper doesn’t stock them (marked “Customer”). Stock is held back when an order is placed and goes back on the shelf if it’s cancelled or a rental comes home. Kits use the stock of the parts inside them.</p>
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -50,7 +50,7 @@ export function AdminSupplies() {
               {open.map((o) => (
                 <tr key={o.id} className={trow(false, o.status === 'delivered')} data-testid="admin-order">
                   <td className="px-3 py-3"><span className="font-mono text-xs font-semibold">{o.ref}</span><p className="text-[11px] text-text-muted">{o.createdAt ? fmtDate(o.createdAt) : ''}</p></td>
-                  <td className="px-3 py-3 text-xs">{o.shipperName}<p className="text-text-muted">{[o.shipTo.city, o.shipTo.state, o.shipTo.country].filter(Boolean).join(', ')}</p></td>
+                  <td className="px-3 py-3 text-xs">{o.kind === 'customer' ? <><span className="mr-1 rounded-full bg-gold/20 px-1.5 py-0.5 text-[10px] font-semibold text-gold-deep">Customer</span>{o.customerName}<p className="text-text-muted">for {o.shipmentRef} · {o.shipperName}</p></> : o.shipperName}<p className="text-text-muted">{[o.shipTo.city, o.shipTo.state, o.shipTo.country].filter(Boolean).join(', ')}</p></td>
                   <td className="px-3 py-3 text-xs">{o.items.map((i) => <p key={i.productId + i.mode}>{i.qty} × {i.name}{i.mode !== 'buy' ? <span className="text-text-muted"> ({i.mode === 'rent' ? 'rent' : 'with plan'})</span> : null}</p>)}</td>
                   <td className="px-3 py-3 text-right tabular-nums">{o.totalUsd ? usd(o.totalUsd) : 'Free'}{o.monthlyUsd ? <p className="text-[11px] text-text-muted">+ {usd(o.monthlyUsd)}/mo</p> : null}</td>
                   <td className="px-3 py-3"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone[o.status]}`}>{orderStatusLabels[o.status]}</span>{o.tracking && <p className="mt-1 font-mono text-[11px] text-text-muted">{o.carrier} {o.tracking}</p>}</td>
@@ -132,6 +132,10 @@ export function AdminSupplies() {
             <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
               <label className="text-xs text-text-muted">Name<input required minLength={2} className="input-dark mt-1 !min-h-10 text-sm" value={edit.f.name} onChange={(e) => setEdit({ ...edit, f: { ...edit.f, name: e.target.value } })} /></label>
               <label className="text-xs text-text-muted">SKU<input className="input-dark mt-1 !min-h-10 text-sm" value={edit.f.sku} onChange={(e) => setEdit({ ...edit, f: { ...edit.f, sku: e.target.value } })} /></label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-xs text-text-muted">Sold to<select className="input-dark mt-1 !min-h-10 text-sm" value={edit.f.audience} onChange={(e) => { const a = e.target.value as 'shipper' | 'customer'; setEdit({ ...edit, f: { ...edit.f, audience: a, category: a === 'customer' ? 'packing' : edit.f.category === 'packing' ? 'accessory' : edit.f.category, packingKind: a === 'customer' ? edit.f.packingKind ?? 'barrel' : null } }) }} data-testid="product-audience"><option value="shipper">Shipping companies (equipment)</option><option value="customer">Customers (packing supplies)</option></select></label>
+              {edit.f.audience === 'customer' && <label className="text-xs text-text-muted">Covers requests for<select className="input-dark mt-1 !min-h-10 text-sm" value={edit.f.packingKind ?? 'barrel'} onChange={(e) => setEdit({ ...edit, f: { ...edit.f, packingKind: e.target.value as ProductInput['packingKind'] } })}>{[['barrel', 'Barrels'], ['box', 'Boxes'], ['lock', 'Locks & seals'], ['tape', 'Tape'], ['other', 'Other']].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>}
             </div>
             <label className="text-xs text-text-muted">Short description<input className="input-dark mt-1 !min-h-10 text-sm" value={edit.f.blurb} onChange={(e) => setEdit({ ...edit, f: { ...edit.f, blurb: e.target.value } })} /></label>
             <label className="text-xs text-text-muted">Key points (one per line)<textarea rows={3} className="input-dark mt-1 py-2 text-sm" value={edit.specs} onChange={(e) => setEdit({ ...edit, specs: e.target.value })} /></label>

@@ -5,7 +5,9 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Download, ExternalLink, Filter, Inbox, Lock, Mail, MessageSquare, Phone, Search, Send, Tag, Trophy, Users, X, XCircle } from 'lucide-react'
 import { requestsApi } from '../lib/requests'
 import { MessageThread } from '../components/RequestPanel'
-import { useStore, type Quote, type QuoteRequest } from '../lib/store'
+import { useStore, type Quote, type QuoteRequest, type QuoteSupplyLine } from '../lib/store'
+import { suppliesApi, type PackingItem } from '../lib/supplies'
+import { usd } from '../lib/payments'
 import { cargoLabel, countries, countryByCode, type CargoType, type Mode } from '../lib/data'
 import { Empty, ModeBadge, Pill, fmtDate, fmtDateTime, money } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
@@ -66,6 +68,18 @@ function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (ms
   const [form, setForm] = useState({ price: prev ? String(prev.price) : sg ? String(sg.price) : '', transit: prev ? String(prev.transitDays) : sg ? String(sg.transitDays) : r.mode === 'air' ? '7' : '30', notes: prev?.notes ?? sg?.notes ?? '', valid: '14', kind: (prev?.kind ?? (r.weightKg ? 'firm' : 'estimate')) as 'firm' | 'estimate', mode: (prev?.mode ?? (r.mode === 'air' ? 'air' : 'ocean')) as 'air' | 'ocean' })
   const [busy, setBusy] = useState(false); const [error, setError] = useState('')
   const [skip, setSkip] = useState<string[]>([])
+  // Packing supplies the customer asked for: start from the previous quote, else the default (own list, else Ntemtem).
+  const [sup, setSup] = useState<QuoteSupplyLine[]>(() => prev?.supplies?.length ? prev.supplies : r.suggestedSupplies ?? [])
+  const [opts, setOpts] = useState<{ own: PackingItem[]; ntem: { id: string; name: string; kind: string; priceUsd: number; available: number }[] } | null>(null)
+  useEffect(() => { if (!r.supplies?.length) return; Promise.all([suppliesApi.myPacking().then((x) => x.supplies.filter((s) => s.active)).catch(() => [] as PackingItem[]), suppliesApi.packingOptions().then((x) => x.ntemtem).catch(() => [])]).then(([own, ntem]) => setOpts({ own, ntem })) }, [r.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const supTotal = sup.filter((l) => l.source !== 'none').reduce((a, l) => a + (l.unitUsd ?? 0) * l.qty, 0)
+  const pick = (kind: string, v: string) => setSup((cur) => cur.map((l) => {
+    if (l.kind !== kind) return l
+    if (v === 'none') return { kind: l.kind, qty: l.qty, source: 'none' }
+    const [src, id] = v.split(':')
+    if (src === 'own') { const it = opts?.own.find((x) => x.id === id); return it ? { kind: l.kind, qty: l.qty, source: 'shipper', supplyId: it.id, name: it.name, unitUsd: it.priceUsd } : l }
+    const it = opts?.ntem.find((x) => x.id === id); return it ? { kind: l.kind, qty: l.qty, source: 'ntemtem', productId: it.id, name: it.name, unitUsd: it.priceUsd } : l
+  }))
   const options = [r.pickup ? 'Pickup' : 'Drop-off at warehouse', form.mode === 'air' ? 'Air freight' : 'Ocean freight', r.delivery ? 'Door delivery' : 'Port handling', ...(r.insurance ? ['All-risk insurance'] : [])]
   const includes = options.filter((o) => !skip.includes(o))
   const optional = (o: string) => o === 'Pickup' || o === 'Door delivery' || o === 'All-risk insurance'
@@ -75,7 +89,7 @@ function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (ms
     const validUntil = new Date(Date.now() + Math.max(1, Number(form.valid) || 14) * 86400000).toISOString().slice(0, 10)
     const dropped = skip.filter(optional)
     const notes = [form.notes || (tagline ? `${tagline}.` : ''), dropped.length ? `Not included: ${dropped.join(', ').toLowerCase()}.` : ''].filter(Boolean).join(' ')
-    try { await sendQuote(r.id, { price, transitDays: transit, notes, includes, validUntil, kind: form.kind, mode: form.mode }); onDone(`${prev ? 'Updated quote' : 'Quote'} of ${money(price)} sent to ${r.contact.name}.`) } catch (err) { setError(err instanceof Error ? err.message : 'Could not send the quote.') } finally { setBusy(false) }
+    try { await sendQuote(r.id, { price, transitDays: transit, notes, includes, validUntil, kind: form.kind, mode: form.mode, supplies: sup.length ? sup : undefined }); onDone(`${prev ? 'Updated quote' : 'Quote'} of ${money(price)} sent to ${r.contact.name}.`) } catch (err) { setError(err instanceof Error ? err.message : 'Could not send the quote.') } finally { setBusy(false) }
   }
   return (
     <form onSubmit={submit} className="grid gap-3" aria-label={`Quote for ${r.ref}`} data-testid="quote-form">
@@ -89,13 +103,33 @@ function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (ms
       <TemplateBar r={r} form={form} setForm={setForm} />
       {r.mode === 'either' && <div className="flex gap-1.5" role="radiogroup" aria-label="Mode for this quote">{(['ocean', 'air'] as const).map((m) => <button key={m} type="button" role="radio" aria-checked={form.mode === m} onClick={() => setForm({ ...form, mode: m, transit: m === 'air' ? '7' : '30' })} className={`flex-1 rounded-lg border px-2 py-1.5 text-xs capitalize focus-ring ${form.mode === m ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border text-text-muted'}`} data-testid={`qf-mode-${m}`}>{m} freight</button>)}</div>}
       <div className="grid gap-3 sm:grid-cols-3">
-        <div><label htmlFor={`p-${r.id}`} className="label-dark">Total price (USD)</label><input id={`p-${r.id}`} type="number" min={1} required autoFocus className="input-dark !min-h-10 tabular-nums" placeholder="590" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
+        <div><label htmlFor={`p-${r.id}`} className="label-dark">{r.supplies?.length ? 'Freight price (USD)' : 'Total price (USD)'}</label><input id={`p-${r.id}`} type="number" min={1} required autoFocus className="input-dark !min-h-10 tabular-nums" placeholder="590" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
         <div><label htmlFor={`t-${r.id}`} className="label-dark">Transit (days)</label><input id={`t-${r.id}`} type="number" min={1} required className="input-dark !min-h-10 tabular-nums" value={form.transit} onChange={(e) => setForm({ ...form, transit: e.target.value })} /></div>
         <div><label htmlFor={`v-${r.id}`} className="label-dark">Valid for (days)</label><input id={`v-${r.id}`} type="number" min={1} max={60} className="input-dark !min-h-10 tabular-nums" value={form.valid} onChange={(e) => setForm({ ...form, valid: e.target.value })} data-testid="qf-valid" /></div>
       </div>
       <div className="flex gap-1.5" role="radiogroup" aria-label="Firm or estimate">{(['firm', 'estimate'] as const).map((k) => <button key={k} type="button" role="radio" aria-checked={form.kind === k} onClick={() => setForm({ ...form, kind: k })} className={`flex-1 rounded-lg border px-2 py-1.5 text-left text-xs focus-ring ${form.kind === k ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted'}`} data-testid={`qf-kind-${k}`}><span className="block font-semibold">{k === 'firm' ? 'Firm price' : 'Estimate'}</span><span className="block">{k === 'firm' ? 'This is what they pay' : 'Final after weighing at check-in'}</span></button>)}</div>
       <div><label htmlFor={`n-${r.id}`} className="label-dark">Notes to customer</label><textarea id={`n-${r.id}`} rows={2} className="input-dark py-2 text-sm" placeholder="Sailing date, what’s included, duty handling…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
       <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-text-muted"><span className="mr-1 font-semibold uppercase tracking-wider">Includes</span>{options.map((i) => optional(i) ? <button key={i} type="button" onClick={() => setSkip((x) => (x.includes(i) ? x.filter((y) => y !== i) : [...x, i]))} aria-pressed={!skip.includes(i)} className={`rounded-full border px-2 py-0.5 ${skip.includes(i) ? 'border-danger/40 text-danger line-through' : 'border-border'}`} title={skip.includes(i) ? 'Not included — the client will see that' : 'Click if you don’t offer this'} data-testid="qf-include">{i}</button> : <Pill key={i} tone="muted">{i}</Pill>)}</div>
+      {r.supplies && r.supplies.length > 0 && (
+        <div className="rounded-lg border border-border bg-surface-2/50 p-3" data-testid="quote-supplies">
+          <p className="text-xs font-semibold">Packing supplies the client needs{r.suppliesAddress?.city ? ` — to ${r.suppliesAddress.city}${r.suppliesAddress.state ? `, ${r.suppliesAddress.state}` : ''}` : ''}</p>
+          <p className="mt-0.5 text-[11px] text-text-muted">Charged on top of your freight price. Ntemtem items are sent to the client by Ntemtem and paid to Ntemtem; your own items are paid to you.</p>
+          <ul className="mt-2 grid gap-2">
+            {sup.map((l) => { const own = (opts?.own ?? []).filter((x) => x.kind === l.kind); const nt = (opts?.ntem ?? []).filter((x) => x.kind === l.kind); const val = l.source === 'shipper' ? `own:${l.supplyId}` : l.source === 'ntemtem' ? `ntem:${l.productId}` : 'none'; return (
+              <li key={l.kind} className="grid gap-1.5">
+                <span className="flex items-baseline justify-between gap-2 text-sm"><span><b>{l.qty} ×</b> {({ barrel: 'Barrels', box: 'Boxes', lock: 'Barrel locks & seals', tape: 'Packing tape', other: 'Other supplies' } as Record<string, string>)[l.kind]}</span><span className="tabular-nums">{l.source === 'none' ? '—' : usd((l.unitUsd ?? 0) * l.qty)}</span></span>
+                <select aria-label={`Who supplies the ${l.kind}`} className="input-dark !min-h-9 text-sm" value={val} onChange={(e) => pick(l.kind, e.target.value)} data-testid={`supply-source-${l.kind}`}>
+                  {own.map((x) => <option key={x.id} value={`own:${x.id}`}>Mine — {x.name} ({usd(x.priceUsd)})</option>)}
+                  {nt.map((x) => <option key={x.id} value={`ntem:${x.id}`} disabled={x.available < l.qty}>Supplied by Ntemtem — {usd(x.priceUsd)} each{x.available < l.qty ? ' (not enough stock)' : ''}</option>)}
+                  {!own.length && !nt.length && l.source !== 'none' && <option value={val}>{l.name} ({usd(l.unitUsd ?? 0)})</option>}
+                  <option value="none">I can’t supply this</option>
+                </select>
+              </li>
+            ) })}
+          </ul>
+          <p className="mt-2 flex justify-between border-t border-border pt-2 text-xs"><span className="text-text-muted">Supplies</span><b className="tabular-nums" data-testid="quote-supplies-total">{usd(supTotal)}</b></p>
+        </div>
+      )}
       {skip.some(optional) && <p className="text-[11px] text-danger">The client asked for {skip.filter(optional).join(', ').toLowerCase()} — your quote will be flagged as not including it.</p>}
       <div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className="btn-ghost !min-h-9 !px-3 text-xs"><X size={13} aria-hidden="true" /> Cancel</button><button disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60" data-testid="qf-send"><Send size={13} aria-hidden="true" /> {busy ? 'Sending…' : prev ? 'Send updated quote' : 'Send quote'}</button></div>
     </form>
@@ -113,6 +147,7 @@ function MyQuote({ q, r, onRequote, onDone }: { q: Quote; r: QuoteRequest; onReq
       <div className="flex items-baseline justify-between"><p className={`font-heading text-2xl font-bold tabular-nums ${dead ? 'text-text-muted line-through' : ''}`}>{money(q.price)}</p><Pill tone={q.status === 'accepted' ? 'green' : q.status === 'declined' || dead ? 'muted' : 'teal'}>{label}</Pill></div>
       <dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><div><dt className="text-text-muted">Transit</dt><dd>{q.transitDays} days{q.mode ? ` · ${q.mode}` : ''}</dd></div><div><dt className="text-text-muted">Valid until</dt><dd>{q.validUntil ? fmtDate(q.validUntil + 'T12:00:00Z') : '—'}</dd></div><div><dt className="text-text-muted">Type</dt><dd>{q.kind === 'estimate' ? 'Estimate' : 'Firm'}</dd></div></dl>
       {q.includes.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{q.includes.map((i) => <li key={i}><Pill tone="muted">{i}</Pill></li>)}</ul>}
+      {(q.supplies?.length ?? 0) > 0 && <ul className="mt-3 space-y-1 text-xs" data-testid="my-quote-supplies">{q.supplies!.map((l) => <li key={l.kind} className="flex justify-between gap-2">{l.source === 'none' ? <span className="text-text-muted">Not supplying {l.kind}</span> : <><span>{l.qty} × {l.name} <span className="text-text-muted">· {l.source === 'ntemtem' ? 'sent by Ntemtem (paid to Ntemtem)' : 'yours'}</span></span><span className="tabular-nums">{usd((l.unitUsd ?? 0) * l.qty)}</span></>}</li>)}</ul>}
       {q.notes && <p className="mt-3 text-xs text-text-muted">“{q.notes}”</p>}
       {q.stale && !dead && q.status === 'sent' && <p className="mt-2 text-xs text-gold-deep" data-testid="quote-stale">The client changed the request after you quoted — check the details and update if needed.</p>}
       {err && <p role="alert" className="mt-2 text-xs text-danger">{err}</p>}

@@ -38,6 +38,9 @@ export function MessageThread({ requestId, shipperId, onClose, compact }: { requ
 }
 
 /** The client's quotes: tagged (lowest all-in, fastest, best rated), flagged when they leave out something asked for, grouped by mode for "either". */
+const SUPPLY_WORD: Record<string, string> = { barrel: 'barrels', box: 'boxes', lock: 'barrel locks', tape: 'tape', other: 'supplies' }
+/** What the customer pays for a quote: freight plus any packing supplies priced in it. */
+const totalOf = (q: Quote) => q.price + (q.suppliesUsd ?? 0)
 export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest; accept: (r: QuoteRequest, quoteId: string) => void; busyQuote: string | null; threadFor?: string | null }) {
   const { shipperById } = useStore()
   const [thread, setThread] = useState<string | null>(threadFor ?? null)
@@ -46,7 +49,7 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
     const ls = quotes.filter(live); const t = new Map<string, string[]>()
     const add = (id: string | undefined, tag: string) => { if (!id) return; t.set(id, [...(t.get(id) ?? []), tag]) }
     if (ls.length > 1) {
-      add([...ls].sort((a, b) => a.price - b.price)[0]?.id, 'Lowest price')
+      add([...ls].sort((a, b) => totalOf(a) - totalOf(b))[0]?.id, 'Lowest price')
       const fast = [...ls].sort((a, b) => a.transitDays - b.transitDays); if (fast[0] && fast[0].transitDays < (fast[1]?.transitDays ?? Infinity)) add(fast[0].id, 'Fastest')
       const rated = [...ls].map((q) => ({ q, s: shipperById(q.shipperId) })).filter((x) => (x.s?.reviews ?? 0) > 0).sort((a, b) => (b.s!.rating - a.s!.rating) || (b.s!.reviews - a.s!.reviews)); if (rated[0]) add(rated[0].q.id, 'Best rated')
     }
@@ -55,7 +58,7 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
   const groups: { label: string; icon: typeof Ship; list: Quote[] }[] = r.mode === 'either'
     ? ([['ocean', 'Ocean freight', Ship], ['air', 'Air freight', Plane]] as const).map(([m, label, icon]) => ({ label, icon, list: quotes.filter((q) => (q.mode ?? 'ocean') === m) })).filter((g) => g.list.length)
     : [{ label: '', icon: Ship, list: quotes }]
-  const order = (a: Quote, b: Quote) => Number(live(b)) - Number(live(a)) || a.price - b.price
+  const order = (a: Quote, b: Quote) => Number(live(b)) - Number(live(a)) || totalOf(a) - totalOf(b)
   return (
     <div className="mt-4 space-y-4">
       <div className="no-print flex justify-end"><button onClick={() => window.print()} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="print-quotes">Print / save quotes as PDF</button></div>
@@ -74,9 +77,16 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
                   <div className="flex items-start gap-3">
                     <Avatar initials={s.initials} hue={s.hue} logo={'logo' in s ? s.logo : null} size={40} />
                     <div className="min-w-0 flex-1"><p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{s.name}</p>{s.verified && <p className="mt-1"><VerifiedBadge /></p>}<div className="mt-1 flex flex-wrap gap-1.5"><Rating value={s.rating} count={s.reviews} /></div></div>
-                    <div className="text-right"><p className="font-heading text-2xl font-bold text-text">{money(q.price)}</p><p className="text-xs text-text-muted">~{q.transitDays} days{q.kind === 'estimate' ? ' · estimate' : ''}</p></div>
+                    <div className="text-right"><p className="font-heading text-2xl font-bold text-text" data-testid="quote-total">{money(totalOf(q))}</p><p className="text-xs text-text-muted">{q.suppliesUsd ? `${money(q.price)} freight + ${money(q.suppliesUsd)} supplies · ` : ''}~{q.transitDays} days{q.kind === 'estimate' ? ' · estimate' : ''}</p></div>
                   </div>
                   <ul className="mt-3 flex flex-wrap gap-1.5">{q.includes.map((x) => <li key={x} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted">{x}</li>)}</ul>
+                  {(q.supplies?.length ?? 0) > 0 && (
+                    <ul className="mt-3 space-y-1 rounded-lg bg-surface-2/60 p-2.5 text-xs" data-testid="quote-supply-lines">
+                      {q.supplies!.map((l) => <li key={l.kind} className="flex items-center justify-between gap-2">{l.source === 'none'
+                        ? <span className="text-danger">Can’t supply the {SUPPLY_WORD[l.kind] ?? l.kind} you asked for</span>
+                        : <><span className="min-w-0 truncate">{l.qty} × {l.name} <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${l.source === 'ntemtem' ? 'bg-gold/20 text-gold-deep' : 'bg-teal/15 text-teal'}`}>{l.source === 'ntemtem' ? 'Sent by Ntemtem' : 'From the shipper'}</span></span><span className="shrink-0 tabular-nums">{money((l.unitUsd ?? 0) * l.qty)}</span></>}</li>)}
+                    </ul>
+                  )}
                   {missing.length > 0 && <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-danger/10 px-2 py-1 text-[11px] text-danger" data-testid="quote-missing"><AlertTriangle size={11} aria-hidden="true" /> Doesn’t include {missing.join(', ')} you asked for — ask before booking</p>}
                   {q.kind === 'estimate' && <p className="mt-2 text-[11px] text-text-muted">Estimate: the final price is confirmed when your pieces are weighed at the warehouse.</p>}
                   {q.stale && live(q) && <p className="mt-2 text-[11px] text-gold-deep">You changed the request after this quote — the shipper may update it.</p>}

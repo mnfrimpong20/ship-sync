@@ -116,7 +116,7 @@ const PAYOUT_SELECT = `select o.*, sh.name as shipper_name, (select count(*) fro
 /* ------------------------------------------------------------------ core */
 /** What the customer still owes on a shipment: the accepted quote plus any insurance premium not yet collected. */
 export async function amountDue(db: Db, s: Row) {
-  const items: { description: string; amountUsd: number; kind: 'freight' | 'insurance' | 'supplies'; ref?: string }[] = []
+  const items: { description: string; amountUsd: number; kind: 'freight' | 'insurance' | 'supplies' | 'ntemtem_supplies'; ref?: string }[] = []
   const { rows: q } = s.request_id ? await db.query<Row>(`select price, includes from quotes where request_id = $1 and status = 'accepted' limit 1`, [s.request_id]) : { rows: [] as Row[] }
   const { rows: inv } = await db.query<Row>(`select total from invoices where shipment_id = $1 and status in ('sent','draft') order by created_at desc limit 1`, [s.id])
   const grp = await groupageAmount(db, s)
@@ -136,7 +136,9 @@ export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; m
   if (!['pending'].includes(p.status)) return p
   const cfg = await getSettings(db)
   const amount = Number(p.amount_usd)
-  const fee = opts.direct || p.sourcing_id ? 0 : r2(amount * cfg.takeRatePct) // Ntemtem Sourcing is the platform — no take rate on its own jobs
+  // Ntemtem's own packing supplies on the bill belong to Ntemtem, so they count fully towards the fee (never paid out to the shipper).
+  const ntem = Math.min(amount, (await import('./supplies')).ntemtemShare(J(p.items ?? '[]') as { kind?: string; amountUsd?: number }[]))
+  const fee = p.sourcing_id ? 0 : opts.direct ? ntem : r2((amount - ntem) * cfg.takeRatePct + ntem) // Ntemtem Sourcing is the platform — no take rate on its own jobs
   // No shipment behind the payment (a standalone invoice) → nothing to escrow against; released to the shipper's balance at once.
   const status: PaymentStatus = opts.direct ? 'direct' : p.shipment_id || p.sourcing_id ? 'held' : 'released'
   await db.query(`update escrow_payments set status = $2, fee_usd = $3, net_usd = $4, provider_payment_intent = coalesce($5, provider_payment_intent), method = coalesce($6, method), paid_at = now(), recorded_by = coalesce($7, recorded_by), released_at = case when $2 = 'released' then now() else released_at end, release_reason = case when $2 = 'released' then 'invoice:no-shipment' else release_reason end where id = $1`, [p.id, status, fee, r2(amount - fee), opts.intent ?? null, opts.method ?? null, opts.by ?? null])
@@ -145,11 +147,11 @@ export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; m
   // Insurance premium included → collected.
   if (p.shipment_id && items.some((i) => i.kind === 'insurance')) await db.query(`update insurance_policies set payment_status = 'collected', collected_at = now() where shipment_id = $1 and payment_status = 'due' and status <> 'cancelled'`, [p.shipment_id])
   // Packing supplies the shipper brings before pickup → paid.
-  await (await import('./supplies')).markSuppliesPaid(db, items as { kind?: string; ref?: string }[])
+  await (await import('./supplies')).markSuppliesPaid(db, items as { kind?: string; ref?: string }[], p.shipment_id)
   // Open invoice on the shipment → record the payment against it.
   const { rows: inv } = p.invoice_id ? await db.query<Row>(`select * from invoices where id = $1`, [p.invoice_id]) : p.shipment_id ? await db.query<Row>(`select * from invoices where shipment_id = $1 and status in ('sent','draft') order by created_at desc limit 1`, [p.shipment_id]) : { rows: [] as Row[] }
   if (inv[0]) {
-    const freight = (J(p.items ?? '[]') as { kind?: string; amountUsd: number }[]).filter((i) => i.kind !== 'insurance' && i.kind !== 'supplies').reduce((n, i) => n + i.amountUsd, 0)
+    const freight = (J(p.items ?? '[]') as { kind?: string; amountUsd: number }[]).filter((i) => i.kind !== 'insurance' && i.kind !== 'supplies' && i.kind !== 'ntemtem_supplies').reduce((n, i) => n + i.amountUsd, 0)
     await db.query('insert into payments (id,invoice_id,amount,method,at,note) values ($1,$2,$3,$4,current_date,$5)', ['pay_' + uid(), inv[0].id, Math.round(freight), opts.direct ? opts.method ?? 'bank' : 'ship_sync', opts.direct ? `Recorded by ${opts.by ?? 'office'}` : `Paid online via Ntemtem (${p.id})`])
     const { rows: sum } = await db.query<{ s: string }>('select coalesce(sum(amount),0)::text as s from payments where invoice_id = $1', [inv[0].id])
     await db.query(`update invoices set status = case when $2::int >= total then 'paid' else 'sent' end where id = $1`, [inv[0].id, Number(sum[0].s)])
@@ -194,7 +196,7 @@ export async function refundPayment(db: Db, p: Row, amountUsd: number | null, re
     await db.query(`update escrow_payments set status = 'refunded', refunded_at = now(), refund_reason = $2, provider_refund_id = $3, hold = false where id = $1`, [p.id, reason, refundId])
     if (p.receipt_document_id) await db.query('delete from documents where id = $1', [p.receipt_document_id])
   } else {
-    const cfg = await getSettings(db); const newAmount = r2(Number(p.amount_usd) - amt); const fee = r2(newAmount * cfg.takeRatePct)
+    const cfg = await getSettings(db); const newAmount = r2(Number(p.amount_usd) - amt); const ntem = Math.min(newAmount, (await import('./supplies')).ntemtemShare(J(p.items ?? '[]') as { kind?: string; amountUsd?: number }[])); const fee = r2((newAmount - ntem) * cfg.takeRatePct + ntem)
     await db.query(`update escrow_payments set amount_usd = $2, fee_usd = $3, net_usd = $4, refund_reason = $5, provider_refund_id = coalesce($6, provider_refund_id), hold = false where id = $1`, [p.id, newAmount, fee, r2(newAmount - fee), `Partial refund $${amt}: ${reason}`, refundId])
   }
   const { rows: ss } = await db.query<Row>('select * from shipments where id = $1', [p.shipment_id]); const s = ss[0]

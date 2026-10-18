@@ -1315,6 +1315,18 @@ create table if not exists shipment_supplies (
   unit_usd numeric not null, status text not null default 'due', added_by text not null default '', created_at timestamptz not null default now()
 );
 create index if not exists idx_shipment_supplies on shipment_supplies(shipment_id);
+alter table requests add column if not exists supplies jsonb;
+alter table requests add column if not exists supplies_address jsonb;
+alter table quotes add column if not exists supplies jsonb not null default '[]';
+alter table shipments add column if not exists supplies_address jsonb;
+alter table shipment_supplies add column if not exists source text not null default 'shipper';
+alter table shipment_supplies add column if not exists product_id text;
+alter table shipment_supplies add column if not exists kind text not null default 'other';
+alter table supply_products add column if not exists audience text not null default 'shipper';
+alter table supply_products add column if not exists packing_kind text;
+alter table supply_orders add column if not exists kind text not null default 'shipper';
+alter table supply_orders add column if not exists shipment_id text;
+alter table supply_orders add column if not exists customer_name text not null default '';
 
 `
 

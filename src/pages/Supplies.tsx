@@ -8,7 +8,7 @@ import { usd } from '../lib/payments'
 import { fmtDate } from '../components/ui'
 import { Confirm, StatCard } from '../components/board'
 
-export const categoryIcon: Record<Category, LucideIcon> = { kit: Package, printer: Printer, scanner: Barcode, labels: Tag, accessory: Package }
+export const categoryIcon: Record<Category, LucideIcon> = { kit: Package, printer: Printer, scanner: Barcode, labels: Tag, accessory: Package, packing: Package }
 const statusTone: Record<Order['status'], string> = { awaiting_payment: 'bg-gold/15 text-gold-deep', paid: 'bg-sky/15 text-sea', packed: 'bg-sky/15 text-sea', shipped: 'bg-sky/15 text-sea', delivered: 'bg-teal/15 text-teal', cancelled: 'bg-surface-2 text-text-muted' }
 const STEPS: Order['status'][] = ['paid', 'packed', 'shipped', 'delivered']
 type Line = { productId: string; qty: number; mode: Mode }

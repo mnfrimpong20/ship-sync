@@ -12,6 +12,7 @@ import { ease } from '../lib/motion'
 import { RequestVehicleFields } from '../components/VehicleCard'
 import { congestionLabel, useCongestion } from '../lib/useCongestion'
 import { hubApi } from '../lib/customerHub'
+import { PackingNeeds } from '../components/PackingSupplies'
 
 type Form = NewRequest
 const stepsMeta = ['Route', 'Cargo', 'Services', 'Contact']
@@ -90,6 +91,12 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
   const validate = () => {
     const e: Record<string, string> = {}
     if (step === 1 && form.quantity < 1) e.quantity = 'Enter at least 1.'
+    if (step === 2 && form.supplies?.length) {
+      const a = form.suppliesAddress ?? {}
+      if ((a.name ?? '').trim().length < 2) e.supName = 'Add a name for the delivery.'
+      else if ((a.line1 ?? '').trim().length < 3) e.supLine1 = 'Add the street address for the supplies.'
+      else if ((a.city ?? '').trim().length < 2) e.supCity = 'Add the city.'
+    }
     if (step === 3) {
       if (form.contact.name.trim().length < 2) e.name = 'Please enter your name.'
       if (!/^\S+@\S+\.\S+$/.test(form.contact.email)) e.email = 'Enter a valid email.'
@@ -182,6 +189,8 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                         <span><span className="block font-semibold text-text">{l}</span><span className="text-sm text-text-muted">{h}</span></span>
                       </label>
                     ))}
+                    <PackingNeeds needs={form.supplies ?? []} onNeeds={(n) => setForm((f) => ({ ...f, supplies: n, suppliesAddress: n.length ? (f.suppliesAddress ?? { name: f.contact.name, country: 'US' }) : undefined }))}
+                      address={form.suppliesAddress} onAddress={(a) => set('suppliesAddress', a)} shipperId={only} shipperName={onlyShipper?.name} errors={errors} />
                     <div className="rounded-[var(--radius-sm)] border border-border bg-surface-2 p-4" data-testid="recipient-section">
                       <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold text-text">Who receives it in {countryByCode(form.destination)?.name ?? 'the destination'}?</p><p className="text-xs text-text-muted">Optional now, but it lets the shipper text them when it lands and the driver find them.</p></div>{form.consignee && <button type="button" onClick={() => { set('consignee', undefined); setRecipientMode(saved.length ? 'pick' : 'none') }} className="text-xs text-text-muted underline">Clear</button>}</div>
                       {saved.length > 0 && <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Saved recipients">{saved.map((c) => <button type="button" key={c.id} role="radio" aria-checked={form.consignee?.name === c.name && form.consignee?.phone === c.phone} onClick={() => pickSaved(c)} className={`rounded-full border px-3 py-1.5 text-sm focus-ring ${form.consignee?.name === c.name && form.consignee?.phone === c.phone ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`} data-testid="saved-recipient">{c.name}{c.city ? ` · ${c.city}` : ''}</button>)}<button type="button" onClick={() => { set('consignee', { name: '', country: form.destination }); setRecipientMode('new') }} className="rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-text-muted hover:text-text focus-ring">+ Someone else</button></div>}

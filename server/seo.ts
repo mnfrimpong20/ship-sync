@@ -6,7 +6,7 @@
  *   - /robots.txt and /sitemap.xml (public pages + every public shipper profile)
  */
 import type { Express, Request } from 'express'
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { publicShipperSql, type Db } from './db'
 import { NOINDEX, SITEMAP_PATHS, pageMeta } from '../src/lib/pageMeta'
@@ -34,8 +34,9 @@ export function mountSeoFiles(app: Express, getDb: () => Promise<Db>) {
 
 /** Production: every page's HTML carries its own title, description, Open Graph tags and canonical address. */
 export function mountSeo(app: Express, getDb: () => Promise<Db>, dist: string) {
-  let shell: string | null = null
-  const html = () => (shell ??= readFileSync(path.join(dist, 'index.html'), 'utf8'))
+  // Re-read the page shell when a new build replaces it (asset file names change on every build).
+  let shell: { at: number; html: string } | null = null
+  const html = () => { const f = path.join(dist, 'index.html'); const at = statSync(f).mtimeMs; if (!shell || shell.at !== at) shell = { at, html: readFileSync(f, 'utf8') }; return shell.html }
 
   app.get('*path', async (req, res) => {
     const p = req.path

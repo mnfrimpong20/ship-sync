@@ -49,7 +49,7 @@ import { mountRequestFlow, startRequestSweeps, sweepRequests } from './requestFl
 import { mountBooking } from './booking'
 import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
-import { mountSupplies } from './supplies'
+import { mountSupplies, attachDefaultSupplies, defaultQuoteSupplies, resolveQuoteSupplies, suppliesFromQuote, suppliesTotal, type QuoteSupplyLine, type SupplyNeed } from './supplies'
 import { mountReviews } from './reviews'
 import { mountBrand } from './brand'
 
@@ -97,11 +97,14 @@ const shipperOut = (r: Row) => ({
 })
 const quoteMode = (r: Row) => (r.mode === 'air' || r.mode === 'ocean' ? r.mode : (J(r.includes) as string[] ?? []).includes('Air freight') ? 'air' : 'ocean')
 const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.shipper_id, price: r.price, currency: r.currency, transitDays: r.transit_days, validUntil: DATE(r.valid_until), notes: r.notes, includes: J(r.includes), status: r.status, sentAt: ISO(r.sent_at), updatedAt: r.updated_at ? ISO(r.updated_at) : undefined,
-  kind: (r.kind ?? 'firm') as 'firm' | 'estimate', mode: quoteMode(r) as 'air' | 'ocean', expired: r.status === 'sent' && DATE(r.valid_until) < new Date().toISOString().slice(0, 10) })
+  kind: (r.kind ?? 'firm') as 'firm' | 'estimate', mode: quoteMode(r) as 'air' | 'ocean', supplies: J(r.supplies ?? '[]') as QuoteSupplyLine[], suppliesUsd: suppliesTotal(J(r.supplies ?? '[]') as QuoteSupplyLine[]), expired: r.status === 'sent' && DATE(r.valid_until) < new Date().toISOString().slice(0, 10) })
+/** Shippers see only the town of the supplies address until the job is theirs (same rule as the contact details). */
+const maskSupAddr = (a: unknown, full: boolean) => (!a ? undefined : full ? a : { city: (a as Row).city, state: (a as Row).state, country: (a as Row).country })
 const requestOut = (r: Row, quotes: Row[]) => ({
   id: r.id, ref: r.ref, userId: r.user_id, createdAt: ISO(r.created_at), origin: r.origin, destination: r.destination, mode: r.mode, cargo: r.cargo, quantity: r.quantity, weightKg: r.weight_kg ?? undefined,
   description: r.description, pickup: r.pickup, delivery: r.delivery, insurance: r.insurance, readyDate: DATE(r.ready_date),
   contact: { name: r.contact_name, email: r.contact_email, phone: r.contact_phone }, status: r.status, quotes: quotes.map((q) => ({ ...quoteOut(q), stale: !!r.updated_at && new Date(q.updated_at ?? q.sent_at) < new Date(r.updated_at) })),
+  supplies: r.supplies ? (J(r.supplies) as SupplyNeed[]) : [], suppliesAddress: r.supplies_address ? J(r.supplies_address) : undefined,
   dims: r.dims ?? '', declaredValueUsd: r.declared_value_usd == null ? undefined : Number(r.declared_value_usd), expiresAt: r.expires_at ? ISO(r.expires_at) : undefined, updatedAt: r.updated_at ? ISO(r.updated_at) : undefined, cancelReason: r.cancel_reason ?? undefined, openedToMarket: !!r.opened_to_market_at, vehicle: r.vehicle ? J(r.vehicle) : undefined, consignee: r.consignee ? J(r.consignee) : undefined, source: r.source ?? 'marketplace', preferredShipperId: r.preferred_shipper_id ?? undefined,
 })
 const shipmentOut = (r: Row, events: Row[]) => ({
@@ -411,6 +414,9 @@ const zRequest = zMatch.extend({
   consignee: zConsignee.optional(),
   /** How the request reached a specific shipper: picked in the form, the shipper's order link, or their branded page. */
   source: z.enum(['marketplace', 'picked', 'link', 'branded']).optional(),
+  /** Packing supplies the customer needs before pickup (from their shipper, or sent by Ntemtem). */
+  supplies: z.array(z.object({ kind: z.enum(['barrel', 'box', 'lock', 'tape', 'other']), qty: z.number().int().min(1).max(50) })).max(5).optional(),
+  suppliesAddress: z.object({ name: z.string().trim().min(2).max(80), line1: z.string().trim().min(3).max(160), line2: z.string().trim().max(160).default(''), city: z.string().trim().min(2).max(80), state: z.string().trim().max(40).default(''), zip: z.string().trim().max(20).default(''), country: z.string().trim().min(2).max(40).default('US'), phone: z.string().trim().max(40).default('') }).optional(),
 })
 const zTransit = z.object({
   vesselName: z.string().trim().max(80).optional().or(z.literal('').transform(() => undefined)),
@@ -435,7 +441,7 @@ const zProfile = z.object({
   responseHours: z.number().int().min(1).max(168),
 })
 const zVerify = z.object({ verified: z.boolean(), plan: z.enum(['starter', 'pro', 'enterprise']).optional(), note: z.string().trim().max(500).optional() })
-const zQuote = z.object({ price: z.number().int().min(1), transitDays: z.number().int().min(1), notes: z.string().max(2000).default(''), includes: z.array(z.string()).default([]), validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), kind: z.enum(['firm', 'estimate']).default('firm'), mode: z.enum(['air', 'ocean']).optional() })
+const zQuote = z.object({ price: z.number().int().min(1), transitDays: z.number().int().min(1), notes: z.string().max(2000).default(''), includes: z.array(z.string()).default([]), validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), kind: z.enum(['firm', 'estimate']).default('firm'), mode: z.enum(['air', 'ocean']).optional() , supplies: z.array(z.object({ kind: z.enum(['barrel', 'box', 'lock', 'tape', 'other']), qty: z.number().int().min(1).max(50), source: z.enum(['shipper', 'ntemtem', 'none']), supplyId: z.string().max(60).optional(), productId: z.string().max(60).optional() })).max(5).optional() })
 
 /* ---------------- router ---------------- */
 export function apiRouter() {
@@ -569,7 +575,8 @@ export function apiRouter() {
       const fit = leadFit(s, q)
       const suggested = q.status === 'open' && !mineQ.length && priced++ < 40 ? await instantQuote(db, user.shipperId!, { origin: q.origin, destination: q.destination, mode: q.mode, cargo: q.cargo, quantity: q.quantity, weightKg: q.weightKg, pickup: q.pickup, delivery: q.delivery, insurance: q.insurance }).catch(() => null) : null
       const won = mineQ.some((x) => x.status === 'accepted')
-      out.push({ ...q, contact: contactFor(q, user.shipperId!, won), quotes: mineQ, competingQuotes: q.quotes.filter((x) => x.shipperId !== user.shipperId).length, outsideArea: q.status === 'open' && !fit.local && q.preferredShipperId !== user.shipperId, suggested: suggested ? { price: suggested.price, transitDays: suggested.transitDays, notes: suggested.notes, includes: suggested.includes, breakdown: suggested.breakdown } : null })
+      const suggestedSupplies = q.status === 'open' && q.supplies?.length ? await defaultQuoteSupplies(db, user.shipperId!, q.supplies) : undefined
+      out.push({ ...q, suggestedSupplies, suppliesAddress: maskSupAddr(q.suppliesAddress, won), contact: contactFor(q, user.shipperId!, won), quotes: mineQ, competingQuotes: q.quotes.filter((x) => x.shipperId !== user.shipperId).length, outsideArea: q.status === 'open' && !fit.local && q.preferredShipperId !== user.shipperId, suggested: suggested ? { price: suggested.price, transitDays: suggested.transitDays, notes: suggested.notes, includes: suggested.includes, breakdown: suggested.breakdown } : null })
     }
     res.json({ requests: out })
   }))
@@ -604,6 +611,11 @@ export function apiRouter() {
       await db.query('update requests set po_number = $2, created_by_name = $3 where id = $1', [id, String(req.body?.poNumber ?? '').trim().slice(0, 40), user.actingBy?.name ?? user.name])
     }
     if (body.consignee) await rememberConsignee(db, user.id, body.consignee)
+    if (body.supplies?.length) {
+      if (!body.suppliesAddress) { await db.query('delete from requests where id = $1', [id]); throw new HttpError(400, 'Add the address the packing supplies should go to.') }
+      const merged = Object.values(body.supplies.reduce<Record<string, { kind: string; qty: number }>>((a, n) => { a[n.kind] = { kind: n.kind, qty: Math.min(50, (a[n.kind]?.qty ?? 0) + n.qty) }; return a }, {}))
+      await db.query('update requests set supplies = $2, supplies_address = $3 where id = $1', [id, JSON.stringify(merged), JSON.stringify(body.suppliesAddress)])
+    }
     const { rows } = await db.query<Row>('select * from requests where id = $1', [id])
     if (body.preferredShipperId) {
       // White-label lead: only that shipper sees it; price it from their rate cards if they have them.
@@ -616,6 +628,7 @@ export function apiRouter() {
       if (DEMO_AUTO_QUOTES) await demoAutoQuotes(db, rows[0])
       await notifyNewLead(db, rows[0])
     }
+    await attachDefaultSupplies(db, rows[0]).catch((e) => console.error('[supplies] defaults', e))
     const [request] = await loadRequests(db, 'id = $1', [id])
     res.status(201).json({ request, user, passwordLinkSent })
   }))
@@ -640,9 +653,14 @@ export function apiRouter() {
     await db.query('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes,sent_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict (request_id, shipper_id) do update set price = excluded.price, transit_days = excluded.transit_days, valid_until = excluded.valid_until, notes = excluded.notes, includes = excluded.includes, sent_at = now(), sent_by = excluded.sent_by',
       [uid(), req.params.id, user.shipperId, body.price, body.transitDays, body.validUntil ?? new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), body.notes, JSON.stringify(body.includes), user.staffId ?? null])
     await db.query(`update quotes set kind = $3, mode = $4, updated_at = now(), status = case when status in ('withdrawn','expired') then 'sent' else status end, expiry_reminded_at = null where request_id = $1 and shipper_id = $2`, [req.params.id, user.shipperId, body.kind, qMode])
+    { // Packing supplies the customer asked for: priced from the shipper's list or Ntemtem's catalogue.
+      const needs = rows[0].supplies ? (J(rows[0].supplies) as SupplyNeed[]) : []
+      const lines = needs.length ? (body.supplies ? await resolveQuoteSupplies(db, user.shipperId!, needs, body.supplies as QuoteSupplyLine[]) : await defaultQuoteSupplies(db, user.shipperId!, needs)) : []
+      await db.query('update quotes set supplies = $3 where request_id = $1 and shipper_id = $2', [req.params.id, user.shipperId, JSON.stringify(lines)])
+    }
     await notify(db, { userId: rows[0].user_id, kind: 'quote_received', title: `${user.company ?? 'A shipper'} quoted $${body.price.toLocaleString()} on ${rows[0].ref}`, body: `${body.transitDays} days transit${body.includes.length ? ` · ${body.includes.join(', ')}` : ''}. Open your dashboard to compare and accept.`, link: '/dashboard', dedupe: `rq:${rows[0].id}:q:${user.shipperId}:${Date.now()}` })
     const [request] = await loadRequests(db, 'id = $1', [req.params.id])
-    res.status(201).json({ request: { ...request, contact: contactFor(request, user.shipperId!, false), quotes: request.quotes.filter((x) => x.shipperId === user.shipperId), competingQuotes: request.quotes.filter((x) => x.shipperId !== user.shipperId).length } })
+    res.status(201).json({ request: { ...request, suppliesAddress: maskSupAddr(request.suppliesAddress, false), contact: contactFor(request, user.shipperId!, false), quotes: request.quotes.filter((x) => x.shipperId === user.shipperId), competingQuotes: request.quotes.filter((x) => x.shipperId !== user.shipperId).length } })
   }))
   r.post('/quotes/:id/accept', wrap(async (req, res) => {
     const db = await getDb(); const user = await requireUser(db, req)
@@ -671,6 +689,7 @@ export function apiRouter() {
     await attachShipmentToClient(db, q.shipper_id, user.id, sid, r0.contact_name, r0.contact_email)
     await consigneeToClient(db, sid, r0.consignee ? J(r0.consignee) : null)
     if (r0.cargo === 'vehicle') await vehicleFromRequest(db, r0.id, sid)
+    await suppliesFromQuote(db, sid, q, r0).catch((e) => console.error('[supplies] booking', e))
     await db.query('update shipments set booking = $2 where id = $1', [sid, JSON.stringify({ quantity: r0.quantity, weightKg: r0.weight_kg ?? null, dims: r0.dims ?? '', declaredValueUsd: r0.declared_value_usd == null ? null : Number(r0.declared_value_usd), readyDate: DATE(r0.ready_date), quoteKind: q.kind ?? 'firm', bookedBy: r0.contact_name })])
     if (q.kind === 'estimate') await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, 'booked', r0.origin, 'Price is an estimate — final amount confirmed when the pieces are weighed at check-in.'])
     await invoiceForBooking(db, sid, q).catch((e) => console.error('[invoice] auto', e))

@@ -38,7 +38,9 @@ export const SHIP_FLAT_USD = 12
 export const SHIP_FREE_OVER_USD = 150
 const LIVE = ['paid', 'packed', 'shipped', 'delivered']
 
-export type Category = 'printer' | 'scanner' | 'labels' | 'kit' | 'accessory'
+export type Category = 'printer' | 'scanner' | 'labels' | 'kit' | 'accessory' | 'packing'
+export type PackingKind = 'barrel' | 'box' | 'lock' | 'tape' | 'other'
+export const PACKING_KINDS: PackingKind[] = ['barrel', 'box', 'lock', 'tape', 'other']
 export type Mode = 'buy' | 'rent' | 'included'
 
 /* ------------------------------------------------------------------ stock */
@@ -74,10 +76,11 @@ const productOut = (p: Row, products: Map<string, Row>) => {
     reorderLevel: Number(p.reorder_level), low: avail <= Number(p.reorder_level), labelsPerUnit: Number(p.labels_per_unit),
     kit: J<{ productId: string; qty: number }[]>(p.kit, []).map((k) => ({ ...k, name: products.get(k.productId)?.name ?? k.productId })),
     includedWith: J<Plan[]>(p.included_with, []), active: !!p.active, sort: Number(p.sort),
+    audience: (p.audience ?? 'shipper') as 'shipper' | 'customer', packingKind: (p.packing_kind ?? null) as PackingKind | null,
   }
 }
 const orderOut = (o: Row, items: Row[]) => ({
-  id: o.id, ref: o.ref, shipperId: o.shipper_id, shipperName: o.shipper_name ?? undefined, placedBy: o.placed_by, status: o.status as 'awaiting_payment' | 'paid' | 'packed' | 'shipped' | 'delivered' | 'cancelled',
+  id: o.id, ref: o.ref, shipperId: o.shipper_id, shipperName: o.shipper_name ?? undefined, placedBy: o.placed_by, kind: (o.kind ?? 'shipper') as 'shipper' | 'customer', shipmentId: o.shipment_id ?? null, shipmentRef: o.shipment_ref ?? null, customerName: o.customer_name ?? '', status: o.status as 'awaiting_payment' | 'paid' | 'packed' | 'shipped' | 'delivered' | 'cancelled',
   provider: o.provider as 'stripe' | 'manual' | 'included', subtotalUsd: Number(o.subtotal_usd), shippingUsd: Number(o.shipping_usd), totalUsd: Number(o.total_usd), monthlyUsd: Number(o.monthly_usd),
   shipTo: J<Record<string, string>>(o.ship_to, {}), carrier: o.carrier, tracking: o.tracking, note: o.note,
   createdAt: ISO(o.created_at), paidAt: ISO(o.paid_at), shippedAt: ISO(o.shipped_at), deliveredAt: ISO(o.delivered_at), cancelledAt: ISO(o.cancelled_at),
@@ -90,7 +93,7 @@ const rentalOut = (r: Row) => ({
 })
 const RENTAL_SELECT = `select r.*, p.name as product_name, o.ref as order_ref, sh.name as shipper_name from supply_rentals r left join supply_products p on p.id = r.product_id left join supply_orders o on o.id = r.order_id join shippers sh on sh.id = r.shipper_id`
 async function ordersWithItems(db: Db, where: string, params: unknown[]) {
-  const { rows } = await db.query<Row>(`select o.*, sh.name as shipper_name from supply_orders o join shippers sh on sh.id = o.shipper_id ${where} order by o.created_at desc limit 300`, params)
+  const { rows } = await db.query<Row>(`select o.*, sh.name as shipper_name, s.ref as shipment_ref from supply_orders o join shippers sh on sh.id = o.shipper_id left join shipments s on s.id = o.shipment_id ${where} order by o.created_at desc limit 300`, params)
   const ids = rows.map((o) => o.id)
   const { rows: items } = ids.length ? await db.query<Row>('select * from supply_order_items where order_id = any($1)', [ids]) : { rows: [] as Row[] }
   return rows.map((o) => orderOut(o, items))
@@ -169,11 +172,78 @@ export async function handleSuppliesEvent(db: Db, evt: Row): Promise<boolean> {
 /* ------------------------------------------------------------------ packing supplies on a shipment (used by payments) */
 export async function dueSupplies(db: Db, shipmentId: string) {
   const { rows } = await db.query<Row>(`select * from shipment_supplies where shipment_id = $1 and status = 'due' order by created_at`, [shipmentId])
-  return rows.map((l) => ({ description: `${l.qty} × ${l.name} — brought before pickup`, amountUsd: r2(Number(l.qty) * Number(l.unit_usd)), kind: 'supplies' as const, ref: l.id as string }))
+  return rows.map((l) => l.source === 'ntemtem'
+    ? { description: `${l.qty} × ${l.name} — sent to you by Ntemtem`, amountUsd: r2(Number(l.qty) * Number(l.unit_usd)), kind: 'ntemtem_supplies' as const, ref: l.id as string }
+    : { description: `${l.qty} × ${l.name} — brought before pickup`, amountUsd: r2(Number(l.qty) * Number(l.unit_usd)), kind: 'supplies' as const, ref: l.id as string })
 }
-export async function markSuppliesPaid(db: Db, items: { kind?: string; ref?: string }[]) {
-  const ids = items.filter((i) => i.kind === 'supplies' && i.ref).map((i) => i.ref!)
-  if (ids.length) await db.query(`update shipment_supplies set status = 'paid' where id = any($1) and status = 'due'`, [ids])
+/** The part of a payment that belongs to Ntemtem (its own packing supplies) — never paid out to the shipper. */
+export const ntemtemShare = (items: { kind?: string; amountUsd?: number }[]) => r2(items.filter((i) => i.kind === 'ntemtem_supplies').reduce((a, i) => a + Number(i.amountUsd ?? 0), 0))
+export async function markSuppliesPaid(db: Db, items: { kind?: string; ref?: string }[], shipmentId?: string | null) {
+  const ids = items.filter((i) => (i.kind === 'supplies' || i.kind === 'ntemtem_supplies') && i.ref).map((i) => i.ref!)
+  if (!ids.length) return
+  await db.query(`update shipment_supplies set status = 'paid' where id = any($1) and status = 'due'`, [ids])
+  const ntem = items.filter((i) => i.kind === 'ntemtem_supplies' && i.ref).map((i) => i.ref!)
+  if (ntem.length && shipmentId) await customerSupplyOrder(db, shipmentId, ntem).catch((e) => console.error('[supplies] customer order', e))
+}
+/** Ntemtem's packing supplies paid for on a shipment → an order for Ntemtem to pack and send to the customer. */
+async function customerSupplyOrder(db: Db, shipmentId: string, lineIds: string[]) {
+  const { rows: ss } = await db.query<Row>('select * from shipments where id = $1', [shipmentId]); const s = ss[0]; if (!s) return
+  const { rows: lines } = await db.query<Row>('select * from shipment_supplies where id = any($1)', [lineIds]); if (!lines.length) return
+  const { rows: done } = await db.query<Row>(`select 1 from supply_orders where kind = 'customer' and shipment_id = $1 and status <> 'cancelled' and note = $2`, [shipmentId, lineIds.slice().sort().join(',')])
+  if (done.length) return
+  const products = await allProducts(db)
+  const id = 'eqo_' + uid(), ref = 'PS-' + String(10000 + Math.floor(Math.random() * 89999))
+  const total = r2(lines.reduce((a, l) => a + Number(l.qty) * Number(l.unit_usd), 0))
+  const addr = J<Record<string, string>>(s.supplies_address, {})
+  await db.query(`insert into supply_orders (id,ref,shipper_id,user_id,placed_by,status,provider,subtotal_usd,shipping_usd,total_usd,monthly_usd,ship_to,note,kind,shipment_id,customer_name,paid_at) values ($1,$2,$3,$4,$5,'paid','escrow',$6,0,$6,0,$7,$8,'customer',$9,$10,now())`,
+    [id, ref, s.shipper_id, s.user_id, s.customer, total, JSON.stringify(addr), lineIds.slice().sort().join(','), s.id, s.customer])
+  const parts: Parts = new Map()
+  for (const l of lines) { await db.query('insert into supply_order_items (id,order_id,product_id,name,qty,mode,unit_usd) values ($1,$2,$3,$4,$5,$6,$7)', ['eqi_' + uid(), id, l.product_id ?? '', l.name, l.qty, 'buy', l.unit_usd]); if (l.product_id && products.has(l.product_id)) partsOf(products, l.product_id, Number(l.qty), parts) }
+  await move(db, parts, -1, 'customer order', ref, 'Paid with shipment ' + s.ref)
+  await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, s.origin, `Packing supplies (${lines.map((l) => `${l.qty} × ${l.name}`).join(', ')}) ordered from Ntemtem — order ${ref}.`])
+}
+
+/* ------------------------------------------------------------------ packing supplies in requests & quotes */
+export type SupplyNeed = { kind: PackingKind; qty: number }
+export type QuoteSupplyLine = { kind: PackingKind; qty: number; source: 'shipper' | 'ntemtem' | 'none'; supplyId?: string; productId?: string; name?: string; unitUsd?: number }
+/** Ntemtem's packing items sold to customers (only ones in stock). */
+export async function ntemtemPacking(db: Db) {
+  const products = await allProducts(db)
+  return [...products.values()].filter((p) => p.active && p.audience === 'customer').sort((a, b) => Number(a.sort) - Number(b.sort)).map((p) => ({ id: p.id as string, name: p.name as string, kind: (p.packing_kind ?? 'other') as PackingKind, blurb: p.blurb as string, priceUsd: Number(p.price_usd), available: available(products, p.id) }))
+}
+/** Turn what a shipper chose into priced lines — prices always come from the shipper's list or Ntemtem's catalogue, never the browser. */
+export async function resolveQuoteSupplies(db: Db, shipperId: string, needs: SupplyNeed[], chosen: QuoteSupplyLine[]): Promise<QuoteSupplyLine[]> {
+  const { rows: mine } = await db.query<Row>('select * from shipper_supplies where shipper_id = $1 and active', [shipperId])
+  const ntem = await ntemtemPacking(db)
+  const out: QuoteSupplyLine[] = []
+  for (const n of needs) {
+    const c = chosen.find((x) => x.kind === n.kind)
+    const qty = Math.max(1, Math.min(50, Number(c?.qty ?? n.qty) || n.qty))
+    if (c?.source === 'shipper') { const it = mine.find((x) => x.id === c.supplyId) ?? mine.filter((x) => x.kind === n.kind).sort((a, b) => Number(a.price_usd) - Number(b.price_usd))[0]; if (it) { out.push({ kind: n.kind, qty, source: 'shipper', supplyId: it.id, name: it.name, unitUsd: Number(it.price_usd) }); continue } }
+    if (c?.source === 'ntemtem' || (c?.source === 'shipper')) { const it = ntem.find((x) => x.id === c.productId) ?? ntem.find((x) => x.kind === n.kind && x.available >= qty) ?? ntem.find((x) => x.kind === n.kind); if (it) { out.push({ kind: n.kind, qty, source: 'ntemtem', productId: it.id, name: it.name, unitUsd: it.priceUsd }); continue } }
+    out.push({ kind: n.kind, qty, source: 'none' })
+  }
+  return out
+}
+/** Default for instant quotes and the quote form: the shipper's own item if they sell that kind, else Ntemtem's. */
+export async function defaultQuoteSupplies(db: Db, shipperId: string, needs: SupplyNeed[]) {
+  const { rows: mine } = await db.query<Row>('select id, kind, price_usd from shipper_supplies where shipper_id = $1 and active', [shipperId])
+  const chosen: QuoteSupplyLine[] = needs.map((n) => (mine.some((x) => x.kind === n.kind) ? { kind: n.kind, qty: n.qty, source: 'shipper' } : { kind: n.kind, qty: n.qty, source: 'ntemtem' }))
+  return resolveQuoteSupplies(db, shipperId, needs, chosen)
+}
+/** Instant/auto quotes: price the customer's packing supplies the default way (shipper's own items, else Ntemtem's). */
+export async function attachDefaultSupplies(db: Db, request: Row) {
+  const needs = J<SupplyNeed[]>(request.supplies, [])
+  if (!needs.length) return
+  const { rows } = await db.query<Row>(`select id, shipper_id from quotes where request_id = $1 and (supplies is null or supplies = '[]'::jsonb)`, [request.id])
+  for (const q of rows) await db.query('update quotes set supplies = $2 where id = $1', [q.id, JSON.stringify(await defaultQuoteSupplies(db, q.shipper_id, needs))])
+}
+export const suppliesTotal = (lines: QuoteSupplyLine[]) => r2(lines.filter((l) => l.source !== 'none').reduce((a, l) => a + (l.unitUsd ?? 0) * l.qty, 0))
+/** On booking: the accepted quote's supply lines become due lines on the shipment, paid with the freight. */
+export async function suppliesFromQuote(db: Db, shipmentId: string, quote: Row, request: Row) {
+  const lines = J<QuoteSupplyLine[]>(quote.supplies, []).filter((l) => l.source !== 'none' && l.unitUsd)
+  if (request.supplies_address) await db.query('update shipments set supplies_address = $2 where id = $1', [shipmentId, typeof request.supplies_address === 'string' ? request.supplies_address : JSON.stringify(request.supplies_address)])
+  for (const l of lines) await db.query(`insert into shipment_supplies (id,shipment_id,supply_id,product_id,name,qty,unit_usd,added_by,source,kind) values ($1,$2,$3,$4,$5,$6,$7,'quote',$8,$9)`, ['ssl_' + uid(), shipmentId, l.source === 'shipper' ? l.supplyId ?? null : null, l.source === 'ntemtem' ? l.productId ?? null : null, l.name ?? l.kind, l.qty, l.unitUsd, l.source, l.kind])
 }
 
 /* ------------------------------------------------------------------ seed */
@@ -186,6 +256,13 @@ const CATALOG: Row[] = [
   { id: 'eq-kit-starter', sku: 'NT-KIT-ST', name: 'Starter kit', category: 'kit', blurb: 'Everything a small team needs to sticker and scan from day one.', specs: ['1 label printer', '1 wireless scanner', '2 rolls of labels (1,000)'], price: 339, rent: 19, kit: [{ productId: 'eq-printer', qty: 1 }, { productId: 'eq-scanner', qty: 1 }, { productId: 'eq-labels-roll', qty: 2 }], included: ['pro', 'enterprise'], labels: 1000, sort: 0 },
   { id: 'eq-kit-warehouse', sku: 'NT-KIT-WH', name: 'Warehouse kit', category: 'kit', blurb: 'For warehouses loading several containers a month.', specs: ['1 label printer', '3 rugged scanners with stands', '1 case of labels (3,000)'], price: 749, rent: 45, kit: [{ productId: 'eq-printer', qty: 1 }, { productId: 'eq-scanner-rugged', qty: 3 }, { productId: 'eq-labels-case', qty: 1 }], included: ['enterprise'], labels: 3000, sort: 0.5 },
 ]
+/** Ntemtem's own packing supplies for customers whose shipper doesn't stock them (sent straight to the customer). */
+const NTEMTEM_PACKING: [string, string, PackingKind, string, number, number, number][] = [
+  ['pk-barrel', 'Blue drum barrel (55 gal) with lid', 'barrel', 'Food-safe plastic drum, sent flat-packed lid on.', 42, 120, 100],
+  ['pk-box', 'Large moving box (24 × 18 × 18 in)', 'box', 'Double-wall cardboard, sold singly.', 6, 400, 101],
+  ['pk-lock', 'Barrel lock ring & numbered seal', 'lock', 'Steel ring and a tamper-evident seal.', 8, 300, 102],
+  ['pk-tape', 'Heavy-duty packing tape (3 rolls)', 'tape', 'Wide, strong tape for boxes and barrel lids.', 6, 300, 103],
+]
 const PACKING: [string, string, string, number][] = [
   ['Blue drum barrel (55 gal)', 'barrel', 'Food-safe plastic drum with a lid', 45],
   ['Barrel lock ring & seal', 'lock', 'Steel ring with a numbered seal', 9],
@@ -196,6 +273,7 @@ export async function seedSupplies(db: Db) {
   const { rows: have } = await db.query<Row>('select count(*)::int as n from supply_products')
   if (!Number(have[0]?.n)) for (const p of CATALOG) await db.query(`insert into supply_products (id,sku,name,category,blurb,specs,price_usd,rent_usd,stock,reorder_level,labels_per_unit,kit,included_with,sort) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
     [p.id, p.sku, p.name, p.category, p.blurb, JSON.stringify(p.specs), p.price, p.rent, p.stock ?? 0, p.reorder ?? 0, p.labels ?? 0, JSON.stringify(p.kit ?? []), JSON.stringify(p.included ?? []), Math.round((p.sort ?? 0) * 10)])
+  for (const [id, name, kind, blurb, price, stock, sort] of NTEMTEM_PACKING) await db.query(`insert into supply_products (id,sku,name,category,blurb,specs,price_usd,stock,reorder_level,audience,packing_kind,sort) values ($1,$2,$3,'packing',$4,'[]',$5,$6,$7,'customer',$8,$9) on conflict (id) do nothing`, [id, 'NT-PK-' + kind.toUpperCase(), name, blurb, price, stock, Math.round(stock / 5), kind, sort])
   const { rows: flag } = await db.query<Row>(`select 1 from settings where id = 'seed:supplies'`)
   if (flag.length) return
   const { rows: demo } = await db.query<Row>(`select id from shippers where demo order by id`)
@@ -230,7 +308,7 @@ export async function seedSupplies(db: Db) {
 /* ------------------------------------------------------------------ routes */
 const zAddress = z.object({ name: z.string().trim().min(2).max(80), company: z.string().trim().max(120).default(''), line1: z.string().trim().min(3).max(160), line2: z.string().trim().max(160).default(''), city: z.string().trim().min(2).max(80), state: z.string().trim().max(40).default(''), zip: z.string().trim().max(20).default(''), country: z.string().trim().min(2).max(40), phone: z.string().trim().max(40).default('') })
 const zCheckout = z.object({ items: z.array(z.object({ productId: z.string().max(60), qty: z.number().int().min(1).max(50), mode: z.enum(['buy', 'rent', 'included']) })).min(1).max(20), shipTo: zAddress, note: z.string().trim().max(400).default('') })
-const zProduct = z.object({ name: z.string().trim().min(2).max(120), sku: z.string().trim().max(40).default(''), category: z.enum(['printer', 'scanner', 'labels', 'kit', 'accessory']), blurb: z.string().trim().max(300).default(''), specs: z.array(z.string().trim().max(120)).max(10).default([]), priceUsd: z.number().min(0).max(100000), rentUsd: z.number().min(0).max(10000).nullable().default(null), reorderLevel: z.number().int().min(0).max(100000).default(5), labelsPerUnit: z.number().int().min(0).max(100000).default(0), kit: z.array(z.object({ productId: z.string().max(60), qty: z.number().int().min(1).max(100) })).max(10).default([]), includedWith: z.array(z.enum(['starter', 'pro', 'enterprise'])).default([]), active: z.boolean().default(true), sort: z.number().int().min(0).max(1000).default(50) })
+const zProduct = z.object({ name: z.string().trim().min(2).max(120), sku: z.string().trim().max(40).default(''), category: z.enum(['printer', 'scanner', 'labels', 'kit', 'accessory', 'packing']), audience: z.enum(['shipper', 'customer']).default('shipper'), packingKind: z.enum(['barrel', 'box', 'lock', 'tape', 'other']).nullable().default(null), blurb: z.string().trim().max(300).default(''), specs: z.array(z.string().trim().max(120)).max(10).default([]), priceUsd: z.number().min(0).max(100000), rentUsd: z.number().min(0).max(10000).nullable().default(null), reorderLevel: z.number().int().min(0).max(100000).default(5), labelsPerUnit: z.number().int().min(0).max(100000).default(0), kit: z.array(z.object({ productId: z.string().max(60), qty: z.number().int().min(1).max(100) })).max(10).default([]), includedWith: z.array(z.enum(['starter', 'pro', 'enterprise'])).default([]), active: z.boolean().default(true), sort: z.number().int().min(0).max(1000).default(50) })
 const zPacking = z.object({ name: z.string().trim().min(2).max(80), kind: z.enum(['barrel', 'box', 'lock', 'tape', 'other']).default('other'), note: z.string().trim().max(160).default(''), priceUsd: z.number().min(0.5).max(5000), active: z.boolean().default(true) })
 
 export function mountSupplies(r: Router, d: Deps) {
@@ -242,7 +320,7 @@ export function mountSupplies(r: Router, d: Deps) {
   /* ---- equipment: public catalogue (marketing page) ---- */
   r.get('/supplies/catalog', wrap(async (_req, res) => {
     const db = await getDb(); const products = await allProducts(db)
-    const list = [...products.values()].filter((p) => p.active).sort((a, b) => Number(a.sort) - Number(b.sort)).map((p) => { const o = productOut(p, products); return { id: o.id, name: o.name, category: o.category, blurb: o.blurb, specs: o.specs, priceUsd: o.priceUsd, rentUsd: o.rentUsd, includedWith: o.includedWith } })
+    const list = [...products.values()].filter((p) => p.active && p.audience !== 'customer').sort((a, b) => Number(a.sort) - Number(b.sort)).map((p) => { const o = productOut(p, products); return { id: o.id, name: o.name, category: o.category, blurb: o.blurb, specs: o.specs, priceUsd: o.priceUsd, rentUsd: o.rentUsd, includedWith: o.includedWith } })
     res.set('Cache-Control', 'public, max-age=300'); res.json({ products: list })
   }))
 
@@ -254,7 +332,7 @@ export function mountSupplies(r: Router, d: Deps) {
     const { rows: sh } = await db.query<Row>('select plan, trial_ends_at from shippers where id = $1', [u.shipperId]); const plan = effectivePlan(sh[0] ?? {})
     const { rows: rent } = await db.query<Row>(`${RENTAL_SELECT} where r.shipper_id = $1 and r.status <> 'cancelled' order by r.created_at desc`, [u.shipperId])
     const claimed = new Set(rent.filter((x) => x.mode === 'included' && ['pending', 'active', 'return_requested'].includes(x.status)).map((x) => x.product_id))
-    const list = [...products.values()].filter((p) => p.active).sort((a, b) => Number(a.sort) - Number(b.sort)).map((p) => {
+    const list = [...products.values()].filter((p) => p.active && p.audience !== 'customer').sort((a, b) => Number(a.sort) - Number(b.sort)).map((p) => {
       const o = productOut(p, products)
       return { ...o, includedNow: o.includedWith.includes(plan.billed) && !claimed.has(p.id), includedClaimed: claimed.has(p.id) }
     })
@@ -356,9 +434,10 @@ export function mountSupplies(r: Router, d: Deps) {
     })
   }))
   const saveProduct = async (db: Db, id: string, b: z.infer<typeof zProduct>, create: boolean) => {
-    const vals = [id, b.sku, b.name, b.category, b.blurb, JSON.stringify(b.specs), b.priceUsd, b.rentUsd, b.reorderLevel, b.labelsPerUnit, JSON.stringify(b.kit), JSON.stringify(b.includedWith), b.active, b.sort]
-    if (create) await db.query(`insert into supply_products (id,sku,name,category,blurb,specs,price_usd,rent_usd,reorder_level,labels_per_unit,kit,included_with,active,sort) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, vals)
-    else await db.query(`update supply_products set sku=$2,name=$3,category=$4,blurb=$5,specs=$6,price_usd=$7,rent_usd=$8,reorder_level=$9,labels_per_unit=$10,kit=$11,included_with=$12,active=$13,sort=$14,updated_at=now() where id=$1`, vals)
+    const customer = b.audience === 'customer'
+    const vals = [id, b.sku, b.name, customer ? 'packing' : b.category, b.blurb, JSON.stringify(b.specs), b.priceUsd, customer ? null : b.rentUsd, b.reorderLevel, b.labelsPerUnit, JSON.stringify(customer ? [] : b.kit), JSON.stringify(customer ? [] : b.includedWith), b.active, b.sort, b.audience, customer ? b.packingKind ?? 'other' : null]
+    if (create) await db.query(`insert into supply_products (id,sku,name,category,blurb,specs,price_usd,rent_usd,reorder_level,labels_per_unit,kit,included_with,active,sort,audience,packing_kind) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`, vals)
+    else await db.query(`update supply_products set sku=$2,name=$3,category=$4,blurb=$5,specs=$6,price_usd=$7,rent_usd=$8,reorder_level=$9,labels_per_unit=$10,kit=$11,included_with=$12,active=$13,sort=$14,audience=$15,packing_kind=$16,updated_at=now() where id=$1`, vals)
   }
   r.post('/admin/supplies/products', wrap(async (req, res) => {
     const db = await getDb(); await requireAdmin(db, req); const b = zProduct.parse(req.body); const id = 'eq-' + uid()
@@ -391,7 +470,11 @@ export function mountSupplies(r: Router, d: Deps) {
     else if (b.action === 'shipped') {
       if (!b.tracking) throw new HttpError(400, 'Add the tracking number.')
       await db.query(`update supply_orders set status = 'shipped', shipped_at = now(), carrier = $2, tracking = $3 where id = $1`, [o.id, b.carrier, b.tracking])
-      await notifyShipperStaff(db, o.shipper_id, { kind: 'system', title: `Your equipment order ${o.ref} is on its way`, body: `${b.carrier || 'Carrier'} tracking ${b.tracking}.`, link: '/dashboard/supplies', dedupe: `eq:${o.id}:shipped` }, ['owner', 'finance', 'dispatcher', 'warehouse'])
+      if (o.kind === 'customer') {
+        const { rows: ss } = await db.query<Row>('select id, ref, user_id from shipments where id = $1', [o.shipment_id])
+        if (ss[0]?.user_id) await notify(db, { userId: ss[0].user_id, kind: 'shipment_status', title: `Your packing supplies are on the way — ${ss[0].ref}`, body: `Ntemtem sent them with ${b.carrier || 'the carrier'}, tracking ${b.tracking}. Pack them before your pickup.`, link: `/dashboard?tab=shipments&s=${ss[0].id}`, dedupe: `eq:${o.id}:shipped` })
+        await notifyShipperStaff(db, o.shipper_id, { kind: 'shipment_status', title: `Ntemtem sent the packing supplies for ${ss[0]?.ref ?? 'a shipment'}`, body: `${b.carrier || 'Carrier'} tracking ${b.tracking}. The customer packs before your pickup.`, link: '/dashboard/shipments', dedupe: `eq:${o.id}:shipped:office` }, ['owner', 'dispatcher', 'agent'])
+      } else await notifyShipperStaff(db, o.shipper_id, { kind: 'system', title: `Your equipment order ${o.ref} is on its way`, body: `${b.carrier || 'Carrier'} tracking ${b.tracking}.`, link: '/dashboard/supplies', dedupe: `eq:${o.id}:shipped` }, ['owner', 'finance', 'dispatcher', 'warehouse'])
     } else if (b.action === 'delivered') await db.query(`update supply_orders set status = 'delivered', delivered_at = now() where id = $1`, [o.id])
     res.json({ ok: true })
   }))
@@ -453,12 +536,30 @@ export function mountSupplies(r: Router, d: Deps) {
     const editable = (isOffice || owner) && !pay.length && s.status === 'booked'
     return { u, s, isOffice, owner, editable }
   }
-  const lineOut = (l: Row) => ({ id: l.id, supplyId: l.supply_id, name: l.name, qty: Number(l.qty), unitUsd: Number(l.unit_usd), status: l.status as 'due' | 'paid', addedBy: l.added_by })
+  const lineOut = (l: Row) => ({ id: l.id, supplyId: l.supply_id, productId: l.product_id ?? null, source: (l.source ?? 'shipper') as 'shipper' | 'ntemtem', name: l.name, qty: Number(l.qty), unitUsd: Number(l.unit_usd), status: l.status as 'due' | 'paid', addedBy: l.added_by })
   const view = async (db: Db, s: Row, editable: boolean, isOffice: boolean) => {
     const { rows: cat } = await db.query<Row>('select * from shipper_supplies where shipper_id = $1 and active order by sort, created_at', [s.shipper_id])
     const { rows: lines } = await db.query<Row>(`select * from shipment_supplies where shipment_id = $1 and status <> 'cancelled' order by created_at`, [s.id])
-    return { catalog: cat.map(packingOut), lines: lines.map(lineOut), editable, isOffice }
+    const has = new Set(cat.map((c) => c.kind))
+    const ntem = (await ntemtemPacking(db)).filter((p) => !has.has(p.kind) && p.available > 0)
+    const { rows: ord } = await db.query<Row>(`select ref, status, carrier, tracking from supply_orders where kind = 'customer' and shipment_id = $1 and status <> 'cancelled' order by created_at desc`, [s.id])
+    return { catalog: cat.map(packingOut), ntemtem: ntem, lines: lines.map(lineOut), address: J<Record<string, string> | null>(s.supplies_address, null), orders: ord.map((o) => ({ ref: o.ref, status: o.status, carrier: o.carrier, tracking: o.tracking })), editable, isOffice }
   }
+  const zSupAddress = z.object({ name: z.string().trim().min(2).max(80), line1: z.string().trim().min(3).max(160), line2: z.string().trim().max(160).default(''), city: z.string().trim().min(2).max(80), state: z.string().trim().max(40).default(''), zip: z.string().trim().max(20).default(''), country: z.string().trim().min(2).max(40).default('US'), phone: z.string().trim().max(40).default('') })
+  r.put('/shipments/:id/supplies/address', wrap(async (req, res) => {
+    const db = await getDb(); const { s, editable, isOffice } = await access(db, req)
+    if (!editable) throw new HttpError(409, 'Supplies can only be changed before pickup, while the shipment is unpaid.')
+    const b = zSupAddress.parse(req.body)
+    await db.query('update shipments set supplies_address = $2 where id = $1', [s.id, JSON.stringify(b)])
+    const { rows } = await db.query<Row>('select * from shipments where id = $1', [s.id])
+    res.json(await view(db, rows[0], editable, isOffice))
+  }))
+  /** Public: what can be asked for in the request form — Ntemtem's items, plus a shipper's own list when one was picked. */
+  r.get('/supplies/packing', wrap(async (req, res) => {
+    const db = await getDb(); const shipper = String(req.query.shipper ?? '')
+    const { rows } = shipper ? await db.query<Row>('select * from shipper_supplies where shipper_id = $1 and active order by sort, created_at', [shipper]) : { rows: [] as Row[] }
+    res.set('Cache-Control', 'public, max-age=120'); res.json({ ntemtem: await ntemtemPacking(db), shipper: rows.map(packingOut) })
+  }))
   r.get('/shipments/:id/supplies', wrap(async (req, res) => {
     const db = await getDb(); const { s, editable, isOffice } = await access(db, req)
     res.set('Cache-Control', 'no-store'); res.json(await view(db, s, editable, isOffice))
@@ -466,11 +567,22 @@ export function mountSupplies(r: Router, d: Deps) {
   r.post('/shipments/:id/supplies', wrap(async (req, res) => {
     const db = await getDb(); const { u, s, editable, isOffice, owner } = await access(db, req)
     if (!editable) throw new HttpError(409, 'Supplies can only be added before pickup, while the shipment is unpaid.')
-    const b = z.object({ supplyId: z.string().max(60), qty: z.number().int().min(1).max(50) }).parse(req.body)
+    const b = z.object({ supplyId: z.string().max(60).optional(), productId: z.string().max(60).optional(), qty: z.number().int().min(1).max(50) }).parse(req.body)
+    if (b.productId) {
+      // Ntemtem's own item, sent straight to the customer.
+      const p = (await ntemtemPacking(db)).find((x) => x.id === b.productId); if (!p) throw new HttpError(404, 'That item isn’t available.')
+      if (p.available < b.qty) throw new HttpError(409, `Only ${p.available} left.`)
+      if (!s.supplies_address) throw new HttpError(409, 'Add the address Ntemtem should send the supplies to first.')
+      const { rows: ex } = await db.query<Row>(`select id from shipment_supplies where shipment_id = $1 and product_id = $2 and status = 'due'`, [s.id, p.id])
+      if (ex[0]) await db.query('update shipment_supplies set qty = least(qty + $2, 50) where id = $1', [ex[0].id, b.qty])
+      else await db.query(`insert into shipment_supplies (id,shipment_id,product_id,name,qty,unit_usd,added_by,source,kind) values ($1,$2,$3,$4,$5,$6,$7,'ntemtem',$8)`, ['ssl_' + uid(), s.id, p.id, p.name, b.qty, p.priceUsd, owner ? 'customer' : u.name, p.kind])
+      return res.status(201).json(await view(db, s, editable, isOffice))
+    }
+    if (!b.supplyId) throw new HttpError(400, 'Choose an item.')
     const { rows } = await db.query<Row>('select * from shipper_supplies where id = $1 and shipper_id = $2 and active', [b.supplyId, s.shipper_id]); const it = rows[0]; if (!it) throw new HttpError(404, 'That item isn’t available.')
     const { rows: ex } = await db.query<Row>(`select id, qty from shipment_supplies where shipment_id = $1 and supply_id = $2 and status = 'due'`, [s.id, it.id])
     if (ex[0]) await db.query('update shipment_supplies set qty = least(qty + $2, 50) where id = $1', [ex[0].id, b.qty])
-    else await db.query(`insert into shipment_supplies (id,shipment_id,supply_id,name,qty,unit_usd,added_by) values ($1,$2,$3,$4,$5,$6,$7)`, ['ssl_' + uid(), s.id, it.id, it.name, b.qty, Number(it.price_usd), owner ? 'customer' : u.name])
+    else await db.query(`insert into shipment_supplies (id,shipment_id,supply_id,name,qty,unit_usd,added_by,kind) values ($1,$2,$3,$4,$5,$6,$7,$8)`, ['ssl_' + uid(), s.id, it.id, it.name, b.qty, Number(it.price_usd), owner ? 'customer' : u.name, it.kind])
     if (owner) await notifyShipperStaff(db, s.shipper_id, { kind: 'shipment_status', title: `${s.customer} added ${b.qty} × ${it.name} to ${s.ref}`, body: 'Bring them before the pickup. They’re paid with the shipment.', link: '/dashboard/supplies?tab=packing' }, ['owner', 'dispatcher', 'agent', 'warehouse'])
     else if (isOffice && s.user_id) await notify(db, { userId: s.user_id, kind: 'shipment_status', title: `${b.qty} × ${it.name} added to ${s.ref}`, body: 'Your shipper will bring them before pickup. They’re added to what you pay for this shipment.', link: `/dashboard?tab=shipments&s=${s.id}` })
     res.status(201).json(await view(db, s, editable, isOffice))

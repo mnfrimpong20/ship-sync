@@ -6,6 +6,7 @@ import { fadeUp, stagger } from '../lib/motion'
 import { countries, faqs, shippers, testimonials } from '../lib/data'
 import { Section, SectionHeader, ShipperCard, Avatar, VerifiedMark, Flag } from './ui'
 import { congestionLabel, useCongestion } from '../lib/useCongestion'
+import { useStore } from '../lib/store'
 
 /* ---------- Destinations ---------- */
 export function Destinations() {
@@ -136,7 +137,10 @@ export function ForShippers() {
 
 /* ---------- Featured shippers ---------- */
 export function FeaturedShippers() {
-  const featured = shippers.filter((s) => ['gold-coast-freight', 'atlantic-bridge', 'sahel-air-cargo'].includes(s.id))
+  // Live directory (logos, badges, real ratings); the bundled list is only a fallback while it loads.
+  const { shippers: live } = useStore()
+  const pool = live.length ? live : shippers
+  const featured = [...pool].sort((a, b) => Number(b.plan === 'enterprise') - Number(a.plan === 'enterprise') || Number(b.verified) - Number(a.verified) || b.rating - a.rating || b.reviews - a.reviews).slice(0, 3)
   return (
     <Section id="featured" light>
       <SectionHeader light eyebrow="Shipper directory" title="Companies customers book again" body="Ratings come only from customers who booked through Ntemtem." />
@@ -144,7 +148,7 @@ export function FeaturedShippers() {
         {featured.map((s) => <ShipperCard key={s.id} s={s} light />)}
       </div>
       <motion.div variants={fadeUp} className="mt-10 text-center">
-        <Link to="/shippers" className="btn-light">Browse all {shippers.length * 15}+ shippers <ArrowRight size={18} aria-hidden="true" /></Link>
+        <Link to="/shippers" className="btn-light">{live.length ? `Browse all ${live.length} shippers` : 'Browse all shippers'} <ArrowRight size={18} aria-hidden="true" /></Link>
       </motion.div>
     </Section>
   )

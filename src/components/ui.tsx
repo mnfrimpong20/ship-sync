@@ -155,10 +155,8 @@ export function ShipperCard({ s, light = false }: { s: Shipper; light?: boolean 
       <div className="flex items-start gap-4">
         <Avatar initials={s.initials} hue={s.hue} logo={s.logo} />
         <div className="min-w-0 flex-1">
-          <h3 className={`flex items-center gap-1.5 text-lg ${light ? 'text-ink' : 'text-text'}`}>
-            <span className="truncate">{s.name}</span>
-            {s.verified && <VerifiedMark size={18} role="img" aria-label="Ntemtem Verified" />}
-          </h3>
+          {(s.plan === 'enterprise' || s.verified) && <div className="mb-1.5 flex flex-wrap gap-1.5">{s.plan === 'enterprise' && <FeaturedBadge />}{s.verified && <VerifiedBadge />}</div>}
+          <h3 className={`truncate text-lg ${light ? 'text-ink' : 'text-text'}`}>{s.name}</h3>
           <p className={`line-clamp-2 min-h-10 text-sm ${light ? 'text-ink-muted' : 'text-text-muted'}`}>{s.tagline}</p>
         </div>
       </div>

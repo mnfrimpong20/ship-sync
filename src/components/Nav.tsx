@@ -8,7 +8,7 @@ import { useStore } from '../lib/store'
 /** Top level stays short so it fits a laptop; everything else lives under Services. */
 const primary = [
   { to: '/quote', label: 'Ship' },
-  { to: '/shippers', label: 'Browse shippers' },
+  { to: '/shippers', label: 'Find a shipper' },
   { to: '/track', label: 'Track' },
   { to: '/pricing', label: 'Pricing' },
 ]

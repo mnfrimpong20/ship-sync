@@ -47,6 +47,26 @@ export function VerifiedMark({ size = 16, className = '', ...rest }: SVGProps<SV
   )
 }
 
+/** The Featured mark — a solid navy disc with a gold star, the partner of VerifiedMark. Featured means paid priority
+ *  placement (Enterprise plan), never a quality claim — that is what Verified is for. */
+export function FeaturedMark({ size = 16, className = '', ...rest }: SVGProps<SVGSVGElement> & { size?: number | string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 26 26" className={`shrink-0 ${className}`} {...rest}>
+      <circle cx="13" cy="13" r="13" fill="#14213D" />
+      <path d="M13 5.6l2.2 4.6 5 .6-3.7 3.4 1 5-4.5-2.5-4.5 2.5 1-5-3.7-3.4 5-.6z" fill="#F2A900" stroke="#F2A900" strokeWidth="0.8" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/** "Featured" pill — gold, navy text, the Featured mark. Only for shippers with paid featured placement. */
+export function FeaturedBadge({ large = false }: { large?: boolean }) {
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gold font-bold text-on-accent ${large ? 'py-1 pl-1 pr-3 text-xs' : 'py-0.5 pl-0.5 pr-2.5 text-[11px]'}`} title="Featured placement — a paid listing on the Enterprise plan" data-testid="featured-badge">
+      <FeaturedMark size={large ? 20 : 16} aria-hidden="true" /> Featured
+    </span>
+  )
+}
+
 /** "Ntemtem Verified" — the brand-book badge: gold-tint pill, green mark, navy text. Only for shippers who passed vetting. */
 export function VerifiedBadge({ large = false }: { large?: boolean }) {
   return (

@@ -2,11 +2,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Check, ChevronDown, Crown, Globe2, Landmark, Minus, PackageCheck, Ship, ShieldCheck, Sparkles, Users, Wallet } from 'lucide-react'
+import { Check, ChevronDown, Globe2, Landmark, Minus, PackageCheck, Ship, ShieldCheck, Sparkles, Users, Wallet } from 'lucide-react'
 import { api } from '../lib/store'
 import { brokersApi, type Broker } from '../lib/brokers'
 import { cargoTypes, type CargoType } from '../lib/data'
-import { money, VerifiedMark } from '../components/ui'
+import { FeaturedMark, money, VerifiedMark } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 
 interface PricingData {
@@ -77,7 +77,7 @@ export default function PricingPage() {
               {d.plans.map((p) => { const hi = p.key === 'pro'; return (
                 <motion.div key={p.key} variants={fadeUp} whileHover={{ y: -4 }} className={`relative flex flex-col rounded-2xl border bg-surface p-7 ${hi ? 'border-gold shadow-[0_0_0_1px_rgba(227,181,74,.2),0_24px_60px_-30px_rgba(227,181,74,.45)]' : 'border-border'}`} data-testid={`plan-${p.key}`}>
                   {hi && <span className="absolute -top-3 left-7 rounded-full bg-gold px-3 py-1 text-xs font-bold text-on-accent">Most popular</span>}
-                  <h2 className="flex items-center gap-2 !text-xl">{p.key === 'enterprise' && <Crown size={18} className="text-gold-deep" aria-hidden="true" />}{p.label}</h2>
+                  <h2 className="flex items-center gap-2 !text-xl">{p.key === 'enterprise' && <FeaturedMark size={20} aria-hidden="true" />}{p.label}</h2>
                   <p className="mt-1 min-h-10 text-sm text-text-muted">{p.blurb}</p>
                   <p className="mt-4 flex items-baseline gap-1"><span className={`font-heading text-5xl font-bold ${hi ? 'text-gold-deep' : ''}`}>{money(p.priceUsd)}</span><span className="text-text-muted">/month</span></p>
                   <p className="mt-1 text-xs text-text-muted">{p.team == null ? 'Unlimited team members' : `Up to ${p.team} team members`}</p>

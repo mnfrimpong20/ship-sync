@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Compass, Crown, Filter, Plane, Search, Ship, ShieldCheck, Sparkles, Star, TrendingUp, X, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Compass, Filter, Plane, Search, Ship, ShieldCheck, Sparkles, Star, TrendingUp, X, Zap } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { cargoLabel, cargoTypes, countries, countryByCode, origins, type CargoType, type Shipper } from '../lib/data'
 import { directoryApi, isFeatured, priorityOptions, sortLabels, urgencyOptions, type DirectorySort, type Match, type Needs, type Recommendation, type SearchResult } from '../lib/directory'
-import { Avatar, Empty, ModeBadge, Rating, VerifiedBadge } from '../components/ui'
+import { Avatar, Empty, FeaturedBadge, FeaturedMark, ModeBadge, Rating, VerifiedBadge } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 
 const PAGE = 9
@@ -13,7 +13,7 @@ const priceLabel = (i: number) => (i === 1 ? '$' : i === 2 ? '$$' : '$$$')
 
 /* ---------- card ---------- */
 function PlanBadge({ s }: { s: Shipper }) {
-  if (s.plan === 'enterprise') return <span className="inline-flex items-center gap-1 rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent"><Crown size={11} aria-hidden="true" /> Featured</span>
+  if (s.plan === 'enterprise') return <FeaturedBadge />
   if (s.plan === 'pro') return <span className="inline-flex items-center gap-1 rounded-full border border-gold/50 px-2 py-0.5 text-[11px] font-semibold text-gold-deep">Pro</span>
   return null
 }
@@ -267,7 +267,7 @@ export default function Directory() {
         <section className="border-b border-border bg-surface/40" aria-label="Featured shippers">
           <div className="container-fluid py-8">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gold-deep"><Crown size={14} aria-hidden="true" /> Featured shippers{dest ? ` · ${countryByCode(dest)?.name}` : ''}</p><p className="mt-1 text-sm text-text-muted">Enterprise partners with priority placement. Sponsored.</p></div>
+              <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gold-deep"><FeaturedMark size={16} aria-hidden="true" /> Featured shippers{dest ? ` · ${countryByCode(dest)?.name}` : ''}</p><p className="mt-1 text-sm text-text-muted">Enterprise partners with priority placement. Sponsored.</p></div>
               <Link to="/pricing" className="text-sm text-text-muted underline-offset-4 hover:text-gold-deep hover:underline focus-ring">Get your company featured →</Link>
             </div>
             <FeaturedCarousel items={featured} />

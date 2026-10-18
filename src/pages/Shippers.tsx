@@ -6,7 +6,7 @@ import { cargoLabel, countryByCode } from '../lib/data'
 import { useStore } from '../lib/store'
 import { fadeUp, stagger } from '../lib/motion'
 import { ShipperReviews } from '../components/ReviewCards'
-import { Avatar, Empty, ModeBadge, Rating, VerifiedBadge } from '../components/ui'
+import { Avatar, Empty, ModeBadge, Rating, VerifiedBadge, Flag } from '../components/ui'
 import { ShippingBackdrop } from '../components/ShippingBackdrop'
 import { hubApi } from '../lib/customerHub'
 
@@ -64,7 +64,7 @@ export function ShipperProfile() {
                 <p className="mt-1 text-xs text-text-muted">Pickup areas → destinations</p>
                 <div className="mt-4 space-y-3 text-sm">
                   <div><p className="font-semibold text-text-muted">From</p><ul className="mt-1 flex flex-wrap gap-1.5">{s.origins.map((o) => <li key={o} className="rounded-full bg-surface-2 px-2.5 py-1 text-text">{o}</li>)}</ul></div>
-                  <div><p className="font-semibold text-text-muted">To</p><ul className="mt-1 flex flex-wrap gap-1.5">{s.destinations.map((d) => { const c = countryByCode(d)!; return <li key={d} className="rounded-full bg-surface-2 px-2.5 py-1 text-text">{c.flag} {c.name} · {c.ports[0]}</li> })}</ul></div>
+                  <div><p className="font-semibold text-text-muted">To</p><ul className="mt-1 flex flex-wrap gap-1.5">{s.destinations.map((d) => { const c = countryByCode(d)!; return <li key={d} className="rounded-full bg-surface-2 px-2.5 py-1 text-text"><Flag code={c.code} /> {c.name} · {c.ports[0]}</li> })}</ul></div>
                 </div>
               </div>
               <div className="card-dark p-6">

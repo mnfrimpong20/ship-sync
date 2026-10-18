@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, Eye, EyeOff, Pencil, Plus } from 'lucide-react'
 import { api } from '../lib/store'
-import { Pill } from './ui'
+import { Pill, Flag } from './ui'
 
 export interface Destination { code: string; name: string; flag: string; ports: string[]; airports: string[]; oceanDays: string; airDays: string; note: string; dialCode: string; active: boolean; sort: number }
 const destApi = {
@@ -64,7 +64,7 @@ export function AdminDestinations() {
         {list?.map((d) => (
           <li key={d.code} className={`flex flex-wrap items-start justify-between gap-3 px-4 py-3 ${d.active ? '' : 'opacity-60'}`} data-testid="destination-row">
             <div className="min-w-0">
-              <p className="flex flex-wrap items-center gap-2 font-semibold">{d.flag} {d.name} <span className="font-mono text-xs text-text-muted">{d.code}</span>{!d.active && <Pill tone="muted">hidden</Pill>}</p>
+              <p className="flex flex-wrap items-center gap-2 font-semibold"><Flag code={d.code} /> {d.name} <span className="font-mono text-xs text-text-muted">{d.code}</span>{!d.active && <Pill tone="muted">hidden</Pill>}</p>
               <p className="text-xs text-text-muted">Ports: {d.ports.join(', ') || '—'} · Airports: {d.airports.join(', ') || '—'} · Ocean {d.oceanDays || '—'} d · Air {d.airDays || '—'} d{d.dialCode ? ` · +${d.dialCode}` : ''}</p>
             </div>
             <div className="flex shrink-0 gap-1.5">

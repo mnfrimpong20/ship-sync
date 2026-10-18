@@ -97,7 +97,7 @@ export default function Sailings() {
             <StatCard label="Next cut-off" value={list[0]?.cutoff ? day(list[0].cutoff) : '—'} hint={list[0] ? `${list[0].line} · ${list[0].vesselName}` : ''} icon={Calendar} />
           </motion.div>
           <motion.div variants={fadeUp} className="mt-6 flex flex-wrap items-center gap-2">
-            <select aria-label="Destination" className="input-dark !min-h-10 !w-auto text-sm" value={dest} onChange={(e) => setDest(e.target.value)}><option value="">Any destination</option>{countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select>
+            <select aria-label="Destination" className="input-dark !min-h-10 !w-auto text-sm" value={dest} onChange={(e) => setDest(e.target.value)}><option value="">Any destination</option>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select>
             <select aria-label="Kind" className="input-dark !min-h-10 !w-auto text-sm" value={kind} onChange={(e) => setKind(e.target.value)}><option value="">Containers & RoRo</option><option value="container">Container services</option><option value="roro">RoRo (vehicles)</option></select>
             {data && <span className="text-xs text-text-muted">Schedule: {data.provider === 'builtin' ? 'built-in (indicative)' : data.provider}</span>}
           </motion.div>
@@ -140,7 +140,7 @@ export function PublicSailings() {
           <motion.p variants={fadeUp} className="mt-2 text-text-muted">Container services and RoRo car carriers from the US and UK. Shippers on Ntemtem book space on these directly, so your goods are on the next departure.</motion.p>
         </motion.div>
         <motion.div initial="hidden" animate="show" variants={stagger} className="mx-auto mt-8 max-w-5xl">
-          <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2"><select aria-label="Destination" className="input-dark !min-h-10 !w-auto text-sm" value={dest} onChange={(e) => setDest(e.target.value)}>{countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select><Link to="/quote" className="btn-gold !min-h-10 !px-4 text-sm">Get a quote</Link></motion.div>
+          <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2"><select aria-label="Destination" className="input-dark !min-h-10 !w-auto text-sm" value={dest} onChange={(e) => setDest(e.target.value)}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select><Link to="/quote" className="btn-gold !min-h-10 !px-4 text-sm">Get a quote</Link></motion.div>
           <motion.div variants={fadeUp} className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data === null && <p className="text-sm text-text-muted">Loading…</p>}{data && data.length === 0 && <div className="md:col-span-3"><Empty title="No sailings listed" body="Check back soon." /></div>}{data?.slice(0, 12).map((s) => <SailingCard key={s.id} s={s} compact />)}</motion.div>
         </motion.div>
       </div>

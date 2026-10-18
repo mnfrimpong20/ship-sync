@@ -4,7 +4,7 @@ import { motion } from 'motion/react'
 import { AlertTriangle, Bell, Check, Globe2, Info, MapPin, MessageCircle, Package, Pencil, Phone, Plane, Plus, Receipt, Ship, Star, Trash2, UserRound } from 'lucide-react'
 import { customerApi, type AttentionItem, type Consignee, type ConsigneeInput, type NextArrival } from '../lib/customer'
 import { countries, countryByCode, flowFor, statusLabels, type ShipmentStatus } from '../lib/data'
-import { Pill, fmtDate, fmtDateTime } from './ui'
+import { Pill, fmtDate, fmtDateTime, Flag } from './ui'
 
 const sevCls = { critical: 'border-l-danger', warning: 'border-l-gold', info: 'border-l-sky' } as const
 const sevIcon = { critical: AlertTriangle, warning: Bell, info: Info } as const
@@ -44,7 +44,7 @@ export function NextArrivalCard({ s }: { s: NextArrival }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className={`eyebrow mb-1 ${s.daysToEta < 0 ? '!text-danger' : ''}`} data-testid="eta-label">{s.daysToEta < 0 ? `Past its expected date by ${-s.daysToEta} day${s.daysToEta === -1 ? '' : 's'} · ${statusLabels[s.status as ShipmentStatus].toLowerCase()}` : s.daysToEta === 0 ? 'Arriving today' : s.daysToEta === 1 ? 'Arriving tomorrow' : `Arriving in ${s.daysToEta} days`}</p>
-          <h2 id="next-h" className="!text-xl">{s.origin} → {dest?.flag} {s.destinationName}</h2>
+          <h2 id="next-h" className="!text-xl">{s.origin} → <Flag code={dest?.code} /> {s.destinationName}</h2>
           <p className="mt-1 text-sm text-text-muted">{s.ref} · {s.description} · {s.shipper}</p>
         </div>
         <Pill tone={s.status === 'out_for_delivery' ? 'green' : s.status === 'customs' ? 'gold' : 'teal'}>{statusLabels[s.status as ShipmentStatus]}</Pill>
@@ -79,7 +79,7 @@ export function ConsigneeForm({ initial = empty, onSave, onCancel, busy }: { ini
       <label className="grid gap-1 text-xs"><span className="text-text-muted">Phone / WhatsApp</span><input className="input-dark !min-h-10" type="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} placeholder="+233 24 …" data-testid="cs-phone" /></label>
       <label className="grid gap-1 text-xs sm:col-span-2"><span className="text-text-muted">Address / landmark</span><input className="input-dark !min-h-10" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} placeholder="House 12, near the Methodist church" /></label>
       <label className="grid gap-1 text-xs"><span className="text-text-muted">City / town</span><input className="input-dark !min-h-10" value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} data-testid="cs-city" /></label>
-      <label className="grid gap-1 text-xs"><span className="text-text-muted">Country</span><select className="input-dark !min-h-10" value={f.country} onChange={(e) => setF({ ...f, country: e.target.value })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select></label>
+      <label className="grid gap-1 text-xs"><span className="text-text-muted">Country</span><select className="input-dark !min-h-10" value={f.country} onChange={(e) => setF({ ...f, country: e.target.value })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
       <label className="grid gap-1 text-xs"><span className="text-text-muted">Relationship (optional)</span><input className="input-dark !min-h-10" value={f.relationship} onChange={(e) => setF({ ...f, relationship: e.target.value })} placeholder="Brother, business partner…" /></label>
       {err && <p role="alert" className="text-xs text-danger sm:col-span-2">{err}</p>}
       <div className="flex gap-2 sm:col-span-2">{onCancel && <button type="button" onClick={onCancel} className="btn-ghost !min-h-10 text-sm">Cancel</button>}<button className="btn-gold !min-h-10 text-sm" disabled={busy} data-testid="cs-save"><Check size={16} aria-hidden="true" /> Save recipient</button></div>

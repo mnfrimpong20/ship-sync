@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, Bell, BadgeDollarSign, Boxes, CheckCircle2, Clock, Globe2, Info, Landmark, Lock, RefreshCw, Ship, TrendingUp, Users } from 'lucide-react'
 import { api } from '../lib/store'
 import { countryByCode } from '../lib/data'
-import { Pill, fmtDateTime } from './ui'
+import { Pill, fmtDateTime, Flag } from './ui'
 import { Spark } from './ShipperOverview'
 
 /* ---------- types ---------- */
@@ -100,7 +100,7 @@ export function AdminBusiness() {
           <h3 className="font-semibold">Where demand is <span className="text-xs font-normal text-text-muted">· requests, 90 days</span></h3>
           <ul className="mt-4 space-y-2.5" aria-label="Destinations">
             {b.demand.destinations.map((d) => (
-              <li key={d.destination}><div className="flex items-baseline justify-between text-sm"><span>{countryByCode(d.destination)?.flag} {countryByCode(d.destination)?.name ?? d.destination}</span><span className="tabular-nums text-xs text-text-muted"><b className="text-sm text-text">{d.requests}</b> · {d.shippersQuoting} shipper{d.shippersQuoting === 1 ? '' : 's'} quoting</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-teal" style={{ width: `${(d.requests / maxDest) * 100}%` }} /></div></li>
+              <li key={d.destination}><div className="flex items-baseline justify-between text-sm"><span><Flag code={d.destination} /> {countryByCode(d.destination)?.name ?? d.destination}</span><span className="tabular-nums text-xs text-text-muted"><b className="text-sm text-text">{d.requests}</b> · {d.shippersQuoting} shipper{d.shippersQuoting === 1 ? '' : 's'} quoting</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-teal" style={{ width: `${(d.requests / maxDest) * 100}%` }} /></div></li>
             ))}
             {b.demand.destinations.length === 0 && <li className="text-sm text-text-muted">No requests in the last 90 days.</li>}
           </ul>

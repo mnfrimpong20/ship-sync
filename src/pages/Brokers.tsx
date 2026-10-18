@@ -5,7 +5,7 @@ import { Anchor, ArrowLeft, BadgeCheck, Calculator, Check, ClipboardCheck, Clock
 import { brokersApi, jobStepLabels, JOB_STEPS, type Broker, type BrokerInput, type JobStep, type StepInput } from '../lib/brokers'
 import { countries, countryByCode, cargoLabel, cargoTypes, type CargoType } from '../lib/data'
 import { useStore } from '../lib/store'
-import { Avatar, Empty, Logo, Pill, Rating, fmtDateTime, money } from '../components/ui'
+import { Avatar, Empty, Logo, Pill, Rating, fmtDateTime, money, Flag } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { StatCard } from '../components/board'
 
@@ -39,7 +39,7 @@ export function BrokerDirectoryCard({ b, cargo }: { b: Broker; cargo?: CargoType
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Rating value={b.rating} count={b.reviews} />
-        <span className="ml-auto text-xs text-text-muted">{countryByCode(b.country)?.flag} {b.countryName}</span>
+        <span className="ml-auto text-xs text-text-muted"><Flag code={b.country} /> {b.countryName}</span>
       </div>
       <p className="mt-3 flex items-center gap-1.5 text-sm text-text-muted"><Anchor size={13} aria-hidden="true" /> {b.ports.join(' · ')}</p>
       <p className="mt-2 line-clamp-2 text-sm text-text-muted">{b.about}</p>
@@ -90,7 +90,7 @@ export default function BrokersPage() {
       <fieldset><legend className="label-dark">Country</legend>
         <div className="grid gap-1">
           <button onClick={() => set({ destination: undefined, port: undefined })} aria-pressed={!dest} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${!dest ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>All countries</span><span className="text-xs opacity-70">{all?.length ?? ''}</span></button>
-          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code, port: undefined })} aria-pressed={dest === c.code} disabled={!count(c.code)} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring disabled:opacity-40 ${dest === c.code ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} data-testid={`bf-country-${c.code}`}><span>{c.flag} {c.name}</span><span className="text-xs opacity-70">{count(c.code) || ''}</span></button>)}
+          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code, port: undefined })} aria-pressed={dest === c.code} disabled={!count(c.code)} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring disabled:opacity-40 ${dest === c.code ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} data-testid={`bf-country-${c.code}`}><span><Flag code={c.code} /> {c.name}</span><span className="text-xs opacity-70">{count(c.code) || ''}</span></button>)}
         </div>
       </fieldset>
       <div><label htmlFor="bf-port" className="label-dark">Port</label><select id="bf-port" className="input-dark !min-h-10 text-sm" value={port} onChange={(e) => set({ port: e.target.value || undefined })} data-testid="bf-port"><option value="">Any port</option>{ports.map((p) => <option key={p}>{p}</option>)}</select></div>
@@ -208,7 +208,7 @@ export function BrokerProfile() {
                   <p className="mt-1 text-text-muted">{b.company || 'Independent clearing agent'}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-2"><Rating value={b.rating} count={b.reviews} />{b.dutyAdvance && <Pill tone="gold">Can pay the duty for you</Pill>}</div>
                   <ul className="mt-4 grid gap-2 text-sm text-text-muted sm:grid-cols-2">
-                    <li className="flex items-center gap-2"><Anchor size={15} aria-hidden="true" /> {b.ports.join(', ')}, {c?.flag} {b.countryName}</li>
+                    <li className="flex items-center gap-2"><Anchor size={15} aria-hidden="true" /> {b.ports.join(', ')}, <Flag code={c?.code} /> {b.countryName}</li>
                     <li className="flex items-center gap-2"><ShieldCheck size={15} aria-hidden="true" /> {b.licenceAuthority}{b.licenceNo ? ` · ${b.licenceNo}` : ''}</li>
                     <li className="flex items-center gap-2"><Clock size={15} aria-hidden="true" /> Replies in ~{b.responseHours}h</li>
                     <li className="flex items-center gap-2"><FileText size={15} aria-hidden="true" /> {stats.jobs} job{stats.jobs === 1 ? '' : 's'} on Ntemtem{stats.avgClearDays != null ? ` · clears in ~${stats.avgClearDays} days` : ''}</li>
@@ -330,7 +330,7 @@ export function AdminBrokers() {
         <form onSubmit={(e) => { e.preventDefault(); void act(async () => { if (form.id) await brokersApi.update(form.id, form); else await brokersApi.create(form); setForm(null) }, form.id ? 'Broker updated.' : 'Broker listed.', 'save') }} className="card-dark mt-4 grid gap-3 p-5 sm:grid-cols-2" aria-label="Broker form" data-testid="broker-form">
           <label className="text-xs text-text-muted">Name<input required className="input-dark mt-1 !min-h-9 text-sm" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
           <label className="text-xs text-text-muted">Company<input className="input-dark mt-1 !min-h-9 text-sm" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} /></label>
-          <label className="text-xs text-text-muted">Country<select className="input-dark mt-1 !min-h-9 text-sm" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value, licenceAuthority: e.target.value === 'NG' ? 'Nigeria Customs Service' : e.target.value === 'GH' ? 'GRA Customs Division' : form.licenceAuthority })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select></label>
+          <label className="text-xs text-text-muted">Country<select className="input-dark mt-1 !min-h-9 text-sm" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value, licenceAuthority: e.target.value === 'NG' ? 'Nigeria Customs Service' : e.target.value === 'GH' ? 'GRA Customs Division' : form.licenceAuthority })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
           <label className="text-xs text-text-muted">Ports (comma-separated)<input required className="input-dark mt-1 !min-h-9 text-sm" value={form.ports.join(', ')} onChange={(e) => setForm({ ...form, ports: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} /></label>
           <label className="text-xs text-text-muted">Licence no.<input className="input-dark mt-1 !min-h-9 text-sm" value={form.licenceNo} onChange={(e) => setForm({ ...form, licenceNo: e.target.value })} /></label>
           <label className="text-xs text-text-muted">Licensing authority<input className="input-dark mt-1 !min-h-9 text-sm" value={form.licenceAuthority} onChange={(e) => setForm({ ...form, licenceAuthority: e.target.value })} /></label>

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Check, Loader2, Plane, Radio, Search, Ship } from 'lucide-react'
 import { cargoLabel, countryByCode, flowFor, flowIndex, statusLabels, type Shipment } from '../lib/data'
 import { useStore } from '../lib/store'
-import { Avatar, ModeBadge, Pill, fmtDate, fmtDateTime } from '../components/ui'
+import { Avatar, ModeBadge, Pill, fmtDate, fmtDateTime, Flag } from '../components/ui'
 import type { PositionPayload } from '../components/LiveMap'
 import { FlightCard, VesselCard } from '../components/CarrierCards'
 
@@ -152,7 +152,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="font-mono text-sm text-gold-deep">{s.ref}</p>
-              <h2 className="mt-1 !text-2xl">{s.origin} → {dest.flag} {dest.name}</h2>
+              <h2 className="mt-1 !text-2xl">{s.origin} → <Flag code={dest.code} /> {dest.name}</h2>
               <p className="mt-1 text-sm text-text-muted">{s.description} · {cargoLabel(s.cargo)}</p>
             </div>
             <div className="flex flex-col items-end gap-2">
@@ -204,7 +204,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
           </div>
           <div className="card-dark mt-4 p-6 text-sm">
             <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Destination</p>
-            <p className="mt-2 text-text">{dest.flag} {dest.name} — {s.mode === 'air' ? dest.airports[0] : dest.ports[0]}</p>
+            <p className="mt-2 text-text"><Flag code={dest.code} /> {dest.name} — {s.mode === 'air' ? dest.airports[0] : dest.ports[0]}</p>
             <p className="mt-2 text-text-muted">{dest.note}</p>
           </div>
         </aside>

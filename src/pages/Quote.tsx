@@ -136,7 +136,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                     <h2 className="!text-xl">Where is it going?</h2>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div><label htmlFor="origin" className="label-dark">Shipping from</label><OriginCombobox id="origin" value={form.origin} onChange={(v) => set('origin', v)} /></div>
-                      <div><label htmlFor="dest" className="label-dark">Shipping to</label><select id="dest" className="input-dark" value={form.destination} onChange={(e) => set('destination', e.target.value)}>{countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select></div>
+                      <div><label htmlFor="dest" className="label-dark">Shipping to</label><select id="dest" className="input-dark" value={form.destination} onChange={(e) => set('destination', e.target.value)}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></div>
                     </div>
                     <fieldset>
                       <legend className="label-dark">Mode</legend>

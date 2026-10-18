@@ -5,6 +5,15 @@ import type { ReactNode, SVGProps } from 'react'
 import { fadeUp, stagger, viewport } from '../lib/motion'
 import { countryByCode, type Mode, type Shipper } from '../lib/data'
 
+/** Real flag images (flag-icons, MIT). Flag emoji show as letters ("GH") on Windows, so never use them on screen. */
+const FLAG_URLS = import.meta.glob('../../node_modules/flag-icons/flags/4x3/*.svg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
+export function Flag({ code, size = 14, className = '' }: { code?: string | null; size?: number; className?: string }) {
+  const c = (code === 'UK' ? 'gb' : code ?? '').toLowerCase()
+  const url = FLAG_URLS[`../../node_modules/flag-icons/flags/4x3/${c}.svg`]
+  if (!url) return null
+  return <img src={url} alt="" aria-hidden="true" width={Math.round((size * 4) / 3)} height={size} className={`inline-block shrink-0 rounded-[2px] object-cover align-[-0.15em] ring-1 ring-black/10 ${className}`} />
+}
+
 /** Tagline under the wordmark. One place to change it. */
 export const TAGLINE = 'Air · Ocean · Door to door'
 

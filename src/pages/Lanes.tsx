@@ -63,7 +63,7 @@ export default function LanesPage() {
           <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2">
             <select aria-label="Origin" className="input-dark !min-h-10 !w-auto text-sm" value={f.origin} onChange={(e) => setF({ ...f, origin: e.target.value })}>{origins.map((o) => <option key={o} value={o}>{o}</option>)}</select>
             <span className="text-text-muted">→</span>
-            <select aria-label="Destination" className="input-dark !min-h-10 !w-auto text-sm" value={f.destination} onChange={(e) => setF({ ...f, destination: e.target.value })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select>
+            <select aria-label="Destination" className="input-dark !min-h-10 !w-auto text-sm" value={f.destination} onChange={(e) => setF({ ...f, destination: e.target.value })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select>
             <select aria-label="Cargo" className="input-dark !min-h-10 !w-auto text-sm" value={f.cargo} onChange={(e) => setF({ ...f, cargo: e.target.value })}>{cargoTypes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
           </motion.div>
           <motion.div variants={fadeUp} className="mt-6">{b ? <BenchmarkPanel b={b} title={`${f.origin.split(',')[0]} → ${countries.find((c) => c.code === f.destination)?.name} · ${cargo}`} /> : <div className="card-dark p-5 text-sm text-text-muted">Loading…</div>}</motion.div>

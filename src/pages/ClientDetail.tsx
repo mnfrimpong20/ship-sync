@@ -7,7 +7,7 @@ import { useStore } from '../lib/store'
 import { activityLabel, clientsApi, paymentMethods, type Activity, type ActivityType, type ClientDetail as Detail, type Consignee, type ConsigneeInput, type Invoice, type InvoiceItem } from '../lib/clients'
 import { ClientAvatar, ClientForm, waLink } from './Clients'
 import { collectionsApi } from '../lib/collections'
-import { ModeBadge, Pill, fmtDate, fmtDateTime, money } from '../components/ui'
+import { ModeBadge, Pill, fmtDate, fmtDateTime, money, Flag } from '../components/ui'
 import { BookingForm } from '../components/BookingForm'
 import { AutoTag, ShipmentManage } from '../components/ShipmentTools'
 
@@ -132,7 +132,7 @@ function Overview({ d, busy, run, reload }: Common) {
                 <div><label className="label-dark" htmlFor="cs-phone">Phone</label><input id="cs-phone" className="input-dark !min-h-10" placeholder="+233 …" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
                 <div className="sm:col-span-2"><label className="label-dark" htmlFor="cs-addr">Address</label><input id="cs-addr" className="input-dark !min-h-10" placeholder="Street, landmark, area" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
                 <div><label className="label-dark" htmlFor="cs-city">City</label><input id="cs-city" className="input-dark !min-h-10" placeholder="Accra" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
-                <div><label className="label-dark" htmlFor="cs-country">Country</label><select id="cs-country" className="input-dark !min-h-10" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })}>{countries.map((k) => <option key={k.code} value={k.code}>{k.flag} {k.name}</option>)}</select></div>
+                <div><label className="label-dark" htmlFor="cs-country">Country</label><select id="cs-country" className="input-dark !min-h-10" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })}>{countries.map((k) => <option key={k.code} value={k.code}>{k.name}</option>)}</select></div>
                 <div><label className="label-dark" htmlFor="cs-rel">Relationship</label><input id="cs-rel" className="input-dark !min-h-10" placeholder="Brother, business partner…" value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })} /></div>
                 <label className="flex items-center gap-2 self-end text-sm text-text-muted"><input type="checkbox" className="accent-gold" checked={form.isDefault} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} /> Default consignee</label>
                 <div className="sm:col-span-2 flex justify-end gap-2"><button type="button" onClick={() => { setForm(null); setEditId(null) }} className="btn-ghost !min-h-9 !px-3 text-xs">Cancel</button><button disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60">{editId ? 'Save' : 'Add consignee'}</button></div>
@@ -145,7 +145,7 @@ function Overview({ d, busy, run, reload }: Common) {
               <li key={k.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
                 <div className="text-sm">
                   <p className="flex items-center gap-2 font-semibold text-text">{k.name}{k.isDefault && <Star size={13} className="fill-gold text-gold-deep" aria-label="Default" />}{k.relationship && <span className="font-normal text-text-muted">· {k.relationship}</span>}</p>
-                  <p className="text-text-muted">{[k.address, k.city].filter(Boolean).join(', ')} {countryByCode(k.country)?.flag}</p>
+                  <p className="text-text-muted">{[k.address, k.city].filter(Boolean).join(', ')} <Flag code={k.country} /></p>
                   {k.phone && <p className="text-text-muted"><Phone size={11} className="mr-1 inline" aria-hidden="true" />{k.phone}</p>}
                 </div>
                 <div className="flex gap-1">
@@ -190,7 +190,7 @@ function Shipments({ d, busy, run, reload, advance }: Common & { advance: (id: s
               <div className="flex flex-wrap items-center gap-4">
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2"><Link to={`/track?ref=${s.ref}`} className="font-mono text-xs text-gold-deep hover:underline focus-ring rounded">{s.ref}</Link><ModeBadge mode={s.mode} />{s.cancelledAt ? <Pill tone="muted">Cancelled</Pill> : <Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill>}{!s.consigneeId && !s.cancelledAt && <Pill tone="danger">No recipient</Pill>}{s.handover === 'collection' && !s.cancelledAt && s.status !== 'delivered' && <Pill tone="muted">Collects</Pill>}{s.stuck && <Pill tone="danger">Stuck {s.stuck.days}d</Pill>}{inv && <Pill tone={inv.status === 'paid' ? 'green' : 'gold'}>{inv.number} · {money(inv.total)}</Pill>}</p>
-                  <p className="mt-1 text-sm font-semibold text-text">{s.origin} → {dest?.flag} {dest?.name}</p>
+                  <p className="mt-1 text-sm font-semibold text-text">{s.origin} → <Flag code={dest?.code} /> {dest?.name}</p>
                   <p className="text-xs text-text-muted">{s.description} · {cargoLabel(s.cargo)}{cons ? ` · to ${cons.name}${cons.city ? `, ${cons.city}` : ''}` : ''} · ETA {fmtDate(s.eta)}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">

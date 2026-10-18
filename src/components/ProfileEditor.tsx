@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import { Check, ImagePlus, Plus, Trash2, X } from 'lucide-react'
 import { cargoTypes, countries, origins as originCities, type Shipper } from '../lib/data'
 import { useStore, type ShipperProfileInput } from '../lib/store'
+import { Flag } from './ui'
 
 /** Shipper's own listing — the fields customers see on the directory and profile pages. */
 export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; onDone: (msg: string) => void }) {
@@ -85,7 +86,7 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
         <div className="mt-2 flex flex-wrap gap-2">{(['ocean', 'air'] as const).map((m) => <button type="button" key={m} aria-pressed={f.modes.includes(m)} onClick={() => setF({ ...f, modes: toggle(f.modes, m) })} className={chip(f.modes.includes(m))}>{m === 'ocean' ? 'Ocean freight' : 'Air freight'}</button>)}</div>
       </fieldset>
       <fieldset className="mt-5"><legend className="label-dark">Destinations you serve</legend>
-        <div className="mt-2 flex flex-wrap gap-2">{countries.map((c) => <button type="button" key={c.code} aria-pressed={f.destinations.includes(c.code)} onClick={() => setF({ ...f, destinations: toggle(f.destinations, c.code) })} className={chip(f.destinations.includes(c.code))}>{c.flag} {c.name}</button>)}</div>
+        <div className="mt-2 flex flex-wrap gap-2">{countries.map((c) => <button type="button" key={c.code} aria-pressed={f.destinations.includes(c.code)} onClick={() => setF({ ...f, destinations: toggle(f.destinations, c.code) })} className={chip(f.destinations.includes(c.code))}><Flag code={c.code} /> {c.name}</button>)}</div>
       </fieldset>
       <fieldset className="mt-5"><legend className="label-dark">Cargo you handle</legend>
         <div className="mt-2 flex flex-wrap gap-2">{cargoTypes.map((c) => <button type="button" key={c.id} aria-pressed={f.cargo.includes(c.id)} onClick={() => setF({ ...f, cargo: toggle(f.cargo, c.id) })} className={chip(f.cargo.includes(c.id))}>{c.label}</button>)}</div>

@@ -10,7 +10,7 @@ import { MAP_STYLE, brandBasemap, type LivePos } from '../components/LiveMap'
 import { countries } from '../lib/data'
 import { greatCircle, originCoords, destGeo, type LngLat } from '../lib/geo'
 import { fadeUp, stagger } from '../lib/motion'
-import { Pill } from '../components/ui'
+import { Pill, Flag } from '../components/ui'
 import { useStore } from '../lib/store'
 import { countryByCode } from '../lib/data'
 import { FlightCard, VesselCard, type FlightDetail, type VesselDetail } from '../components/CarrierCards'
@@ -225,7 +225,7 @@ export default function Live() {
                   const cg = data?.congestion[c.code]
                   return (
                     <li key={c.code} className="flex items-center justify-between py-2.5 text-sm">
-                      <span className="flex items-center gap-2 text-text"><span aria-hidden="true">{c.flag}</span>{destGeo[c.code]?.port.name.replace('Port of ', '') ?? c.name}</span>
+                      <span className="flex items-center gap-2 text-text"><span aria-hidden="true"><Flag code={c.code} /></span>{destGeo[c.code]?.port.name.replace('Port of ', '') ?? c.name}</span>
                       <span className="flex items-center gap-3 tabular-nums">
                         <span className="text-text-muted" title="Vessels in approach"><Ship size={12} className="mr-1 inline" aria-hidden="true" />{cg?.total ?? '–'}</span>
                         <span className={cg && cg.anchored >= 8 ? 'text-gold-deep' : 'text-text'} title="Stopped / at anchor"><Anchor size={12} className="mr-1 inline" aria-hidden="true" />{cg?.anchored ?? '–'}</span>

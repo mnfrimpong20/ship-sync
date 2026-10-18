@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { ArrowRight, Car, Check, ChevronDown, ClipboardList, Container, FileCheck2, Handshake, MapPinned, Minus, Plane, Radar, Scale, Ship, Truck, Users } from 'lucide-react'
 import { fadeUp, stagger } from '../lib/motion'
 import { countries, faqs, shippers, testimonials } from '../lib/data'
-import { Section, SectionHeader, ShipperCard, Avatar, VerifiedMark } from './ui'
+import { Section, SectionHeader, ShipperCard, Avatar, VerifiedMark, Flag } from './ui'
 import { congestionLabel, useCongestion } from '../lib/useCongestion'
 
 /* ---------- Destinations ---------- */
@@ -17,7 +17,7 @@ export function Destinations() {
       <div className="-mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-4 scrollbar-none md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0 lg:grid-cols-4">
         {countries.map((c) => (
           <motion.div key={c.code} variants={fadeUp} whileHover={{ y: -4 }} className="card-light flex w-[260px] shrink-0 snap-start flex-col p-5 md:w-auto">
-            <span className="text-3xl" aria-hidden="true">{c.flag}</span>
+            <Flag code={c.code} size={30} className="rounded-[4px]" />
             <h3 className="mt-3 text-ink">{c.name}</h3>
             <p className="mt-1 text-xs text-ink-muted">{c.ports[0]}{c.ports[1] ? ` · ${c.ports[1]}` : ''}</p>
             <dl className="mt-4 space-y-1.5 text-sm">

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { ArrowRight, Check, ChevronRight, Clock, FileText, Pencil, PlusCircle, Send, X } from 'lucide-react'
 import { cargoLabel, countryByCode, statusLabels, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
-import { Empty, ModeBadge, Pill, fmtDate, money, VerifiedMark } from '../components/ui'
+import { Empty, ModeBadge, Pill, fmtDate, money, VerifiedMark, Flag } from '../components/ui'
 import { ShipmentDetail } from './Track'
 import { DocumentsPanel } from '../components/DocumentsPanel'
 import { PickupCard } from '../components/PickupCard'
@@ -111,7 +111,7 @@ export function CustomerDashboard() {
                   <div className="flex items-center gap-4">
                     <span className="grid h-11 w-11 place-items-center rounded-xl bg-gold/15 text-gold-deep"><FileText size={20} aria-hidden="true" /></span>
                     <div>
-                      <p className="font-semibold text-text">{r.origin} → {dest.flag} {dest.name} <span className="font-normal text-text-muted">· {r.quantity} × {cargoLabel(r.cargo)}</span></p>
+                      <p className="font-semibold text-text">{r.origin} → <Flag code={dest.code} /> {dest.name} <span className="font-normal text-text-muted">· {r.quantity} × {cargoLabel(r.cargo)}</span></p>
                       <p className="text-xs text-text-muted">{r.ref} · posted {fmtDate(r.createdAt)} · {r.mode === 'either' ? 'air or ocean' : r.mode}</p>
                     </div>
                   </div>
@@ -244,7 +244,7 @@ function ShipmentsTab() {
             <li key={x.id} className={`rounded-[var(--radius-md)] border transition-colors ${sel === x.id ? 'border-gold bg-surface' : 'border-border bg-surface/50 hover:bg-surface'}`} data-testid="ship-row">
               <button onClick={() => pick(x.id)} aria-current={sel === x.id} className="w-full rounded-[var(--radius-md)] p-4 pb-2 text-left focus-ring">
                 <div className="flex items-center justify-between"><p className="font-mono text-xs text-gold-deep">{x.ref}</p><ModeBadge mode={x.mode} /></div>
-                <p className="mt-1.5 text-sm font-semibold text-text">{x.origin} → {d.flag} {d.name}</p>
+                <p className="mt-1.5 text-sm font-semibold text-text">{x.origin} → <Flag code={d.code} /> {d.name}</p>
                 <p className="truncate text-xs text-text-muted">{x.description}</p>
                 <p className="mt-2 text-xs"><Pill tone={x.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[x.status]}</Pill></p>
               </button>
@@ -331,7 +331,7 @@ export function ShipperDashboard() {
                 <motion.div key={r.id} layout className="card-dark p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-text">{r.quantity} × {cargoLabel(r.cargo as CargoType)} · {r.origin} → {d.flag} {d.name}</p>
+                      <p className="font-semibold text-text">{r.quantity} × {cargoLabel(r.cargo as CargoType)} · {r.origin} → <Flag code={d.code} /> {d.name}</p>
                       <p className="mt-0.5 text-xs text-text-muted">{r.ref} · {r.mode === 'either' ? 'air or ocean' : r.mode} · ready {fmtDate(r.readyDate)} {r.weightKg ? `· ~${r.weightKg} kg` : ''}</p>
                       <p className="mt-2 text-sm text-text-muted">{r.description || 'No description.'}</p>
                       <ul className="mt-2 flex flex-wrap gap-1.5">{r.pickup && <li><Pill tone="muted">Pickup</Pill></li>}{r.delivery && <li><Pill tone="muted">Door delivery</Pill></li>}{r.insurance && <li><Pill tone="muted">Insurance</Pill></li>}</ul>

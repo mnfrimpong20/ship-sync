@@ -66,7 +66,7 @@ export default function Hero() {
             <div>
               <label htmlFor="q-dest" className="label-dark">Shipping to</label>
               <select id="q-dest" className="input-dark" value={dest} onChange={(e) => setDest(e.target.value)}>
-                {countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
+                {countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
               </select>
             </div>
             <fieldset>

@@ -6,7 +6,7 @@ import { useStore } from '../lib/store'
 import { canManageOps } from '../lib/ops'
 import { blankRate, ratesApi, unitLabel, type PreviewInput, type RateCard, type RateInput, type RatePreview } from '../lib/rates'
 import { cargoLabel, cargoTypes, countries, countryByCode, type CargoType, type Mode } from '../lib/data'
-import { Empty, ModeBadge, Pill, money } from '../components/ui'
+import { Empty, ModeBadge, Pill, money, Flag } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { Chip, Confirm, Expander, Pager, SearchBox, StatCard, Th, thead, trow, usePaged } from '../components/board'
 
@@ -20,7 +20,7 @@ function RateForm({ initial, origins, onSave, onCancel, busy, error }: { initial
     <form onSubmit={(e) => { e.preventDefault(); onSave(f) }} className="grid gap-3 md:grid-cols-3" aria-label="Rate card">
       {error && <p role="alert" className="md:col-span-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
       <div><label htmlFor="r-origin" className="label-dark">Origin</label><input id="r-origin" list="r-origins" className="input-dark" placeholder="Any origin" value={f.origin} onChange={(e) => setF({ ...f, origin: e.target.value })} /><datalist id="r-origins">{origins.map((o) => <option key={o} value={o} />)}</datalist><p className="mt-1 text-[11px] text-text-muted">Leave blank to cover every pickup area you serve.</p></div>
-      <div><label htmlFor="r-dest" className="label-dark">Destination</label><select id="r-dest" className="input-dark" value={f.destination} onChange={(e) => setF({ ...f, destination: e.target.value })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select></div>
+      <div><label htmlFor="r-dest" className="label-dark">Destination</label><select id="r-dest" className="input-dark" value={f.destination} onChange={(e) => setF({ ...f, destination: e.target.value })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></div>
       <div><label htmlFor="r-mode" className="label-dark">Mode</label><select id="r-mode" className="input-dark" value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value as Mode })}><option value="ocean">Ocean</option><option value="air">Air</option></select></div>
       <div><label htmlFor="r-cargo" className="label-dark">Cargo type</label><select id="r-cargo" className="input-dark" value={f.cargo} onChange={(e) => setF({ ...f, cargo: e.target.value as CargoType })}>{cargoTypes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
       <div><label htmlFor="r-price" className="label-dark">Price (USD, {unitLabel(f.cargo, f.unit)})</label><input id="r-price" type="number" min={1} required className="input-dark tabular-nums" value={f.price || ''} onChange={num('price')} /></div>
@@ -199,7 +199,7 @@ export default function Rates() {
                           <Fragment key={r.id}>
                             <tr className={trow(isOpen, !r.active)} data-testid="rate-row">
                               <td className="px-3 py-3"><Expander open={isOpen} onClick={() => { setOpen(isOpen ? null : r.id); if (editing === r.id) setEditing(null) }} label={`details for ${r.origin || 'any origin'} to ${c?.name}`} /></td>
-                              <td className="px-3 py-3"><p className="font-semibold">{r.origin || <span className="text-text-muted">Any origin</span>} → {c?.flag} {c?.name ?? r.destination}</p><div className="mt-1"><ModeBadge mode={r.mode} /></div></td>
+                              <td className="px-3 py-3"><p className="font-semibold">{r.origin || <span className="text-text-muted">Any origin</span>} → <Flag code={c?.code} /> {c?.name ?? r.destination}</p><div className="mt-1"><ModeBadge mode={r.mode} /></div></td>
                               <td className="px-3 py-3">{cargoLabel(r.cargo)}</td>
                               <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums"><p className="font-semibold">{money(r.price)}</p><p className="text-[11px] text-text-muted">{unitLabel(r.cargo, r.unit)}{r.minCharge > r.price ? ` · min ${money(r.minCharge)}` : ''}</p></td>
                               <td className="px-3 py-3 text-xs text-text-muted">{extras(r) || '—'}</td>

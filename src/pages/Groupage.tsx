@@ -106,7 +106,7 @@ export default function GroupagePage() {
         {toast && <p role="status" className="mx-auto mt-6 flex max-w-2xl items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</p>}
         <motion.div initial="hidden" animate="show" variants={stagger} className="mx-auto mt-8 max-w-5xl">
           <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2">
-            <select aria-label="Destination" className="input-dark !min-h-10 !w-auto text-sm" value={dest} onChange={(e) => setDest(e.target.value)}><option value="">Any destination</option>{(dests.length ? dests : countries).map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select>
+            <select aria-label="Destination" className="input-dark !min-h-10 !w-auto text-sm" value={dest} onChange={(e) => setDest(e.target.value)}><option value="">Any destination</option>{(dests.length ? dests : countries).map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select>
             <select aria-label="Kind" className="input-dark !min-h-10 !w-auto text-sm" value={kind} onChange={(e) => setKind(e.target.value)}><option value="">Barrels & containers</option>{data?.kinds.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</select>
             <span className="text-xs text-text-muted">{list.length} open {list.length === 1 ? 'slot' : 'slots'}</span>
           </motion.div>

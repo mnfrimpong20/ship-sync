@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Lock, Mail, MessageCircle, Phone, Radar } from 'lucide-react'
-import { Logo, VerifiedMark } from './ui'
+import { Logo, VerifiedMark, Flag } from './ui'
 import { countries } from '../lib/data'
 import { useSiteConfig } from '../lib/site'
 
@@ -57,7 +57,7 @@ export default function Footer() {
           <p className="shrink-0 text-[11px] font-bold uppercase tracking-[0.14em] text-gold-deep">We ship to</p>
           <ul className="flex flex-wrap gap-2">
             {countries.map((c) => (
-              <li key={c.code}><Link to={`/quote?destination=${c.code}`} className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border px-3.5 text-sm text-text-muted transition-colors hover:border-gold hover:text-text focus-ring"><span aria-hidden="true">{c.flag}</span>{c.name}</Link></li>
+              <li key={c.code}><Link to={`/quote?destination=${c.code}`} className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border px-3.5 text-sm text-text-muted transition-colors hover:border-gold hover:text-text focus-ring"><span aria-hidden="true"><Flag code={c.code} /></span>{c.name}</Link></li>
             ))}
           </ul>
         </div>

@@ -9,7 +9,7 @@ export { useSummary }
 import { hubApi, type CalEvent } from '../lib/customerHub'
 import { customerApi, type AttentionItem, type NextArrival } from '../lib/customer'
 import { countryByCode, statusLabels, type Shipment } from '../lib/data'
-import { Empty, ModeBadge, Pill, money } from './ui'
+import { Empty, ModeBadge, Pill, money, Flag } from './ui'
 import { NeedsYou, NextArrivalCard } from './CustomerHome'
 import { fadeUp, stagger } from '../lib/motion'
 
@@ -95,7 +95,7 @@ export function CustomerOverview() {
           <div className="mb-3 flex items-center justify-between"><h2 id="ov-ship-h" className="!text-lg">Your shipments</h2><Link to="/dashboard?tab=shipments" className="text-sm text-gold-deep hover:underline">All shipments</Link></div>
           <ul className="space-y-3">{recent.map((s) => { const d = countryByCode(s.destination); return (
             <li key={s.id} className="card-dark p-4" data-testid="ov-shipment">
-              <Link to={`/dashboard?tab=shipments&s=${s.id}`} className="flex items-start justify-between gap-3 focus-ring rounded"><div className="min-w-0"><p className="font-mono text-xs text-gold-deep">{s.ref}</p><p className="truncate font-semibold">{s.origin} → {d?.flag} {d?.name ?? s.destination}</p><p className="truncate text-xs text-text-muted">{s.description}</p></div><div className="flex shrink-0 flex-col items-end gap-1"><Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill><ModeBadge mode={s.mode} /></div></Link>
+              <Link to={`/dashboard?tab=shipments&s=${s.id}`} className="flex items-start justify-between gap-3 focus-ring rounded"><div className="min-w-0"><p className="font-mono text-xs text-gold-deep">{s.ref}</p><p className="truncate font-semibold">{s.origin} → <Flag code={d?.code} /> {d?.name ?? s.destination}</p><p className="truncate text-xs text-text-muted">{s.description}</p></div><div className="flex shrink-0 flex-col items-end gap-1"><Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill><ModeBadge mode={s.mode} /></div></Link>
               <div className="mt-3"><ShipmentQuickActions s={s} due={sum?.dueByShipment[s.id]} /></div>
             </li>) })}</ul>
         </section>}

@@ -126,7 +126,13 @@ export function Rating({ value, count, light = false }: { value: number; count?:
   )
 }
 
-export function Avatar({ initials, hue, size = 48 }: { initials: string; hue: string; size?: number }) {
+export function Avatar({ initials, hue, size = 48, logo }: { initials: string; hue: string; size?: number; logo?: string | null }) {
+  // A company's own logo when it has one, on a white tile so any logo colour reads; otherwise its initials.
+  if (logo) return (
+    <span className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-white" style={{ width: size, height: size }} aria-hidden="true">
+      <img src={logo} alt="" loading="lazy" className="h-full w-full object-contain" style={{ padding: size >= 40 ? 3 : 2 }} />
+    </span>
+  )
   return (
     <span className="inline-flex shrink-0 items-center justify-center rounded-2xl font-heading font-bold text-ink" style={{ width: size, height: size, background: `linear-gradient(135deg, ${hue}, ${hue}99)`, fontSize: size * 0.36 }} aria-hidden="true">
       {initials}
@@ -138,7 +144,7 @@ export function ShipperCard({ s, light = false }: { s: Shipper; light?: boolean 
   return (
     <motion.article variants={fadeUp} whileHover={{ y: -4 }} transition={{ duration: 0.2 }} className={`${light ? 'card-light' : 'card-dark'} flex h-full flex-col p-6`}>
       <div className="flex items-start gap-4">
-        <Avatar initials={s.initials} hue={s.hue} />
+        <Avatar initials={s.initials} hue={s.hue} logo={s.logo} />
         <div className="min-w-0 flex-1">
           <h3 className={`flex items-center gap-1.5 text-lg ${light ? 'text-ink' : 'text-text'}`}>
             <span className="truncate">{s.name}</span>

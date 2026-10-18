@@ -23,7 +23,7 @@ export function DirectoryCard({ s, quote }: { s: Shipper; quote?: string }) {
   return (
     <motion.article variants={fadeUp} whileHover={{ y: -4 }} transition={{ duration: 0.2 }} className={`group relative flex h-full flex-col rounded-2xl border bg-surface p-5 transition-colors ${isFeatured(s) ? 'border-gold/40 shadow-[0_0_0_1px_rgba(227,181,74,.15),0_20px_50px_-30px_rgba(227,181,74,.35)]' : 'border-border hover:border-gold/30'}`}>
       <div className="flex items-start gap-3.5">
-        <Avatar initials={s.initials} hue={s.hue} size={52} />
+        <Avatar initials={s.initials} hue={s.hue} logo={s.logo} size={52} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2"><PlanBadge s={s} />{s.verified && <VerifiedBadge />}</div>
           <h3 className="mt-1 truncate !text-[17px] leading-tight"><Link to={`/shippers/${s.id}`} className="focus-ring hover:text-gold-deep">{s.name}</Link></h3>
@@ -59,7 +59,7 @@ function FeaturedCarousel({ items }: { items: Shipper[] }) {
   const Card = ({ s, i }: { s: Shipper; i: number }) => (
     <Link to={`/shippers/${s.id}`} aria-hidden={loop && i >= items.length ? true : undefined} tabIndex={loop && i >= items.length ? -1 : undefined} className="group relative mr-4 w-[300px] shrink-0 overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-br from-surface to-bg p-5 transition-colors hover:border-gold/60 focus-ring">
       <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40" style={{ background: s.hue }} aria-hidden="true" />
-      <div className="flex items-center gap-3"><Avatar initials={s.initials} hue={s.hue} size={44} /><div className="min-w-0"><p className="truncate font-heading text-base font-bold">{s.name}</p><p className="truncate text-xs text-text-muted">{s.hq}</p></div></div>
+      <div className="flex items-center gap-3"><Avatar initials={s.initials} hue={s.hue} logo={s.logo} size={44} /><div className="min-w-0"><p className="truncate font-heading text-base font-bold">{s.name}</p><p className="truncate text-xs text-text-muted">{s.hq}</p></div></div>
       <p className="mt-3 line-clamp-2 text-sm text-text-muted">{s.tagline}</p>
       <div className="mt-3 flex items-center gap-2 text-xs"><Rating value={s.rating} count={s.reviews} /><span className="ml-auto text-text-muted">{s.destinations.length} {s.destinations.length === 1 ? 'country' : 'countries'}</span></div>
     </Link>
@@ -342,7 +342,7 @@ function RecentlyViewed() {
   if (list.length === 0) return null
   return (
     <section className="border-b border-border" aria-label="Recently viewed" data-testid="recently-viewed">
-      <div className="container-fluid flex flex-wrap items-center gap-2 py-3 text-sm"><span className="mr-1 text-xs font-semibold uppercase tracking-wider text-text-muted">Recently viewed</span>{list.map((s) => <Link key={s.id} to={`/shippers/${s.id}`} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs hover:border-gold hover:text-gold-deep"><Avatar initials={s.initials} hue={s.hue} size={18} />{s.name}</Link>)}</div>
+      <div className="container-fluid flex flex-wrap items-center gap-2 py-3 text-sm"><span className="mr-1 text-xs font-semibold uppercase tracking-wider text-text-muted">Recently viewed</span>{list.map((s) => <Link key={s.id} to={`/shippers/${s.id}`} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs hover:border-gold hover:text-gold-deep"><Avatar initials={s.initials} hue={s.hue} logo={s.logo} size={18} />{s.name}</Link>)}</div>
     </section>
   )
 }

@@ -72,7 +72,7 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
                 <div key={q.id} className={`relative rounded-[var(--radius-md)] border p-4 ${q.status === 'accepted' ? 'border-teal bg-teal/5' : dead ? 'border-border opacity-55' : t.includes('Lowest price') ? 'border-gold' : 'border-border bg-surface'}`} data-testid="quote-card">
                   {t.length > 0 && r.status === 'open' && <div className="absolute -top-2.5 left-4 flex gap-1">{t.map((x) => <span key={x} className="rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent" data-testid="quote-tag">{x}</span>)}</div>}
                   <div className="flex items-start gap-3">
-                    <Avatar initials={s.initials} hue={s.hue} size={40} />
+                    <Avatar initials={s.initials} hue={s.hue} logo={'logo' in s ? s.logo : null} size={40} />
                     <div className="min-w-0 flex-1"><p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{s.name}</p>{s.verified && <p className="mt-1"><VerifiedBadge /></p>}<div className="mt-1 flex flex-wrap gap-1.5"><Rating value={s.rating} count={s.reviews} /></div></div>
                     <div className="text-right"><p className="font-heading text-2xl font-bold text-text">{money(q.price)}</p><p className="text-xs text-text-muted">~{q.transitDays} days{q.kind === 'estimate' ? ' · estimate' : ''}</p></div>
                   </div>

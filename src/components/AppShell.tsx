@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Anchor, BarChart3, LineChart, Calculator, Megaphone, Plug, CreditCard, History, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X } from 'lucide-react'
-import { Logo } from './ui'
+import { Avatar, Logo } from './ui'
 import { PlatformBanners } from './PlatformBanners'
 import { NotificationBell } from './NotificationBell'
 import { useStore } from '../lib/store'
@@ -21,7 +21,7 @@ interface Item { to: string; label: string; icon: typeof Inbox; end?: boolean; b
  * from the marketing site. Marketing pages keep the big header/footer; everything under /dashboard and /admin lives here.
  */
 export default function AppShell() {
-  const { ready, user, logout, requests, shipments } = useStore()
+  const { ready, user, logout, requests, shipments, shipperById } = useStore()
   const loc = useLocation()
   const outlet = useOutlet()
   const nav = useNavigate()
@@ -42,6 +42,7 @@ export default function AppShell() {
   if (user.role === 'shipper' && user.staffRole && !user.admin && loc.pathname.startsWith('/dashboard') && !roleAllows(user.staffRole, loc.pathname, user.perms as never)) return <Navigate to={roleHome[user.staffRole]} replace />
 
   const isShipper = user.role === 'shipper'
+  const company = isShipper && user.shipperId ? shipperById(user.shipperId) : undefined
   const openLeads = isShipper ? requests.filter((r) => r.status === 'open' && !r.quotes.some((q) => q.shipperId === user.shipperId)).length : requests.reduce((n, r) => n + (r.status === 'open' ? r.quotes.length : 0), 0)
   const active = shipments.filter((s) => s.status !== 'delivered').length
 
@@ -137,7 +138,10 @@ export default function AppShell() {
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="flex h-16 items-center justify-between px-5"><Logo partner={isShipper} /><button onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-lg text-text-muted lg:hidden focus-ring" aria-label="Close menu"><X size={18} /></button></div>
-      <div className="px-4 pb-3"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : 'Customer'}</p>{isShipper && user.staffRole && <p className="text-[11px] text-text-muted/70">{user.staffRole.charAt(0).toUpperCase() + user.staffRole.slice(1)}</p>}</div>
+      <div className="flex items-center gap-2.5 px-4 pb-3">
+        {isShipper && company && <Avatar initials={company.initials} hue={company.hue} logo={company.logo} size={32} />}
+        <div className="min-w-0"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : 'Customer'}</p>{isShipper && user.staffRole && <p className="text-[11px] text-text-muted/70">{user.staffRole.charAt(0).toUpperCase() + user.staffRole.slice(1)}</p>}</div>
+      </div>
       <nav className={`flex-1 overflow-y-auto px-3 ${isShipper ? 'space-y-5' : 'space-y-3.5'}`} aria-label="Application">
         <NavItems list={visible.filter((i) => !i.group)} />
         {Array.from(new Set(visible.map((i) => i.group).filter(Boolean))).map((g) => <div key={g}><p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted/70">{g}</p><NavItems list={visible.filter((i) => i.group === g)} /></div>)}

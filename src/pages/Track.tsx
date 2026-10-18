@@ -198,7 +198,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
         <aside className="lg:col-span-4">
           <div className="card-dark p-6">
             <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Handled by</p>
-            <div className="mt-3 flex items-center gap-3"><Avatar initials={shipper.initials} hue={shipper.hue} size={44} /><div><p className="font-semibold text-text">{shipper.name}</p><p className="text-xs text-text-muted">{shipper.hq}</p></div></div>
+            <div className="mt-3 flex items-center gap-3"><Avatar initials={shipper.initials} hue={shipper.hue} logo={'logo' in shipper ? shipper.logo : null} size={44} /><div><p className="font-semibold text-text">{shipper.name}</p><p className="text-xs text-text-muted">{shipper.hq}</p></div></div>
             <div className="mt-3 flex gap-2"><ModeBadge mode={s.mode} /></div>
             <Link to={`/shippers/${shipper.id}`} className="btn-ghost mt-5 w-full !min-h-10 text-sm">View shipper profile</Link>
           </div>

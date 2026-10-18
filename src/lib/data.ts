@@ -41,6 +41,8 @@ export const cargoTypes: { id: CargoType; label: string; hint: string }[] = [
 export interface Shipper {
   id: string
   name: string
+  /** URL of the company logo (served by /api/shippers/:id/logo), or null to show initials. */
+  logo?: string | null
   tagline: string
   hq: string
   founded: number

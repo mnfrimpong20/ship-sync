@@ -68,7 +68,7 @@ export default function Admin() {
           <li key={s.id} className="card-dark p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-start gap-3">
-                <Avatar initials={s.initials} hue={s.hue} size={44} />
+                <Avatar initials={s.initials} hue={s.hue} logo={s.logo} size={44} />
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-2 font-semibold text-text"><Link to={`/shippers/${s.id}`} className="hover:text-gold-deep focus-ring rounded">{s.name}</Link>{s.verified && <VerifiedMark size={16} role="img" aria-label="Ntemtem Verified" />}{s.demo && <Pill tone="muted">Demo</Pill>}{!s.verified && s.verificationRequestedAt && <Pill tone="gold">Review requested</Pill>}{s.docsPending > 0 && <Pill tone="sky">{s.docsPending} doc{s.docsPending === 1 ? '' : 's'} to check</Pill>}</p>
                   <p className="text-xs text-text-muted">{s.tagline || 'No tagline'} · {s.hq || 'No HQ set'} · founded {s.founded}</p>

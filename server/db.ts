@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs'
 import bcrypt from 'bcryptjs'
 import { sampleShipments, shippers as seedShippers } from '../src/lib/data'
 import { extraShippers } from './seedShippers'
+import { demoLogos } from './demoLogos'
 import { seedRatesDemo } from './rates'
 import { seedPickupsDemo } from './pickups'
 import { seedPaymentsDemo } from './payments'
@@ -52,6 +53,7 @@ export async function getDb(): Promise<Db> {
   await seedRunsDemo(db)
   await seedRatesDemo(db)
   await seedPickupsDemo(db)
+  await applyDemoLogos(db)
   await seedPaymentsDemo(db)
   await seedGroupageDemo(db)
   await seedBrokersDemo(db)
@@ -1287,6 +1289,14 @@ async function migrate(d: Db) {
 const DEMO_PASSWORD = 'shipsync'
 const addDays = (n: number) => new Date(Date.now() + n * 86400000)
 const dateOnly = (d: Date) => d.toISOString().slice(0, 10)
+
+/** Give demo shipping companies a logo if they don't have one. Never touches a logo someone uploaded. */
+async function applyDemoLogos(d: Db) {
+  for (const [id, logo] of Object.entries(demoLogos)) {
+    await d.query(`update shippers set brand = coalesce(brand, '{}'::jsonb) || jsonb_build_object('logo', $2::text)
+      where id = $1 and demo and coalesce(brand->>'logo', '') = ''`, [id, logo])
+  }
+}
 
 async function seed(d: Db) {
   const { rows } = await d.query<{ n: string }>('select count(*)::text as n from shippers')

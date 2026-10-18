@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from 'express'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { publicShipperSql, getDb, makeRef, uid, type Db } from './db'
@@ -85,7 +85,11 @@ const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : typeof v === 
 const DATE = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10))
 const J = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : v)
 
+/** A shipper's uploaded logo, served as its own cacheable image (never inlined into lists — logos can be 250 KB). */
+const brandLogo = (r: Row): string => { const b = J(r.brand) as { logo?: string } | null; return typeof b?.logo === 'string' ? b.logo : '' }
+const logoUrl = (r: Row) => { const l = brandLogo(r); return l ? `/api/shippers/${encodeURIComponent(r.id)}/logo?v=${createHash('sha1').update(l).digest('hex').slice(0, 10)}` : null }
 const shipperOut = (r: Row) => ({
+  logo: logoUrl(r),
   id: r.id, name: r.name, tagline: r.tagline, hq: r.hq, founded: r.founded, modes: J(r.modes), destinations: J(r.destinations), origins: J(r.origins), cargo: J(r.cargo),
   rating: Number(r.rating), reviews: r.reviews, verified: r.verified, responseHours: r.response_hours, onTime: r.on_time, services: J(r.services), about: r.about,
   priceIndex: r.price_index, plan: r.plan, standing: r.standing ?? 'good', qualityScore: J(r.quality)?.score ?? null, initials: r.initials, hue: r.hue, demo: r.demo, verifiedAt: r.verified_at ? ISO(r.verified_at) : undefined, createdAt: r.created_at ? ISO(r.created_at) : undefined,
@@ -414,6 +418,8 @@ const zTransit = z.object({
   departedAt: z.string().datetime().optional(),
 })
 const zProfile = z.object({
+  /** Company logo: a PNG, JPG, WebP or SVG as a data URL; '' removes it. Stored with the branded-page settings. */
+  logo: z.string().max(260_000).regex(/^$|^data:image\/(png|jpeg|webp|svg\+xml);base64,/, 'Upload a PNG, JPG, WebP or SVG.').optional(),
   name: z.string().trim().min(2, 'Company name is too short.').max(80),
   tagline: z.string().trim().max(120).default(''),
   hq: z.string().trim().max(80).default(''),
@@ -492,6 +498,14 @@ export function apiRouter() {
   // shippers (public)
   mountDirectory(r, { getDb, shipperOut, wrap })
   r.get('/shippers', wrap(async (_req, res) => { const db = await getDb(); const { rows } = await db.query<Row>(`select * from shippers where ${publicShipperSql()} order by rating desc, reviews desc`); res.json({ shippers: rows.map(shipperOut) }) }))
+  r.get('/shippers/:id/logo', wrap(async (req, res) => {
+    const db = await getDb(); const { rows } = await db.query<Row>('select brand from shippers where id = $1', [req.params.id])
+    const m = /^data:(image\/(?:png|jpeg|webp|svg\+xml));base64,(.+)$/.exec(rows[0] ? brandLogo(rows[0]) : '')
+    if (!m) throw new HttpError(404, 'No logo.')
+    // Uploaded SVGs are untrusted: sandbox them so opening the URL directly can never run script on our origin.
+    res.set({ 'Content-Type': m[1], 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" })
+    res.send(Buffer.from(m[2], 'base64'))
+  }))
   r.get('/shippers/:id', wrap(async (req, res) => { const db = await getDb(); const { rows } = await db.query<Row>('select * from shippers where id = $1', [req.params.id]); if (!rows[0]) throw new HttpError(404, 'Shipper not found.'); res.json({ shipper: shipperOut(rows[0]) }) }))
   r.patch('/shippers/me', wrap(async (req, res) => {
     const db = await getDb(); const user = await requireUser(db, req)
@@ -503,6 +517,7 @@ export function apiRouter() {
       `update shippers set name=$2, tagline=$3, hq=$4, founded=$5, modes=$6, destinations=$7, origins=$8, cargo=$9, services=$10, about=$11, price_index=$12, response_hours=$13, initials=$14 where id = $1`,
       [user.shipperId, b.name, b.tagline, b.hq, b.founded, JSON.stringify(b.modes), JSON.stringify([...new Set(b.destinations)]), JSON.stringify([...new Set(b.origins)]), JSON.stringify([...new Set(b.cargo)]), JSON.stringify([...new Set(b.services)]), b.about, b.priceIndex, b.responseHours, initialsOf(b.name)],
     )
+    if (b.logo !== undefined) await db.query(`update shippers set brand = coalesce(brand, '{}'::jsonb) || jsonb_build_object('logo', $2::text) where id = $1`, [user.shipperId, b.logo])
     const { rows } = await db.query<Row>('select * from shippers where id = $1', [user.shipperId])
     res.json({ shipper: shipperOut(rows[0]), user: await loadUserWithCompany(db, user.id) })
   }))

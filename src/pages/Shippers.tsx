@@ -42,7 +42,7 @@ export function ShipperProfile() {
           <div className="lg:col-span-8">
             <motion.div variants={fadeUp} className="card-dark p-6 md:p-8">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                <Avatar initials={s.initials} hue={s.hue} size={72} />
+                <Avatar initials={s.initials} hue={s.hue} logo={s.logo} size={72} />
                 <div className="flex-1">
                   <h1 className="flex flex-wrap items-center gap-2 !text-3xl">{s.name}{s.verified && <VerifiedBadge large />}</h1>
                   <p className="mt-1 text-text-muted">{s.tagline}</p>

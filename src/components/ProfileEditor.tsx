@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { Check, Plus, X } from 'lucide-react'
+import { Check, ImagePlus, Plus, Trash2, X } from 'lucide-react'
 import { cargoTypes, countries, origins as originCities, type Shipper } from '../lib/data'
 import { useStore, type ShipperProfileInput } from '../lib/store'
 
@@ -11,6 +11,8 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
     name: shipper.name, tagline: shipper.tagline, hq: shipper.hq, founded: shipper.founded, modes: shipper.modes, destinations: shipper.destinations,
     origins: shipper.origins, cargo: shipper.cargo, services: shipper.services, about: shipper.about, priceIndex: shipper.priceIndex, responseHours: shipper.responseHours,
   })
+  const [logo, setLogo] = useState<string | null>(shipper.logo ?? null)   // what the preview shows
+  const [logoErr, setLogoErr] = useState('')
   const [newService, setNewService] = useState('')
   const [newOrigin, setNewOrigin] = useState('')
   const [busy, setBusy] = useState(false)
@@ -24,6 +26,27 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
     finally { setBusy(false) }
   }
 
+  /** Raster logos are scaled to fit 512px and saved as WebP so they stay small; SVGs are kept as they are. */
+  const pickLogo = async (file: File | undefined) => {
+    setLogoErr(''); if (!file) return
+    if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) { setLogoErr('Use a PNG, JPG, WebP or SVG.'); return }
+    const asDataUrl = (b: Blob) => new Promise<string>((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => bad(r.error); r.readAsDataURL(b) })
+    if (file.type === 'image/svg+xml') {
+      if (file.size > 180_000) { setLogoErr('That SVG is too large — keep it under 180 KB.'); return }
+      const url = await asDataUrl(file); setLogo(url); setF((cur) => ({ ...cur, logo: url })); return
+    }
+    const img = new Image(); const src = URL.createObjectURL(file)
+    try {
+      await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = src })
+      const k = Math.min(1, 512 / Math.max(img.width, img.height)); const c = document.createElement('canvas')
+      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k))
+      c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+      const url = c.toDataURL('image/webp', 0.9)
+      if (url.length > 255_000) { setLogoErr('That image is too detailed — try a simpler or smaller logo.'); return }
+      setLogo(url); setF((cur) => ({ ...cur, logo: url }))
+    } catch { setLogoErr('Could not read that image.') } finally { URL.revokeObjectURL(src) }
+  }
+
   const chip = (active: boolean) => `rounded-full border px-3 py-1.5 text-sm transition-colors focus-ring ${active ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`
 
   return (
@@ -33,6 +56,23 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
         <button type="button" onClick={() => onDone('')} className="focus-ring rounded-md p-2 text-text-muted hover:text-text" aria-label="Close editor"><X size={18} aria-hidden="true" /></button>
       </div>
       {error && <p role="alert" className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
+
+      <div className="mt-6 flex flex-wrap items-center gap-4 rounded-[var(--radius-md)] border border-border p-4" data-testid="logo-editor">
+        <span className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-white">
+          {logo ? <img src={logo} alt="Your company logo" className="h-full w-full object-contain p-1.5" /> : <span className="font-heading text-2xl font-bold text-ink">{shipper.initials}</span>}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Company logo</p>
+          <p className="text-sm text-text-muted">Shown on your profile, in the directory, next to your quotes and on your branded page. Square logos look best.</p>
+          {logoErr && <p role="alert" className="mt-1 text-sm text-danger">{logoErr}</p>}
+        </div>
+        <div className="flex gap-2">
+          <label className="btn-ghost !min-h-10 cursor-pointer !px-4 text-sm"><ImagePlus size={16} aria-hidden="true" /> {logo ? 'Change' : 'Upload logo'}
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="sr-only" onChange={(e) => { void pickLogo(e.target.files?.[0]); e.target.value = '' }} data-testid="logo-input" />
+          </label>
+          {logo && <button type="button" onClick={() => { setLogo(null); setF((cur) => ({ ...cur, logo: '' })) }} className="btn-ghost !min-h-10 !px-3 text-sm" aria-label="Remove logo"><Trash2 size={16} aria-hidden="true" /></button>}
+        </div>
+      </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <div><label htmlFor="pf-name" className="label-dark">Company name</label><input id="pf-name" className="input-dark" required minLength={2} maxLength={80} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>

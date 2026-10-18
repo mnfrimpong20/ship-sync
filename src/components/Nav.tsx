@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useScroll, useSpring } from 'motion/react'
-import { Anchor, BarChart3, Boxes, Calculator, ChevronDown, Globe2, Landmark, LayoutDashboard, LogOut, Menu, Radar, Route, ShieldCheck, Users, X } from 'lucide-react'
+import { Anchor, ArrowRight, BadgeCheck, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X } from 'lucide-react'
 import { Logo } from './ui'
 import { useStore } from '../lib/store'
 
@@ -13,6 +13,8 @@ const primary = [
   { to: '/pricing', label: 'Pricing' },
 ]
 type Service = { to: string; label: string; blurb: string; icon: typeof Boxes }
+type Side = 'senders' | 'shippers'
+/** For senders — people shipping something home. */
 const services: { title: string; items: Service[] }[] = [
   { title: 'Ways to ship', items: [
     { to: '/groupage', label: 'Fill a barrel', blurb: 'Share a barrel or container, pay for the space you use', icon: Boxes },
@@ -29,16 +31,38 @@ const services: { title: string; items: Service[] }[] = [
     { to: '/?s=how', label: 'How it works', blurb: 'Post, compare, book and track', icon: Route },
   ] },
 ]
+/** For shipping companies — every tool in the partner workspace, each linking to its section of /for-shippers. */
+const shipperServices: { title: string; items: Service[] }[] = [
+  { title: 'Win customers', items: [
+    { to: '/for-shippers?s=win', label: 'Matched quote requests', blurb: 'Leads on your lanes, delivered to you', icon: Inbox },
+    { to: '/for-shippers?s=win', label: 'Rate cards & instant quotes', blurb: 'Price once, quote while you sleep', icon: Tag },
+    { to: '/for-shippers?s=win', label: 'Your branded page', blurb: 'Your logo, your link, your leads', icon: Globe },
+    { to: '/for-shippers?s=verified', label: 'Ntemtem Verified', blurb: 'The badge customers look for', icon: BadgeCheck },
+  ] },
+  { title: 'Run operations', items: [
+    { to: '/for-shippers?s=run', label: 'Containers & sailings', blurb: 'Book space, load orders, track the box', icon: Ship },
+    { to: '/for-shippers?s=run', label: 'Warehouse & scanning', blurb: 'Stickers, phone scans, proof of delivery', icon: ScanLine },
+    { to: '/for-shippers?s=run', label: 'Pickups, routes & drivers', blurb: 'Collection slots and daily runs', icon: Truck },
+    { to: '/for-shippers?s=updates', label: 'Destination agent links', blurb: 'Your agent at the port sees the manifest', icon: Link2 },
+  ] },
+  { title: 'Get paid & grow', items: [
+    { to: '/for-shippers?s=paid', label: 'Protected payments', blurb: 'Customers pay upfront, you get paid out', icon: ShieldCheck },
+    { to: '/for-shippers?s=paid', label: 'Clients, invoices & collections', blurb: 'Every customer and every payment owed', icon: Receipt },
+    { to: '/for-shippers?s=grow', label: 'Analytics & lane intelligence', blurb: 'Win rates, profit and market prices', icon: ChartLine },
+    { to: '/for-shippers?s=grow', label: 'Team & integrations', blurb: 'Roles for staff, webhooks for your systems', icon: UsersRound },
+  ] },
+]
 
 export default function Nav() {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [menu, setMenu] = useState(false)
   const [svc, setSvc] = useState(false)
+  const { user, logout } = useStore()
+  const [side, setSide] = useState<Side>(() => user?.role === 'shipper' ? 'shippers' : 'senders')
   const svcRef = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<number | null>(null)
   const hovering = useRef(false)
-  const { user, logout } = useStore()
   const loc = useLocation()
   const nav = useNavigate()
   const { scrollYProgress } = useScroll()
@@ -64,7 +88,8 @@ export default function Nav() {
   const toggleSvc = () => setSvc((v) => (hovering.current ? true : !v))
 
   const dash = user?.role === 'shipper' ? '/dashboard/shipper' : '/dashboard'
-  const serviceActive = services.some((g) => g.items.some((i) => !i.to.startsWith('/#') && loc.pathname.startsWith(i.to)))
+  const serviceActive = [...services, ...shipperServices].some((g) => g.items.some((i) => !i.to.startsWith('/#') && i.to !== '/?s=how' && loc.pathname.startsWith(i.to.split('?')[0])))
+  const groups = side === 'senders' ? services : shipperServices
 
   return (
     <header className={`sticky top-0 z-50 border-b transition-colors duration-300 ${scrolled || !marketing ? 'border-border bg-bg/90 backdrop-blur-xl' : 'border-border/60 bg-bg'}`}>
@@ -80,15 +105,28 @@ export default function Nav() {
             </button>
             <AnimatePresence>
               {svc && (
-                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} role="menu" className="card-dark absolute left-1/2 top-full mt-2 w-[46rem] -translate-x-1/2 p-3 shadow-xl" data-testid="services-menu">
-                  <div className="grid grid-cols-3 gap-2">
-                    {services.map((g) => (
+                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} className="card-dark absolute left-1/2 top-full mt-2 w-[52rem] -translate-x-1/2 overflow-hidden shadow-xl" data-testid="services-menu">
+                  <div role="tablist" aria-label="Who it's for" className="grid grid-cols-2 border-b border-border">
+                    <SideTab active={side === 'senders'} onClick={() => setSide('senders')} icon={House} label="For senders" hint="shipping something home" testId="services-tab-senders" />
+                    <SideTab active={side === 'shippers'} onClick={() => setSide('shippers')} icon={Building2} label="For shipping companies" hint="run your business" partner testId="services-tab-shippers" />
+                  </div>
+                  <div role="menu" className="grid grid-cols-3 gap-2 p-3">
+                    {groups.map((g) => (
                       <div key={g.title}>
                         <p className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted">{g.title}</p>
-                        <ul className="space-y-0.5">{g.items.map((i) => <li key={i.to}><ServiceLink item={i} /></li>)}</ul>
+                        <ul className="space-y-0.5">{g.items.map((i) => <li key={i.label}><ServiceLink item={i} partner={side === 'shippers'} /></li>)}</ul>
                       </div>
                     ))}
                   </div>
+                  {side === 'shippers' && (
+                    <div className="flex items-center justify-between gap-4 bg-partner px-5 py-3.5 text-[#FBF6EC]">
+                      <p className="text-sm"><strong>Run your shipping business on Ntemtem.</strong> <span className="text-[#C9C1B1]">Free Pro trial for new partners.</span></p>
+                      <div className="flex shrink-0 gap-2">
+                        <Link to="/for-shippers" className="inline-flex min-h-9 items-center rounded-full border border-[#5A544A] px-4 text-sm font-semibold text-[#FBF6EC] hover:border-[#FBF6EC] focus-ring">See all tools</Link>
+                        <Link to="/signup?role=shipper" className="inline-flex min-h-9 items-center rounded-full bg-gold px-4 text-sm font-bold text-on-accent hover:bg-[#F5B82E] focus-ring">List your company</Link>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -96,6 +134,7 @@ export default function Nav() {
           {primary.slice(1).map((l) => <NavItem key={l.to} to={l.to} label={l.label} />)}
         </nav>
         <div className="hidden shrink-0 items-center gap-2 lg:flex">
+          {user?.role !== 'shipper' && <Link to="/for-shippers" className="hidden min-h-10 items-center gap-2 whitespace-nowrap rounded-full border border-border px-4 text-sm font-semibold text-text hover:border-text focus-ring xl:inline-flex" data-testid="nav-for-shippers"><span className="h-2 w-2 rounded-[2px] bg-partner" aria-hidden="true" />For shipping companies</Link>}
           {user ? (
             <div className="relative">
               <button onClick={() => setMenu((m) => !m)} className="btn-ghost !min-h-10 whitespace-nowrap !px-3 text-sm" aria-expanded={menu} aria-haspopup="menu">
@@ -131,12 +170,21 @@ export default function Nav() {
               <div className="grid grid-cols-2 gap-2 pb-3">
                 {primary.map((l) => <Link key={l.to} to={l.to} className="flex min-h-12 items-center justify-center rounded-xl border border-border text-[15px] font-semibold focus-ring">{l.label}</Link>)}
               </div>
+              <p className="border-t border-border/60 pt-3 text-xs font-bold uppercase tracking-wider text-text">For senders</p>
               {services.map((g) => (
-                <div key={g.title} className="border-t border-border/60 py-2">
+                <div key={g.title} className="py-2">
                   <p className="pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted">{g.title}</p>
-                  {g.items.map((i) => <Link key={i.to} to={i.to} className="flex min-h-11 items-center gap-3 text-[15px] font-medium focus-ring"><i.icon size={16} className="text-gold-deep" aria-hidden="true" />{i.label}</Link>)}
+                  {g.items.map((i) => <Link key={i.label} to={i.to} className="flex min-h-11 items-center gap-3 text-[15px] font-medium focus-ring"><i.icon size={16} className="text-gold-deep" aria-hidden="true" />{i.label}</Link>)}
                 </div>
               ))}
+              <div className="mt-2 rounded-2xl bg-partner p-4 text-[#FBF6EC]" data-testid="mobile-for-shippers">
+                <p className="text-xs font-bold uppercase tracking-wider">For shipping companies</p>
+                <p className="mt-1 text-sm text-[#C9C1B1]">Leads, rate cards, containers, warehouse scanning, protected payments and more.</p>
+                <div className="mt-3 flex flex-col gap-2">
+                  <Link to="/for-shippers" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#5A544A] text-[15px] font-semibold text-[#FBF6EC] focus-ring">See all tools <ArrowRight size={16} aria-hidden="true" /></Link>
+                  <Link to="/signup?role=shipper" className="inline-flex min-h-11 items-center justify-center rounded-full bg-gold text-[15px] font-bold text-on-accent focus-ring">List your company</Link>
+                </div>
+              </div>
               <div className="mt-3 flex flex-col gap-2 pb-2">
                 {user ? (
                   <>
@@ -156,9 +204,19 @@ export default function Nav() {
   )
 }
 
-function ServiceLink({ item }: { item: Service }) {
+function SideTab({ active, onClick, icon: Icon, label, hint, partner = false, testId }: { active: boolean; onClick: () => void; icon: typeof Boxes; label: string; hint: string; partner?: boolean; testId: string }) {
+  return (
+    <button role="tab" aria-selected={active} onClick={onClick} onMouseEnter={onClick} data-testid={testId}
+      className={`flex items-center gap-2.5 border-b-[3px] px-5 py-3.5 text-left text-[15px] focus-ring ${active ? (partner ? 'border-partner bg-surface-2/60 font-bold text-text' : 'border-gold bg-surface-2/60 font-bold text-text') : 'border-transparent font-semibold text-text-muted hover:text-text'}`}>
+      <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${partner ? 'bg-partner text-gold' : 'bg-gold/20 text-text'}`}><Icon size={15} aria-hidden="true" /></span>
+      <span>{label} <span className="font-normal text-text-muted text-[13px]">— {hint}</span></span>
+    </button>
+  )
+}
+
+function ServiceLink({ item, partner = false }: { item: Service; partner?: boolean }) {
   const cls = 'flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-surface-2 focus-ring'
-  const body = <><span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gold/15 text-gold-deep"><item.icon size={15} aria-hidden="true" /></span><span className="min-w-0"><span className="block text-sm font-semibold text-text">{item.label}</span><span className="block text-xs leading-snug text-text-muted">{item.blurb}</span></span></>
+  const body = <><span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${partner ? 'bg-partner/10 text-text' : 'bg-gold/15 text-gold-deep'}`}><item.icon size={15} aria-hidden="true" /></span><span className="min-w-0"><span className="block text-sm font-semibold text-text">{item.label}</span><span className="block text-xs leading-snug text-text-muted">{item.blurb}</span></span></>
   return item.to.startsWith('/#') ? <a href={item.to} role="menuitem" className={cls}>{body}</a> : <Link to={item.to} role="menuitem" className={cls}>{body}</Link>
 }
 

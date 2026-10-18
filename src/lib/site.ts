@@ -33,6 +33,7 @@ export function useSiteConfig() {
 /** Per-route browser title + description + Open Graph tags. */
 const TITLES: [RegExp, string, string?][] = [
   [/^\/$/, '', 'Compare verified shippers to Ghana, Nigeria and across West Africa. Clear prices, protected payments, tracked all the way home.'],
+  [/^\/for-shippers/, 'For shipping companies', 'Run your shipping business on Ntemtem: matched leads, rate cards, containers, warehouse scanning, protected payments and more.'],
   [/^\/quote/, 'Get freight quotes', 'Post your shipment once and let verified shippers compete with itemised quotes.'],
   [/^\/shippers\/[^/]+/, 'Shipper profile'], [/^\/shippers/, 'Verified shippers directory'], [/^\/track/, 'Track a shipment'], [/^\/duty/, 'Duty & landed-cost estimator'],
   [/^\/groupage/, 'Fill a barrel — shared barrels & containers'], [/^\/brokers/, 'Customs brokers'], [/^\/sailings/, 'Sailing schedule'], [/^\/lanes/, 'Lane prices'], [/^\/live/, 'Live map'],

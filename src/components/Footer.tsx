@@ -6,7 +6,7 @@ import { useSiteConfig } from '../lib/site'
 
 const cols = [
   { title: 'Ship', links: [['Get a quote', '/quote'], ['Fill a barrel', '/groupage'], ['Source from China, UK & USA', '/sourcing'], ['Track a shipment', '/track'], ['Duty estimator', '/duty'], ['Customs brokers', '/brokers'], ['Sailing schedule', '/sailings'], ['Lane prices', '/lanes'], ['Live map', '/live']] },
-  { title: 'Shippers', links: [['List your company', '/signup?role=shipper'], ['Pricing', '/pricing'], ['How verification works', '/about'], ['Shipper agreement', '/shipper-agreement'], ['Shipper dashboard', '/dashboard/shipper']] },
+  { title: 'Shippers', links: [['For shipping companies', '/for-shippers'], ['List your company', '/signup?role=shipper'], ['Pricing', '/pricing'], ['How verification works', '/about'], ['Shipper agreement', '/shipper-agreement'], ['Shipper dashboard', '/dashboard/shipper']] },
   { title: 'Company', links: [['About', '/about'], ['Contact', '/contact'], ['FAQ', '/?s=faq'], ['Privacy policy', '/privacy'], ['Terms of service', '/terms']] },
 ]
 const SOCIAL_LABELS: Record<string, string> = { linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook', x: 'X', tiktok: 'TikTok', youtube: 'YouTube' }
@@ -56,7 +56,7 @@ export default function Footer() {
       </div>
       <div className="border-t border-border">
         <div className="container-fluid flex flex-col gap-2 py-6 text-xs text-text-muted md:flex-row md:items-center md:justify-between">
-          <p>© {new Date().getFullYear()} Ntemtem, Inc. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Ntemtem. All rights reserved.</p>
           <p className="flex gap-4"><Link to="/privacy" className="hover:text-gold-deep">Privacy</Link><Link to="/terms" className="hover:text-gold-deep">Terms</Link><Link to="/shipper-agreement" className="hover:text-gold-deep">Shipper agreement</Link><Link to="/contact" className="hover:text-gold-deep">Contact</Link></p>
         </div>
       </div>

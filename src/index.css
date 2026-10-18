@@ -75,6 +75,9 @@
   color-scheme: dark;
 }
 
+/* The Ntemtem weave — one band per layout, horizontal, never behind text. */
+.ss-weave { height: 64px; background: url('/weave-band.svg') repeat-x left center / auto 64px; }
+
 html { scroll-behavior: smooth; }
 body {
   @apply bg-bg text-text font-sans antialiased;

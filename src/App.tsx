@@ -45,6 +45,7 @@ const BrokersPage = lazy(() => import('./pages/Brokers'))
 const BrokerPortal = L(() => import('./pages/Brokers'), 'BrokerPortal')
 const BrokerProfile = L(() => import('./pages/Brokers'), 'BrokerProfile')
 const PricingPage = lazy(() => import('./pages/Pricing'))
+const ForShippersPage = lazy(() => import('./pages/ForShippers'))
 const Sailings = lazy(() => import('./pages/Sailings'))
 const PublicSailings = L(() => import('./pages/Sailings'), 'PublicSailings')
 const Warehouse = lazy(() => import('./pages/Warehouse'))
@@ -149,6 +150,7 @@ export default function App() {
               <Route path="/brokers" element={<BrokersPage />} />
               <Route path="/brokers/:id" element={<BrokerProfile />} />
               <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/for-shippers" element={<ForShippersPage />} />
               <Route path="/how" element={<Navigate to="/?s=how" replace />} />
               <Route path="/faq" element={<Navigate to="/?s=faq" replace />} />
               <Route path="/sailings" element={<PublicSailings />} />

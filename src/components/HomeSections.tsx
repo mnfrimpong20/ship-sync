@@ -109,17 +109,17 @@ export function ForShippers() {
           </ul>
           <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-3 sm:flex-row">
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/signup?role=shipper" className="btn-gold w-full sm:w-auto">List your company <ArrowRight size={18} aria-hidden="true" /></Link></motion.div>
-            <Link to="/pricing" className="btn-ghost">See shipper pricing</Link>
+            <Link to="/for-shippers" className="btn-ghost">See all tools for shippers</Link>
           </motion.div>
         </div>
         <motion.div variants={fadeUp} className="card-dark p-6 md:p-8">
-          <p className="text-sm font-medium text-text-muted">Live lead feed · Newark, NJ warehouse</p>
+          <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-text-muted">What a partner sees · new requests on their lanes</p><span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Example</span></div>
           <ul className="mt-4 divide-y divide-border">
             {[
-              ['4 barrels → Kumasi, Ghana', 'Ocean · pickup requested', '12 min ago'],
-              ['2019 Toyota Highlander → Tema', 'Ocean · title in hand', '41 min ago'],
-              ['3 pallets medical → Lagos', 'Air · urgent', '2 h ago'],
-              ['20ft FCL → Lomé', 'Ocean · commercial', '5 h ago'],
+              ['4 barrels → Kumasi, Ghana', 'Ocean · pickup requested', ''],
+              ['2019 Toyota Highlander → Tema', 'Ocean · title in hand', ''],
+              ['3 pallets medical → Lagos', 'Air · urgent', ''],
+              ['20ft FCL → Lomé', 'Ocean · commercial', ''],
             ].map(([a, b, c]) => (
               <li key={a} className="flex items-center justify-between gap-4 py-3.5">
                 <div><p className="text-[15px] font-medium text-text">{a}</p><p className="text-xs text-text-muted">{b}</p></div>
@@ -127,11 +127,7 @@ export function ForShippers() {
               </li>
             ))}
           </ul>
-          <div className="mt-5 grid grid-cols-3 gap-3 border-t border-border pt-5 text-center">
-            {[['38', 'Bookings / mo'], ['4.8', 'Rating'], ['2h', 'Avg. response']].map(([v, l]) => (
-              <div key={l}><p className="font-heading text-2xl font-bold text-gold-deep">{v}</p><p className="text-xs text-text-muted">{l}</p></div>
-            ))}
-          </div>
+          <Link to="/for-shippers" className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-5 text-sm font-semibold text-gold-deep hover:underline focus-ring rounded" data-testid="home-see-shipper-tools">See everything partners get — containers, warehouse, payouts and more <ArrowRight size={16} aria-hidden="true" /></Link>
         </motion.div>
       </div>
     </Section>
@@ -255,7 +251,7 @@ export function FinalCTA() {
             <div className="md:col-span-8">
               <p className="eyebrow mb-3">Get started</p>
               <h2>Ready to ship to West Africa?</h2>
-              <p className="mt-3 max-w-xl text-lg text-text-muted">Post your shipment now and have verified quotes in your inbox by tomorrow. Shippers: join 120+ companies already winning bookings.</p>
+              <p className="mt-3 max-w-xl text-lg text-text-muted">Post your shipment now and have verified quotes in your inbox by tomorrow. Shipping companies: <Link to="/for-shippers" className="font-semibold text-gold-deep hover:underline">see what Ntemtem does for you</Link>.</p>
             </div>
             <div className="flex flex-col gap-3 md:col-span-4 md:items-end">
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/quote" className="btn-gold w-full md:w-auto">Get free quotes <ArrowRight size={18} aria-hidden="true" /></Link></motion.div>

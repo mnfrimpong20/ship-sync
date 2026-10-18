@@ -6,7 +6,7 @@ import { useSiteConfig } from '../lib/site'
 
 /** Four balanced groups of short links; legal links live only in the bottom bar. */
 const cols: { title: string; links: [string, string][] }[] = [
-  { title: 'Send', links: [['Get a quote', '/quote'], ['Track a shipment', '/track'], ['Find a shipper', '/shippers'], ['Fill a barrel', '/groupage'], ['Sourcing service', '/sourcing'], ['How it works', '/?s=how']] },
+  { title: 'Send', links: [['Get a quote', '/quote'], ['Track a shipment', '/track'], ['Browse shippers', '/shippers'], ['Fill a barrel', '/groupage'], ['Sourcing service', '/sourcing'], ['How it works', '/?s=how']] },
   { title: 'Plan', links: [['Duty estimator', '/duty'], ['Lane prices', '/lanes'], ['Sailing schedule', '/sailings'], ['Customs brokers', '/brokers'], ['Live map', '/live']] },
   { title: 'For shipping companies', links: [['Why Ntemtem', '/for-shippers'], ['List your company', '/signup?role=shipper'], ['Plans & pricing', '/pricing?for=shippers'], ['Getting verified', '/for-shippers?s=verified'], ['Partner sign in', '/login']] },
   { title: 'Company', links: [['About us', '/about'], ['Contact', '/contact'], ['FAQ', '/?s=faq']] },

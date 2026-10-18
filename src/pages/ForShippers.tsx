@@ -5,6 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { ArrowRight, ChartLine, MessageCircle, Ship, ShieldCheck, Users, Wallet } from 'lucide-react'
 import { api } from '../lib/store'
+import { suppliesApi } from '../lib/supplies'
 import { Mark, money, VerifiedBadge } from '../components/ui'
 import { fadeUp, stagger, viewport } from '../lib/motion'
 
@@ -43,6 +44,8 @@ export default function ForShippersPage() {
   const [sp] = useSearchParams(); const s = sp.get('s')
   const [d, setD] = useState<PricingData | null>(null)
   useEffect(() => { api<PricingData>('/pricing').then(setD).catch(() => setD(null)) }, [])
+  const [catalog, setCatalog] = useState<Awaited<ReturnType<typeof suppliesApi.catalog>>>([])
+  useEffect(() => { suppliesApi.catalog().then(setCatalog).catch(() => setCatalog([])) }, [])
   // /for-shippers?s=run jumps to a section (hash links can't be used with the hash router).
   useEffect(() => { if (!s) return; const t = setTimeout(() => document.getElementById(s)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300); return () => clearTimeout(t) }, [s])
   const trial = d?.trialDays ? `${d.trialDays}-day free Pro trial` : 'Free Pro trial'
@@ -130,6 +133,35 @@ export default function ForShippersPage() {
             <VerifiedBadge large />
             <h2 className="mt-5 !text-[clamp(1.5rem,2.4vw,2rem)]">Get verified, rank higher.</h2>
             <p className="mt-3 text-text-muted">Upload your business registration and insurance; we check them and your track record. Verified partners show the badge on every quote and rank higher in matching.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Equipment — buy, rent or free with a plan (live from the catalogue) */}
+      <section id="equipment" className="scroll-mt-24 pb-20 md:pb-28" data-testid="fs-equipment">
+        <div className="container-x grid items-start gap-10 lg:grid-cols-12">
+          <div className="lg:col-span-5">
+            <Eyebrow>Equipment & supplies</Eyebrow>
+            <h2 className="!text-[clamp(1.6rem,2.6vw,2.25rem)]">Printers, scanners and labels — ready to work.</h2>
+            <p className="mt-4 text-text-muted">Everything we sell prints Ntemtem stickers and scans them straight into your warehouse and containers. No setup, no drivers to hunt for.</p>
+            <ul className="mt-6 space-y-3 text-[15px]">
+              <li className="flex gap-3"><b className="w-24 shrink-0">Buy it</b><span className="text-text-muted">Pay once, it’s yours. Free shipping over $150.</span></li>
+              <li className="flex gap-3"><b className="w-24 shrink-0">Rent it</b><span className="text-text-muted">A small monthly fee. Swaps and repairs on us; send it back any time.</span></li>
+              <li className="flex gap-3"><b className="w-24 shrink-0">Free with Pro</b><span className="text-text-muted">A starter kit on loan for as long as you’re on Pro. Enterprise gets the warehouse kit.</span></li>
+            </ul>
+            <p className="mt-6 text-sm text-text-muted">Sell packing supplies too — list your barrels, boxes and locks, and senders add them when they book.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3 lg:col-span-7">
+            {catalog.slice(0, 3).map((p) => (
+              <div key={p.id} className="card-light flex flex-col p-5">
+                {p.includedWith.length > 0 && <span className="mb-2 self-start rounded-full bg-teal/15 px-2 py-0.5 text-[11px] font-semibold text-teal">Free with {p.includedWith.map((x) => x[0].toUpperCase() + x.slice(1)).join(' / ')}</span>}
+                <h3 className="!text-base">{p.name}</h3>
+                <ul className="mt-2 flex-1 space-y-1 text-sm text-text-muted">{p.specs.slice(0, 3).map((x) => <li key={x}>{x}</li>)}</ul>
+                <p className="mt-4 font-heading text-2xl font-extrabold">{money(p.priceUsd)}</p>
+                {p.rentUsd != null && <p className="text-sm text-text-muted">or {money(p.rentUsd)}/month to rent</p>}
+              </div>
+            ))}
+            {!catalog.length && [0, 1, 2].map((i) => <div key={i} className="card-light h-48 animate-pulse" aria-hidden="true" />)}
           </div>
         </div>
       </section>

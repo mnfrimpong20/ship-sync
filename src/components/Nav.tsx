@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useScroll, useSpring } from 'motion/react'
-import { Anchor, ArrowRight, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X } from 'lucide-react'
+import { Anchor, ArrowRight, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X, Printer } from 'lucide-react'
 import { Logo, VerifiedMark } from './ui'
 import { useStore } from '../lib/store'
 
@@ -42,6 +42,7 @@ const shipperServices: { title: string; items: Service[] }[] = [
   { title: 'Run operations', items: [
     { to: '/for-shippers?s=run', label: 'Containers & sailings', blurb: 'Book space, load orders, track the box', icon: Ship },
     { to: '/for-shippers?s=run', label: 'Warehouse & scanning', blurb: 'Stickers, phone scans, proof of delivery', icon: ScanLine },
+    { to: '/for-shippers?s=equipment', label: 'Equipment & supplies', blurb: 'Printers, scanners, labels — buy, rent or free with Pro', icon: Printer },
     { to: '/for-shippers?s=run', label: 'Pickups, routes & drivers', blurb: 'Collection slots and daily runs', icon: Truck },
     { to: '/for-shippers?s=updates', label: 'Destination agent links', blurb: 'Your agent at the port sees the manifest', icon: Link2 },
   ] },

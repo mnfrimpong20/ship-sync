@@ -54,6 +54,7 @@ export async function getDb(): Promise<Db> {
   await seedRatesDemo(db)
   await seedPickupsDemo(db)
   await applyDemoLogos(db)
+  await (await import('./supplies')).seedSupplies(db)
   await seedPaymentsDemo(db)
   await seedGroupageDemo(db)
   await seedBrokersDemo(db)
@@ -1278,6 +1279,42 @@ alter table invoices add column if not exists plan jsonb;
 alter table disputes add column if not exists photos jsonb not null default '[]';
 update shippers set plan = 'pro' where demo and id in ('gold-coast-freight','atlantic-bridge') and plan = 'starter';
 update shippers set trial_ends_at = now() + interval '30 days' where trial_ends_at is null and plan = 'starter';
+create table if not exists supply_products (
+  id text primary key, sku text not null default '', name text not null, category text not null, blurb text not null default '',
+  specs jsonb not null default '[]', price_usd numeric not null default 0, rent_usd numeric, stock int not null default 0, reorder_level int not null default 5,
+  labels_per_unit int not null default 0, kit jsonb not null default '[]', included_with jsonb not null default '[]', active boolean not null default true,
+  sort int not null default 0, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create table if not exists supply_orders (
+  id text primary key, ref text not null, shipper_id text not null references shippers(id) on delete cascade, user_id text, placed_by text not null default '',
+  status text not null default 'awaiting_payment', provider text not null default 'manual', session_id text, subscription_id text,
+  subtotal_usd numeric not null default 0, shipping_usd numeric not null default 0, total_usd numeric not null default 0, monthly_usd numeric not null default 0,
+  ship_to jsonb not null default '{}', carrier text not null default '', tracking text not null default '', note text not null default '',
+  created_at timestamptz not null default now(), paid_at timestamptz, shipped_at timestamptz, delivered_at timestamptz, cancelled_at timestamptz
+);
+create index if not exists idx_supply_orders_shipper on supply_orders(shipper_id, created_at desc);
+create table if not exists supply_order_items (
+  id text primary key, order_id text not null references supply_orders(id) on delete cascade, product_id text not null, name text not null,
+  qty int not null, mode text not null, unit_usd numeric not null default 0
+);
+create table if not exists supply_rentals (
+  id text primary key, shipper_id text not null references shippers(id) on delete cascade, product_id text not null, order_id text, qty int not null default 1,
+  mode text not null default 'rent', monthly_usd numeric not null default 0, status text not null default 'pending', note text not null default '',
+  started_at timestamptz, return_requested_at timestamptz, returned_at timestamptz, created_at timestamptz not null default now()
+);
+create table if not exists supply_stock_moves (
+  id text primary key, product_id text not null, delta int not null, reason text not null, ref text not null default '', by_name text not null default '', at timestamptz not null default now()
+);
+create table if not exists shipper_supplies (
+  id text primary key, shipper_id text not null references shippers(id) on delete cascade, name text not null, kind text not null default 'other',
+  note text not null default '', price_usd numeric not null, active boolean not null default true, sort int not null default 0, created_at timestamptz not null default now()
+);
+create index if not exists idx_shipper_supplies on shipper_supplies(shipper_id);
+create table if not exists shipment_supplies (
+  id text primary key, shipment_id text not null references shipments(id) on delete cascade, supply_id text, name text not null, qty int not null,
+  unit_usd numeric not null, status text not null default 'due', added_by text not null default '', created_at timestamptz not null default now()
+);
+create index if not exists idx_shipment_supplies on shipment_supplies(shipment_id);
 
 `
 

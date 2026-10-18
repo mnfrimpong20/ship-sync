@@ -6,6 +6,7 @@ import { cargoLabel, countryByCode } from '../lib/data'
 import { useStore } from '../lib/store'
 import { fadeUp, stagger } from '../lib/motion'
 import { ShipperReviews } from '../components/ReviewCards'
+import { ShipperPackingList } from '../components/PackingSupplies'
 import { Avatar, Empty, ModeBadge, Rating, VerifiedBadge, Flag } from '../components/ui'
 import { ShippingBackdrop } from '../components/ShippingBackdrop'
 import { hubApi } from '../lib/customerHub'
@@ -75,6 +76,8 @@ export function ShipperProfile() {
                 <ul className="mt-4 flex flex-wrap gap-1.5 border-t border-border pt-4">{s.services.map((x) => <li key={x} className="rounded-full border border-border px-2.5 py-1 text-xs text-text-muted">{x}</li>)}</ul>
               </div>
             </motion.div>
+
+            <ShipperPackingList shipperId={s.id} name={s.name} />
 
             <motion.div variants={fadeUp} className="card-dark mt-6 p-6">
               <h2 className="!text-lg">Recent reviews</h2>

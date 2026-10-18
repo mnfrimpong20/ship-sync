@@ -1,7 +1,7 @@
 import { api } from './store'
 
 export type PaymentStatus = 'pending' | 'held' | 'released' | 'paid_out' | 'refunded' | 'cancelled' | 'direct'
-export interface PaymentItem { description: string; amountUsd: number; kind?: 'freight' | 'insurance' }
+export interface PaymentItem { description: string; amountUsd: number; kind?: 'freight' | 'insurance' | 'supplies'; ref?: string }
 export interface Payment {
   id: string; shipmentId: string; shipmentRef?: string; customer?: string; shipperId: string; shipperName?: string
   items: PaymentItem[]; amountUsd: number; feeUsd: number; netUsd: number

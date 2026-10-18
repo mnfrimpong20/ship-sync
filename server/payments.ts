@@ -75,7 +75,7 @@ function encode(obj: Record<string, unknown>, prefix = '', out = new URLSearchPa
   }
   return out
 }
-export async function stripe<T = Row>(path: string, params?: Record<string, unknown>, method: 'POST' | 'GET' = params ? 'POST' : 'GET'): Promise<T> {
+export async function stripe<T = Row>(path: string, params?: Record<string, unknown>, method: 'POST' | 'GET' | 'DELETE' = params ? 'POST' : 'GET'): Promise<T> {
   const key = stripeKey(); if (!key) throw new Error('Stripe is not configured.')
   const res = await fetch(`${STRIPE_URL()}/v1${path}`, { method, headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Version': '2024-06-20' }, body: method === 'POST' ? encode(params ?? {}).toString() : undefined })
   const data = (await res.json().catch(() => ({}))) as Row
@@ -116,7 +116,7 @@ const PAYOUT_SELECT = `select o.*, sh.name as shipper_name, (select count(*) fro
 /* ------------------------------------------------------------------ core */
 /** What the customer still owes on a shipment: the accepted quote plus any insurance premium not yet collected. */
 export async function amountDue(db: Db, s: Row) {
-  const items: { description: string; amountUsd: number; kind: 'freight' | 'insurance' }[] = []
+  const items: { description: string; amountUsd: number; kind: 'freight' | 'insurance' | 'supplies'; ref?: string }[] = []
   const { rows: q } = s.request_id ? await db.query<Row>(`select price, includes from quotes where request_id = $1 and status = 'accepted' limit 1`, [s.request_id]) : { rows: [] as Row[] }
   const { rows: inv } = await db.query<Row>(`select total from invoices where shipment_id = $1 and status in ('sent','draft') order by created_at desc limit 1`, [s.id])
   const grp = await groupageAmount(db, s)
@@ -125,6 +125,8 @@ export async function amountDue(db: Db, s: Row) {
   else if (q[0]) items.push({ description: `${s.mode === 'air' ? 'Air' : 'Ocean'} freight ${s.origin} → ${s.destination} — ${s.ref}`, amountUsd: Number(q[0].price), kind: 'freight' })
   const { rows: pol } = await db.query<Row>(`select premium_usd from insurance_policies where shipment_id = $1 and status <> 'cancelled' and payment_status = 'due' limit 1`, [s.id])
   if (pol[0]) items.push({ description: 'All-risk cargo insurance premium', amountUsd: Number(pol[0].premium_usd), kind: 'insurance' })
+  // Packing supplies ride along with the freight — never charged on their own before the shipper has priced the job.
+  if (items.some((i) => i.kind === 'freight')) items.push(...(await (await import('./supplies')).dueSupplies(db, s.id)))
   const amountUsd = r2(items.reduce((n, i) => n + i.amountUsd, 0))
   return { items, amountUsd }
 }
@@ -142,10 +144,12 @@ export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; m
   const items = J(p.items ?? '[]') as { kind?: string }[]
   // Insurance premium included → collected.
   if (p.shipment_id && items.some((i) => i.kind === 'insurance')) await db.query(`update insurance_policies set payment_status = 'collected', collected_at = now() where shipment_id = $1 and payment_status = 'due' and status <> 'cancelled'`, [p.shipment_id])
+  // Packing supplies the shipper brings before pickup → paid.
+  await (await import('./supplies')).markSuppliesPaid(db, items as { kind?: string; ref?: string }[])
   // Open invoice on the shipment → record the payment against it.
   const { rows: inv } = p.invoice_id ? await db.query<Row>(`select * from invoices where id = $1`, [p.invoice_id]) : p.shipment_id ? await db.query<Row>(`select * from invoices where shipment_id = $1 and status in ('sent','draft') order by created_at desc limit 1`, [p.shipment_id]) : { rows: [] as Row[] }
   if (inv[0]) {
-    const freight = (J(p.items ?? '[]') as { kind?: string; amountUsd: number }[]).filter((i) => i.kind !== 'insurance').reduce((n, i) => n + i.amountUsd, 0)
+    const freight = (J(p.items ?? '[]') as { kind?: string; amountUsd: number }[]).filter((i) => i.kind !== 'insurance' && i.kind !== 'supplies').reduce((n, i) => n + i.amountUsd, 0)
     await db.query('insert into payments (id,invoice_id,amount,method,at,note) values ($1,$2,$3,$4,current_date,$5)', ['pay_' + uid(), inv[0].id, Math.round(freight), opts.direct ? opts.method ?? 'bank' : 'ship_sync', opts.direct ? `Recorded by ${opts.by ?? 'office'}` : `Paid online via Ntemtem (${p.id})`])
     const { rows: sum } = await db.query<{ s: string }>('select coalesce(sum(amount),0)::text as s from payments where invoice_id = $1', [inv[0].id])
     await db.query(`update invoices set status = case when $2::int >= total then 'paid' else 'sent' end where id = $1`, [inv[0].id, Number(sum[0].s)])
@@ -234,6 +238,7 @@ export function stripeWebhook(getDb: () => Promise<Db>) {
     let evt: Row; try { evt = JSON.parse(raw.toString()) } catch { return res.status(400).json({ error: 'Bad payload.' }) }
     const db = await getDb()
     if (evt.id) { const { rows } = await db.query('select 1 from stripe_events where id = $1', [evt.id]); if (rows.length) return res.json({ received: true, duplicate: true }); await db.query('insert into stripe_events (id,type) values ($1,$2)', [evt.id, evt.type ?? '']) }
+    if (await (await import('./supplies')).handleSuppliesEvent(db, evt)) return res.json({ received: true, supplies: true })
     if (await (await import('./billing')).handleBillingEvent(db, evt)) return res.json({ received: true, billing: true })
     const obj: Row = evt.data?.object ?? {}
     if (evt.type === 'checkout.session.completed' || evt.type === 'checkout.session.async_payment_succeeded') {

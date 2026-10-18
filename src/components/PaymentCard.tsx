@@ -5,6 +5,7 @@ import { NOTIFY_EVENT } from '../lib/notifications'
 import { methodLabels, paymentStatusLabels, paymentsApi, usd, type Payment } from '../lib/payments'
 import { Confirm } from './board'
 import { ProtectedNote } from './ui'
+import { PAYMENT_REFRESH } from '../lib/supplies'
 
 const tone: Record<Payment['status'], string> = { pending: 'bg-gold/15 text-gold-deep', held: 'bg-teal/15 text-teal', released: 'bg-teal/15 text-teal', paid_out: 'bg-teal/15 text-teal', refunded: 'bg-danger/15 text-danger', cancelled: 'bg-surface-2 text-text-muted', direct: 'bg-teal/15 text-teal' }
 const fmt = (v: string | null) => (v ? new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '')
@@ -22,6 +23,7 @@ export function PaymentCard({ shipmentId }: { shipmentId: string }) {
   const [params, setParams] = useSearchParams()
   const load = () => paymentsApi.forShipment(shipmentId).then(setD).catch((e) => setError(e instanceof Error ? e.message : 'Could not load.'))
   useEffect(() => { void load() }, [shipmentId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const on = () => { void load() }; window.addEventListener(PAYMENT_REFRESH, on); return () => window.removeEventListener(PAYMENT_REFRESH, on) }, [shipmentId]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 4000); return () => clearTimeout(t) }, [toast])
   // Back from Stripe Checkout: confirm with the server (covers the case where the webhook hasn't landed yet).
   useEffect(() => {

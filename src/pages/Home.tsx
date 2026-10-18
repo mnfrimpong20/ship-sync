@@ -10,7 +10,6 @@ export default function Home() {
   return (
     <>
       <Hero />
-      <div className="ss-weave" role="presentation" />
       <Destinations />
       <HowItWorks />
       <FamilyUpdates />

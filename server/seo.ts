@@ -15,10 +15,8 @@ type Row = Record<string, any>
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const baseUrl = (req: Request) => (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')
 
-export function mountSeo(app: Express, getDb: () => Promise<Db>, dist: string) {
-  let shell: string | null = null
-  const html = () => (shell ??= readFileSync(path.join(dist, 'index.html'), 'utf8'))
-
+/** robots.txt + sitemap.xml — mounted in both dev and production (before Vite's dev middleware). */
+export function mountSeoFiles(app: Express, getDb: () => Promise<Db>) {
   app.get('/robots.txt', (req, res) => {
     res.type('text/plain').set('Cache-Control', 'public, max-age=3600')
     res.send(['User-agent: *', 'Allow: /', ...['/dashboard', '/admin', '/api/', '/pay/', '/doc/', '/r/', '/p/', '/s/', '/broker/', '/reset', '/join', '/embed/', '/add-recipient/', '/order/', '/scan'].map((p) => `Disallow: ${p}`), '', `Sitemap: ${baseUrl(req)}/sitemap.xml`, ''].join('\n'))
@@ -32,6 +30,12 @@ export function mountSeo(app: Express, getDb: () => Promise<Db>, dist: string) {
     res.type('application/xml').set('Cache-Control', 'public, max-age=3600')
     res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(u.loc)}</loc><priority>${u.pri}</priority></url>`).join('\n')}\n</urlset>\n`)
   })
+}
+
+/** Production: every page's HTML carries its own title, description, Open Graph tags and canonical address. */
+export function mountSeo(app: Express, getDb: () => Promise<Db>, dist: string) {
+  let shell: string | null = null
+  const html = () => (shell ??= readFileSync(path.join(dist, 'index.html'), 'utf8'))
 
   app.get('*path', async (req, res) => {
     const p = req.path

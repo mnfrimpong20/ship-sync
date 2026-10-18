@@ -4,7 +4,7 @@ import compression from 'compression'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { apiRouter } from './api'
-import { mountSeo } from './seo'
+import { mountSeo, mountSeoFiles } from './seo'
 import { getDb } from './db'
 import { ais, startAirSweep } from './live'
 import { startCarrierSync } from './containers'
@@ -46,6 +46,7 @@ async function main() {
   // White-label custom domains: a shipper's own host lands on their branded page.
   app.get('/', async (req, res, next) => { try { const slug = await slugForHost(await getDb(), req.headers.host); if (slug && !req.url.includes('#')) return res.redirect(302, `/t/${slug}`) } catch { /* ignore */ } next() })
 
+  mountSeoFiles(app, getDb)
   if (isProd) {
     const dist = path.join(root, 'dist')
     app.use(express.static(dist, { index: false, maxAge: '1h' }))

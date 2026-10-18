@@ -283,3 +283,25 @@ Ship Sync Sourcing buys in three countries. `src/lib/sourcingOrigins.ts` (shared
   - Menus now use `/pricing`, `/?s=how` and `/?s=faq`; the home page scrolls to `?s=<section id>`.
   - `/how` and `/faq` redirect to those home sections.
   - In-page buttons scroll instead of changing the route.
+
+## Customer portal layout (`/dashboard`)
+
+- **Overview** (`/dashboard`, `src/components/CustomerOverview.tsx`): one row of summary tiles (you owe, unread messages, on the way, quotes to review), then:
+  - a getting-started checklist (phone, recipient, first request, WhatsApp/SMS alerts, family) — hide it with the ✕ (remembered in the browser);
+  - Needs you;
+  - the next arrival;
+  - recent shipments with quick actions;
+  - the next two weeks.
+
+  The counts come from `GET /me/summary` (`server/account.ts`), shared by the overview and the menu badges.
+- **Sections:** each menu item (`?tab=…`) is its own page with its own title — no repeated overview and no tab strip. The menu is grouped: Shipping, Money, Organise, Help & account. It shows the amount owed and unread messages.
+- **Phones:** a bottom bar (Home, Shipments, Messages, Money, More).
+- **Shipment page:** split into tabs (`?tab=shipments&s=<id>&view=…`): `tracking`, `inside`, `pay`, `customs`, `people`, `chat`, `docs`, `help`. Old `?recipient=` and `?review=` links still land on the right tab.
+- **Quick actions** on shipment cards (`ShipmentQuickActions`): Pay (when something is due), Message, Share, Pickup (booked shipments).
+- **Account:**
+  - Profile: name and phone (`PATCH /me/profile`).
+  - Password: change it (`POST /me/password` signs out other devices).
+  - Devices: where you're signed in (`GET/DELETE /me/sessions`, `POST /me/sessions/revoke-others`; `sessions` now stores the user agent and last-seen time).
+  - Download your data (`GET /me/export`).
+  - Delete your account (`POST /me/delete` with password and `DELETE`). It's refused while a shipment is on the way, money is owed, or a payment is held. Identity is anonymised; shipment and invoice records stay for legal retention.
+  - Deep links: `?tab=account&section=profile|security|alerts|family`.

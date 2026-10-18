@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, Car, Check, ChevronDown, ClipboardList, Container, FileCheck2, Handshake, MapPinned, Minus, Plane, Radar, Scale, Ship, Truck, Users } from 'lucide-react'
+import { ArrowRight, Car, Check, ChevronDown, ClipboardList, Container, FileCheck2, Handshake, MapPinned, Minus, Plane, Radar, Scale, Ship, Truck } from 'lucide-react'
 import { fadeUp, stagger } from '../lib/motion'
 import { countries, faqs, shippers, testimonials } from '../lib/data'
 import { Section, SectionHeader, ShipperCard, Avatar, VerifiedMark, Flag } from './ui'
@@ -179,31 +179,62 @@ export function Testimonials() {
 // Kept in line with server/features.ts PLANS; prices are refreshed from /api/pricing.
 const plans = [
   { key: 'starter', name: 'Starter', price: 0, per: '/month', tag: 'For new or small forwarders', features: ['Directory listing', 'Customer requests, quotes & messages', 'Shipments, tracking & invoices', 'Up to 3 team members'], missing: ['Branded page', 'Full analytics'] },
-  { key: 'pro', name: 'Pro', price: 149, per: '/month', tag: 'Most popular', highlight: true, features: ['Everything in Starter', 'Branded page', 'Full analytics', 'Win-back campaigns', 'Container load planner & accounting export', 'Up to 15 team members'], missing: [] },
+  { key: 'pro', name: 'Pro', price: 149, per: '/month', tag: 'Growing forwarders', highlight: true, features: ['Everything in Starter', 'Branded page', 'Full analytics', 'Win-back campaigns', 'Container load planner & accounting export', 'Up to 15 team members'], missing: [] },
   { key: 'enterprise', name: 'Enterprise', price: 499, per: '/month', tag: 'Multi-lane operators', features: ['Everything in Pro', 'Webhooks', 'Unlimited team members', 'Featured placement in the directory'], missing: [] },
 ]
+const senderPerks = ['Unlimited quote requests', 'Compare verified shippers side by side', 'Payment protection until the shipper confirms', 'Live tracking, with WhatsApp updates for family', 'Duty estimator and lane prices']
 export function Pricing() {
   const [live, setLive] = useState<Record<string, number>>({})
-  useEffect(() => { fetch('/api/pricing').then((r) => r.json()).then((d: { plans?: { key: string; priceUsd: number }[] }) => setLive(Object.fromEntries((d.plans ?? []).map((p) => [p.key, p.priceUsd])))).catch(() => {}) }, [])
+  const [trialDays, setTrialDays] = useState<number | null>(null)
+  useEffect(() => { fetch('/api/pricing').then((r) => r.json()).then((d: { plans?: { key: string; priceUsd: number }[]; trialDays?: number }) => { setLive(Object.fromEntries((d.plans ?? []).map((p) => [p.key, p.priceUsd]))); setTrialDays(d.trialDays ?? null) }).catch(() => {}) }, [])
+  const trial = trialDays ? `${trialDays}-day free trial` : 'Free trial'
   return (
     <Section id="pricing" light>
-      <SectionHeader light eyebrow="Pricing" title="Free for customers. Simple plans for shippers." body="Customers never pay Ntemtem. Shippers pay a flat monthly fee for leads and tools; a small platform fee applies only when a customer pays you through Ntemtem's escrow." />
+      <SectionHeader light eyebrow="Pricing" title="Free for senders. Always." body="Requesting quotes, comparing shippers, booking and tracking never cost you a cent. Shipping companies pay a simple monthly plan." />
+
+      {/* For senders — the headline offer */}
+      <motion.div variants={fadeUp} className="theme-dark relative overflow-hidden rounded-[var(--radius-lg)] bg-bg p-7 text-text md:p-10" data-testid="pricing-senders">
+        <div className="grid items-center gap-8 lg:grid-cols-12">
+          <div className="lg:col-span-4">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-gold">For senders</p>
+            <p className="mt-3 flex items-baseline gap-3"><span className="font-heading text-7xl font-extrabold leading-none text-gold md:text-8xl">$0</span><span className="text-lg font-semibold text-text">free, always</span></p>
+            <p className="mt-3 text-sm text-text-muted">No sign-up needed to see prices. You only pay the shipper you choose — never Ntemtem.</p>
+          </div>
+          <ul className="grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:col-span-5">
+            {senderPerks.map((f) => <li key={f} className="flex gap-2.5 text-[15px]"><Check size={18} className="mt-0.5 shrink-0 text-teal" aria-hidden="true" />{f}</li>)}
+          </ul>
+          <div className="flex flex-col gap-3 lg:col-span-3">
+            <Link to="/quote" className="btn-gold">Get free quotes <ArrowRight size={18} aria-hidden="true" /></Link>
+            <Link to="/track" className="btn-ghost">Track a shipment</Link>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* For shipping companies */}
+      <motion.div variants={fadeUp} className="mt-16 mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-ink"><span className="h-2.5 w-2.5 rounded-[3px] bg-partner" aria-hidden="true" />For shipping companies</p>
+          <h3 className="mt-2 !text-[clamp(1.5rem,2.6vw,2rem)] text-ink">Simple plans. Start on Pro, free.</h3>
+          <p className="mt-1 text-sm text-ink-muted">A small platform fee applies only when a customer pays you through Ntemtem’s escrow.</p>
+        </div>
+        <Link to="/for-shippers" className="text-sm font-semibold text-gold-deep hover:underline focus-ring rounded">See everything partners get →</Link>
+      </motion.div>
       <div className="grid gap-6 lg:grid-cols-3">
         {plans.map((p) => (
-          <motion.div key={p.name} variants={fadeUp} whileHover={{ y: -4 }} className={`relative flex flex-col rounded-[var(--radius-lg)] border p-7 ${p.highlight ? 'border-gold bg-bg text-text shadow-[var(--shadow-dark)]' : 'card-light'}`}>
-            {p.highlight && <span className="absolute -top-3 left-7 rounded-full bg-gold px-3 py-1 text-xs font-bold text-on-accent">{p.tag}</span>}
-            <h3 className={p.highlight ? 'text-text' : 'text-ink'}>{p.name}</h3>
-            <p className={`text-sm ${p.highlight ? 'text-text-muted' : 'text-ink-muted'}`}>{p.highlight ? 'Growing forwarders' : p.tag}</p>
-            <p className="mt-4 flex items-baseline gap-1"><span className={`font-heading text-5xl font-bold ${p.highlight ? 'text-gold-deep' : 'text-ink'}`}>${live[p.key] ?? p.price}</span><span className={p.highlight ? 'text-text-muted' : 'text-ink-muted'}>{p.per}</span></p>
+          <motion.div key={p.name} variants={fadeUp} whileHover={{ y: -4 }} className={`relative flex flex-col rounded-[var(--radius-lg)] border p-7 ${p.highlight ? 'border-partner bg-partner text-[#FBF6EC] shadow-[var(--shadow-dark)]' : 'card-light'}`}>
+            {p.highlight && <span className="absolute -top-3 left-7 rounded-full bg-gold px-3 py-1 text-xs font-bold text-on-accent">{trial}</span>}
+            <h3 className={p.highlight ? 'text-[#FBF6EC]' : 'text-ink'}>{p.name}</h3>
+            <p className={`text-sm ${p.highlight ? 'text-[#C9C1B1]' : 'text-ink-muted'}`}>{p.highlight ? 'Growing forwarders' : p.tag}</p>
+            <p className="mt-4 flex items-baseline gap-1"><span className={`font-heading text-5xl font-bold ${p.highlight ? 'text-gold' : 'text-ink'}`}>${live[p.key] ?? p.price}</span><span className={p.highlight ? 'text-[#C9C1B1]' : 'text-ink-muted'}>{p.per}</span></p>
             <ul className="mt-6 flex-1 space-y-2.5 text-sm">
-              {p.features.map((f) => <li key={f} className={`flex gap-2 ${p.highlight ? 'text-text' : 'text-ink'}`}><Check size={16} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" />{f}</li>)}
+              {p.features.map((f) => <li key={f} className={`flex gap-2 ${p.highlight ? 'text-[#FBF6EC]' : 'text-ink'}`}><Check size={16} className={`mt-0.5 shrink-0 ${p.highlight ? 'text-gold' : 'text-gold-deep'}`} aria-hidden="true" />{f}</li>)}
               {p.missing.map((f) => <li key={f} className="flex gap-2 text-ink-muted/70"><Minus size={16} className="mt-0.5 shrink-0" aria-hidden="true" />{f}</li>)}
             </ul>
-            <Link to="/signup?role=shipper" className={`mt-7 ${p.highlight ? 'btn-gold' : 'btn-light'}`}>{p.price === 0 ? 'Start free' : `Choose ${p.name}`}</Link>
+            <Link to="/signup?role=shipper" className={`mt-7 ${p.highlight ? 'btn-gold' : 'btn-light'}`}>{p.price === 0 ? 'Start free' : p.highlight ? `Try ${p.name} free` : `Choose ${p.name}`}</Link>
           </motion.div>
         ))}
       </div>
-      <motion.p variants={fadeUp} className="mt-8 flex items-center justify-center gap-2 text-center text-sm text-ink-muted"><Users size={16} aria-hidden="true" /> Customers: requesting quotes, booking and tracking is always free. <Link to="/pricing" className="font-semibold text-gold-deep hover:underline">Full pricing →</Link></motion.p>
+      <motion.p variants={fadeUp} className="mt-8 text-center text-sm text-ink-muted"><Link to="/pricing?for=shippers" className="font-semibold text-gold-deep hover:underline focus-ring rounded">Compare every plan feature →</Link></motion.p>
     </Section>
   )
 }

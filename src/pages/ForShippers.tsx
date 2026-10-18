@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { ArrowRight, BadgeCheck, ChartLine, MessageCircle, Ship, ShieldCheck, Users, Wallet } from 'lucide-react'
+import { ArrowRight, ChartLine, MessageCircle, Ship, ShieldCheck, Users, Wallet } from 'lucide-react'
 import { api } from '../lib/store'
-import { Mark, money } from '../components/ui'
+import { Mark, money, VerifiedBadge } from '../components/ui'
 import { fadeUp, stagger, viewport } from '../lib/motion'
 
 interface PricingData {
@@ -127,7 +127,7 @@ export default function ForShippersPage() {
             <p className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-teal"><MessageCircle size={16} aria-hidden="true" /> WhatsApp and SMS included on every plan</p>
           </div>
           <div id="verified" className="card-light scroll-mt-24 p-8 md:p-10 lg:col-span-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-teal/30 bg-teal/10 px-3 py-1.5 text-sm font-semibold text-teal"><BadgeCheck size={16} aria-hidden="true" /> Ntemtem Verified</span>
+            <VerifiedBadge large />
             <h2 className="mt-5 !text-[clamp(1.5rem,2.4vw,2rem)]">Get verified, rank higher.</h2>
             <p className="mt-3 text-text-muted">Upload your business registration and insurance; we check them and your track record. Verified partners show the badge on every quote and rank higher in matching.</p>
           </div>

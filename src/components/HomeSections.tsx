@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, BadgeCheck, Car, Check, ChevronDown, ClipboardList, Container, FileCheck2, Handshake, MapPinned, Minus, Plane, Radar, Scale, Ship, Truck, Users } from 'lucide-react'
+import { ArrowRight, Car, Check, ChevronDown, ClipboardList, Container, FileCheck2, Handshake, MapPinned, Minus, Plane, Radar, Scale, Ship, Truck, Users } from 'lucide-react'
 import { fadeUp, stagger } from '../lib/motion'
 import { countries, faqs, shippers, testimonials } from '../lib/data'
-import { Section, SectionHeader, ShipperCard, Avatar } from './ui'
+import { Section, SectionHeader, ShipperCard, Avatar, VerifiedMark } from './ui'
 import { congestionLabel, useCongestion } from '../lib/useCongestion'
 
 /* ---------- Destinations ---------- */
@@ -67,7 +67,7 @@ export function HowItWorks() {
 
 /* ---------- Features bento ---------- */
 const features = [
-  { icon: BadgeCheck, title: 'Verified shippers only', body: 'Business registration, forwarder licence, insurance certificate and warehouse address checked before the badge appears.', span: 'md:col-span-4', accent: true },
+  { icon: VerifiedMark, title: 'Verified shippers only', body: 'Business registration, forwarder licence, insurance certificate and warehouse address checked before the badge appears.', span: 'md:col-span-4', accent: true },
   { icon: Scale, title: 'Transparent, itemised quotes', body: 'Freight, pickup, delivery, insurance and destination fees listed separately. No “call for price”.', span: 'md:col-span-2' },
   { icon: Truck, title: 'Door-to-door', body: 'Pickup in 40+ US, UK, Canadian and EU cities. Delivery to Accra, Kumasi, Lagos, Abuja, Monrovia, Lomé and more.', span: 'md:col-span-2' },
   { icon: Car, title: 'Vehicles & containers', body: 'RoRo and containerised vehicle shipping with title handling and duty estimates before you commit.', span: 'md:col-span-2' },

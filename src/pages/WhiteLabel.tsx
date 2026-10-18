@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { BadgeCheck, Check, Copy, ExternalLink, Globe, Mail, MessageCircle, Package, Phone, Save, Search, Star } from 'lucide-react'
+import { Check, Copy, ExternalLink, Globe, Mail, MessageCircle, Package, Phone, Save, Search, Star } from 'lucide-react'
 import { useStore, type NewRequest } from '../lib/store'
 import { onAccent, whitelabelApi, type WlBrand } from '../lib/whitelabel'
 import { cargoLabel, cargoTypes, countries, countryByCode, type CargoType, type Mode, type Shipment } from '../lib/data'
-import { Avatar, Logo, money } from '../components/ui'
+import { Avatar, Logo, money, VerifiedMark } from '../components/ui'
 import { ShipmentDetail } from './Track'
 import { Stars } from '../components/ReviewCards'
 import { fadeUp, stagger } from '../lib/motion'
@@ -132,7 +132,7 @@ export function BrandEditor() {
               <div className="space-y-4">
                 <div className="card-dark p-5"><p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Preview</p><div className="mt-3 overflow-hidden rounded-xl border border-border"><div className="flex items-center gap-2 border-b border-border bg-surface p-3">{b.logo ? <img src={b.logo} alt="" className="h-7 object-contain" /> : <Avatar initials={d.shipper.initials} hue={b.accent} size={28} />}<span className="text-sm font-semibold">{d.shipper.name}</span><span className="ml-auto rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: b.accent, color: onAccent(b.accent) }}>Get a quote</span></div><div className="p-3"><p className="text-sm font-semibold">{b.headline || `Ship to ${countryByCode(d.shipper.destinations[0])?.name ?? ''} with ${d.shipper.name}`}</p><p className="mt-1 line-clamp-2 text-xs text-text-muted">{b.intro || 'Your intro appears here.'}</p></div></div></div>
                 <div className="card-dark p-5 text-sm"><p className="inline-flex items-center gap-2 font-semibold"><Star size={14} className="text-gold-deep" aria-hidden="true" /> Leads from your page</p><p className="mt-1 text-3xl font-bold">{d.leads}</p><p className="text-xs text-text-muted">Requests that came through your branded page go only to you, never to competitors.</p><Link to="/dashboard/rates" className="btn-ghost mt-3 !min-h-8 !px-3 text-xs">Publish rate cards for instant quotes</Link></div>
-                <p className="text-[11px] text-text-muted"><BadgeCheck size={11} className="inline" aria-hidden="true" /> Your Ntemtem listing, reviews and verification badge carry over to the page.</p>
+                <p className="text-[11px] text-text-muted"><VerifiedMark size={11} className="inline align-[-1px]" aria-hidden="true" /> Your Ntemtem listing, reviews and verification badge carry over to the page.</p>
               </div>
             </div>
           )}

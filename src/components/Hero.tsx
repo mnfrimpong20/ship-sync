@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { siteApi, type SiteStats } from '../lib/site'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { ArrowRight, BadgeCheck, Plane, Ship, ShieldCheck, Clock } from 'lucide-react'
+import { ArrowRight, Plane, Ship, ShieldCheck, Clock } from 'lucide-react'
+import { VerifiedMark } from './ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { countries, origins, type Mode } from '../lib/data'
 import HeroVideo from './HeroVideo'
@@ -39,7 +40,7 @@ export default function Hero() {
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/signup?role=shipper" className="btn-ghost w-full !border-white/50 !text-white hover:!border-white hover:!bg-white/10 sm:w-auto">List your shipping company</Link></motion.div>
           </motion.div>
           <motion.ul variants={fadeUp} className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-text-muted">
-            <li className="flex items-center gap-2"><BadgeCheck size={16} className="text-teal" aria-hidden="true" /> {stats ? `${stats.verifiedShippers} verified shippers` : 'Verified shippers only'}</li>
+            <li className="flex items-center gap-2"><VerifiedMark size={16} aria-hidden="true" /> {stats ? `${stats.verifiedShippers} verified shippers` : 'Verified shippers only'}</li>
             <li className="flex items-center gap-2"><ShieldCheck size={16} className="text-teal" aria-hidden="true" /> Payment protected until the shipper confirms</li>
             <li className="flex items-center gap-2"><Clock size={16} className="text-gold-deep" aria-hidden="true" /> Quotes within 24 hours</li>
           </motion.ul>

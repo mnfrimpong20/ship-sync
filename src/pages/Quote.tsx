@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, ArrowRight, BadgeCheck, Check, Loader2, Plane, Ship, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Loader2, Plane, Ship, Zap } from 'lucide-react'
 import { cargoTypes, countries, countryByCode, type CargoType, type Mode } from '../lib/data'
 import { useStore, type Match, type NewRequest, type RequestConsignee } from '../lib/store'
 import { customerApi, type Consignee } from '../lib/customer'
 import { ConsigneeForm } from '../components/CustomerHome'
 import { OriginCombobox } from '../components/OriginCombobox'
-import { Avatar, ModeBadge, Rating, money } from '../components/ui'
+import { Avatar, ModeBadge, Rating, money, VerifiedMark } from '../components/ui'
 import { ease } from '../lib/motion'
 import { RequestVehicleFields } from '../components/VehicleCard'
 import { congestionLabel, useCongestion } from '../lib/useCongestion'
@@ -228,7 +228,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
               {locked ? (
                 <div data-testid="locked-shipper">
                   <p className="eyebrow mb-2">You’re ordering from</p>
-                  <div className="flex items-start gap-3"><Avatar initials={locked.shipper.initials} hue={locked.shipper.hue} size={48} /><div className="min-w-0"><p className="flex items-center gap-1 text-base font-semibold">{locked.shipper.name}{locked.shipper.verified && <BadgeCheck size={16} className="text-gold-deep" aria-label="Verified" />}</p><p className="text-sm text-text-muted">{locked.shipper.tagline || locked.shipper.hq}</p><div className="mt-1 flex flex-wrap items-center gap-1.5">{locked.shipper.modes.map((md) => <ModeBadge key={md} mode={md} />)}<Rating value={locked.shipper.rating} count={locked.shipper.reviews} /></div></div></div>
+                  <div className="flex items-start gap-3"><Avatar initials={locked.shipper.initials} hue={locked.shipper.hue} size={48} /><div className="min-w-0"><p className="flex items-center gap-1 text-base font-semibold">{locked.shipper.name}{locked.shipper.verified && <VerifiedMark size={16} role="img" aria-label="Ntemtem Verified" />}</p><p className="text-sm text-text-muted">{locked.shipper.tagline || locked.shipper.hq}</p><div className="mt-1 flex flex-wrap items-center gap-1.5">{locked.shipper.modes.map((md) => <ModeBadge key={md} mode={md} />)}<Rating value={locked.shipper.rating} count={locked.shipper.reviews} /></div></div></div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-text-muted">Ships to</dt><dd>{locked.shipper.destinations.map((c) => countryByCode(c)?.name ?? c).join(', ')}</dd></div><div><dt className="text-xs text-text-muted">Collects from</dt><dd>{locked.shipper.origins.slice(0, 3).join(', ') || '—'}</dd></div>{locked.shipper.onTime > 0 && <div><dt className="text-xs text-text-muted">On time</dt><dd>{locked.shipper.onTime}%</dd></div>}<div><dt className="text-xs text-text-muted">Replies in</dt><dd>~{locked.shipper.responseHours} h</dd></div></dl>
                   <p className="mt-4 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">This request goes only to {locked.shipper.name}. You’ll get a Ntemtem account to track it, and payment is held in escrow until the goods are on their way.</p>
                 </div>
@@ -254,7 +254,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                       {only === m.shipper.id && <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-gold px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-on-accent" data-testid="selected-tag"><Check size={10} aria-hidden="true" /> Selected</span>}
                       <Avatar initials={m.shipper.initials} hue={m.shipper.hue} size={40} />
                       <div className="min-w-0 flex-1">
-                        <p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{m.shipper.name}{m.shipper.verified && <BadgeCheck size={14} className="text-gold-deep" aria-label="Verified" />}</p>
+                        <p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{m.shipper.name}{m.shipper.verified && <VerifiedMark size={14} role="img" aria-label="Ntemtem Verified" />}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">{m.shipper.modes.map((md) => <ModeBadge key={md} mode={md} />)}<Rating value={m.shipper.rating} /></div>
                         <p className="mt-1 text-xs text-text-muted">{m.reasons.slice(0, 2).join(' · ')}</p>
                         {m.estimate && <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-gold/10 px-2 py-0.5 text-xs font-semibold text-gold-deep" data-testid="match-estimate">{m.estimate.instant ? <Zap size={11} aria-hidden="true" /> : null}{money(m.estimate.price)} · {m.estimate.transitDays} days{m.estimate.instant ? ' · instant quote' : ' · published rate'}</p>}

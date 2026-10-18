@@ -1,7 +1,7 @@
 import { motion } from 'motion/react'
 import { Link } from 'react-router-dom'
-import { BadgeCheck, Plane, Ship, ShieldCheck, Star } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { Plane, Ship, ShieldCheck, Star } from 'lucide-react'
+import type { ReactNode, SVGProps } from 'react'
 import { fadeUp, stagger, viewport } from '../lib/motion'
 import { countryByCode, type Mode, type Shipper } from '../lib/data'
 
@@ -36,11 +36,22 @@ export function Logo({ light = true, className = '', tagline = true, partner = f
   )
 }
 
-/** "Ntemtem Verified" — only for shippers who passed vetting. Green: verified is good news. */
+/** The Ntemtem Verified mark — a solid green disc with a check, from the brand book. Same props as a lucide icon,
+ *  so it can stand in for one anywhere. Reserve it for shipping companies that passed Ntemtem vetting. */
+export function VerifiedMark({ size = 16, className = '', ...rest }: SVGProps<SVGSVGElement> & { size?: number | string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 26 26" className={`shrink-0 ${className}`} {...rest}>
+      <circle cx="13" cy="13" r="13" fill="var(--color-teal)" />
+      <path d="M7.5 13.5 11.3 17.3 18.5 9.3" fill="none" stroke="var(--color-surface)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/** "Ntemtem Verified" — the brand-book badge: gold-tint pill, green mark, navy text. Only for shippers who passed vetting. */
 export function VerifiedBadge({ large = false }: { large?: boolean }) {
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-teal/30 bg-teal/10 font-semibold text-teal ${large ? 'px-2.5 py-1 text-xs' : 'px-2 py-0.5 text-[11px]'}`} title="Passed Ntemtem vetting: business registration, insurance, warehouse and track record">
-      <BadgeCheck size={large ? 14 : 12} aria-hidden="true" /> Ntemtem Verified
+    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gold-soft font-semibold text-text ${large ? 'py-1 pl-1 pr-3 text-xs' : 'py-0.5 pl-0.5 pr-2.5 text-[11px]'}`} title="Passed Ntemtem vetting: business registration, insurance, warehouse and track record" data-testid="verified-badge">
+      <VerifiedMark size={large ? 20 : 16} aria-hidden="true" /> Ntemtem Verified
     </span>
   )
 }
@@ -111,7 +122,7 @@ export function ShipperCard({ s, light = false }: { s: Shipper; light?: boolean 
         <div className="min-w-0 flex-1">
           <h3 className={`flex items-center gap-1.5 text-lg ${light ? 'text-ink' : 'text-text'}`}>
             <span className="truncate">{s.name}</span>
-            {s.verified && <BadgeCheck size={18} className="shrink-0 text-gold-deep" aria-label="Verified shipper" />}
+            {s.verified && <VerifiedMark size={18} role="img" aria-label="Ntemtem Verified" />}
           </h3>
           <p className={`line-clamp-2 min-h-10 text-sm ${light ? 'text-ink-muted' : 'text-text-muted'}`}>{s.tagline}</p>
         </div>

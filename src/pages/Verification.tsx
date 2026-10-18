@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { BadgeCheck, Check, Clock, FileText, Loader2, ShieldCheck, Trash2, Upload, XCircle } from 'lucide-react'
+import { Check, Clock, FileText, Loader2, ShieldCheck, Trash2, Upload, XCircle } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { onboardingApi, type CompanyDocKind, type DocsPayload } from '../lib/onboarding'
-import { Pill, fmtDate, fmtDateTime } from '../components/ui'
+import { Pill, fmtDate, fmtDateTime, VerifiedMark } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { canManageOps } from '../lib/ops'
 
@@ -55,7 +55,7 @@ export default function Verification() {
           <div className="card-dark p-5 lg:col-span-1" data-testid="verify-status">
             <h2 className="flex items-center gap-2 !text-base"><ShieldCheck size={16} className="text-gold-deep" aria-hidden="true" /> Status</h2>
             {d?.verified ? (
-              <div className="mt-3 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-teal/15 text-teal"><BadgeCheck size={20} aria-hidden="true" /></span><div><p className="font-semibold">Verified</p><p className="text-xs text-text-muted">Your listing carries the badge.</p></div></div>
+              <div className="mt-3 flex items-center gap-3"><VerifiedMark size={40} aria-hidden="true" /><div><p className="font-semibold">Verified</p><p className="text-xs text-text-muted">Your listing carries the badge.</p></div></div>
             ) : d?.requestedAt ? (
               <div className="mt-3 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-gold/15 text-gold-deep"><Clock size={20} aria-hidden="true" /></span><div><p className="font-semibold">Under review</p><p className="text-xs text-text-muted">Requested {fmtDateTime(d.requestedAt)}. Usually one business day.</p></div></div>
             ) : (

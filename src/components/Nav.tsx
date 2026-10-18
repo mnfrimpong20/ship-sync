@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useScroll, useSpring } from 'motion/react'
-import { Anchor, ArrowRight, BadgeCheck, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X } from 'lucide-react'
-import { Logo } from './ui'
+import { Anchor, ArrowRight, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X } from 'lucide-react'
+import { Logo, VerifiedMark } from './ui'
 import { useStore } from '../lib/store'
 
 /** Top level stays short so it fits a laptop; everything else lives under Services. */
@@ -12,7 +12,7 @@ const primary = [
   { to: '/track', label: 'Track' },
   { to: '/pricing', label: 'Pricing' },
 ]
-type Service = { to: string; label: string; blurb: string; icon: typeof Boxes }
+type Service = { to: string; label: string; blurb: string; icon: ComponentType<SVGProps<SVGSVGElement> & { size?: number | string }> }
 type Side = 'senders' | 'shippers'
 /** For senders — people shipping something home. */
 const services: { title: string; items: Service[] }[] = [
@@ -37,7 +37,7 @@ const shipperServices: { title: string; items: Service[] }[] = [
     { to: '/for-shippers?s=win', label: 'Matched quote requests', blurb: 'Leads on your lanes, delivered to you', icon: Inbox },
     { to: '/for-shippers?s=win', label: 'Rate cards & instant quotes', blurb: 'Price once, quote while you sleep', icon: Tag },
     { to: '/for-shippers?s=win', label: 'Your branded page', blurb: 'Your logo, your link, your leads', icon: Globe },
-    { to: '/for-shippers?s=verified', label: 'Ntemtem Verified', blurb: 'The badge customers look for', icon: BadgeCheck },
+    { to: '/for-shippers?s=verified', label: 'Ntemtem Verified', blurb: 'The badge customers look for', icon: VerifiedMark },
   ] },
   { title: 'Run operations', items: [
     { to: '/for-shippers?s=run', label: 'Containers & sailings', blurb: 'Book space, load orders, track the box', icon: Ship },

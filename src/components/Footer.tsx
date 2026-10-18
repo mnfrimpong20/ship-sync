@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { BadgeCheck, Lock, MessageCircle, Radar } from 'lucide-react'
-import { Logo } from './ui'
+import { Lock, MessageCircle, Radar } from 'lucide-react'
+import { Logo, VerifiedMark } from './ui'
 import { countries } from '../lib/data'
 import { useSiteConfig } from '../lib/site'
 
@@ -18,7 +18,7 @@ export default function Footer() {
       <div className="container-fluid border-b border-border py-5">
         <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-xs text-text-muted" aria-label="Trust" data-testid="trust-strip">
           <li className="inline-flex items-center gap-2"><Lock size={14} className="text-gold-deep" aria-hidden="true" /> Payments held in escrow until your goods are on their way</li>
-          <li className="inline-flex items-center gap-2"><BadgeCheck size={14} className="text-gold-deep" aria-hidden="true" /> Licence &amp; insurance checked on every verified shipper</li>
+          <li className="inline-flex items-center gap-2"><VerifiedMark size={14} aria-hidden="true" /> Licence &amp; insurance checked on every verified shipper</li>
           <li className="inline-flex items-center gap-2"><Radar size={14} className="text-gold-deep" aria-hidden="true" /> One tracking page from pickup to the door</li>
         </ul>
       </div>

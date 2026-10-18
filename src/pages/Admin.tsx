@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { BadgeCheck, Check, ChevronDown, Clock, FileText, ShieldCheck, ShieldOff, XCircle } from 'lucide-react'
+import { Check, ChevronDown, Clock, FileText, ShieldCheck, ShieldOff, XCircle } from 'lucide-react'
 import { onboardingApi, type CompanyDoc } from '../lib/onboarding'
 import { AdminAttention, AdminBusiness, adminApi } from '../components/AdminBusiness'
 import { countryByCode, type Shipper } from '../lib/data'
 import { useStore, type AdminShipper } from '../lib/store'
-import { Avatar, Pill, Rating, fmtDate, fmtDateTime } from '../components/ui'
+import { Avatar, Pill, Rating, fmtDate, fmtDateTime, VerifiedMark } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { AdminInsurance } from '../components/AdminInsurance'
 import { AdminPayments } from '../components/AdminPayments'
@@ -70,7 +70,7 @@ export default function Admin() {
               <div className="flex min-w-0 items-start gap-3">
                 <Avatar initials={s.initials} hue={s.hue} size={44} />
                 <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2 font-semibold text-text"><Link to={`/shippers/${s.id}`} className="hover:text-gold-deep focus-ring rounded">{s.name}</Link>{s.verified && <BadgeCheck size={16} className="text-gold-deep" aria-label="Verified" />}{s.demo && <Pill tone="muted">Demo</Pill>}{!s.verified && s.verificationRequestedAt && <Pill tone="gold">Review requested</Pill>}{s.docsPending > 0 && <Pill tone="sky">{s.docsPending} doc{s.docsPending === 1 ? '' : 's'} to check</Pill>}</p>
+                  <p className="flex flex-wrap items-center gap-2 font-semibold text-text"><Link to={`/shippers/${s.id}`} className="hover:text-gold-deep focus-ring rounded">{s.name}</Link>{s.verified && <VerifiedMark size={16} role="img" aria-label="Ntemtem Verified" />}{s.demo && <Pill tone="muted">Demo</Pill>}{!s.verified && s.verificationRequestedAt && <Pill tone="gold">Review requested</Pill>}{s.docsPending > 0 && <Pill tone="sky">{s.docsPending} doc{s.docsPending === 1 ? '' : 's'} to check</Pill>}</p>
                   <p className="text-xs text-text-muted">{s.tagline || 'No tagline'} · {s.hq || 'No HQ set'} · founded {s.founded}</p>
                   <p className="mt-1 text-xs text-text-muted">{s.owner ? <>{s.owner.name} · {s.owner.email}</> : 'No account linked'}{s.createdAt ? ` · joined ${fmtDate(s.createdAt)}` : ''}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-muted">

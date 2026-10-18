@@ -2,11 +2,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { BadgeCheck, Check, ChevronDown, Crown, Globe2, Landmark, Minus, PackageCheck, Ship, ShieldCheck, Sparkles, Users, Wallet } from 'lucide-react'
+import { Check, ChevronDown, Crown, Globe2, Landmark, Minus, PackageCheck, Ship, ShieldCheck, Sparkles, Users, Wallet } from 'lucide-react'
 import { api } from '../lib/store'
 import { brokersApi, type Broker } from '../lib/brokers'
 import { cargoTypes, type CargoType } from '../lib/data'
-import { money } from '../components/ui'
+import { money, VerifiedMark } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 
 interface PricingData {
@@ -92,7 +92,7 @@ export default function PricingPage() {
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <div className="card-dark p-5 text-sm"><Sparkles size={18} className="text-gold-deep" aria-hidden="true" /><p className="mt-2 font-semibold">{d.trialDays} days of Pro, free</p><p className="mt-1 text-text-muted">Every new shipping company starts on a Pro trial. Keep Pro, move up, or drop to Starter — no card needed to start.</p></div>
               <div className="card-dark p-5 text-sm" data-testid="take-rate"><Wallet size={18} className="text-gold-deep" aria-hidden="true" /><p className="mt-2 font-semibold">{pct(d.payments.takeRatePct)} platform fee on online payments</p><p className="mt-1 text-text-muted">Only when a customer pays you through Ntemtem. Money is held safely and released to you {d.payments.releaseOn === 'delivered' ? 'once the goods are delivered' : 'once the goods are on their way'}. Cash and bank payments you record yourself are free.</p></div>
-              <div className="card-dark p-5 text-sm"><BadgeCheck size={18} className="text-gold-deep" aria-hidden="true" /><p className="mt-2 font-semibold">Verification is free</p><p className="mt-1 text-text-muted">We check your licence and insurance once. Verified shippers get the badge on every quote and profile.</p></div>
+              <div className="card-dark p-5 text-sm"><VerifiedMark size={20} aria-hidden="true" /><p className="mt-2 font-semibold">Verification is free</p><p className="mt-1 text-text-muted">We check your licence and insurance once. Verified shippers get the badge on every quote and profile.</p></div>
             </div>
           </div>
         )}

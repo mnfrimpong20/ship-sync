@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Bell, CalendarDays, CreditCard, Download, FileText, Gift, Heart, MessageCircle, PiggyBank, Plus, Repeat, Send, Ship, Trash2, Users, Wallet } from 'lucide-react'
 import { hubApi, statementUrl, type Balance, type CalEvent, type OpenInvoice, type Spending, type Thread } from '../lib/customerHub'
 import { useStore } from '../lib/store'
+import { accountApi, type Device, type Profile } from '../lib/account'
 import { cargoLabel, countries, countryByCode, type CargoType } from '../lib/data'
 import { fmtDate, fmtDateTime, money } from './ui'
 import { C, HBars, NoData, Panel, Stat, Trend } from './Charts'
@@ -60,7 +61,7 @@ export function MoneyTab() {
       </Panel>
       {s && <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Panel title={`Spending in ${s.year}`} actions={<select value={s.year} onChange={(e) => setYear(Number(e.target.value))} className={`${cls} !w-auto`} aria-label="Year">{s.years.map((y) => <option key={y} value={y}>{y}</option>)}</select>}>
-          <Trend data={s.months} bucket="month" label="Spent per month" format={(v) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`)} series={[{ key: 'spent', label: 'Spent', color: C.focus }]} />
+          {s.total > 0 ? <Trend data={s.months} bucket="month" label="Spent per month" format={(v) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`)} series={[{ key: 'spent', label: 'Spent', color: C.focus }]} /> : <NoData>No spending in {s.year} yet. Once a shipper invoices you, your month-by-month spending shows here.</NoData>}
         </Panel>
         <Panel title="Where it went">{s.byDestination.length ? <HBars label="Spent by destination" rows={s.byDestination.map((x) => ({ label: x.label, value: x.amount, display: money(x.amount) }))} /> : <NoData>No invoices this year.</NoData>}
           {s.perUnit.length > 0 && <div className="mt-4 border-t border-border pt-3"><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">Average cost</p><ul className="space-y-1 text-sm" data-testid="per-unit">{s.perUnit.map((u) => <li key={u.cargo} className="flex justify-between"><span>{cargoLabel(u.cargo as CargoType)}</span><span><b>{money(u.avg)}</b> <span className="text-xs text-text-muted">each · {u.units}</span></span></li>)}</ul></div>}
@@ -257,6 +258,72 @@ function Business() {
     </Panel>
   )
 }
+/* ---------- profile & security ---------- */
+function ProfileCard() {
+  const { refresh } = useStore()
+  const [p, setP] = useState<Profile | null>(null); const [f, setF] = useState({ name: '', phone: '' }); const [msg, setMsg] = useState(''); const [err, setErr] = useState('')
+  useEffect(() => { accountApi.profile().then((x) => { setP(x); setF({ name: x.name, phone: x.phone }) }).catch(() => {}) }, [])
+  if (!p) return null
+  const save = async (e: React.FormEvent) => { e.preventDefault(); setMsg(''); setErr(''); try { await accountApi.setProfile(f); setMsg('Saved.'); await refresh() } catch (x) { setErr(x instanceof Error ? x.message : 'Could not save.') } }
+  return (
+    <Panel title="Profile" sub={`Signed in as ${p.email}${p.createdAt ? ` · member since ${fmtDate(p.createdAt)}` : ''}`} testid="profile">
+      <form onSubmit={save} className="grid gap-3 text-sm sm:grid-cols-2">
+        <label><span className="label-dark">Your name</span><input required minLength={2} className={cls} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="pf-name" autoComplete="name" /></label>
+        <label><span className="label-dark">Mobile (with country code)</span><input type="tel" className={cls} placeholder="+1 713 555 0100" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} data-testid="pf-phone" autoComplete="tel" /></label>
+        <div className="flex items-center gap-2 sm:col-span-2"><button className="btn-gold !min-h-10" data-testid="pf-save">Save profile</button>{msg && <span role="status" className="text-sm text-teal">{msg}</span>}</div>
+        <Err e={err} />
+      </form>
+      <p className="mt-3 text-xs text-text-muted">Need to change your email? <Link to="/contact" className="text-gold-deep hover:underline">Ask us</Link> — we confirm it’s you first.</p>
+    </Panel>
+  )
+}
+function SecurityCard() {
+  const [f, setF] = useState({ current: '', next: '', again: '' }); const [msg, setMsg] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false)
+  const [devices, setDevices] = useState<Device[] | null>(null)
+  const load = () => accountApi.sessions().then(setDevices).catch(() => setDevices([]))
+  useEffect(() => { void load() }, [])
+  const change = async (e: React.FormEvent) => { e.preventDefault(); setMsg(''); setErr(''); if (f.next !== f.again) return setErr('The new passwords don’t match.'); setBusy(true); try { const r = await accountApi.password(f.current, f.next); setF({ current: '', next: '', again: '' }); setMsg(`Password changed.${r.signedOut ? ` Signed out ${r.signedOut} other device${r.signedOut === 1 ? '' : 's'}.` : ''}`); void load() } catch (x) { setErr(x instanceof Error ? x.message : 'Could not change it.') } finally { setBusy(false) } }
+  return (
+    <Panel title="Password & devices" sub="Changing your password signs you out everywhere else." testid="security">
+      <form onSubmit={change} className="grid gap-3 text-sm sm:grid-cols-3">
+        <label><span className="label-dark">Current password</span><input type="password" required className={cls} value={f.current} onChange={(e) => setF({ ...f, current: e.target.value })} autoComplete="current-password" data-testid="pw-current" /></label>
+        <label><span className="label-dark">New password</span><input type="password" required minLength={8} className={cls} value={f.next} onChange={(e) => setF({ ...f, next: e.target.value })} autoComplete="new-password" data-testid="pw-next" /></label>
+        <label><span className="label-dark">New password again</span><input type="password" required minLength={8} className={cls} value={f.again} onChange={(e) => setF({ ...f, again: e.target.value })} autoComplete="new-password" data-testid="pw-again" /></label>
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-3"><button disabled={busy} className="btn-gold !min-h-10" data-testid="pw-save">{busy ? 'Changing…' : 'Change password'}</button>{msg && <span role="status" className="text-sm text-teal">{msg}</span>}</div>
+        <div className="sm:col-span-3"><Err e={err} /></div>
+      </form>
+      <div className="mt-5 border-t border-border pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">Where you’re signed in</p>{devices && devices.length > 1 && <button type="button" onClick={async () => { await accountApi.revokeOthers(); void load() }} className="btn-ghost !min-h-8 !px-3 text-xs" data-testid="dev-others">Sign out all other devices</button>}</div>
+        <ul className="mt-2 divide-y divide-border text-sm" data-testid="devices">{(devices ?? []).map((d) => <li key={d.key} className="flex items-center justify-between gap-2 py-2" data-testid="device"><span><b>{d.device}</b>{d.current && <span className="ml-2 rounded-full bg-teal/15 px-2 py-0.5 text-[11px] font-semibold text-teal">This device</span>}<span className="block text-xs text-text-muted">Last active {d.lastSeenAt ? fmtDateTime(d.lastSeenAt) : '—'}</span></span>{!d.current && <button type="button" onClick={async () => { await accountApi.revoke(d.key); void load() }} className="text-xs font-semibold text-danger hover:underline">Sign out</button>}</li>)}</ul>
+      </div>
+    </Panel>
+  )
+}
+function DataCard() {
+  const { user } = useStore(); const [open, setOpen] = useState(false); const [pw, setPw] = useState(''); const [word, setWord] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false)
+  if (user?.actingBy) return null
+  const del = async (e: React.FormEvent) => { e.preventDefault(); setErr(''); setBusy(true); try { await accountApi.remove(pw); window.location.hash = '#/'; window.location.reload() } catch (x) { setErr(x instanceof Error ? x.message : 'Could not delete the account.'); setBusy(false) } }
+  return (
+    <Panel title="Your data" sub="Download everything we hold about you, or close your account." testid="your-data">
+      <div className="flex flex-wrap gap-2"><a href={accountApi.exportUrl} className="btn-ghost !min-h-10 text-sm" data-testid="data-export"><Download size={14} aria-hidden="true" /> Download my data (JSON)</a>{!open && <button type="button" onClick={() => setOpen(true)} className="btn-ghost !min-h-10 text-sm text-danger" data-testid="data-delete-open"><Trash2 size={14} aria-hidden="true" /> Delete my account</button>}</div>
+      {open && <form onSubmit={del} className="mt-4 rounded-xl border border-danger/40 bg-danger/5 p-4 text-sm" data-testid="delete-form">
+        <p className="font-semibold text-danger">This can’t be undone.</p>
+        <p className="mt-1 text-text-muted">We remove your name, contact details, recipients, saved shippers, alerts and messages settings, and sign you out everywhere. Invoices and shipment records stay (anonymised) because tax and customs law require them. You can’t delete while a shipment is on the way or money is owed or held.</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2"><label><span className="label-dark">Your password</span><input type="password" required className={cls} value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" data-testid="del-pw" /></label><label><span className="label-dark">Type DELETE to confirm</span><input required className={cls} value={word} onChange={(e) => setWord(e.target.value)} data-testid="del-word" /></label></div>
+        <Err e={err} />
+        <div className="mt-3 flex gap-2"><button type="button" onClick={() => { setOpen(false); setErr('') }} className="btn-ghost !min-h-10 text-sm">Keep my account</button><button disabled={busy || word !== 'DELETE'} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-danger px-4 text-sm font-semibold text-white disabled:opacity-50" data-testid="del-confirm">{busy ? 'Deleting…' : 'Delete my account'}</button></div>
+      </form>}
+    </Panel>
+  )
+}
+
 export function AccountTab() {
-  return <div className="mt-6 grid gap-6 lg:grid-cols-2" data-testid="account-tab"><NotifyPrefs /><div className="space-y-6"><Referral /><Household /><Business /></div></div>
+  const [sp] = useSearchParams(); const section = sp.get('section')
+  useEffect(() => { if (section) { const t = setTimeout(() => document.getElementById(`acct-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400); return () => clearTimeout(t) } }, [section])
+  return (
+    <div className="mt-6 grid gap-6 lg:grid-cols-2" data-testid="account-tab">
+      <div className="min-w-0 space-y-6"><div id="acct-profile" className="scroll-mt-24"><ProfileCard /></div><div id="acct-security" className="scroll-mt-24"><SecurityCard /></div><div id="acct-alerts" className="scroll-mt-24"><NotifyPrefs /></div></div>
+      <div className="min-w-0 space-y-6"><div id="acct-family" className="scroll-mt-24"><Household /></div><Referral /><Business /><DataCard /></div>
+    </div>
+  )
 }

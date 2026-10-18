@@ -43,7 +43,7 @@ export function NextArrivalCard({ s }: { s: NextArrival }) {
     <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card-dark mt-8 p-5 md:p-6" aria-labelledby="next-h" data-testid="next-arrival">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="eyebrow mb-1">{s.daysToEta < 0 ? 'Overdue' : s.daysToEta === 0 ? 'Arriving today' : s.daysToEta === 1 ? 'Arriving tomorrow' : `Arriving in ${s.daysToEta} days`}</p>
+          <p className={`eyebrow mb-1 ${s.daysToEta < 0 ? '!text-danger' : ''}`} data-testid="eta-label">{s.daysToEta < 0 ? `Past its expected date by ${-s.daysToEta} day${s.daysToEta === -1 ? '' : 's'} · ${statusLabels[s.status as ShipmentStatus].toLowerCase()}` : s.daysToEta === 0 ? 'Arriving today' : s.daysToEta === 1 ? 'Arriving tomorrow' : `Arriving in ${s.daysToEta} days`}</p>
           <h2 id="next-h" className="!text-xl">{s.origin} → {dest?.flag} {s.destinationName}</h2>
           <p className="mt-1 text-sm text-text-muted">{s.ref} · {s.description} · {s.shipper}</p>
         </div>

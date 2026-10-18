@@ -18,6 +18,7 @@ import { mountGrowth, startGrowthSweeps } from './growth'
 import { mountIntegrations, startWebhookSweeps } from './integrations'
 import { mountAdminInsights, startScorecardSweeps } from './adminInsights'
 import { mountCustomerHub, startCustomerSweeps } from './customerHub'
+import { mountAccount } from './account'
 import { mountContainers } from './containers'
 import { mountLabels } from './labels'
 import { mountScans, piecesForTracking, proofOfDelivery } from './scans'
@@ -168,6 +169,8 @@ async function currentUser(db: Db, req: Request): Promise<ApiUser | null> {
     `select u.*, s.name as company, st.role as staff_role, st.perms as staff_perms, st.id as staff_id, st.last_active_at, se.read_only as se_read_only, se.impersonator_id as se_impersonator, se.acting_as as se_acting_as from sessions se join users u on u.id = se.user_id left join shippers s on s.id = u.shipper_id left join staff st on st.user_id = u.id and st.shipper_id = u.shipper_id where se.id = $1 and se.expires_at > now()`, [sid],
   )
   const r = rows[0]; if (!r) return null
+  // "Where you're signed in" — last seen, touched at most every 10 minutes.
+  db.query(`update sessions set last_seen_at = now() where id = $1 and (last_seen_at is null or last_seen_at < now() - interval '10 minutes')`, [sid]).catch(() => {})
   // Staff "last active" — touched at most every 10 minutes so the team page can show who's really using the app.
   if (r.staff_id && (!r.last_active_at || Date.now() - new Date(r.last_active_at).getTime() > 10 * 60_000)) db.query('update staff set last_active_at = now() where id = $1', [r.staff_id]).catch(() => {})
   let u = userOut(r, r.company ?? undefined)
@@ -181,9 +184,9 @@ async function currentUser(db: Db, req: Request): Promise<ApiUser | null> {
   return u
 }
 
-async function createSession(db: Db, res: Response, userId: string) {
+async function createSession(db: Db, res: Response, userId: string, req?: Request) {
   const id = randomBytes(32).toString('hex')
-  await db.query('insert into sessions (id,user_id,expires_at) values ($1,$2,$3)', [id, userId, new Date(Date.now() + SESSION_DAYS * 86400000)])
+  await db.query('insert into sessions (id,user_id,expires_at,user_agent,last_seen_at) values ($1,$2,$3,$4,now())', [id, userId, new Date(Date.now() + SESSION_DAYS * 86400000), String(req?.headers['user-agent'] ?? '').slice(0, 300)])
   res.cookie(SESSION_COOKIE, id, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: SESSION_DAYS * 86400000, path: '/' })
 }
 
@@ -440,7 +443,7 @@ export function apiRouter() {
     throttle(`signup:ip:${clientIp(req)}`, 10, 60 * 60_000, HttpError)
     const user = await signupUser(db, body)
     if (body.ref && user.role === 'customer') await (await import('./customerHub')).applyReferral(db, user.id, body.ref).catch(() => {})
-    await createSession(db, res, user.id)
+    await createSession(db, res, user.id, req)
     res.status(201).json({ user })
   }))
   r.post('/auth/login', wrap(async (req, res) => {
@@ -450,7 +453,7 @@ export function apiRouter() {
     const { rows } = await db.query<Row>('select * from users where email = $1', [email])
     if (!rows[0] || !(await bcrypt.compare(body.password, rows[0].password_hash))) throw new HttpError(401, 'Email or password is incorrect.')
     clearThrottle(`login:email:${email}`)
-    await createSession(db, res, rows[0].id)
+    await createSession(db, res, rows[0].id, req)
     res.json({ user: await loadUserWithCompany(db, rows[0].id) })
   }))
   /** Forgot password: always answers OK (no account enumeration); emails a 1-hour link when the account exists. */
@@ -476,7 +479,7 @@ export function apiRouter() {
     await db.query('update users set password_hash = $2 where id = $1', [rows[0].user_id, hash])
     await db.query('update password_resets set used_at = now() where token = $1', [b.token])
     await db.query('delete from sessions where user_id = $1', [rows[0].user_id]) // sign out everywhere else
-    await createSession(db, res, rows[0].user_id)
+    await createSession(db, res, rows[0].user_id, req)
     res.json({ user: await loadUserWithCompany(db, rows[0].user_id) })
   }))
   r.post('/auth/logout', wrap(async (req, res) => {
@@ -564,7 +567,7 @@ export function apiRouter() {
       // No password needed to get quotes: we open the account and email a link to set one.
       const password = body.password ?? randomBytes(18).toString('base64url')
       user = await signupUser(db, { name: body.contact.name, email: body.contact.email, password, role: 'customer' })
-      await createSession(db, res, user.id)
+      await createSession(db, res, user.id, req)
       if (!body.password) passwordLinkSent = await sendSetPasswordLink(db, user.id, user.name, body.contact.email.trim().toLowerCase(), req)
     }
     if (user.role !== 'customer') throw new HttpError(403, 'Shipper accounts cannot post shipment requests.')
@@ -732,6 +735,7 @@ export function apiRouter() {
   mountAdminInsights(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   startScorecardSweeps(getDb)
   mountCustomerHub(r, { getDb, requireUser, HttpError, wrap })
+  mountAccount(r, { getDb, requireUser, HttpError, wrap })
   startCustomerSweeps(getDb)
   mountContainers(r, { getDb, requireUser, HttpError, wrap, loadShipments })
   mountLabels(r, { getDb, requireUser, HttpError, wrap })

@@ -49,7 +49,7 @@ const csvCell = (v: unknown) => { const s = v == null ? '' : String(v); return /
 const esc = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
 /** Invoices addressed to this customer, across every shipper (via the shipper's client record). */
-async function myInvoices(db: Db, userId: string) {
+export async function myInvoices(db: Db, userId: string) {
   const { rows } = await db.query<Row>(`select i.*, sh.name as shipper_name, s.ref as shipment_ref, s.destination, s.cargo, s.origin, coalesce((select sum(p.amount) from payments p where p.invoice_id = i.id), 0)::float as paid
     from invoices i join clients c on c.id = i.client_id join shippers sh on sh.id = i.shipper_id left join shipments s on s.id = i.shipment_id where c.user_id = $1 and i.status not in ('draft','void') order by i.issued_at desc`, [userId])
   return rows.map((i): Row => ({ ...i, balance: Math.max(0, Math.round((num(i.total) - num(i.paid)) * 100) / 100) }))
@@ -184,7 +184,7 @@ export async function onDelivered(db: Db, s: Row) {
   await notify(db, { userId: u.referred_by, kind: 'payment', title: `You earned ${money(amt)} credit`, body: `${u.name.split(' ')[0]}’s first shipment arrived. The credit comes off your next payment on Ship Sync.`, link: '/dashboard?tab=money' })
   await notify(db, { userId: u.id, kind: 'payment', title: `${money(amt)} welcome credit`, body: 'Thanks for shipping with Ship Sync — it comes off your next online payment.', link: '/dashboard?tab=money' })
 }
-async function creditBalance(db: Db, userId: string) { const { rows } = await db.query<Row>('select coalesce(sum(amount_usd),0)::float as v from credits where user_id = $1 and used_at is null', [userId]); return num(rows[0]?.v) }
+export async function creditBalance(db: Db, userId: string) { const { rows } = await db.query<Row>('select coalesce(sum(amount_usd),0)::float as v from credits where user_id = $1 and used_at is null', [userId]); return num(rows[0]?.v) }
 
 /* =============================== sweeps: instalments, repeats, alerts =============================== */
 export async function sweepCustomer(db: Db) {

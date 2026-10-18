@@ -1260,6 +1260,11 @@ alter table users add column if not exists company_name text not null default ''
 alter table users add column if not exists tax_id text not null default '';
 alter table users add column if not exists billing_address text not null default '';
 alter table users add column if not exists po_required boolean not null default false;
+alter table users add column if not exists phone text not null default '';
+alter table users add column if not exists deleted_at timestamptz;
+alter table sessions add column if not exists created_at timestamptz default now();
+alter table sessions add column if not exists last_seen_at timestamptz;
+alter table sessions add column if not exists user_agent text not null default '';
 create unique index if not exists idx_users_referral on users(referral_code) where referral_code is not null;
 create table if not exists credits (id text primary key, user_id text not null references users(id) on delete cascade, amount_usd numeric not null, reason text not null, source_user_id text, used_at timestamptz, used_ref text, created_at timestamptz not null default now());
 create table if not exists account_members (id text primary key, owner_id text not null references users(id) on delete cascade, member_id text references users(id) on delete cascade, email text not null, role text not null default 'member', token text, status text not null default 'invited', created_at timestamptz not null default now());

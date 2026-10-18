@@ -1,4 +1,4 @@
-/** Where Ship Sync Sourcing buys from. Shared by the server and the app. */
+/** Where Ntemtem Sourcing buys from. Shared by the server and the app. */
 export type Origin = 'CN' | 'GB' | 'US'
 export interface OriginInfo {
   code: Origin; name: string; short: string; flag: string; currency: 'CNY' | 'GBP' | 'USD'; symbol: string

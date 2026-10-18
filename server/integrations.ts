@@ -75,7 +75,7 @@ export function deliverDue(db: Db): Promise<void> {
       let status = 0, err = ''
       try {
         const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 10_000)
-        const r = await fetch(d.url, { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'ShipSync-Webhooks/1', 'x-shipsync-event': d.event, 'x-shipsync-delivery': d.id, 'x-shipsync-signature': `t=${t},v1=${sig}` }, body, signal: ctl.signal })
+        const r = await fetch(d.url, { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'Ntemtem-Webhooks/1', 'x-shipsync-event': d.event, 'x-shipsync-delivery': d.id, 'x-shipsync-signature': `t=${t},v1=${sig}` }, body, signal: ctl.signal })
         clearTimeout(timer); status = r.status; if (!r.ok) err = `HTTP ${r.status}`
       } catch (e) { err = e instanceof Error ? (e.name === 'AbortError' ? 'Timed out after 10 s' : e.message) : String(e) }
       const attempts = Number(d.attempts) + 1
@@ -138,7 +138,7 @@ export function mountIntegrations(r: Router, d: Deps) {
     const db = await getDb(); const { rows: [s] } = await db.query<Row>('select id, name, brand, initials, hue from shippers where id = $1', [req.params.id]); if (!s) throw new HttpError(404, 'Unknown shipper.')
     if (!(await featureOn(db, 'trackingWidget', s.id))) throw new HttpError(403, 'Tracking widget is switched off.')
     const b = J(s.brand) ?? {}; res.set('Cache-Control', 'public, max-age=300')
-    res.json({ id: s.id, name: s.name, color: b.color ?? s.hue ?? '#C99C33', logo: b.logo ?? null, initials: s.initials })
+    res.json({ id: s.id, name: s.name, color: b.color ?? s.hue ?? '#F2A900', logo: b.logo ?? null, initials: s.initials })
   }))
   r.get('/widget/:id/track/:ref', wrap(async (req, res) => {
     const db = await getDb()
@@ -181,7 +181,7 @@ export function mountIntegrations(r: Router, d: Deps) {
   r.post('/webhooks/:id/test', wrap(async (req, res) => {
     const db = await getDb(); const u = await managers(db, req)
     const { rows: [h] } = await db.query<Row>('select * from webhooks where id = $1 and shipper_id = $2', [req.params.id, u.shipperId]); if (!h) throw new HttpError(404, 'Webhook not found.')
-    const payload = { id: 'evt_' + randomBytes(8).toString('hex'), event: 'ping', createdAt: new Date().toISOString(), data: { message: 'Hello from Ship Sync', shipperId: u.shipperId } }
+    const payload = { id: 'evt_' + randomBytes(8).toString('hex'), event: 'ping', createdAt: new Date().toISOString(), data: { message: 'Hello from Ntemtem', shipperId: u.shipperId } }
     const did = 'whd_' + uid(); await db.query(`insert into webhook_deliveries (id,webhook_id,event,payload) values ($1,$2,'ping',$3)`, [did, h.id, JSON.stringify(payload)])
     await deliverDue(db)
     const { rows: [x] } = await db.query<Row>('select status, response_status, error from webhook_deliveries where id = $1', [did])

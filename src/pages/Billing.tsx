@@ -31,7 +31,7 @@ export default function BillingPage() {
       {b && <>
         <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="billing-stats">
           <Stat label="Your plan" value={cur?.label ?? b.plan} icon={Sparkles} hint={b.trial ? `Free trial of Pro${b.trialEndsAt ? ` until ${fmtDate(b.trialEndsAt)}` : ''}` : b.subscription?.cancelAtPeriodEnd ? `Ends ${b.subscription.currentPeriodEnd ? fmtDate(b.subscription.currentPeriodEnd) : 'soon'}` : undefined} testid="plan-stat" />
-          <Stat label="Monthly price" value={money(b.subscription?.amountUsd || b.prices[b.billed] || 0)} icon={CreditCard} hint={b.subscription?.currentPeriodEnd ? `renews ${fmtDate(b.subscription.currentPeriodEnd)}` : b.billed === 'starter' ? 'free' : 'billed by Ship Sync'} />
+          <Stat label="Monthly price" value={money(b.subscription?.amountUsd || b.prices[b.billed] || 0)} icon={CreditCard} hint={b.subscription?.currentPeriodEnd ? `renews ${fmtDate(b.subscription.currentPeriodEnd)}` : b.billed === 'starter' ? 'free' : 'billed by Ntemtem'} />
           <Stat label="Team members" value={`${b.usage.team}${b.usage.teamLimit ? ` / ${b.usage.teamLimit}` : ''}`} icon={Users} tone={b.usage.teamLimit != null && b.usage.team >= b.usage.teamLimit ? 'bad' : undefined} />
           <Stat label="Payment" value={b.subscription?.provider === 'stripe' ? 'Card (Stripe)' : b.billed === 'starter' ? '—' : 'Invoice'} hint={b.subscription?.status && b.subscription.status !== 'active' ? b.subscription.status : undefined} />
         </div>
@@ -49,7 +49,7 @@ export default function BillingPage() {
             </div>
           ) })}
         </div>
-        {!b.online && <p className="mt-4 text-sm text-text-muted">Card billing isn’t switched on yet — contact Ship Sync to change your plan.</p>}
+        {!b.online && <p className="mt-4 text-sm text-text-muted">Card billing isn’t switched on yet — contact Ntemtem to change your plan.</p>}
         {!isOwner && <p className="mt-2 text-sm text-text-muted">Only the account owner can change the plan.</p>}
         {b.history.length > 0 && <Panel title="History" className="mt-6"><ul className="divide-y divide-border text-sm">{b.history.map((h, i) => <li key={i} className="flex justify-between py-2"><span>{h.kind.replace(/_/g, ' ')} · {h.plan}{h.amountUsd ? ` · ${money(h.amountUsd)}` : ''}</span><span className="text-text-muted">{fmtDate(h.at)}{h.by ? ` · ${h.by}` : ''}</span></li>)}</ul></Panel>}
       </>}

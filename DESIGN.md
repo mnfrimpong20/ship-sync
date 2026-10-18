@@ -1,49 +1,54 @@
-# Ship Sync — Design Brief
+# Ntemtem — Design Brief
 
-Ship Sync is a marketplace that connects air and ocean shippers (freight forwarders, consolidators, carriers) with customers shipping to West Africa — Ghana, Nigeria, Liberia, Togo, Côte d'Ivoire, Sierra Leone, Senegal. Audience: diaspora individuals shipping barrels/boxes/vehicles home, SME importers, and the shippers who serve them. Goal: quote requests from customers and sign-ups from shippers.
+Ntemtem is a marketplace that connects air and ocean shippers (freight forwarders, consolidators, carriers) with customers shipping to West Africa — Ghana, Nigeria, Liberia, Togo, Côte d'Ivoire, Sierra Leone, Senegal. Audience: diaspora individuals shipping barrels/boxes/vehicles home, SME importers, and the shippers who serve them. Goal: quote requests from customers and sign-ups from shippers.
 
-## 1. Style direction — "Light Logistics Editorial"
+## 1. Brand — Ntemtem
 
-Warm off-white pages, deep navy type, and gold used sparingly as the brand signature (logo, primary button, small highlights). Large editorial serif headlines, generous whitespace, white cards with hairline borders and soft shadows. The hero, footer and live map stay as **dark navy islands** (class `theme-dark`) so the brand keeps its cinematic photography and the navy identity, while the body of the site reads like an established freight institution rather than a startup template. Why the switch from all-dark: freight is a trust business, and light editorial layouts (Flexport, Maersk, the FT) signal "institution" more strongly than a dark UI, which reads as "tool". The dark islands preserve warmth and drama where it counts.
+The full brand book (logo, colour, type, weave pattern, trust marks, voice, WhatsApp templates) lives in the **Ntemtem design system**: https://claude.ai/artifact/XtAYSnaBvBqPoZxtDC5q8t. This file is the code-side summary.
+
+*Ntɛmtɛm* (say **n-tem-TEM**) is Twi for "quickly-quickly". Tagline: **Send it. Ntemtem.** Write `Ntemtem` in sentences, `ntemtem` in the logo, URLs and handles.
+
+**Logo** — `Mark` / `Logo` in `src/components/ui.tsx`: a gold tile with two rounded chevrons (green trailing, navy leading) sending a box forward. `partner` draws the shipper-side version on a charcoal tile with a PARTNER label. Favicon `public/favicon.svg`, app icon `public/app-icon.svg` / `icon-512.png` / `apple-touch-icon.png`, social image `public/og.png`.
+
+**One brand, two sides.** Customers get navy; when a shipper is signed in, `AppShell` adds `ss-partner` and the sidebar (`.ss-sidebar`) turns partner charcoal with the partner logo. Destination agents (the no-login container link) are **agents**, never "partners".
+
+**Trust marks** — `VerifiedBadge` ("Ntemtem Verified", shipper passed vetting) and `ProtectedNote` (payment protection line, same words everywhere) in `ui.tsx`. Show them where people decide: quote cards, shipper profile, directory, payment.
 
 ## 2. Color palette
 
-Tokens are CSS variables in `src/index.css`. The root scope is light; `.theme-dark` re-points the same tokens to the navy set, so every component works in both without conditional classes.
+Tokens are CSS variables in `src/index.css`. The root scope is light; `.theme-dark` re-points the same tokens to the navy set (hero, footer, live map). There is one brand — no theme switcher.
 
-| Token | Light (root) | Dark island (`.theme-dark`) | Use |
+| Token | Light (root) | Dark island | Use |
 |---|---|---|---|
-| `--color-bg` | `#F7F5F0` | `#0B1220` | Page background |
-| `--color-surface` | `#FFFFFF` | `#111B2E` | Cards, panels, nav |
-| `--color-surface-2` | `#F1EEE6` | `#182540` | Inputs, elevated chips |
-| `--color-light` / `--color-light-surface` | `#FFFFFF` | — | Alternating white sections on the home page |
-| `--color-text` | `#0B1B33` | `#F4F6FA` | Primary text |
-| `--color-text-muted` | `#5B6578` | `#A3AEC2` | Secondary text |
-| `--color-ink` / `--color-ink-muted` | `#0B1B33` / `#5B6578` | same | Text on light sections and on gold |
-| `--color-gold` | `#C99C33` | `#E3B54A` | Primary accent (CTAs, badges, stars) |
-| `--color-gold-deep` | `#9A7420` | `#CFA23A` | Eyebrows, gold text on light, hover |
-| `--color-teal` | `#0E8F7E` | `#2DD4BF` | Ocean / success |
+| `--color-bg` | `#FBF6EC` cream | `#0D1424` | Page background |
+| `--color-surface` | `#FFFFFF` | `#18213A` | Cards, panels, nav |
+| `--color-surface-2` | `#F2E9D8` | `#202B48` | Inputs, raised chips |
+| `--color-text` / `--color-ink` | `#14213D` navy | `#F5EEE0` | Text |
+| `--color-text-muted` | `#586079` | `#A8AFC3` | Secondary text |
+| `--color-gold` | `#F2A900` kente gold | `#F5B82E` | Fills only: primary buttons, logo, highlights. Text on gold is navy |
+| `--color-gold-deep` | `#8A5A00` | `#F5B82E` | Gold as **text or icon** (eyebrows, links). Never use `text-gold` on light grounds |
+| `--color-teal` | `#0E7A4E` green | `#37B07A` | **Good news only** — delivered, verified, protected, success |
+| `--color-sea` | `#1B5E78` | `#6CC3DD` | Ocean freight |
 | `--color-sky` | `#2B6CB0` | `#7DD3FC` | Air freight |
-| `--color-border` | `#E3DED3` | `#24324D` | Hairline borders |
-| `--color-danger` | `#C03A3A` | `#F87171` | Errors |
+| `--color-partner` | `#24211C` | — | Shipper side only |
+| `--color-danger` | `#C2382C` clay | `#F06A5C` | Errors and delays |
+| `--color-border` | `#E3D8C3` | `#2A3554` | Hairlines |
 
-Contrast checks (light): `#0B1B33` on `#F7F5F0` = 15.6:1; `#5B6578` on `#FFFFFF` = 5.6:1; `#9A7420` on `#FFFFFF` = 4.6:1 (eyebrows); `#0B1220` on `#C99C33` (button text) = 7.2:1. Dark island values unchanged from the original palette (all ≥ 4.5:1).
+Contrast (light): navy on cream 14.8:1; muted on cream 5.8:1; gold-deep on cream 5.5:1; navy on gold 7.9:1; green on cream 5.0:1. Green and clay never carry meaning by colour alone — always a word or icon too.
 
 ## 3. Typography
 
-- Heading: **Fraunces** (variable, optical sizing, 600–700) — editorial warmth.
-- Body/UI: **Inter** (400–600).
+- Heading: **Bricolage Grotesque** (variable, 600–800) — warm, characterful.
+- Body/UI: **Figtree** (variable, 400–700) — friendly and readable on small phones.
+- Both self-hosted via `@fontsource-variable/*` imported in `src/main.tsx`.
 
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-```
+Headlines short and in sentence case. Prices, days and tracking refs never in caption size.
 
-Scale: h1 `clamp(2.6rem, 5.5vw, 4.75rem)` lh 1.05; h2 `clamp(2rem, 3.5vw, 3rem)` lh 1.1; h3 `1.375rem` lh 1.25; body 17px lh 1.6; small 14px lh 1.5; eyebrow 12px uppercase tracking 0.14em.
+**Voice:** a reliable cousin who works in shipping — warm, direct, a little playful. Plain English first, one touch of Twi per screen at most ("Akwaaba" on the dashboard and on texts to Ghana). Bad news always comes with a next step. Receiver texts: greeting, news, next step, link — no emoji (it doubles SMS cost).
 
 ## 4. Spacing & layout
 
-8px scale (4px half-step). Max content width 1240px (`max-w-[1240px] px-5 md:px-8`). Section padding `py-20 md:py-28`. Grids: 12-col on desktop, features as 3-col bento (`md:grid-cols-6` spans), directory 3-col cards, dashboards 2-col with sidebar 260px. Radius tokens: `--radius-sm` 8px, `--radius` 14px, `--radius-lg` 24px, pills 999px. Shadow: `0 20px 60px -20px rgb(0 0 0 / .5)` on dark cards; `0 10px 30px -12px rgb(11 18 32 / .15)` on light.
+8px scale (4px half-step). Max content width 1240px (`max-w-[1240px] px-5 md:px-8`). Section padding `py-20 md:py-28`. Grids: 12-col on desktop, features as 3-col bento (`md:grid-cols-6` spans), directory 3-col cards, dashboards 2-col with sidebar 260px. Radius tokens: `--radius-sm` 6px, `--radius-md` 12px, `--radius-lg` 22px (the logo tile), pills 999px. Shadow: `0 20px 60px -20px rgb(0 0 0 / .5)` on dark cards; `0 10px 30px -12px rgb(11 18 32 / .15)` on light.
 
 ## 5. Section plan (marketing home)
 

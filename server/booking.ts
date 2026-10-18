@@ -1,5 +1,5 @@
 /**
- * Carrier booking — book space with the shipping line from inside Ship Sync instead of by email.
+ * Carrier booking — book space with the shipping line from inside Ntemtem instead of by email.
  * A rolling schedule of sailings per lane (container services and RoRo car carriers) carries rates,
  * document cut-off, ETD/ETA and space left; the office books slots against a sailing — for an
  * existing container, a new one, or a RoRo vehicle shipment — and the confirmation (booking ref,
@@ -135,12 +135,12 @@ export function mountBooking(r: Router, d: Deps) {
           const cid = 'cn_' + uid(); const ref = `CN-${year}-${String(Number(n[0].n) + 1).padStart(3, '0')}`
           await db.query(`insert into containers (id,shipper_id,ref,size,line,booking_ref,vessel_name,voyage,origin_port,destination,destination_port,cutoff_date,etd,eta,notes) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
             [cid, u.shipperId, ref, b.unit === 'container20' ? '20ft' : b.unit === 'container40hc' ? '40hc' : '40ft', s.line, answer.bookingRef, s.vessel_name, s.voyage, s.origin_port, s.destination, s.destination_port, DATE(s.cutoff), DATE(s.etd), DATE(s.eta), b.note])
-          await db.query(`insert into container_events (container_id,status,place,note,by_name) values ($1,'booked',$2,$3,$4)`, [cid, s.origin_port, `Space booked with ${s.line} via Ship Sync — ${answer.bookingRef}, ${s.vessel_name} ${s.voyage}, ETD ${DATE(s.etd)}.`, u.name])
+          await db.query(`insert into container_events (container_id,status,place,note,by_name) values ($1,'booked',$2,$3,$4)`, [cid, s.origin_port, `Space booked with ${s.line} via Ntemtem — ${answer.bookingRef}, ${s.vessel_name} ${s.voyage}, ETD ${DATE(s.etd)}.`, u.name])
           await db.query('update carrier_bookings set container_id = $2 where id = $1', [id, cid]); container = { id: cid, ref }
         } else if (container) {
           await db.query(`update containers set line = $2, booking_ref = $3, vessel_name = $4, voyage = $5, origin_port = case when origin_port = '' then $6 else origin_port end, destination_port = case when destination_port = '' then $7 else destination_port end, cutoff_date = $8, etd = $9, eta = $10 where id = $1`,
             [container.id, s.line, answer.bookingRef, s.vessel_name, s.voyage, s.origin_port, s.destination_port, DATE(s.cutoff), DATE(s.etd), DATE(s.eta)])
-          await db.query(`insert into container_events (container_id,status,place,note,by_name) values ($1,$2,$3,$4,$5)`, [container.id, container.status, s.origin_port, `Space booked with ${s.line} via Ship Sync — ${answer.bookingRef}, ${s.vessel_name} ${s.voyage}, ETD ${DATE(s.etd)}.`, u.name])
+          await db.query(`insert into container_events (container_id,status,place,note,by_name) values ($1,$2,$3,$4,$5)`, [container.id, container.status, s.origin_port, `Space booked with ${s.line} via Ntemtem — ${answer.bookingRef}, ${s.vessel_name} ${s.voyage}, ETD ${DATE(s.etd)}.`, u.name])
         }
       } else if (shipment) {
         await db.query('update shipments set vessel_name = $2, eta = $3 where id = $1', [shipment.id, s.vessel_name, DATE(s.eta)])

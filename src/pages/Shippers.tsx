@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { ArrowLeft, BadgeCheck, Building2, CalendarDays, Check, Clock, Heart, MapPin, Star } from 'lucide-react'
+import { ArrowLeft, Building2, CalendarDays, Check, Clock, Heart, MapPin, Star } from 'lucide-react'
 import { cargoLabel, countryByCode } from '../lib/data'
 import { useStore } from '../lib/store'
 import { fadeUp, stagger } from '../lib/motion'
 import { ShipperReviews } from '../components/ReviewCards'
-import { Avatar, Empty, ModeBadge, Rating } from '../components/ui'
+import { Avatar, Empty, ModeBadge, Rating, VerifiedBadge } from '../components/ui'
 import { ShippingBackdrop } from '../components/ShippingBackdrop'
 import { hubApi } from '../lib/customerHub'
 
@@ -37,14 +37,14 @@ export function ShipperProfile() {
     <div className="relative bg-bg text-text">
       <ShippingBackdrop />
       <div className="container-x relative py-10 md:py-16">
-        <Link to="/shippers" className="inline-flex min-h-10 items-center gap-1.5 text-sm text-text-muted hover:text-gold focus-ring rounded"><ArrowLeft size={16} aria-hidden="true" /> All shippers</Link>
+        <Link to="/shippers" className="inline-flex min-h-10 items-center gap-1.5 text-sm text-text-muted hover:text-gold-deep focus-ring rounded"><ArrowLeft size={16} aria-hidden="true" /> All shippers</Link>
         <motion.div initial="hidden" animate="show" variants={stagger} className="mt-28 grid gap-8 md:mt-36 lg:grid-cols-12">
           <div className="lg:col-span-8">
             <motion.div variants={fadeUp} className="card-dark p-6 md:p-8">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
                 <Avatar initials={s.initials} hue={s.hue} size={72} />
                 <div className="flex-1">
-                  <h1 className="flex flex-wrap items-center gap-2 !text-3xl">{s.name}{s.verified && <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold"><BadgeCheck size={14} aria-hidden="true" /> Verified</span>}</h1>
+                  <h1 className="flex flex-wrap items-center gap-2 !text-3xl">{s.name}{s.verified && <VerifiedBadge large />}</h1>
                   <p className="mt-1 text-text-muted">{s.tagline}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">{s.modes.map((m) => <ModeBadge key={m} mode={m} />)}<Rating value={s.rating} count={s.reviews} /><FavButton shipperId={s.id} /></div>
                   <ul className="mt-4 grid gap-2 text-sm text-text-muted sm:grid-cols-2">
@@ -70,7 +70,7 @@ export function ShipperProfile() {
               <div className="card-dark p-6">
                 <h2 className="!text-lg">Cargo & services</h2>
                 <ul className="mt-4 space-y-2 text-sm">
-                  {s.cargo.map((c) => <li key={c} className="flex items-center gap-2 text-text"><Check size={15} className="text-gold" aria-hidden="true" />{cargoLabel(c)}</li>)}
+                  {s.cargo.map((c) => <li key={c} className="flex items-center gap-2 text-text"><Check size={15} className="text-gold-deep" aria-hidden="true" />{cargoLabel(c)}</li>)}
                 </ul>
                 <ul className="mt-4 flex flex-wrap gap-1.5 border-t border-border pt-4">{s.services.map((x) => <li key={x} className="rounded-full border border-border px-2.5 py-1 text-xs text-text-muted">{x}</li>)}</ul>
               </div>
@@ -78,7 +78,7 @@ export function ShipperProfile() {
 
             <motion.div variants={fadeUp} className="card-dark mt-6 p-6">
               <h2 className="!text-lg">Recent reviews</h2>
-              <p className="mt-1 text-xs text-text-muted">Only customers who booked through Ship Sync can review.</p>
+              <p className="mt-1 text-xs text-text-muted">Only customers who booked through Ntemtem can review.</p>
               <ShipperReviews shipperId={s.id} fallback={reviews} />
             </motion.div>
           </div>

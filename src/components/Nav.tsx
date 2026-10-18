@@ -3,7 +3,6 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useScroll, useSpring } from 'motion/react'
 import { Anchor, BarChart3, Boxes, Calculator, ChevronDown, Globe2, Landmark, LayoutDashboard, LogOut, Menu, Radar, Route, ShieldCheck, Users, X } from 'lucide-react'
 import { Logo } from './ui'
-import ThemeSwitcher from './ThemeSwitcher'
 import { useStore } from '../lib/store'
 
 /** Top level stays short so it fits a laptop; everything else lives under Services. */
@@ -75,7 +74,7 @@ export default function Nav() {
         <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Primary">
           <NavItem to={primary[0].to} label={primary[0].label} />
           <div ref={svcRef} className="relative" onMouseEnter={hoverOpen} onMouseLeave={hoverClose}>
-            <button onClick={toggleSvc} aria-expanded={svc} aria-haspopup="menu" className={`group relative flex min-h-11 items-center gap-1 whitespace-nowrap rounded-md px-3 text-[15px] font-medium transition-colors focus-ring ${serviceActive || svc ? 'text-gold' : 'text-text-muted hover:text-text'}`} data-testid="nav-services">
+            <button onClick={toggleSvc} aria-expanded={svc} aria-haspopup="menu" className={`group relative flex min-h-11 items-center gap-1 whitespace-nowrap rounded-md px-3 text-[15px] font-medium transition-colors focus-ring ${serviceActive || svc ? 'text-gold-deep' : 'text-text-muted hover:text-text'}`} data-testid="nav-services">
               Services <ChevronDown size={14} className={`transition-transform ${svc ? 'rotate-180' : ''}`} aria-hidden="true" />
               <span className={`absolute inset-x-3 bottom-2 h-px origin-left bg-gold transition-transform duration-200 ${serviceActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`} aria-hidden="true" />
             </button>
@@ -97,7 +96,6 @@ export default function Nav() {
           {primary.slice(1).map((l) => <NavItem key={l.to} to={l.to} label={l.label} />)}
         </nav>
         <div className="hidden shrink-0 items-center gap-2 lg:flex">
-          <ThemeSwitcher compact />
           {user ? (
             <div className="relative">
               <button onClick={() => setMenu((m) => !m)} className="btn-ghost !min-h-10 whitespace-nowrap !px-3 text-sm" aria-expanded={menu} aria-haspopup="menu">
@@ -136,10 +134,9 @@ export default function Nav() {
               {services.map((g) => (
                 <div key={g.title} className="border-t border-border/60 py-2">
                   <p className="pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted">{g.title}</p>
-                  {g.items.map((i) => <Link key={i.to} to={i.to} className="flex min-h-11 items-center gap-3 text-[15px] font-medium focus-ring"><i.icon size={16} className="text-gold" aria-hidden="true" />{i.label}</Link>)}
+                  {g.items.map((i) => <Link key={i.to} to={i.to} className="flex min-h-11 items-center gap-3 text-[15px] font-medium focus-ring"><i.icon size={16} className="text-gold-deep" aria-hidden="true" />{i.label}</Link>)}
                 </div>
               ))}
-              <div className="flex min-h-12 items-center justify-between border-t border-border/60 text-[15px] font-medium"><span>Colour theme</span><ThemeSwitcher align="right" /></div>
               <div className="mt-3 flex flex-col gap-2 pb-2">
                 {user ? (
                   <>
@@ -161,14 +158,14 @@ export default function Nav() {
 
 function ServiceLink({ item }: { item: Service }) {
   const cls = 'flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-surface-2 focus-ring'
-  const body = <><span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gold/15 text-gold"><item.icon size={15} aria-hidden="true" /></span><span className="min-w-0"><span className="block text-sm font-semibold text-text">{item.label}</span><span className="block text-xs leading-snug text-text-muted">{item.blurb}</span></span></>
+  const body = <><span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gold/15 text-gold-deep"><item.icon size={15} aria-hidden="true" /></span><span className="min-w-0"><span className="block text-sm font-semibold text-text">{item.label}</span><span className="block text-xs leading-snug text-text-muted">{item.blurb}</span></span></>
   return item.to.startsWith('/#') ? <a href={item.to} role="menuitem" className={cls}>{body}</a> : <Link to={item.to} role="menuitem" className={cls}>{body}</Link>
 }
 
 function NavItem({ to, label }: { to: string; label: string }) {
   const loc = useLocation()
   const active = to.startsWith('/#') ? false : loc.pathname.startsWith(to)
-  const cls = `group relative flex min-h-11 items-center whitespace-nowrap rounded-md px-3 text-[15px] font-medium transition-colors focus-ring ${active ? 'text-gold' : 'text-text-muted hover:text-text'}`
+  const cls = `group relative flex min-h-11 items-center whitespace-nowrap rounded-md px-3 text-[15px] font-medium transition-colors focus-ring ${active ? 'text-gold-deep' : 'text-text-muted hover:text-text'}`
   const underline = <span className={`absolute inset-x-3 bottom-2 h-px origin-left bg-gold transition-transform duration-200 ${active ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`} aria-hidden="true" />
   return to.startsWith('/#')
     ? <a href={to} className={cls}>{label}{underline}</a>

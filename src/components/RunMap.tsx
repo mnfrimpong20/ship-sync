@@ -23,10 +23,10 @@ interface Props {
 function pinEl(text: string, tone: 'start' | 'pending' | 'done' | 'skipped') {
   // MapLibre positions the marker element with its own transform, so the teardrop rotation lives on a child.
   const el = document.createElement('div')
-  const bg = tone === 'start' ? '#2DD4BF' : tone === 'done' ? '#3FB950' : tone === 'skipped' ? '#6B7A99' : '#E3B54A'
+  const bg = tone === 'start' ? '#6CC3DD' : tone === 'done' ? '#3FB950' : tone === 'skipped' ? '#6B7A99' : '#F5B82E'
   el.className = 'ss-pin'
   el.style.cssText = 'width:30px;height:34px;cursor:pointer'
-  el.innerHTML = `<div style="width:28px;height:28px;margin:1px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${bg};border:2px solid #0B1220;box-shadow:0 4px 12px rgba(0,0,0,.5);display:grid;place-items:center"><span style="transform:rotate(45deg);font:700 11px/1 Inter,system-ui,sans-serif;color:#0B1220">${text}</span></div>`
+  el.innerHTML = `<div style="width:28px;height:28px;margin:1px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${bg};border:2px solid #0D1424;box-shadow:0 4px 12px rgba(0,0,0,.5);display:grid;place-items:center"><span style="transform:rotate(45deg);font:700 11px/1 Figtree,system-ui,sans-serif;color:#0D1424">${text}</span></div>`
   return el
 }
 
@@ -81,8 +81,8 @@ export default function RunMap({ start, stops, draggable = false, onMove, onClic
       if (src) src.setData(fc)
       else {
         m.addSource('legs', { type: 'geojson', data: fc })
-        m.addLayer({ id: 'legs-glow', type: 'line', source: 'legs', paint: { 'line-color': '#E3B54A', 'line-width': 7, 'line-opacity': 0.15 } })
-        m.addLayer({ id: 'legs', type: 'line', source: 'legs', paint: { 'line-color': '#E3B54A', 'line-width': 2.5, 'line-dasharray': [2, 1.5] } })
+        m.addLayer({ id: 'legs-glow', type: 'line', source: 'legs', paint: { 'line-color': '#F5B82E', 'line-width': 7, 'line-opacity': 0.15 } })
+        m.addLayer({ id: 'legs', type: 'line', source: 'legs', paint: { 'line-color': '#F5B82E', 'line-width': 2.5, 'line-dasharray': [2, 1.5] } })
       }
     }
     if (styled.current) draw(); else pending.current = draw
@@ -107,5 +107,5 @@ export default function RunMap({ start, stops, draggable = false, onMove, onClic
   }, [focusId])
 
   // .ss-map is unlayered CSS (height:100%), so sizing utilities go on a wrapper.
-  return <div className={`overflow-hidden rounded-2xl border border-border bg-[#0B1220] ${className}`}><div ref={box} className="ss-map" role="img" aria-label="Route planning map" /></div>
+  return <div className={`overflow-hidden rounded-2xl border border-border bg-[#0D1424] ${className}`}><div ref={box} className="ss-map" role="img" aria-label="Route planning map" /></div>
 }

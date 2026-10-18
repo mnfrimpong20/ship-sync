@@ -17,7 +17,7 @@ function Sticker({ d, piece, qr, shipper }: { d: LabelData; piece: Piece; qr: st
     <div className="sticker">
       <div className="edge" />
       <div className="top">
-        <div><div className="brand">Ship<span>Sync</span></div><div className="shipper">{shipper.name}{shipper.hq ? ` · ${shipper.hq}` : ''}</div></div>
+        <div><div className="brand">ntemtem</div><div className="shipper">{shipper.name}{shipper.hq ? ` · ${shipper.hq}` : ''}</div></div>
         <div className="piece">{piece.seq} <span>of</span> {d.pieces.length}<small>PIECE</small></div>
       </div>
       <div className="ref">
@@ -42,7 +42,7 @@ function Sticker({ d, piece, qr, shipper }: { d: LabelData; piece: Piece; qr: st
 }
 
 const css = `
-.labels-sheet{--ink:#0B1B33;--gold:#C99C33;color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+.labels-sheet{--ink:#14213D;--gold:#F2A900;color:var(--ink);font-family:Figtree,ui-sans-serif,system-ui,sans-serif}
 .sticker{width:4in;height:6in;background:#fff;color:var(--ink);box-sizing:border-box;padding:.2in .2in .18in .27in;display:flex;flex-direction:column;position:relative;overflow:hidden;border:1px solid #d8d3c8;border-radius:4px;page-break-inside:avoid;break-inside:avoid}
 .sticker .edge{position:absolute;left:0;top:0;bottom:0;width:8px;background:var(--gold)}
 .sticker .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--ink);padding-bottom:6px}
@@ -102,7 +102,7 @@ export default function Labels() {
     if (!data) return
     let live = true
     const all = data.labels.flatMap((l) => l.pieces.map((p) => ({ key: p.id, url: trackUrl(l.shipment.ref, p.seq) })))
-    Promise.all(all.map(async ({ key, url }) => [key, await QRCode.toDataURL(url, { errorCorrectionLevel: 'M', margin: 0, width: 400, color: { dark: '#0B1B33', light: '#FFFFFF' } })] as const)).then((pairs) => live && setQr(Object.fromEntries(pairs)))
+    Promise.all(all.map(async ({ key, url }) => [key, await QRCode.toDataURL(url, { errorCorrectionLevel: 'M', margin: 0, width: 400, color: { dark: '#14213D', light: '#FFFFFF' } })] as const)).then((pairs) => live && setQr(Object.fromEntries(pairs)))
     return () => { live = false }
   }, [data])
 
@@ -129,7 +129,7 @@ export default function Labels() {
         <div className="container-x flex flex-wrap items-center gap-3 py-4">
           <Link to="/dashboard/shipments" className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-text focus-ring"><ArrowLeft size={14} aria-hidden="true" /> Shipments</Link>
           <span className="h-5 w-px bg-border" aria-hidden="true" />
-          <p className="flex items-center gap-2 font-semibold"><Tag size={16} className="text-gold" aria-hidden="true" /> {total} label{total === 1 ? '' : 's'} · {data?.labels.length ?? 0} shipment{data?.labels.length === 1 ? '' : 's'}</p>
+          <p className="flex items-center gap-2 font-semibold"><Tag size={16} className="text-gold-deep" aria-hidden="true" /> {total} label{total === 1 ? '' : 's'} · {data?.labels.length ?? 0} shipment{data?.labels.length === 1 ? '' : 's'}</p>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <label className="text-xs text-text-muted" htmlFor="lbl-size">Paper</label>
             <select id="lbl-size" className="input-dark !min-h-9 !w-auto text-sm" value={size} onChange={(e) => { const n = new URLSearchParams(sp); n.set('size', e.target.value); setSp(n, { replace: true }) }}><option value="4x6">4 × 6 in thermal (one per label)</option><option value="letter">Letter / A4 sheet (4 per page)</option></select>

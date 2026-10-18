@@ -32,7 +32,7 @@ export function AdminInsurance() {
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Insured value" value={money(d.totals.insured)} hint="Across live policies" icon={Shield} />
         <StatCard label="Premiums" value={money(d.totals.premiums)} hint="Written to date" icon={Shield} />
-        <StatCard label="Ship Sync commission" value={money(d.totals.commission)} hint={`${Math.round(prod.commissionPct * 100)}% of premium`} icon={Shield} />
+        <StatCard label="Ntemtem commission" value={money(d.totals.commission)} hint={`${Math.round(prod.commissionPct * 100)}% of premium`} icon={Shield} />
         <StatCard label="Claims" value={d.totals.claims} hint={open.length ? `${open.length} open` : 'None open'} icon={Shield} warn={open.length > 0} />
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -45,7 +45,7 @@ export function AdminInsurance() {
                 {d.policies.map((p) => (
                   <tr key={p.id} className={trow(false, p.status === 'cancelled')} data-testid="policy-row">
                     <td className="px-3 py-3 font-mono text-xs">{p.certificateNo}</td>
-                    <td className="px-3 py-3"><span className="font-mono text-xs text-gold">{p.shipmentRef}</span><p className="text-xs text-text-muted">{p.customer}</p></td>
+                    <td className="px-3 py-3"><span className="font-mono text-xs text-gold-deep">{p.shipmentRef}</span><p className="text-xs text-text-muted">{p.customer}</p></td>
                     <td className="px-3 py-3 text-xs">{p.shipperName}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{money(p.declaredValueUsd)}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{money(p.premiumUsd)}<p className={`text-[11px] ${p.paymentStatus === 'collected' ? 'text-teal' : 'text-text-muted'}`}>{p.paymentStatus}</p></td>

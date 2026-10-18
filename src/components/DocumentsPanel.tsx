@@ -71,7 +71,7 @@ export function DocumentsPanel({ shipmentId, shipmentRef, onCount }: { shipmentI
         <form onSubmit={upload} className="mt-3 grid gap-2 rounded-lg border border-border bg-surface-2/40 p-3 sm:grid-cols-[1fr_auto]" aria-label="Upload a document">
           <div className="grid gap-2 sm:grid-cols-3">
             <label className="sm:col-span-3 flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border bg-surface px-3 py-2.5 text-sm hover:border-gold">
-              <Upload size={16} className="shrink-0 text-gold" aria-hidden="true" />
+              <Upload size={16} className="shrink-0 text-gold-deep" aria-hidden="true" />
               <span className="min-w-0 flex-1 truncate">{form.file ? `${form.file.name} · ${fmtBytes(form.file.size)}` : 'Choose a PDF, image or scan (up to 6 MB)'}</span>
               <input ref={fileRef} type="file" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" className="sr-only" onChange={(e) => pick(e.target.files?.[0] ?? null)} data-testid="doc-file" />
             </label>
@@ -87,7 +87,7 @@ export function DocumentsPanel({ shipmentId, shipmentRef, onCount }: { shipmentI
         {docs && docs.length === 0 && <li className="py-4 text-sm text-text-muted">{canManage ? 'Nothing here yet. Generate a packing list or commercial invoice, or upload the line’s bill of lading and customs forms.' : 'No documents shared on this shipment yet.'}</li>}
         {docs?.map((d) => (
           <li key={d.id} className="flex items-center gap-3 py-2.5" data-testid="doc-row">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-gold" aria-hidden="true">{icon(d)}</span>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-gold-deep" aria-hidden="true">{icon(d)}</span>
             <div className="min-w-0 flex-1">
               <Link to={`/dashboard/documents/${d.id}`} className="block truncate text-sm font-semibold hover:underline">{d.title}</Link>
               <p className="truncate text-[11px] text-text-muted">{docKindLabels[d.kind]}{d.source === 'generated' ? ' · generated' : d.size ? ` · ${fmtBytes(d.size)}` : ''}{d.uploadedBy ? ` · ${d.uploadedBy}` : ''}{d.updatedAt ? ` · ${fmtDateTime(d.updatedAt)}` : ''}{canManage ? (d.visibility === 'shared' ? ' · customer can see' : ' · office only') : ''}{d.shareToken ? ' · link on' : ''}</p>
@@ -95,8 +95,8 @@ export function DocumentsPanel({ shipmentId, shipmentRef, onCount }: { shipmentI
             <div className="flex shrink-0 items-center gap-0.5">
               <Link to={`/dashboard/documents/${d.id}`} className="grid h-8 w-8 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text focus-ring" aria-label={`Open ${d.title}`}><ExternalLink size={14} /></Link>
               {canManage && <button onClick={() => toggleVis(d)} disabled={busy === d.id} className="grid h-8 w-8 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text focus-ring" aria-label={d.visibility === 'shared' ? 'Hide from customer' : 'Show to customer'} title={d.visibility === 'shared' ? 'Customer can see this' : 'Office only'}>{d.visibility === 'shared' ? <Eye size={14} /> : <EyeOff size={14} />}</button>}
-              {canManage && (d.shareToken ? <button onClick={() => copy(d)} className={`grid h-8 w-8 place-items-center rounded-md focus-ring ${copied === d.id ? 'text-teal' : 'text-gold hover:bg-surface-2'}`} aria-label="Copy share link" title="Copy share link">{copied === d.id ? <Check size={14} /> : <Copy size={14} />}</button> : null)}
-              {canManage && <button onClick={() => share(d)} disabled={busy === d.id} className={`grid h-8 w-8 place-items-center rounded-md focus-ring ${d.shareToken ? 'text-gold hover:bg-surface-2' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} aria-label={d.shareToken ? 'Revoke share link' : 'Create share link'} title={d.shareToken ? 'Link is live — click to revoke' : 'Create a share link'}><Link2 size={14} /></button>}
+              {canManage && (d.shareToken ? <button onClick={() => copy(d)} className={`grid h-8 w-8 place-items-center rounded-md focus-ring ${copied === d.id ? 'text-teal' : 'text-gold-deep hover:bg-surface-2'}`} aria-label="Copy share link" title="Copy share link">{copied === d.id ? <Check size={14} /> : <Copy size={14} />}</button> : null)}
+              {canManage && <button onClick={() => share(d)} disabled={busy === d.id} className={`grid h-8 w-8 place-items-center rounded-md focus-ring ${d.shareToken ? 'text-gold-deep hover:bg-surface-2' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} aria-label={d.shareToken ? 'Revoke share link' : 'Create share link'} title={d.shareToken ? 'Link is live — click to revoke' : 'Create a share link'}><Link2 size={14} /></button>}
               {(canManage || d.uploadedByRole === 'customer') && <button onClick={() => setDeleting(d)} className="grid h-8 w-8 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-danger focus-ring" aria-label={`Delete ${d.title}`}><Trash2 size={14} /></button>}
             </div>
           </li>

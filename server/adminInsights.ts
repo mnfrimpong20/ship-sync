@@ -1,6 +1,6 @@
 /**
  * Admin intelligence.
- *   GET  /admin/platform?days=        platform analytics: GMV, Ship Sync fees, growth, conversion by destination & source
+ *   GET  /admin/platform?days=        platform analytics: GMV, Ntemtem fees, growth, conversion by destination & source
  *   GET  /admin/marketplace?days=     lane liquidity: demand vs supply, unanswered share, quotes per request, gaps
  *   GET  /admin/scorecards            every shipper's quality score + metrics; POST /admin/scorecards/recompute
  *   POST /admin/shippers/:id/standing { standing, note, lock }   GET|PUT /admin/standing-rules
@@ -234,7 +234,7 @@ export function mountAdminInsights(r: Router, d: Deps) {
     const b = z.object({ standing: z.enum(['good', 'warning', 'probation', 'paused']), note: z.string().trim().max(400).default(''), lock: z.boolean().default(false) }).parse(req.body)
     const { rows } = await db.query<Row>('update shippers set standing = $2, standing_note = $3, standing_locked = $4, standing_at = now() where id = $1 returning id, name, demo', [req.params.id, b.standing, b.note, b.lock])
     if (!rows[0]) throw new HttpError(404, 'Shipper not found.')
-    if (!rows[0].demo) await notifyShipperStaff(db, rows[0].id, { kind: 'system', title: b.standing === 'paused' ? 'Your marketplace listing is paused' : b.standing === 'good' ? 'You’re in good standing' : `Marketplace standing: ${b.standing}`, body: b.note || (b.standing === 'paused' ? 'You won’t receive new requests or appear in the directory until Ship Sync restores your listing. Existing shipments are not affected.' : ''), link: '/dashboard/analytics' }, ['owner'])
+    if (!rows[0].demo) await notifyShipperStaff(db, rows[0].id, { kind: 'system', title: b.standing === 'paused' ? 'Your marketplace listing is paused' : b.standing === 'good' ? 'You’re in good standing' : `Marketplace standing: ${b.standing}`, body: b.note || (b.standing === 'paused' ? 'You won’t receive new requests or appear in the directory until Ntemtem restores your listing. Existing shipments are not affected.' : ''), link: '/dashboard/analytics' }, ['owner'])
     void admin; res.json({ ok: true })
   }))
 

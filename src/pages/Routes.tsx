@@ -17,7 +17,7 @@ export function RunRow({ r, to }: { r: Run; to: string }) {
   const done = r.stops.filter((s) => s.status !== 'pending').length
   return (
     <Link to={to} className="card-dark flex items-center gap-4 p-4 transition-colors hover:border-gold/40 focus-ring">
-      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${r.kind === 'pickup' ? 'bg-teal/15 text-teal' : 'bg-gold/15 text-gold'}`} aria-hidden="true"><MapPinned size={20} /></span>
+      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${r.kind === 'pickup' ? 'bg-teal/15 text-teal' : 'bg-gold/15 text-gold-deep'}`} aria-hidden="true"><MapPinned size={20} /></span>
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2 font-semibold">{r.name}<Pill tone={runTone[r.status]}>{runStatusLabels[r.status]}</Pill><span className="text-xs font-normal text-text-muted">{r.kind === 'pickup' ? 'Pickups' : 'Deliveries'}</span></p>
         <p className="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-text-muted">

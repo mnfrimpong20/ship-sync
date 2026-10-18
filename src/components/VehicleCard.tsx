@@ -27,7 +27,7 @@ export function VinField({ value, onChange, onDecoded, label = 'VIN (17 characte
 export function RequestVehicleFields({ value, onChange }: { value: RequestVehicle; onChange: (v: RequestVehicle) => void }) {
   return (
     <div className="grid gap-3 rounded-xl border border-border bg-surface-2/40 p-4" data-testid="request-vehicle">
-      <p className="inline-flex items-center gap-2 text-sm font-semibold"><Car size={15} className="text-gold" aria-hidden="true" /> About the vehicle</p>
+      <p className="inline-flex items-center gap-2 text-sm font-semibold"><Car size={15} className="text-gold-deep" aria-hidden="true" /> About the vehicle</p>
       <VinField value={value.vin} onChange={(vin) => onChange({ ...value, vin })} onDecoded={(d) => onChange({ ...value, vin: d.vin, year: d.year ?? value.year, make: d.make ?? value.make, model: d.model ?? value.model })} />
       <div className="grid grid-cols-3 gap-2">
         <label className="text-xs text-text-muted">Year<input type="number" min={1950} max={new Date().getFullYear() + 1} aria-label="Year" className="input-dark mt-1 !min-h-10 text-sm tabular-nums" value={value.year ?? ''} onChange={(e) => onChange({ ...value, year: e.target.value ? Number(e.target.value) : null })} /></label>
@@ -69,7 +69,7 @@ export function VehicleCard({ shipmentId, destination }: { shipmentId: string; d
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface p-4" data-testid="vehicle-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Car size={14} className="text-gold" aria-hidden="true" /> Vehicle</p>
+        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Car size={14} className="text-gold-deep" aria-hidden="true" /> Vehicle</p>
         {v && !editing && <button onClick={() => setEditing(true)} className="btn-ghost !min-h-7 !px-2 text-[11px]"><Pencil size={11} aria-hidden="true" /> Edit</button>}
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
@@ -143,7 +143,7 @@ export function VehicleCard({ shipmentId, destination }: { shipmentId: string; d
           </div>
 
           <div className="mt-3 rounded-lg border border-border p-3 text-xs" data-testid="vehicle-checklist">
-            <p className="flex items-center justify-between font-semibold"><span className="inline-flex items-center gap-1.5"><ClipboardCheck size={13} className="text-gold" aria-hidden="true" /> Handover checklist</span><span className="text-text-muted">{done}/{meta.checklist.length}</span></p>
+            <p className="flex items-center justify-between font-semibold"><span className="inline-flex items-center gap-1.5"><ClipboardCheck size={13} className="text-gold-deep" aria-hidden="true" /> Handover checklist</span><span className="text-text-muted">{done}/{meta.checklist.length}</span></p>
             <ul className="mt-2 space-y-1.5">
               {meta.checklist.filter((c) => c.id !== 'lien' || v.titleStatus === 'lien').map((c) => (
                 <li key={c.id}><label className="flex items-start gap-2"><input type="checkbox" disabled={!d.canManage || busy === 'ck'} className="mt-0.5 h-3.5 w-3.5 accent-[var(--color-gold)]" checked={!!v.checklist[c.id]} onChange={(e) => tick(c.id, e.target.checked)} /><span className={v.checklist[c.id] ? 'text-text-muted line-through' : ''}>{c.label}</span></label></li>
@@ -151,7 +151,7 @@ export function VehicleCard({ shipmentId, destination }: { shipmentId: string; d
             </ul>
             {!d.canManage && <p className="mt-2 text-text-muted">Bring these to the handover — the shipper ticks them off.</p>}
           </div>
-          {(destination.toUpperCase() === 'GH' || destination.toUpperCase() === 'NG') && <p className="mt-3 text-[11px] text-text-muted">Duty on arrival is estimated in the <strong>Duty</strong> card below from this year, engine size and value. <Link to={`/duty?destination=${destination}&goods=vehicle`} className="text-gold hover:underline">Open the estimator</Link></p>}
+          {(destination.toUpperCase() === 'GH' || destination.toUpperCase() === 'NG') && <p className="mt-3 text-[11px] text-text-muted">Duty on arrival is estimated in the <strong>Duty</strong> card below from this year, engine size and value. <Link to={`/duty?destination=${destination}&goods=vehicle`} className="text-gold-deep hover:underline">Open the estimator</Link></p>}
         </div>
       ) : null}
     </div>

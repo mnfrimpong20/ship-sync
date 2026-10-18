@@ -279,7 +279,7 @@ const PROVIDERS: AdsbProvider[] = [
   { name: 'adsb.lol', point: (la, lo) => `${ADSB_URL}/v2/point/${la}/${lo}/250`, callsign: (cs) => `${ADSB_URL}/v2/callsign/${encodeURIComponent(cs)}`, key: 'ac', minGapMs: 6000, backoffUntil: 0, lastAt: 0, ok: 0, fail: 0 },
   { name: 'airplanes.live', point: (la, lo) => `${process.env.AIRPLANESLIVE_URL || 'https://api.airplanes.live'}/v2/point/${la}/${lo}/250`, callsign: (cs) => `${process.env.AIRPLANESLIVE_URL || 'https://api.airplanes.live'}/v2/callsign/${encodeURIComponent(cs)}`, key: 'ac', minGapMs: 1500, backoffUntil: 0, lastAt: 0, ok: 0, fail: 0 },
 ]
-const UA = 'ShipSync live map (+https://github.com/mnfrimpong20/ship-sync)'
+const UA = 'Ntemtem live map (+https://github.com/mnfrimpong20/ship-sync)'
 
 async function adsbGet(p: AdsbProvider, url: string): Promise<any[] | null> {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000)

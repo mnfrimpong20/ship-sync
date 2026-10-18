@@ -1,4 +1,4 @@
-/** Coordinates for the origins and destinations Ship Sync serves. [lon, lat] as GeoJSON expects. */
+/** Coordinates for the origins and destinations Ntemtem serves. [lon, lat] as GeoJSON expects. */
 export type LngLat = [number, number]
 
 export const originCoords: Record<string, LngLat> = {

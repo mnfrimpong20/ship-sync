@@ -47,13 +47,13 @@ export default function Join() {
           {state === 'ready' && invite && (
             <>
               <motion.p variants={fadeUp} className="eyebrow mb-2">You’re invited</motion.p>
-              <motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,4vw,2.5rem)]">Join {invite.company} on Ship Sync</motion.h1>
+              <motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,4vw,2.5rem)]">Join {invite.company} on Ntemtem</motion.h1>
               <motion.p variants={fadeUp} className="mt-2 text-text-muted">You’ll join as <strong className="text-text">{roleLabels[invite.role]}</strong> — {roleBlurb[invite.role].charAt(0).toLowerCase() + roleBlurb[invite.role].slice(1)}</motion.p>
               <motion.form variants={fadeUp} onSubmit={submit} className="card-dark mt-8 space-y-4 p-6 md:p-8" aria-label="Join your team">
                 {error && <p role="alert" className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
                 <div><label htmlFor="j-email" className="label-dark">Email</label><input id="j-email" className="input-dark opacity-70" value={invite.email} readOnly /></div>
                 <div><label htmlFor="j-name" className="label-dark">Your name</label><input id="j-name" className="input-dark" required minLength={2} value={name} onChange={(e) => setName(e.target.value)} /></div>
-                <div><label htmlFor="j-pass" className="label-dark">Choose a password</label><input id="j-pass" type="password" className="input-dark" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /><p className="mt-1 text-xs text-text-muted">At least 8 characters. If you already have a Ship Sync account with this email, enter that password to link it.</p></div>
+                <div><label htmlFor="j-pass" className="label-dark">Choose a password</label><input id="j-pass" type="password" className="input-dark" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /><p className="mt-1 text-xs text-text-muted">At least 8 characters. If you already have a Ntemtem account with this email, enter that password to link it.</p></div>
                 <button disabled={busy} className="btn-gold w-full disabled:opacity-60">{busy ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Check size={16} aria-hidden="true" />} Join {invite.company}</button>
                 <p className="flex items-center justify-center gap-1.5 text-center text-xs text-text-muted"><ShieldCheck size={12} aria-hidden="true" /> This link works once and stops working after you join.</p>
               </motion.form>

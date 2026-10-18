@@ -221,7 +221,7 @@ async function sendSetPasswordLink(db: Db, userId: string, name: string, email: 
   await db.query(`insert into password_resets (token,user_id,expires_at) values ($1,$2,now() + interval '3 days')`, [token, userId])
   const link = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/#/reset?token=${token}&welcome=1`
   if (emailProvider().id === 'off') { console.log('[auth] set-password link (email off):', link); return false }
-  try { await sendEmail(email, 'Your Ship Sync quotes — set a password', emailTemplate({ name, title: 'Your request is in', body: 'Shippers are pricing your shipment now. Quotes appear in your dashboard and we email you as each one arrives. Set a password so you can sign back in from any device.', link, cta: 'Set my password' })); return true } catch (e) { console.error('[auth] set-password email', e); return false }
+  try { await sendEmail(email, 'Your Ntemtem quotes — set a password', emailTemplate({ name, title: 'Your request is in', body: 'Shippers are pricing your shipment now. Quotes appear in your dashboard and we email you as each one arrives. Set a password so you can sign back in from any device.', link, cta: 'Set my password' })); return true } catch (e) { console.error('[auth] set-password email', e); return false }
 }
 async function signupUser(db: Db, input: { name: string; email: string; password: string; role: 'customer' | 'shipper'; company?: string }) {
   const email = input.email.trim().toLowerCase()
@@ -236,7 +236,7 @@ async function signupUser(db: Db, input: { name: string; email: string; password
     await db.query(
       `insert into shippers (id,name,tagline,hq,founded,modes,destinations,origins,cargo,verified,response_hours,services,about,price_index,plan,initials,hue,demo,trial_ends_at)
        values ($1,$2,$3,$4,$5,'["ocean","air"]','[]','[]','[]',false,24,'[]',$6,2,'starter',$7,$8,false,now() + interval '14 days')`,
-      [shipperId, company, 'New on Ship Sync', '', new Date().getFullYear(), `${company} is a new shipping company on Ship Sync. Profile details coming soon.`, initials, '#E3B54A'],
+      [shipperId, company, 'New on Ntemtem', '', new Date().getFullYear(), `${company} is a new shipping company on Ntemtem. Profile details coming soon.`, initials, '#F5B82E'],
     )
   }
   const hash = await bcrypt.hash(input.password, 10)
@@ -465,7 +465,7 @@ export function apiRouter() {
       const token = randomBytes(24).toString('base64url')
       await db.query(`insert into password_resets (token,user_id,expires_at) values ($1,$2,now() + interval '1 hour')`, [token, rows[0].id])
       const link = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/#/reset?token=${token}`
-      if (emailProvider().id !== 'off') { try { await sendEmail(e, 'Reset your Ship Sync password', emailTemplate({ name: rows[0].name, title: 'Reset your password', body: 'Someone asked to reset the password for this Ship Sync account. The link below works for one hour. If that was not you, you can ignore this email — nothing changes.', link, cta: 'Choose a new password' })) } catch (err) { console.error('[auth] reset email', err) } }
+      if (emailProvider().id !== 'off') { try { await sendEmail(e, 'Reset your Ntemtem password', emailTemplate({ name: rows[0].name, title: 'Reset your password', body: 'Someone asked to reset the password for this Ntemtem account. The link below works for one hour. If that was not you, you can ignore this email — nothing changes.', link, cta: 'Choose a new password' })) } catch (err) { console.error('[auth] reset email', err) } }
       else console.log('[auth] password reset link (email off):', link)
     }
     res.json({ ok: true })
@@ -497,7 +497,7 @@ export function apiRouter() {
     const db = await getDb(); const user = await requireUser(db, req)
     if (user.role !== 'shipper' || !user.shipperId) throw new HttpError(403, 'Only shipper accounts have a company profile.')
     const b = zProfile.parse(req.body)
-    for (const c of b.destinations) if (!(await isActiveDestination(db, c))) throw new HttpError(400, `${c} is not a destination Ship Sync serves yet.`)
+    for (const c of b.destinations) if (!(await isActiveDestination(db, c))) throw new HttpError(400, `${c} is not a destination Ntemtem serves yet.`)
     bustOrigins()
     await db.query(
       `update shippers set name=$2, tagline=$3, hq=$4, founded=$5, modes=$6, destinations=$7, origins=$8, cargo=$9, services=$10, about=$11, price_index=$12, response_hours=$13, initials=$14 where id = $1`,
@@ -609,7 +609,7 @@ export function apiRouter() {
     const db = await getDb(); const user = await requireUser(db, req)
     if (user.role !== 'shipper' || !user.shipperId) throw new HttpError(403, 'Only shipper accounts can send quotes.')
     if (!can(user, 'leads')) throw new HttpError(403, 'Your role can’t send quotes — ask an owner or dispatcher to give you Leads access.')
-    { const { rows: st } = await db.query<Row>('select standing from shippers where id = $1', [user.shipperId]); if (st[0]?.standing === 'paused') throw new HttpError(403, 'Your marketplace listing is paused — contact Ship Sync to restore it before quoting.') }
+    { const { rows: st } = await db.query<Row>('select standing from shippers where id = $1', [user.shipperId]); if (st[0]?.standing === 'paused') throw new HttpError(403, 'Your marketplace listing is paused — contact Ntemtem to restore it before quoting.') }
     const body = zQuote.parse(req.body)
     const { rows } = await db.query<Row>('select * from requests where id = $1', [req.params.id])
     if (!rows[0]) throw new HttpError(404, 'Request not found.')

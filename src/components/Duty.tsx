@@ -21,7 +21,7 @@ export function DutyBreakdown({ e, compact = false }: { e: DutyEstimate; compact
       </table>
       {!compact && <ul className="mt-3 space-y-1 text-[11px] text-text-muted">{e.notes.map((n, i) => <li key={i}>• {n}</li>)}</ul>}
       <p className="mt-2 text-[11px] text-text-muted">Rates checked {e.checked}. {e.destination === 'GH' ? 'Structure follows GRA’s ICUMS assessment (duty, VAT 15% + NHIL 2.5% + GETFund 2.5% on CIF + duty, ECOWAS/AU/EXIM levies).' : ''} Estimate only — the official figure comes from customs.</p>
-      {e.verifyUrl && <a href={e.verifyUrl} target="_blank" rel="noopener" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline"><ShieldCheck size={13} aria-hidden="true" /> Verify on the official GRA ICUMS calculator <ExternalLink size={11} aria-hidden="true" /></a>}
+      {e.verifyUrl && <a href={e.verifyUrl} target="_blank" rel="noopener" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-gold-deep hover:underline"><ShieldCheck size={13} aria-hidden="true" /> Verify on the official GRA ICUMS calculator <ExternalLink size={11} aria-hidden="true" /></a>}
     </div>
   )
 }
@@ -74,7 +74,7 @@ export function DutyCard({ shipmentId, destination, cargo }: { shipmentId: strin
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface p-4" data-testid="duty-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Calculator size={14} className="text-gold" aria-hidden="true" /> Duty at {destination.toUpperCase() === 'GH' ? 'Tema' : 'Lagos'}</p>
+        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Calculator size={14} className="text-gold-deep" aria-hidden="true" /> Duty at {destination.toUpperCase() === 'GH' ? 'Tema' : 'Lagos'}</p>
         <div className="flex gap-1">{!editing && !confirmed && <button onClick={() => setEditing(true)} className="btn-ghost !min-h-7 !px-2 text-[11px]"><Pencil size={11} aria-hidden="true" /> {est ? 'Edit values' : 'Estimate'}</button>}{!est && !confirmed && !editing && <button onClick={() => setHidden(true)} className="grid h-7 w-7 place-items-center rounded-md text-text-muted hover:text-text focus-ring" aria-label="Hide"><X size={12} /></button>}</div>
       </div>
       {error && <p role="alert" className="mt-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}

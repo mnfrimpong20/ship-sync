@@ -123,7 +123,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
             {stepsMeta.map((s, i) => (
               <li key={s} className="flex-1">
                 <div className={`h-1.5 rounded-full transition-colors ${i <= step ? 'bg-gold' : 'bg-surface-2'}`} />
-                <p className={`mt-2 text-xs font-medium ${i === step ? 'text-gold' : 'text-text-muted'}`} aria-current={i === step ? 'step' : undefined}>{i + 1}. {s}</p>
+                <p className={`mt-2 text-xs font-medium ${i === step ? 'text-gold-deep' : 'text-text-muted'}`} aria-current={i === step ? 'step' : undefined}>{i + 1}. {s}</p>
               </li>
             ))}
           </ol>
@@ -142,7 +142,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                       <legend className="label-dark">Mode</legend>
                       <div className="grid gap-2 sm:grid-cols-3" role="radiogroup">
                         {([['either', 'Either — show me both', null], ['ocean', 'Ocean freight', Ship], ['air', 'Air freight', Plane]] as const).map(([v, l, Icon]) => (
-                          <button type="button" key={v} role="radio" aria-checked={form.mode === v} onClick={() => set('mode', v)} className={`flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-sm)] border text-sm font-medium transition-colors focus-ring ${form.mode === v ? 'border-gold bg-gold/15 text-gold' : 'border-border bg-surface-2 text-text-muted hover:text-text'}`}>{Icon && <Icon size={16} aria-hidden="true" />}{l}</button>
+                          <button type="button" key={v} role="radio" aria-checked={form.mode === v} onClick={() => set('mode', v)} className={`flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-sm)] border text-sm font-medium transition-colors focus-ring ${form.mode === v ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border bg-surface-2 text-text-muted hover:text-text'}`}>{Icon && <Icon size={16} aria-hidden="true" />}{l}</button>
                         ))}
                       </div>
                     </fieldset>
@@ -155,7 +155,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                     <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Cargo type">
                       {cargoTypes.map((c) => (
                         <button type="button" key={c.id} role="radio" aria-checked={form.cargo === c.id} onClick={() => set('cargo', c.id as CargoType)} className={`flex min-h-14 flex-col items-start justify-center rounded-[var(--radius-sm)] border px-4 py-2 text-left transition-colors focus-ring ${form.cargo === c.id ? 'border-gold bg-gold/15' : 'border-border bg-surface-2 hover:border-text-muted'}`}>
-                          <span className={`text-sm font-semibold ${form.cargo === c.id ? 'text-gold' : 'text-text'}`}>{c.label}</span><span className="text-xs text-text-muted">{c.hint}</span>
+                          <span className={`text-sm font-semibold ${form.cargo === c.id ? 'text-gold-deep' : 'text-text'}`}>{c.label}</span><span className="text-xs text-text-muted">{c.hint}</span>
                         </button>
                       ))}
                     </div>
@@ -184,7 +184,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                     ))}
                     <div className="rounded-[var(--radius-sm)] border border-border bg-surface-2 p-4" data-testid="recipient-section">
                       <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold text-text">Who receives it in {countryByCode(form.destination)?.name ?? 'the destination'}?</p><p className="text-xs text-text-muted">Optional now, but it lets the shipper text them when it lands and the driver find them.</p></div>{form.consignee && <button type="button" onClick={() => { set('consignee', undefined); setRecipientMode(saved.length ? 'pick' : 'none') }} className="text-xs text-text-muted underline">Clear</button>}</div>
-                      {saved.length > 0 && <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Saved recipients">{saved.map((c) => <button type="button" key={c.id} role="radio" aria-checked={form.consignee?.name === c.name && form.consignee?.phone === c.phone} onClick={() => pickSaved(c)} className={`rounded-full border px-3 py-1.5 text-sm focus-ring ${form.consignee?.name === c.name && form.consignee?.phone === c.phone ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`} data-testid="saved-recipient">{c.name}{c.city ? ` · ${c.city}` : ''}</button>)}<button type="button" onClick={() => { set('consignee', { name: '', country: form.destination }); setRecipientMode('new') }} className="rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-text-muted hover:text-text focus-ring">+ Someone else</button></div>}
+                      {saved.length > 0 && <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Saved recipients">{saved.map((c) => <button type="button" key={c.id} role="radio" aria-checked={form.consignee?.name === c.name && form.consignee?.phone === c.phone} onClick={() => pickSaved(c)} className={`rounded-full border px-3 py-1.5 text-sm focus-ring ${form.consignee?.name === c.name && form.consignee?.phone === c.phone ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`} data-testid="saved-recipient">{c.name}{c.city ? ` · ${c.city}` : ''}</button>)}<button type="button" onClick={() => { set('consignee', { name: '', country: form.destination }); setRecipientMode('new') }} className="rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-text-muted hover:text-text focus-ring">+ Someone else</button></div>}
                       {saved.length === 0 && recipientMode === 'none' && <button type="button" onClick={() => { set('consignee', { name: '', country: form.destination }); setRecipientMode('new') }} className="btn-ghost mt-3 !min-h-9 text-xs" data-testid="add-recipient-inline">Add a recipient</button>}
                       {recipientMode === 'new' && <div className="mt-3"><ConsigneeForm key={form.consignee?.name ?? 'new'} initial={{ ...(form.consignee ?? { name: '' }), country: form.consignee?.country || form.destination }} onSave={(c) => { set('consignee', c as RequestConsignee); setRecipientMode('pick') }} onCancel={() => { set('consignee', undefined); setRecipientMode(saved.length ? 'pick' : 'none') }} /></div>}
                       {recipientMode === 'pick' && form.consignee?.name && <p className="mt-3 text-sm text-text"><Check size={14} className="inline text-teal" aria-hidden="true" /> {form.consignee.name}{form.consignee.city ? `, ${form.consignee.city}` : ''}{form.consignee.phone ? ` · ${form.consignee.phone}` : ''} <button type="button" onClick={() => setRecipientMode('new')} className="ml-1 text-xs text-text-muted underline">edit</button></p>}
@@ -204,11 +204,11 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                       <div>
                         <label htmlFor="cpw" className="label-dark">Create a password <span className="font-normal text-text-muted">(optional)</span></label>
                         <input id="cpw" type="password" className="input-dark" value={form.password ?? ''} onChange={(e) => set('password', e.target.value)} aria-invalid={!!errors.password} autoComplete="new-password" />
-                        {errors.password ? <p className="mt-1 text-xs text-danger">{errors.password}</p> : <p className="mt-1 text-xs text-text-muted">Leave it blank and we’ll email you a link to set one — your quotes are waiting either way. Already have one? <Link to="/login?next=/quote" className="text-gold hover:underline">Sign in</Link>.</p>}
+                        {errors.password ? <p className="mt-1 text-xs text-danger">{errors.password}</p> : <p className="mt-1 text-xs text-text-muted">Leave it blank and we’ll email you a link to set one — your quotes are waiting either way. Already have one? <Link to="/login?next=/quote" className="text-gold-deep hover:underline">Sign in</Link>.</p>}
                       </div>
                     )}
                     {submitError && <p role="alert" className="text-sm text-danger">{submitError}</p>}
-                    <p className="text-xs text-text-muted">By submitting you agree to receive quotes from matching shippers. Ship Sync never shares your details beyond the shippers you’re matched with.</p>
+                    <p className="text-xs text-text-muted">By submitting you agree to receive quotes from matching shippers. Ntemtem never shares your details beyond the shippers you’re matched with.</p>
                   </div>
                 )}
               </motion.div>
@@ -228,13 +228,13 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
               {locked ? (
                 <div data-testid="locked-shipper">
                   <p className="eyebrow mb-2">You’re ordering from</p>
-                  <div className="flex items-start gap-3"><Avatar initials={locked.shipper.initials} hue={locked.shipper.hue} size={48} /><div className="min-w-0"><p className="flex items-center gap-1 text-base font-semibold">{locked.shipper.name}{locked.shipper.verified && <BadgeCheck size={16} className="text-gold" aria-label="Verified" />}</p><p className="text-sm text-text-muted">{locked.shipper.tagline || locked.shipper.hq}</p><div className="mt-1 flex flex-wrap items-center gap-1.5">{locked.shipper.modes.map((md) => <ModeBadge key={md} mode={md} />)}<Rating value={locked.shipper.rating} count={locked.shipper.reviews} /></div></div></div>
+                  <div className="flex items-start gap-3"><Avatar initials={locked.shipper.initials} hue={locked.shipper.hue} size={48} /><div className="min-w-0"><p className="flex items-center gap-1 text-base font-semibold">{locked.shipper.name}{locked.shipper.verified && <BadgeCheck size={16} className="text-gold-deep" aria-label="Verified" />}</p><p className="text-sm text-text-muted">{locked.shipper.tagline || locked.shipper.hq}</p><div className="mt-1 flex flex-wrap items-center gap-1.5">{locked.shipper.modes.map((md) => <ModeBadge key={md} mode={md} />)}<Rating value={locked.shipper.rating} count={locked.shipper.reviews} /></div></div></div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-text-muted">Ships to</dt><dd>{locked.shipper.destinations.map((c) => countryByCode(c)?.name ?? c).join(', ')}</dd></div><div><dt className="text-xs text-text-muted">Collects from</dt><dd>{locked.shipper.origins.slice(0, 3).join(', ') || '—'}</dd></div>{locked.shipper.onTime > 0 && <div><dt className="text-xs text-text-muted">On time</dt><dd>{locked.shipper.onTime}%</dd></div>}<div><dt className="text-xs text-text-muted">Replies in</dt><dd>~{locked.shipper.responseHours} h</dd></div></dl>
-                  <p className="mt-4 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">This request goes only to {locked.shipper.name}. You’ll get a Ship Sync account to track it, and payment is held in escrow until the goods are on their way.</p>
+                  <p className="mt-4 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">This request goes only to {locked.shipper.name}. You’ll get a Ntemtem account to track it, and payment is held in escrow until the goods are on their way.</p>
                 </div>
               ) : (
               <>
-              <div className="flex items-center justify-between"><h2 className="!text-lg">Who gets this?</h2><span className="rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold">{matches.length} match{matches.length === 1 ? '' : 'es'}</span></div>
+              <div className="flex items-center justify-between"><h2 className="!text-lg">Who gets this?</h2><span className="rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold-deep">{matches.length} match{matches.length === 1 ? '' : 'es'}</span></div>
               <div className="mt-3 grid grid-cols-2 gap-1 rounded-full border border-border bg-surface-2 p-1 text-sm" role="radiogroup" aria-label="Send to">
                 <button type="button" role="radio" aria-checked={!only} onClick={() => setOnly(null)} className={`min-h-9 rounded-full px-3 focus-ring ${!only ? 'bg-gold font-semibold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid="send-all">All matching</button>
                 <button type="button" role="radio" aria-checked={!!only} onClick={() => setOnly(only ?? matches[0]?.shipper.id ?? preferred?.id ?? null)} className={`min-h-9 rounded-full px-3 focus-ring ${only ? 'bg-gold font-semibold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid="send-one">One shipper</button>
@@ -254,10 +254,10 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                       {only === m.shipper.id && <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-gold px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-on-accent" data-testid="selected-tag"><Check size={10} aria-hidden="true" /> Selected</span>}
                       <Avatar initials={m.shipper.initials} hue={m.shipper.hue} size={40} />
                       <div className="min-w-0 flex-1">
-                        <p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{m.shipper.name}{m.shipper.verified && <BadgeCheck size={14} className="text-gold" aria-label="Verified" />}</p>
+                        <p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{m.shipper.name}{m.shipper.verified && <BadgeCheck size={14} className="text-gold-deep" aria-label="Verified" />}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">{m.shipper.modes.map((md) => <ModeBadge key={md} mode={md} />)}<Rating value={m.shipper.rating} /></div>
                         <p className="mt-1 text-xs text-text-muted">{m.reasons.slice(0, 2).join(' · ')}</p>
-                        {m.estimate && <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-gold/10 px-2 py-0.5 text-xs font-semibold text-gold" data-testid="match-estimate">{m.estimate.instant ? <Zap size={11} aria-hidden="true" /> : null}{money(m.estimate.price)} · {m.estimate.transitDays} days{m.estimate.instant ? ' · instant quote' : ' · published rate'}</p>}
+                        {m.estimate && <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-gold/10 px-2 py-0.5 text-xs font-semibold text-gold-deep" data-testid="match-estimate">{m.estimate.instant ? <Zap size={11} aria-hidden="true" /> : null}{money(m.estimate.price)} · {m.estimate.transitDays} days{m.estimate.instant ? ' · instant quote' : ' · published rate'}</p>}
                       </div>
                     </motion.li>
                   ))}
@@ -266,7 +266,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
               </>
               )}
               {portNow && (
-                <p className={`mt-4 rounded-lg border p-3 text-xs ${portNow.level === 'heavy' ? 'border-danger/40 bg-danger/10 text-danger' : portNow.level === 'busy' ? 'border-gold/40 bg-gold/10 text-gold' : 'border-border bg-surface-2 text-text-muted'}`}>
+                <p className={`mt-4 rounded-lg border p-3 text-xs ${portNow.level === 'heavy' ? 'border-danger/40 bg-danger/10 text-danger' : portNow.level === 'busy' ? 'border-gold/40 bg-gold/10 text-gold-deep' : 'border-border bg-surface-2 text-text-muted'}`}>
                   {countryByCode(form.destination)?.ports[0]} right now: {portNow.text}.{portNow.level !== 'clear' ? ' Shippers may quote longer transit.' : ''}
                 </p>
               )}
@@ -274,9 +274,9 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                 <p className="mt-4 border-t border-border pt-4 text-xs text-text-muted">{matches.some((m) => m.estimate?.instant) ? `${matches.filter((m) => m.estimate?.instant).length} of these will quote instantly when you submit. ` : ''}Estimated range {money(estimate(form).lo)}–{money(estimate(form).hi)} based on recent quotes on this lane. Final prices come from shippers.</p>
               )}
             </div>
-            {form.mode !== 'air' && (form.cargo === 'boxes' || form.cargo === 'barrels') && <p className="mt-4 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-center text-sm">Sending less than a barrel? <Link to={`/groupage?destination=${form.destination}`} className="font-semibold text-gold hover:underline">Reserve space in a shared barrel or container →</Link></p>}
-            <p className="mt-4 text-center text-sm text-text-muted">Prefer to browse first? <Link to="/shippers" className="text-gold hover:underline">See the directory</Link></p>
-            {(form.destination === 'GH' || form.destination === 'NG') && <p className="mt-2 text-center text-sm text-text-muted">Wondering about customs? <Link to={`/duty?destination=${form.destination}&goods=${form.cargo === 'vehicle' ? 'vehicle' : 'personal_effects'}`} className="text-gold hover:underline">Estimate duty at {form.destination === 'GH' ? 'Tema' : 'Lagos'}</Link></p>}
+            {form.mode !== 'air' && (form.cargo === 'boxes' || form.cargo === 'barrels') && <p className="mt-4 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-center text-sm">Sending less than a barrel? <Link to={`/groupage?destination=${form.destination}`} className="font-semibold text-gold-deep hover:underline">Reserve space in a shared barrel or container →</Link></p>}
+            <p className="mt-4 text-center text-sm text-text-muted">Prefer to browse first? <Link to="/shippers" className="text-gold-deep hover:underline">See the directory</Link></p>
+            {(form.destination === 'GH' || form.destination === 'NG') && <p className="mt-2 text-center text-sm text-text-muted">Wondering about customs? <Link to={`/duty?destination=${form.destination}&goods=${form.cargo === 'vehicle' ? 'vehicle' : 'personal_effects'}`} className="text-gold-deep hover:underline">Estimate duty at {form.destination === 'GH' ? 'Tema' : 'Lagos'}</Link></p>}
           </div>
         </aside>
       </div>

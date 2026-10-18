@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { AlertTriangle, BadgeCheck, Ban, Clock, Globe2, Lock, MessageSquare, Pencil, Plane, Send, Ship } from 'lucide-react'
+import { AlertTriangle, Ban, Clock, Globe2, Lock, MessageSquare, Pencil, Plane, Send, Ship } from 'lucide-react'
 import { useStore, type Quote, type QuoteRequest } from '../lib/store'
 import { missingServices, requestsApi, type RequestMessage } from '../lib/requests'
 import { refreshShipments } from '../lib/flowEvents'
-import { Avatar, Pill, Rating, fmtDate, fmtDateTime, money } from './ui'
+import { Avatar, Pill, ProtectedNote, Rating, VerifiedBadge, fmtDate, fmtDateTime, money } from './ui'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const live = (q: Quote) => q.status === 'sent' && !q.expired
@@ -64,7 +64,7 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
           {g.label && <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-muted"><g.icon size={13} aria-hidden="true" /> {g.label} · {g.list.length}</p>}
           <div className="grid gap-3 md:grid-cols-2">
             {[...g.list].sort(order).map((q) => {
-              const s = shipperById(q.shipperId) ?? { id: q.shipperId, name: 'Shipper', initials: 'SS', hue: '#E3B54A', rating: 0, reviews: 0, verified: false }
+              const s = shipperById(q.shipperId) ?? { id: q.shipperId, name: 'Shipper', initials: 'SS', hue: '#F5B82E', rating: 0, reviews: 0, verified: false }
               const t = tags.get(q.id) ?? []
               const missing = missingServices(r, q.includes)
               const dead = !live(q) && q.status !== 'accepted'
@@ -73,7 +73,7 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
                   {t.length > 0 && r.status === 'open' && <div className="absolute -top-2.5 left-4 flex gap-1">{t.map((x) => <span key={x} className="rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent" data-testid="quote-tag">{x}</span>)}</div>}
                   <div className="flex items-start gap-3">
                     <Avatar initials={s.initials} hue={s.hue} size={40} />
-                    <div className="min-w-0 flex-1"><p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{s.name}{s.verified && <BadgeCheck size={14} className="text-gold" aria-label="Verified" />}</p><div className="mt-1 flex flex-wrap gap-1.5"><Rating value={s.rating} count={s.reviews} /></div></div>
+                    <div className="min-w-0 flex-1"><p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{s.name}</p>{s.verified && <p className="mt-1"><VerifiedBadge /></p>}<div className="mt-1 flex flex-wrap gap-1.5"><Rating value={s.rating} count={s.reviews} /></div></div>
                     <div className="text-right"><p className="font-heading text-2xl font-bold text-text">{money(q.price)}</p><p className="text-xs text-text-muted">~{q.transitDays} days{q.kind === 'estimate' ? ' · estimate' : ''}</p></div>
                   </div>
                   <ul className="mt-3 flex flex-wrap gap-1.5">{q.includes.map((x) => <li key={x} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted">{x}</li>)}</ul>
@@ -90,6 +90,7 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
                       )}
                     </div>
                   </div>
+                  {live(q) && q.status !== 'accepted' && q.status !== 'declined' && r.status === 'open' && <ProtectedNote className="mt-3" />}
                   {thread === q.shipperId && <div className="mt-3"><MessageThread requestId={r.id} shipperId={q.shipperId} compact onClose={() => setThread(null)} /></div>}
                 </div>
               )

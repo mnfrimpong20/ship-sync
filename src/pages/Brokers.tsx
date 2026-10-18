@@ -32,8 +32,8 @@ export function BrokerDirectoryCard({ b, cargo }: { b: Broker; cargo?: CargoType
       <div className="flex items-start gap-3.5">
         <Avatar initials={b.initials} hue={b.hue} size={52} />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">{b.verified && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal"><BadgeCheck size={13} aria-hidden="true" /> Licence checked</span>}{b.dutyAdvance && <span className="inline-flex items-center gap-1 rounded-full border border-gold/50 px-2 py-0.5 text-[11px] font-semibold text-gold">Advances duty</span>}</div>
-          <h3 className="mt-1 truncate !text-[17px] leading-tight"><Link to={`/brokers/${b.id}`} className="focus-ring hover:text-gold" data-testid="broker-name">{b.name}</Link></h3>
+          <div className="flex flex-wrap items-center gap-2">{b.verified && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal"><BadgeCheck size={13} aria-hidden="true" /> Licence checked</span>}{b.dutyAdvance && <span className="inline-flex items-center gap-1 rounded-full border border-gold/50 px-2 py-0.5 text-[11px] font-semibold text-gold-deep">Advances duty</span>}</div>
+          <h3 className="mt-1 truncate !text-[17px] leading-tight"><Link to={`/brokers/${b.id}`} className="focus-ring hover:text-gold-deep" data-testid="broker-name">{b.name}</Link></h3>
           <p className="truncate text-sm leading-5 text-text-muted">{b.company || 'Independent clearing agent'}</p>
         </div>
       </div>
@@ -45,8 +45,8 @@ export function BrokerDirectoryCard({ b, cargo }: { b: Broker; cargo?: CargoType
       <p className="mt-2 line-clamp-2 text-sm text-text-muted">{b.about}</p>
       {b.specialties.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{b.specialties.slice(0, 3).map((x) => <li key={x} className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-text-muted">{x}</li>)}</ul>}
       <div className="flex-1" />
-      <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3 text-center text-xs">{cols.map((c) => <div key={c}><dt className="truncate text-text-muted">{cargoLabel(c)}</dt><dd className={`font-semibold tabular-nums ${cargo === c ? 'text-gold' : ''}`}>{b.fees[c] != null ? money(b.fees[c]!) : '—'}</dd></div>)}</dl>
-      <p className="mt-2 text-center text-[11px] text-text-muted">Replies ~{b.responseHours}h · {b.jobs} job{b.jobs === 1 ? '' : 's'} on Ship Sync</p>
+      <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3 text-center text-xs">{cols.map((c) => <div key={c}><dt className="truncate text-text-muted">{cargoLabel(c)}</dt><dd className={`font-semibold tabular-nums ${cargo === c ? 'text-gold-deep' : ''}`}>{b.fees[c] != null ? money(b.fees[c]!) : '—'}</dd></div>)}</dl>
+      <p className="mt-2 text-center text-[11px] text-text-muted">Replies ~{b.responseHours}h · {b.jobs} job{b.jobs === 1 ? '' : 's'} on Ntemtem</p>
       <div className="mt-4 flex gap-2">
         <Link to={`/brokers/${b.id}`} className="btn-ghost flex-1 !min-h-10 !px-3 text-sm">Profile</Link>
         <Link to={`/brokers/${b.id}#book`} className="btn-gold flex-1 !min-h-10 !px-3 text-sm" data-testid="broker-book">Book</Link>
@@ -58,7 +58,7 @@ function BrokerSkeleton() { return <div className="h-[360px] animate-pulse round
 
 type BrokerSort = 'recommended' | 'rating' | 'fee' | 'reply'
 const brokerSortLabels: Record<BrokerSort, string> = { recommended: 'Recommended', rating: 'Highest rated', fee: 'Lowest fee', reply: 'Fastest reply' }
-const chip = (on: boolean) => `rounded-full border px-3 py-1 text-xs focus-ring ${on ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`
+const chip = (on: boolean) => `rounded-full border px-3 py-1 text-xs focus-ring ${on ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`
 
 export default function BrokersPage() {
   const [sp, setSp] = useSearchParams()
@@ -89,8 +89,8 @@ export default function BrokersPage() {
     <div className="grid gap-5">
       <fieldset><legend className="label-dark">Country</legend>
         <div className="grid gap-1">
-          <button onClick={() => set({ destination: undefined, port: undefined })} aria-pressed={!dest} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${!dest ? 'bg-gold/15 font-semibold text-gold' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>All countries</span><span className="text-xs opacity-70">{all?.length ?? ''}</span></button>
-          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code, port: undefined })} aria-pressed={dest === c.code} disabled={!count(c.code)} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring disabled:opacity-40 ${dest === c.code ? 'bg-gold/15 font-semibold text-gold' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} data-testid={`bf-country-${c.code}`}><span>{c.flag} {c.name}</span><span className="text-xs opacity-70">{count(c.code) || ''}</span></button>)}
+          <button onClick={() => set({ destination: undefined, port: undefined })} aria-pressed={!dest} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${!dest ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>All countries</span><span className="text-xs opacity-70">{all?.length ?? ''}</span></button>
+          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code, port: undefined })} aria-pressed={dest === c.code} disabled={!count(c.code)} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring disabled:opacity-40 ${dest === c.code ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} data-testid={`bf-country-${c.code}`}><span>{c.flag} {c.name}</span><span className="text-xs opacity-70">{count(c.code) || ''}</span></button>)}
         </div>
       </fieldset>
       <div><label htmlFor="bf-port" className="label-dark">Port</label><select id="bf-port" className="input-dark !min-h-10 text-sm" value={port} onChange={(e) => set({ port: e.target.value || undefined })} data-testid="bf-port"><option value="">Any port</option>{ports.map((p) => <option key={p}>{p}</option>)}</select></div>
@@ -107,7 +107,7 @@ export default function BrokersPage() {
         <div className="container-fluid py-12 md:py-16">
           <motion.div initial="hidden" animate="show" variants={stagger} className="max-w-3xl">
             <motion.p variants={fadeUp} className="eyebrow mb-2">Customs brokers</motion.p>
-            <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4.2vw,3.25rem)]">{all ? all.length : '…'} licensed clearing agents. <span className="text-gold">One at your port.</span></motion.h1>
+            <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4.2vw,3.25rem)]">{all ? all.length : '…'} licensed clearing agents. <span className="text-gold-deep">One at your port.</span></motion.h1>
             <motion.p variants={fadeUp} className="mt-3 max-w-2xl text-text-muted md:text-lg">They lodge the declaration, tell you the assessed duty, pay it and get your goods out of the port — every step shows on your tracking page. Fees are fixed per shipment and shown up front.</motion.p>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mt-8 grid gap-3 lg:grid-cols-[1fr_auto]">
@@ -131,7 +131,7 @@ export default function BrokersPage() {
       <section className="border-b border-border bg-surface/40" aria-label="How it works">
         <div className="container-fluid grid gap-4 py-8 sm:grid-cols-2 lg:grid-cols-4">
           {([[FileText, 'Book from your shipment', 'Pick a broker on the shipment page once it’s booked — or let your shipper pick one.'], [ClipboardCheck, 'Documents lodged', 'The broker files the declaration with ICUMS (Ghana) or NICIS (Nigeria).'], [Landmark, 'Duty assessed', 'You see the official figure on your tracking page — no surprises at the gate.'], [PackageCheck, 'Released & handed over', 'Duty paid, goods released from the port and handed to your shipper or recipient.']] as const).map(([I, t, d], i) => (
-            <div key={t} className="flex gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold/15 text-gold"><I size={16} aria-hidden="true" /></span><div><p className="text-sm font-semibold">{i + 1}. {t}</p><p className="mt-0.5 text-xs text-text-muted">{d}</p></div></div>
+            <div key={t} className="flex gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold/15 text-gold-deep"><I size={16} aria-hidden="true" /></span><div><p className="text-sm font-semibold">{i + 1}. {t}</p><p className="mt-0.5 text-xs text-text-muted">{d}</p></div></div>
           ))}
         </div>
       </section>
@@ -144,8 +144,8 @@ export default function BrokersPage() {
               <div className={`card-dark mt-3 p-5 lg:mt-0 ${showFilters ? '' : 'hidden lg:block'}`}>{filters}</div>
               <div className="mt-4 hidden rounded-2xl border border-dashed border-border p-4 text-xs text-text-muted lg:block">
                 <p className="font-semibold text-text">Are you a licensed clearing agent?</p>
-                <p className="mt-1">Get jobs from shippers and customers on Ship Sync. Listing is free — we check your licence first.</p>
-                <a href="mailto:hello@shipsync.africa?subject=Broker listing" className="btn-ghost mt-3 !min-h-9 w-full text-xs">Get listed</a>
+                <p className="mt-1">Get jobs from shippers and customers on Ntemtem. Listing is free — we check your licence first.</p>
+                <a href="mailto:hello@ntemtem.com?subject=Broker listing" className="btn-ghost mt-3 !min-h-9 w-full text-xs">Get listed</a>
               </div>
             </div>
           </aside>
@@ -158,12 +158,12 @@ export default function BrokersPage() {
             </div>
             {(active > 0 || q) && (
               <div className="mb-4 flex flex-wrap gap-2 text-xs">
-                {q && <button onClick={() => { setTyped(''); set({ q: undefined }) }} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">“{q}” <X size={12} /></button>}
-                {dest && <button onClick={() => set({ destination: undefined, port: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">{countryByCode(dest)?.name} <X size={12} /></button>}
-                {port && <button onClick={() => set({ port: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">{port} <X size={12} /></button>}
-                {cargo && <button onClick={() => set({ cargo: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">{cargoLabel(cargo)} <X size={12} /></button>}
-                {verified && <button onClick={() => set({ verified: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">Licence checked <X size={12} /></button>}
-                {advance && <button onClick={() => set({ advance: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">Pays duty <X size={12} /></button>}
+                {q && <button onClick={() => { setTyped(''); set({ q: undefined }) }} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">“{q}” <X size={12} /></button>}
+                {dest && <button onClick={() => set({ destination: undefined, port: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">{countryByCode(dest)?.name} <X size={12} /></button>}
+                {port && <button onClick={() => set({ port: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">{port} <X size={12} /></button>}
+                {cargo && <button onClick={() => set({ cargo: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">{cargoLabel(cargo)} <X size={12} /></button>}
+                {verified && <button onClick={() => set({ verified: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">Licence checked <X size={12} /></button>}
+                {advance && <button onClick={() => set({ advance: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">Pays duty <X size={12} /></button>}
               </div>
             )}
             {error && <p role="alert" className="mb-4 text-sm text-danger">{error}</p>}
@@ -176,7 +176,7 @@ export default function BrokersPage() {
                 {rows.map((b) => <BrokerDirectoryCard key={b.id} b={b} cargo={cargo} />)}
               </motion.div>
             )}
-            <p className="mt-8 text-center text-xs text-text-muted">Fees are the broker’s service charge per shipment. Customs duty and port charges are separate and set by customs — <Link to="/duty" className="text-gold hover:underline">estimate your duty</Link>.</p>
+            <p className="mt-8 text-center text-xs text-text-muted">Fees are the broker’s service charge per shipment. Customs duty and port charges are separate and set by customs — <Link to="/duty" className="text-gold-deep hover:underline">estimate your duty</Link>.</p>
           </div>
         </div>
       </div>
@@ -198,7 +198,7 @@ export function BrokerProfile() {
     <div className="relative bg-bg text-text" data-testid="broker-profile">
       <div className="border-b border-border bg-[radial-gradient(ellipse_at_top_left,rgba(227,181,74,.12),transparent_55%)]">
         <div className="container-x py-8 md:py-12">
-          <Link to="/brokers" className="inline-flex min-h-10 items-center gap-1.5 text-sm text-text-muted hover:text-gold focus-ring rounded"><ArrowLeft size={16} aria-hidden="true" /> All brokers</Link>
+          <Link to="/brokers" className="inline-flex min-h-10 items-center gap-1.5 text-sm text-text-muted hover:text-gold-deep focus-ring rounded"><ArrowLeft size={16} aria-hidden="true" /> All brokers</Link>
           <motion.div initial="hidden" animate="show" variants={stagger} className="mt-4 grid gap-8 lg:grid-cols-12">
             <motion.div variants={fadeUp} className="card-dark p-6 md:p-8 lg:col-span-8">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
@@ -211,7 +211,7 @@ export function BrokerProfile() {
                     <li className="flex items-center gap-2"><Anchor size={15} aria-hidden="true" /> {b.ports.join(', ')}, {c?.flag} {b.countryName}</li>
                     <li className="flex items-center gap-2"><ShieldCheck size={15} aria-hidden="true" /> {b.licenceAuthority}{b.licenceNo ? ` · ${b.licenceNo}` : ''}</li>
                     <li className="flex items-center gap-2"><Clock size={15} aria-hidden="true" /> Replies in ~{b.responseHours}h</li>
-                    <li className="flex items-center gap-2"><FileText size={15} aria-hidden="true" /> {stats.jobs} job{stats.jobs === 1 ? '' : 's'} on Ship Sync{stats.avgClearDays != null ? ` · clears in ~${stats.avgClearDays} days` : ''}</li>
+                    <li className="flex items-center gap-2"><FileText size={15} aria-hidden="true" /> {stats.jobs} job{stats.jobs === 1 ? '' : 's'} on Ntemtem{stats.avgClearDays != null ? ` · clears in ~${stats.avgClearDays} days` : ''}</li>
                   </ul>
                 </div>
               </div>
@@ -222,7 +222,7 @@ export function BrokerProfile() {
               <div className="card-dark p-6 lg:sticky lg:top-24" id="book" data-testid="broker-book-card">
                 <p className="eyebrow mb-1">Book {b.name.split(' ')[0]}</p>
                 <p className="text-sm text-text-muted">Brokers are booked on a shipment so they get the documents, the container and the consignee in one go.</p>
-                <ol className="mt-4 space-y-2 text-sm">{['Open your shipment', `Under Customs clearance, choose ${b.name}`, 'They accept, lodge the papers and post every step to your tracking page'].map((t, i) => <li key={t} className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gold/15 text-[11px] font-bold text-gold">{i + 1}</span>{t}</li>)}</ol>
+                <ol className="mt-4 space-y-2 text-sm">{['Open your shipment', `Under Customs clearance, choose ${b.name}`, 'They accept, lodge the papers and post every step to your tracking page'].map((t, i) => <li key={t} className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gold/15 text-[11px] font-bold text-gold-deep">{i + 1}</span>{t}</li>)}</ol>
                 <Link to={bookLink} className="btn-gold mt-5 w-full" data-testid="broker-book-cta">{user ? 'Go to my shipments' : 'Sign in to book'}</Link>
                 <Link to="/duty" className="btn-ghost mt-2 w-full !min-h-10 text-sm"><Calculator size={15} aria-hidden="true" /> Estimate the duty first</Link>
               </div>
@@ -276,7 +276,7 @@ export function BrokerPortal() {
             {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <div><dt className="text-xs text-text-muted">Your fee on file</dt><dd className="font-semibold tabular-nums">{money(j.feeUsd)}</dd></div>
-              {s.consignee && <div><dt className="text-xs text-text-muted">Consignee</dt><dd>{s.consignee.name} · <a href={`tel:${s.consignee.phone}`} className="text-gold hover:underline"><Phone size={11} className="inline" aria-hidden="true" /> {s.consignee.phone}</a><span className="block text-xs text-text-muted">{s.consignee.address}{s.consignee.city ? `, ${s.consignee.city}` : ''}</span></dd></div>}
+              {s.consignee && <div><dt className="text-xs text-text-muted">Consignee</dt><dd>{s.consignee.name} · <a href={`tel:${s.consignee.phone}`} className="text-gold-deep hover:underline"><Phone size={11} className="inline" aria-hidden="true" /> {s.consignee.phone}</a><span className="block text-xs text-text-muted">{s.consignee.address}{s.consignee.city ? `, ${s.consignee.city}` : ''}</span></dd></div>}
               {s.vehicle && <div className="sm:col-span-2"><dt className="text-xs text-text-muted">Vehicle</dt><dd>{s.vehicle.label}{s.vehicle.body ? ` · ${s.vehicle.body}` : ''}{s.vehicle.engineL ? ` · ${s.vehicle.engineL} L` : ''}{s.vehicle.valueUsd ? ` · declared ${money(s.vehicle.valueUsd)}` : ''}<span className="block font-mono text-xs">{s.vehicle.vin}</span></dd></div>}
               {s.container && <div><dt className="text-xs text-text-muted">Container</dt><dd className="font-mono text-xs">{s.container.number} · {s.container.vessel}{s.container.eta ? ` · ETA ${s.container.eta}` : ''}</dd></div>}
               {j.notes && <div className="sm:col-span-2"><dt className="text-xs text-text-muted">Notes</dt><dd>{j.notes}</dd></div>}
@@ -299,7 +299,7 @@ export function BrokerPortal() {
             )}
             <ul className="mt-5 space-y-1 border-t border-border pt-4 text-xs text-text-muted">{j.timeline.slice().reverse().map((t, k) => <li key={k}><span className="text-text">{jobStepLabels[t.status as JobStep] ?? t.status}</span> · {fmtDateTime(t.at)} · {t.by}{t.note ? ` — ${t.note}` : ''}</li>)}</ul>
           </motion.div>
-          <motion.p variants={fadeUp} className="mt-4 text-center text-xs text-text-muted">This link is private to you and this job. Questions: the shipper's office or hello@shipsync.africa.</motion.p>
+          <motion.p variants={fadeUp} className="mt-4 text-center text-xs text-text-muted">This link is private to you and this job. Questions: the shipper's office or hello@ntemtem.com.</motion.p>
         </motion.div>
       </div>
     </div>

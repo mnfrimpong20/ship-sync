@@ -165,7 +165,7 @@ export default function ContainerDetail() {
           <motion.div variants={fadeUp}><Link to="/dashboard/containers" className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-text focus-ring"><ArrowLeft size={14} aria-hidden="true" /> All containers</Link></motion.div>
           <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
             <motion.div variants={fadeUp} className="flex items-center gap-4">
-              <span className="grid h-14 w-14 place-items-center rounded-2xl bg-surface-2 text-gold" aria-hidden="true"><ContainerIcon size={26} /></span>
+              <span className="grid h-14 w-14 place-items-center rounded-2xl bg-surface-2 text-gold-deep" aria-hidden="true"><ContainerIcon size={26} /></span>
               <div>
                 <div className="flex flex-wrap items-center gap-2"><h1 className="!text-[clamp(1.5rem,3vw,2.1rem)]">{c.ref}</h1><Pill tone={stageTone(c.status)}>{stageLabels[c.status]}</Pill>{c.tracking.status === 'live' && <span className="inline-flex items-center gap-1 rounded-full border border-teal/40 bg-teal/10 px-2 py-0.5 text-[11px] font-medium text-teal"><Radio size={11} aria-hidden="true" /> Auto-updating from {c.line || 'carrier'}</span>}</div>
                 <p className="mt-1 text-sm text-text-muted">{sizeLabels[c.size]} · {c.line}{c.number ? ` · ${c.number}` : ''} · {c.originPort || '—'} → {c.destinationPort || dest?.name || c.destination}{c.destinationPort && dest ? `, ${dest.name}` : ''}</p>
@@ -272,7 +272,7 @@ export default function ContainerDetail() {
                   <div className="flex items-start justify-between gap-2"><h2 id="carrier-h" className="!text-lg">Carrier tracking</h2>{c.tracking.status !== 'off' && <Pill tone={c.tracking.status === 'live' ? 'teal' : c.tracking.status === 'error' ? 'danger' : 'muted'}>{c.tracking.status === 'live' ? 'Live' : c.tracking.status === 'error' ? 'Error' : 'Waiting for the line'}</Pill>}</div>
                   {c.tracking.status === 'off' ? (
                     <>
-                      <p className="mt-2 text-sm text-text-muted">Connect this booking to {c.line || 'the shipping line'} and Ship Sync pulls the container number, seal, vessel and voyage as they are assigned, then moves the container through Gated in → Sailed → Arrived on its own — every loaded shipment and its customer tracking follow.</p>
+                      <p className="mt-2 text-sm text-text-muted">Connect this booking to {c.line || 'the shipping line'} and Ntemtem pulls the container number, seal, vessel and voyage as they are assigned, then moves the container through Gated in → Sailed → Arrived on its own — every loaded shipment and its customer tracking follow.</p>
                       {provider.simulated && <p className="mt-2 text-xs text-text-muted">This server runs the built-in carrier simulator — a real line or aggregator plugs in with one setting.</p>}
                       {!c.bookingRef && !c.number && <p className="mt-2 text-xs text-danger">Add the booking reference (Edit details) first.</p>}
                       {isOpen(c.status) && <button onClick={connect} disabled={busy || (!c.bookingRef && !c.number)} className="btn-gold mt-4 !min-h-10 !px-4 text-sm disabled:opacity-60"><Radio size={15} aria-hidden="true" /> {busy ? 'Connecting…' : `Connect to ${c.line || 'carrier'}`}</button>}

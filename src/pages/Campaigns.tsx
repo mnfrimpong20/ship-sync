@@ -33,7 +33,7 @@ export default function CampaignsPage() {
     try { const r = await platformApi.sendCampaign({ ...f, audience: 'custom', clientIds: [...picked], test }); setOk(test ? 'Test sent to you.' : `Sending to ${r.recipients} client${r.recipients === 1 ? '' : 's'}${r.skipped ? ` (${r.skipped} without ${f.channel === 'email' ? 'an email' : 'a phone'})` : ''}.`); load() }
     catch (x) { setErr(x instanceof Error ? x.message : 'Could not send.') } finally { setBusy(false) }
   }
-  const preview = (t: string) => t.replace(/\{name\}/g, clients[0]?.name.split(' ')[0] ?? 'Ama').replace(/\{company\}/g, clients[0]?.company || clients[0]?.name || 'Ama').replace(/\{shipper\}/g, user.company ?? 'your shipper').replace(/\{link\}/g, 'shipsync.app/order/…')
+  const preview = (t: string) => t.replace(/\{name\}/g, clients[0]?.name.split(' ')[0] ?? 'Ama').replace(/\{company\}/g, clients[0]?.company || clients[0]?.name || 'Ama').replace(/\{shipper\}/g, user.company ?? 'your shipper').replace(/\{link\}/g, 'ntemtem.com/order/…')
   const totals = (list?.campaigns ?? []).reduce((a, c) => ({ sent: a.sent + c.sent, booked: a.booked + c.booked, revenue: a.revenue + c.revenue }), { sent: 0, booked: 0, revenue: 0 })
   const cls = 'input-dark !min-h-10 text-sm'
   return (

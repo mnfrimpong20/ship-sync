@@ -41,5 +41,5 @@ export const clientsApi = {
   invoice: (id: string) => api<{ invoice: Invoice; client: Client; shipper: { id: string; name: string; hq: string; initials: string; hue: string }; shipment: Shipment | null; display?: { currency: string; rate: number | null } }>(`/invoices/${id}`),
 }
 
-export const activityLabel: Record<ActivityType, string> = { note: 'Note', call: 'Call', email: 'Email', whatsapp: 'WhatsApp', meeting: 'Meeting', reminder: 'Reminder', system: 'Ship Sync' }
+export const activityLabel: Record<ActivityType, string> = { note: 'Note', call: 'Call', email: 'Email', whatsapp: 'WhatsApp', meeting: 'Meeting', reminder: 'Reminder', system: 'Ntemtem' }
 export const paymentMethods: [string, string][] = [['bank', 'Bank transfer'], ['cash', 'Cash'], ['card', 'Card'], ['mobile_money', 'Mobile money'], ['other', 'Other']]

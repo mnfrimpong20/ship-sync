@@ -59,7 +59,7 @@ export function mountScans(r: Router, d: Deps) {
     return u
   }
   const find = async (db: Db, sid: string, raw: string) => {
-    const p = parseCode(raw); if (!p) throw new HttpError(400, 'That doesn’t look like a Ship Sync label. Codes look like SS-9KD4LM-P2.')
+    const p = parseCode(raw); if (!p) throw new HttpError(400, 'That doesn’t look like a Ntemtem label. Codes look like SS-9KD4LM-P2.')
     const { rows: ships } = await db.query<Row>('select * from shipments where upper(ref) = $1 and shipper_id = $2', [p.ref, sid])
     const s = ships[0]; if (!s) throw new HttpError(404, `${p.ref} isn’t one of your shipments.`)
     const { rows: pieces } = await db.query<Row>('select * from pieces where shipment_id = $1 order by seq', [s.id])

@@ -62,7 +62,7 @@ export function NotificationBell() {
         {open && (
           <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} role="dialog" aria-label="Notifications" className="card-dark absolute right-0 mt-2 w-[min(92vw,380px)] overflow-hidden p-0">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <p className="text-sm font-semibold">Notifications{unread > 0 && <span className="ml-2 rounded-full bg-gold/15 px-2 py-0.5 text-[11px] font-semibold text-gold">{unread} new</span>}</p>
+              <p className="text-sm font-semibold">Notifications{unread > 0 && <span className="ml-2 rounded-full bg-gold/15 px-2 py-0.5 text-[11px] font-semibold text-gold-deep">{unread} new</span>}</p>
               <div className="flex items-center gap-1">
                 {unread > 0 && <button onClick={readAll} className="inline-flex min-h-8 items-center gap-1 rounded-md px-2 text-xs text-text-muted hover:bg-surface-2 hover:text-text focus-ring"><CheckCheck size={14} aria-hidden="true" /> Mark all read</button>}
                 <Link to="/dashboard/notifications" className="grid h-8 w-8 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text focus-ring" aria-label="Notification settings"><Settings2 size={15} /></Link>
@@ -83,7 +83,7 @@ export function NotificationBell() {
                 </li>
               ))}
             </ul>
-            <Link to="/dashboard/notifications" className="block border-t border-border px-4 py-2.5 text-center text-xs font-semibold text-gold hover:bg-surface-2 focus-ring">See all notifications</Link>
+            <Link to="/dashboard/notifications" className="block border-t border-border px-4 py-2.5 text-center text-xs font-semibold text-gold-deep hover:bg-surface-2 focus-ring">See all notifications</Link>
           </motion.div>
         )}
       </AnimatePresence>

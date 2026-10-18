@@ -47,13 +47,13 @@ export default function Verification() {
       <motion.div initial="hidden" animate="show" variants={stagger}>
         <motion.p variants={fadeUp} className="eyebrow mb-1">Company</motion.p>
         <motion.h1 variants={fadeUp} className="!text-[clamp(1.6rem,3vw,2.2rem)]">Verification</motion.h1>
-        <motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Verified shippers carry the badge on their listing, rank higher in matching and win more quotes. We check that the company is real, licensed where required, and insured. Your documents are seen only by Ship Sync staff.</motion.p>
+        <motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Verified shippers carry the badge on their listing, rank higher in matching and win more quotes. We check that the company is real, licensed where required, and insured. Your documents are seen only by Ntemtem staff.</motion.p>
         {toast && <p role="status" className="mt-4 inline-flex items-center gap-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {toast}</p>}
         {err && <p role="alert" className="mt-4 text-sm text-danger">{err}</p>}
 
         <motion.div variants={fadeUp} className="mt-6 grid gap-5 lg:grid-cols-3">
           <div className="card-dark p-5 lg:col-span-1" data-testid="verify-status">
-            <h2 className="flex items-center gap-2 !text-base"><ShieldCheck size={16} className="text-gold" aria-hidden="true" /> Status</h2>
+            <h2 className="flex items-center gap-2 !text-base"><ShieldCheck size={16} className="text-gold-deep" aria-hidden="true" /> Status</h2>
             {d?.verified ? (
               <div className="mt-3 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-teal/15 text-teal"><BadgeCheck size={20} aria-hidden="true" /></span><div><p className="font-semibold">Verified</p><p className="text-xs text-text-muted">Your listing carries the badge.</p></div></div>
             ) : d?.requestedAt ? (
@@ -69,13 +69,13 @@ export default function Verification() {
             )}
             {canEdit && d && !d.verified && !d.requestedAt && <button onClick={request} disabled={busy || !requiredDone} className="btn-gold mt-4 w-full !min-h-10 text-sm disabled:opacity-60" data-testid="request-verification"><ShieldCheck size={16} aria-hidden="true" /> Request verification</button>}
             {!requiredDone && !d?.verified && <p className="mt-2 text-[11px] text-text-muted">Upload the required documents to request review.</p>}
-            <p className="mt-4 text-[11px] text-text-muted">Part of your <Link to="/dashboard/shipper" className="underline hover:text-gold">setup checklist</Link>.</p>
+            <p className="mt-4 text-[11px] text-text-muted">Part of your <Link to="/dashboard/shipper" className="underline hover:text-gold-deep">setup checklist</Link>.</p>
           </div>
 
           <div className="lg:col-span-2 space-y-5">
             {canEdit && (
               <div className="card-dark p-5" data-testid="verify-upload">
-                <h2 className="flex items-center gap-2 !text-base"><Upload size={16} className="text-gold" aria-hidden="true" /> Upload a document</h2>
+                <h2 className="flex items-center gap-2 !text-base"><Upload size={16} className="text-gold-deep" aria-hidden="true" /> Upload a document</h2>
                 <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
                   <label className="grid gap-1 text-xs"><span className="text-text-muted">Document type</span><select className="input-dark !min-h-10" value={kind} onChange={(e) => setKind(e.target.value as CompanyDocKind)} data-testid="doc-kind">{d?.kinds.map((k) => <option key={k.id} value={k.id}>{k.label}{k.required ? ' (required)' : ''}</option>)}</select></label>
                   <div className="flex items-end"><button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-gold !min-h-10 w-full text-sm disabled:opacity-60">{busy ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <Upload size={16} aria-hidden="true" />} Choose file</button></div>
@@ -86,12 +86,12 @@ export default function Verification() {
               </div>
             )}
             <div className="card-dark p-5">
-              <h2 className="flex items-center gap-2 !text-base"><FileText size={16} className="text-gold" aria-hidden="true" /> On file {d && <span className="text-xs font-normal text-text-muted">{d.documents.length}</span>}</h2>
+              <h2 className="flex items-center gap-2 !text-base"><FileText size={16} className="text-gold-deep" aria-hidden="true" /> On file {d && <span className="text-xs font-normal text-text-muted">{d.documents.length}</span>}</h2>
               <ul className="mt-3 divide-y divide-border" aria-label="Documents">
                 {d?.documents.map((x) => (
                   <li key={x.id} className="flex flex-wrap items-start justify-between gap-3 py-3 text-sm" data-testid="company-doc">
                     <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-2 font-semibold"><a href={x.url} target="_blank" rel="noreferrer" className="hover:text-gold focus-ring rounded">{x.title}</a><Pill tone={statusTone[x.status]}>{statusLabel[x.status]}</Pill></p>
+                      <p className="flex flex-wrap items-center gap-2 font-semibold"><a href={x.url} target="_blank" rel="noreferrer" className="hover:text-gold-deep focus-ring rounded">{x.title}</a><Pill tone={statusTone[x.status]}>{statusLabel[x.status]}</Pill></p>
                       <p className="text-xs text-text-muted">{x.label} · {kb(x.size)} · {x.uploadedBy}, {fmtDate(x.createdAt)}{x.note ? ` · “${x.note}”` : ''}</p>
                       {x.status === 'rejected' && x.reviewNote && <p className="mt-1 flex items-start gap-1.5 text-xs text-danger"><XCircle size={13} className="mt-0.5 shrink-0" aria-hidden="true" /> {x.reviewNote}</p>}
                       {x.status === 'accepted' && <p className="mt-1 text-xs text-teal">Accepted {x.reviewedAt ? fmtDate(x.reviewedAt) : ''}</p>}

@@ -32,7 +32,7 @@ export function ClientForm({ initial = blank, onSave, onCancel, busy, error }: {
       <div><label htmlFor="c-city" className="label-dark">City</label><input id="c-city" className="input-dark" placeholder="Houston, TX" value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} /></div>
       <div className="md:col-span-2"><label htmlFor="c-tag" className="label-dark">Tags</label>
         <div className="flex flex-wrap items-center gap-2">
-          {f.tags.map((t) => <button type="button" key={t} onClick={() => setF({ ...f, tags: f.tags.filter((x) => x !== t) })} className="rounded-full border border-gold bg-gold/15 px-2.5 py-1 text-xs text-gold focus-ring" aria-label={`Remove tag ${t}`}>{t} <X size={11} className="inline" aria-hidden="true" /></button>)}
+          {f.tags.map((t) => <button type="button" key={t} onClick={() => setF({ ...f, tags: f.tags.filter((x) => x !== t) })} className="rounded-full border border-gold bg-gold/15 px-2.5 py-1 text-xs text-gold-deep focus-ring" aria-label={`Remove tag ${t}`}>{t} <X size={11} className="inline" aria-hidden="true" /></button>)}
           <input id="c-tag" className="input-dark !min-h-9 max-w-[180px] text-sm" placeholder="repeat, vehicles…" value={tag} onChange={(e) => setTag(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag() } }} onBlur={addTag} />
         </div>
       </div>
@@ -111,10 +111,10 @@ export default function Clients() {
           </div>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <motion.div variants={fadeUp} className="card-dark p-5"><div className="flex items-center justify-between"><p className="text-sm text-text-muted">Active clients</p><Users size={18} className="text-gold" aria-hidden="true" /></div><p className="mt-2 font-heading text-3xl font-bold">{active.length}</p><p className="mt-1 text-xs text-text-muted">{active.filter((c) => c.source === 'marketplace').length} via Ship Sync · {active.filter((c) => c.source === 'manual').length} your own</p></motion.div>
-            <motion.div variants={fadeUp} className="card-dark p-5"><div className="flex items-center justify-between"><p className="text-sm text-text-muted">Shipments in progress</p><ChevronRight size={18} className="text-gold" aria-hidden="true" /></div><p className="mt-2 font-heading text-3xl font-bold">{active.reduce((n, c) => n + (c.activeShipments ?? 0), 0)}</p><p className="mt-1 text-xs text-text-muted">Across all clients</p></motion.div>
-            <motion.div variants={fadeUp} className="card-dark p-5"><div className="flex items-center justify-between"><p className="text-sm text-text-muted">Outstanding balance</p><Wallet size={18} className="text-gold" aria-hidden="true" /></div><p className="mt-2 font-heading text-3xl font-bold">{money(outstanding)}</p><p className="mt-1 text-xs text-text-muted">Invoiced but not yet paid</p></motion.div>
-            <motion.div variants={fadeUp} className="card-dark p-5"><div className="flex items-center justify-between"><p className="text-sm text-text-muted">Follow-ups due</p><Bell size={18} className="text-gold" aria-hidden="true" /></div><p className="mt-2 font-heading text-3xl font-bold">{reminders.length}</p><p className="mt-1 text-xs text-text-muted">{overdue.length ? <span className="text-gold">{overdue.length} overdue</span> : 'None overdue'}</p></motion.div>
+            <motion.div variants={fadeUp} className="card-dark p-5"><div className="flex items-center justify-between"><p className="text-sm text-text-muted">Active clients</p><Users size={18} className="text-gold-deep" aria-hidden="true" /></div><p className="mt-2 font-heading text-3xl font-bold">{active.length}</p><p className="mt-1 text-xs text-text-muted">{active.filter((c) => c.source === 'marketplace').length} via Ntemtem · {active.filter((c) => c.source === 'manual').length} your own</p></motion.div>
+            <motion.div variants={fadeUp} className="card-dark p-5"><div className="flex items-center justify-between"><p className="text-sm text-text-muted">Shipments in progress</p><ChevronRight size={18} className="text-gold-deep" aria-hidden="true" /></div><p className="mt-2 font-heading text-3xl font-bold">{active.reduce((n, c) => n + (c.activeShipments ?? 0), 0)}</p><p className="mt-1 text-xs text-text-muted">Across all clients</p></motion.div>
+            <motion.div variants={fadeUp} className="card-dark p-5"><div className="flex items-center justify-between"><p className="text-sm text-text-muted">Outstanding balance</p><Wallet size={18} className="text-gold-deep" aria-hidden="true" /></div><p className="mt-2 font-heading text-3xl font-bold">{money(outstanding)}</p><p className="mt-1 text-xs text-text-muted">Invoiced but not yet paid</p></motion.div>
+            <motion.div variants={fadeUp} className="card-dark p-5"><div className="flex items-center justify-between"><p className="text-sm text-text-muted">Follow-ups due</p><Bell size={18} className="text-gold-deep" aria-hidden="true" /></div><p className="mt-2 font-heading text-3xl font-bold">{reminders.length}</p><p className="mt-1 text-xs text-text-muted">{overdue.length ? <span className="text-gold-deep">{overdue.length} overdue</span> : 'None overdue'}</p></motion.div>
           </div>
 
           {reminders.length > 0 && (
@@ -123,8 +123,8 @@ export default function Clients() {
               <ul className="divide-y divide-border">
                 {reminders.slice(0, 5).map((r) => (
                   <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                    <span className="flex items-center gap-2"><Bell size={14} className={r.dueAt && new Date(r.dueAt).getTime() < Date.now() ? 'text-gold' : 'text-text-muted'} aria-hidden="true" /><Link to={`/dashboard/clients/${r.clientId}?tab=activity`} className="font-medium text-text hover:text-gold focus-ring rounded">{r.clientName}</Link><span className="text-text-muted">— {r.body}</span></span>
-                    <span className={`text-xs ${r.dueAt && new Date(r.dueAt).getTime() < Date.now() ? 'text-gold' : 'text-text-muted'}`}>{r.dueAt ? fmtDate(r.dueAt) : ''}</span>
+                    <span className="flex items-center gap-2"><Bell size={14} className={r.dueAt && new Date(r.dueAt).getTime() < Date.now() ? 'text-gold-deep' : 'text-text-muted'} aria-hidden="true" /><Link to={`/dashboard/clients/${r.clientId}?tab=activity`} className="font-medium text-text hover:text-gold-deep focus-ring rounded">{r.clientName}</Link><span className="text-text-muted">— {r.body}</span></span>
+                    <span className={`text-xs ${r.dueAt && new Date(r.dueAt).getTime() < Date.now() ? 'text-gold-deep' : 'text-text-muted'}`}>{r.dueAt ? fmtDate(r.dueAt) : ''}</span>
                   </li>
                 ))}
               </ul>
@@ -135,7 +135,7 @@ export default function Clients() {
             {adding && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-6 card-dark p-6">
                 <h2 className="!text-lg">New client</h2>
-                <p className="mb-4 mt-1 text-sm text-text-muted">For customers who come to you directly. Customers who book through Ship Sync are added automatically.</p>
+                <p className="mb-4 mt-1 text-sm text-text-muted">For customers who come to you directly. Customers who book through Ntemtem are added automatically.</p>
                 <ClientForm onSave={save} onCancel={() => { setAdding(false); setError('') }} busy={busy} error={error} />
               </motion.div>
             )}
@@ -144,14 +144,14 @@ export default function Clients() {
 
           <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[220px] max-w-sm"><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" /><input aria-label="Search clients" className="input-dark !min-h-10 !pl-9 text-sm" placeholder="Search name, company, phone, tag…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-            {([['active', 'Active'], ['marketplace', 'Via Ship Sync'], ['manual', 'Own clients'], ['owing', 'Owing'], ['archived', 'Archived']] as const).map(([k, label]) => (
-              <button key={k} onClick={() => setFilter(k)} aria-pressed={filter === k} className={`rounded-full border px-3 py-1.5 text-sm focus-ring ${filter === k ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>{label}</button>
+            {([['active', 'Active'], ['marketplace', 'Via Ntemtem'], ['manual', 'Own clients'], ['owing', 'Owing'], ['archived', 'Archived']] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setFilter(k)} aria-pressed={filter === k} className={`rounded-full border px-3 py-1.5 text-sm focus-ring ${filter === k ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{label}</button>
             ))}
             <select aria-label="Sort clients" className="input-dark !min-h-10 !w-auto text-sm sm:ml-auto" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}><option value="recent">Recently active</option><option value="name">Name A–Z</option><option value="owing">Most owing</option><option value="shipments">Most shipments</option><option value="followup">Next follow-up</option></select>
           </motion.div>
 
           <motion.ul variants={fadeUp} className="mt-4 space-y-2" aria-label="Clients">
-            {clients && list.length === 0 && <li><Empty title={clients.length ? 'No clients match' : 'No clients yet'} body={clients.length ? 'Try another search or filter.' : 'Add your first client, or they’ll appear here automatically when a customer books you through Ship Sync.'} action={!clients.length ? <button onClick={() => setAdding(true)} className="btn-gold">Add client</button> : undefined} /></li>}
+            {clients && list.length === 0 && <li><Empty title={clients.length ? 'No clients match' : 'No clients yet'} body={clients.length ? 'Try another search or filter.' : 'Add your first client, or they’ll appear here automatically when a customer books you through Ntemtem.'} action={!clients.length ? <button onClick={() => setAdding(true)} className="btn-gold">Add client</button> : undefined} /></li>}
             {rows.map((c) => {
               const owing = Math.max(0, (c.invoiced ?? 0) - (c.paid ?? 0))
               const remindDue = c.nextReminderAt ? new Date(c.nextReminderAt).getTime() < Date.now() : false
@@ -160,14 +160,14 @@ export default function Clients() {
                   <Link to={`/dashboard/clients/${c.id}`} className="card-dark flex flex-wrap items-center gap-4 p-4 transition-colors hover:bg-surface-2/60 focus-ring">
                     <ClientAvatar c={c} size={44} />
                     <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-center gap-2 font-semibold text-text">{c.name}{c.company && <span className="font-normal text-text-muted">· {c.company}</span>}{c.source === 'marketplace' ? <Pill tone="teal">Ship Sync</Pill> : <Pill tone="muted">Own client</Pill>}{c.status === 'archived' && <Pill tone="muted">Archived</Pill>}</p>
+                      <p className="flex flex-wrap items-center gap-2 font-semibold text-text">{c.name}{c.company && <span className="font-normal text-text-muted">· {c.company}</span>}{c.source === 'marketplace' ? <Pill tone="teal">Ntemtem</Pill> : <Pill tone="muted">Own client</Pill>}{c.status === 'archived' && <Pill tone="muted">Archived</Pill>}</p>
                       <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-text-muted">{c.city && <span>{c.city}</span>}{c.phone && <span className="inline-flex items-center gap-1"><Phone size={11} aria-hidden="true" />{c.phone}</span>}{c.email && <span className="inline-flex items-center gap-1"><Mail size={11} aria-hidden="true" />{c.email}</span>}{c.whatsapp && <span className="inline-flex items-center gap-1"><MessageCircle size={11} aria-hidden="true" />WhatsApp</span>}</p>
                       {c.tags.length > 0 && <p className="mt-1.5 flex flex-wrap gap-1">{c.tags.map((t) => <span key={t} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted">{t}</span>)}</p>}
                     </div>
                     <div className="grid grid-cols-3 gap-4 text-right text-xs text-text-muted sm:min-w-[300px]">
                       <div><p className="font-heading text-lg font-bold text-text">{c.shipmentCount ?? 0}</p><p>shipments{c.activeShipments ? ` · ${c.activeShipments} active` : ''}</p></div>
-                      <div><p className={`font-heading text-lg font-bold ${owing ? 'text-gold' : 'text-text'}`}>{money(owing)}</p><p>owing</p></div>
-                      <div><p className={`font-heading text-lg font-bold ${remindDue ? 'text-gold' : 'text-text'}`}>{c.nextReminderAt ? fmtDate(c.nextReminderAt) : '—'}</p><p className="inline-flex items-center gap-1 justify-end">{remindDue && <AlertCircle size={11} className="text-gold" aria-hidden="true" />}follow-up</p></div>
+                      <div><p className={`font-heading text-lg font-bold ${owing ? 'text-gold-deep' : 'text-text'}`}>{money(owing)}</p><p>owing</p></div>
+                      <div><p className={`font-heading text-lg font-bold ${remindDue ? 'text-gold-deep' : 'text-text'}`}>{c.nextReminderAt ? fmtDate(c.nextReminderAt) : '—'}</p><p className="inline-flex items-center gap-1 justify-end">{remindDue && <AlertCircle size={11} className="text-gold-deep" aria-hidden="true" />}follow-up</p></div>
                     </div>
                     <ChevronRight size={18} className="text-text-muted" aria-hidden="true" />
                   </Link>

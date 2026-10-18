@@ -93,7 +93,7 @@ export function CustomerDashboard() {
   }
 
   return (
-    <Layout eyebrow={tab === 'overview' ? 'Your account' : meta.group} title={tab === 'overview' ? `Hello, ${user.name.split(' ')[0]}` : meta.title} sub={tab === 'overview' ? 'What needs you, what’s on the way, and what you owe.' : meta.sub} cta={tab === 'overview' || meta.cta ? <Link to="/quote" className="btn-gold"><PlusCircle size={18} aria-hidden="true" /> New shipment request</Link> : undefined}>
+    <Layout eyebrow={tab === 'overview' ? 'Your account' : meta.group} title={tab === 'overview' ? `Akwaaba, ${user.name.split(' ')[0]}` : meta.title} sub={tab === 'overview' ? 'What needs you, what’s on the way, and what you owe.' : meta.sub} cta={tab === 'overview' || meta.cta ? <Link to="/quote" className="btn-gold"><PlusCircle size={18} aria-hidden="true" /> New shipment request</Link> : undefined}>
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
       {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
       {tab === 'overview' && <CustomerOverview />}
@@ -109,7 +109,7 @@ export function CustomerDashboard() {
               <motion.div key={r.id} layout className="card-dark overflow-hidden">
                 <button onClick={() => setOpenReq(isOpen ? null : r.id)} aria-expanded={isOpen} className="flex w-full flex-wrap items-center justify-between gap-3 p-5 text-left hover:bg-surface-2/50 focus-ring">
                   <div className="flex items-center gap-4">
-                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-gold/15 text-gold"><FileText size={20} aria-hidden="true" /></span>
+                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-gold/15 text-gold-deep"><FileText size={20} aria-hidden="true" /></span>
                     <div>
                       <p className="font-semibold text-text">{r.origin} → {dest.flag} {dest.name} <span className="font-normal text-text-muted">· {r.quantity} × {cargoLabel(r.cargo)}</span></p>
                       <p className="text-xs text-text-muted">{r.ref} · posted {fmtDate(r.createdAt)} · {r.mode === 'either' ? 'air or ocean' : r.mode}</p>
@@ -165,7 +165,7 @@ function InvoicesTab() {
   return (
     <div className="mt-6" data-testid="invoices-tab">
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-      {d && d.totals.outstanding > 0 && <p className={`mb-4 rounded-lg border px-4 py-2.5 text-sm ${d.totals.overdue > 0 ? 'border-danger/40 bg-danger/10' : 'border-gold/40 bg-gold/10'}`}><strong>{usd(d.totals.outstanding)}</strong> outstanding{d.totals.overdue > 0 ? ` · ${usd(d.totals.overdue)} overdue` : ''}. Pay by card in a minute — the money is protected by Ship Sync.</p>}
+      {d && d.totals.outstanding > 0 && <p className={`mb-4 rounded-lg border px-4 py-2.5 text-sm ${d.totals.overdue > 0 ? 'border-danger/40 bg-danger/10' : 'border-gold/40 bg-gold/10'}`}><strong>{usd(d.totals.outstanding)}</strong> outstanding{d.totals.overdue > 0 ? ` · ${usd(d.totals.overdue)} overdue` : ''}. Pay by card in a minute — the money is protected by Ntemtem.</p>}
       {d === null && !error && <p className="text-sm text-text-muted">Loading…</p>}
       {d && d.invoices.length === 0 && <Empty title="No invoices" body="When a shipper invoices you it shows up here with a secure pay link." />}
       <ul className="grid gap-3 md:grid-cols-2">
@@ -243,7 +243,7 @@ function ShipmentsTab() {
           return (
             <li key={x.id} className={`rounded-[var(--radius-md)] border transition-colors ${sel === x.id ? 'border-gold bg-surface' : 'border-border bg-surface/50 hover:bg-surface'}`} data-testid="ship-row">
               <button onClick={() => pick(x.id)} aria-current={sel === x.id} className="w-full rounded-[var(--radius-md)] p-4 pb-2 text-left focus-ring">
-                <div className="flex items-center justify-between"><p className="font-mono text-xs text-gold">{x.ref}</p><ModeBadge mode={x.mode} /></div>
+                <div className="flex items-center justify-between"><p className="font-mono text-xs text-gold-deep">{x.ref}</p><ModeBadge mode={x.mode} /></div>
                 <p className="mt-1.5 text-sm font-semibold text-text">{x.origin} → {d.flag} {d.name}</p>
                 <p className="truncate text-xs text-text-muted">{x.description}</p>
                 <p className="mt-2 text-xs"><Pill tone={x.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[x.status]}</Pill></p>
@@ -259,7 +259,7 @@ function ShipmentsTab() {
             {SHIP_VIEWS.map((v) => <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => pick(s.id, v.id)} className={`relative min-h-9 shrink-0 whitespace-nowrap rounded-lg px-3 text-sm font-medium focus-ring ${view === v.id ? 'bg-gold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid={`sv-${v.id}`}>{v.label}{v.id === 'pay' && due ? <span className={`ml-1.5 rounded-full px-1.5 text-[10px] font-bold ${view === v.id ? 'bg-on-accent/20' : 'bg-gold/20 text-gold-deep'}`}>{money(due)}</span> : null}</button>)}
           </div>
           <div className="space-y-4" data-testid={`ship-view-${view}`}>
-            {view === 'tracking' && <><ShipmentDetail s={s} compact /><Link to={`/track?ref=${s.ref}`} className="inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link><NextStep shipmentId={s.id} /><CollectionNotice s={s} /><OffersCard s={s} /></>}
+            {view === 'tracking' && <><ShipmentDetail s={s} compact /><Link to={`/track?ref=${s.ref}`} className="inline-flex items-center gap-1 text-sm text-gold-deep hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link><NextStep shipmentId={s.id} /><CollectionNotice s={s} /><OffersCard s={s} /></>}
             {view === 'inside' && <><PackingList shipmentId={s.id} destination={s.destination} /><DutyEarly shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}</>}
             {view === 'pay' && <><PaymentCard shipmentId={s.id} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><p className="text-sm text-text-muted">Paying several shipments? <Link to="/dashboard?tab=money" className="text-gold-deep hover:underline">Pay everything you owe in one checkout</Link>.</p></>}
             {view === 'customs' && <><CustomsCard shipmentId={s.id} destination={s.destination} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /></>}
@@ -312,7 +312,7 @@ export function ShipperDashboard() {
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
       {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
       {!shipper.verified && !editing && (
-        <p className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-text"><BadgeCheck size={16} className="text-gold" aria-hidden="true" /> Not yet verified. Upload your registration and insurance under <Link to="/dashboard/verification" className="font-semibold text-gold hover:underline">Verification</Link> — the badge lifts you in matching and reassures customers.</p>
+        <p className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-text"><BadgeCheck size={16} className="text-gold-deep" aria-hidden="true" /> Not yet verified. Upload your registration and insurance under <Link to="/dashboard/verification" className="font-semibold text-gold-deep hover:underline">Verification</Link> — the badge lifts you in matching and reassures customers.</p>
       )}
       {editing && full && <ProfileEditor shipper={full} onDone={(msg) => { setEditing(false); if (msg) setToast(msg); if (view === 'profile') nav('/dashboard/shipper') }} />}
       {view === 'overview' && !editing && <ShipperOverview firstName={user.name.split(' ')[0]} />}

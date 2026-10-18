@@ -1,8 +1,8 @@
 /**
- * Ship Sync Sourcing — an end-to-end "source & ship" concierge from China, the UK and the USA, run by
- * Ship Sync's own people. A customer picks where to buy from and describes what they want (or pastes a
+ * Ntemtem Sourcing — an end-to-end "source & ship" concierge from China, the UK and the USA, run by
+ * Ntemtem's own people. A customer picks where to buy from and describes what they want (or pastes a
  * 1688 / Alibaba / Amazon / Argos / Walmart link); an agent finds and vets suppliers, prices the landed
- * cost, places the order in Ship Sync's name, inspects the goods, receives them at our warehouse in
+ * cost, places the order in Ntemtem's name, inspects the goods, receives them at our warehouse in
  * that country and hands them to the ocean/air leg — which is a normal shipment.
  *
  *   origin     CN (factories, prices in ¥) · GB (UK retailers/wholesalers, £) · US (US stores/wholesalers, $).
@@ -14,7 +14,7 @@
  *              door   — order + customs clearance + delivery to the door
  *   money      deposit (service fee + inspection + 30 % of factory price) when a quote is accepted →
  *              balance (rest of factory price + handling + freight + insurance + duty) after QC →
- *              all held in escrow, released to Ship Sync Sourcing's balance at 'ordered' / 'shipped'
+ *              all held in escrow, released to Ntemtem Sourcing's balance at 'ordered' / 'shipped'
  *   people     agents are staff of the platform-owned shipper `ship-sync-sourcing`; admins assign jobs
  */
 import type { Request, Response, NextFunction, Router } from 'express'
@@ -45,7 +45,7 @@ const maskCode = (id: string) => { let h = 7; for (const c of id) h = (h * 31 + 
 export const SOURCING_SHIPPER = 'ship-sync-sourcing'
 export const TIERS = {
   find: { label: 'Find me a supplier', blurb: 'We shortlist 2–3 vetted factories, wholesalers or stores with prices, MOQ and lead times. A flat sourcing fee unlocks their contacts — you take it from there, or upgrade.' },
-  order: { label: 'Order & inspect', blurb: 'We buy in Ship Sync’s name, pay the supplier, inspect the goods with photos, and ship them to your port.' },
+  order: { label: 'Order & inspect', blurb: 'We buy in Ntemtem’s name, pay the supplier, inspect the goods with photos, and ship them to your port.' },
   door: { label: 'Door to door', blurb: 'Everything in Order & inspect, plus customs clearance and delivery to your door.' },
 } as const
 export type Tier = keyof typeof TIERS
@@ -74,7 +74,7 @@ const STEP_BY: Record<Step, ('agent' | 'customer' | 'system')[]> = {
 }
 
 export interface SourcingSettings { enabled: boolean; servicePct: number; minFeeUsd: number; findFeeUsd: number; depositPct: number; inspectionUsd: number; handlingUsd: number; cnyPerUsd: number; gbpPerUsd: number; note: string; agentCommissionPct: number; sampleHandlingUsd: number }
-export const DEFAULT_SOURCING: SourcingSettings = { enabled: true, servicePct: 0.07, minFeeUsd: 150, findFeeUsd: 95, depositPct: 0.3, inspectionUsd: 120, handlingUsd: 80, cnyPerUsd: Number(process.env.CNY_PER_USD) || 7.2, gbpPerUsd: Number(process.env.GBP_PER_USD) || 0.79, agentCommissionPct: 0.2, sampleHandlingUsd: 25, note: 'Ship Sync buys in its own name and holds your money in escrow — the factory is only paid once your order is confirmed, and the balance only after you approve the inspection photos.' }
+export const DEFAULT_SOURCING: SourcingSettings = { enabled: true, servicePct: 0.07, minFeeUsd: 150, findFeeUsd: 95, depositPct: 0.3, inspectionUsd: 120, handlingUsd: 80, cnyPerUsd: Number(process.env.CNY_PER_USD) || 7.2, gbpPerUsd: Number(process.env.GBP_PER_USD) || 0.79, agentCommissionPct: 0.2, sampleHandlingUsd: 25, note: 'Ntemtem buys in its own name and holds your money in escrow — the factory is only paid once your order is confirmed, and the balance only after you approve the inspection photos.' }
 export async function sourcingSettings(db: Db): Promise<SourcingSettings> {
   const { rows } = await db.query<Row>(`select value from settings where id = 'sourcing'`)
   const v = (J(rows[0]?.value) ?? {}) as Partial<SourcingSettings>
@@ -209,7 +209,7 @@ const tellAgents = async (db: Db, job: Row, title: string, body: string, dedupe:
   if (job.agent_user_id) await notify(db, { userId: job.agent_user_id, kind: 'sourcing', title, body, link: `/dashboard/sourcing/${job.id}`, dedupe, emailSubject: title })
   else await notifyShipperStaff(db, SOURCING_SHIPPER, { kind: 'sourcing', title, body, link: `/dashboard/sourcing/${job.id}`, dedupe }, ['owner', 'dispatcher', 'agent'])
 }
-/** Release every held payment of a stage to Ship Sync Sourcing's balance (the factory has to be paid). */
+/** Release every held payment of a stage to Ntemtem Sourcing's balance (the factory has to be paid). */
 async function releaseStage(db: Db, job: Row, stage: 'fee' | 'deposit' | 'balance', reason: string) {
   await db.query(`update escrow_payments set status = 'released', released_at = now(), release_reason = $3 where sourcing_id = $1 and stage = $2 and status = 'held' and not coalesce(hold, false)`, [job.id, stage, reason])
 }
@@ -235,7 +235,7 @@ export async function onSourcingPaid(db: Db, p: Row) {
     await tellAgents(db, job, `${job.ref}: sourcing fee paid`, `${job.contact_name} paid $${amount.toLocaleString()} for the shortlist on "${job.title}".`, `src:${job.id}:fee:a`)
   } else if (p.stage === 'deposit') {
     await pushTimeline(db, job, 'deposit_paid', `Deposit $${amount.toLocaleString()} paid — held in escrow until the factory order is confirmed.`, job.contact_name)
-    await tellCustomer(db, job, `Deposit received — ${job.ref}`, `$${amount.toLocaleString()} is held by Ship Sync. Your agent will now place the order with the factory in Ship Sync's name and confirm the production schedule.`, `src:${job.id}:dep`)
+    await tellCustomer(db, job, `Deposit received — ${job.ref}`, `$${amount.toLocaleString()} is held by Ntemtem. Your agent will now place the order with the factory in Ntemtem's name and confirm the production schedule.`, `src:${job.id}:dep`)
     await tellAgents(db, job, `${job.ref}: deposit paid — place the order`, `${job.contact_name} paid $${amount.toLocaleString()}. Place the PO with the factory and record the number, lead time and ready date.`, `src:${job.id}:dep:a`)
   } else if (p.stage === 'sample') {
     const sample = { ...(J(job.sample) ?? {}), status: 'paid', paidAt: new Date().toISOString() }
@@ -255,7 +255,7 @@ export async function sourcingOnShipmentStatus(db: Db, s: Row, status: ShipmentS
     if (status !== 'delivered') return
     const { rows } = await db.query<Row>(`${JOB_SELECT} where j.shipment_id = $1 and j.status not in ('delivered','closed','cancelled')`, [s.id])
     for (const job of rows) {
-      await pushTimeline(db, job, 'delivered', `Shipment ${s.ref} delivered.`, 'Ship Sync')
+      await pushTimeline(db, job, 'delivered', `Shipment ${s.ref} delivered.`, 'Ntemtem')
       await tellCustomer(db, job, `Delivered — ${job.ref}`, `Your sourced order "${job.title}" has been delivered. Close the request from your dashboard and leave the team a review.`, `src:${job.id}:delivered`)
     }
   } catch (e) { console.error('[sourcing] shipment hook', e) }
@@ -265,7 +265,7 @@ export async function sourcingOnShipmentStatus(db: Db, s: Row, status: ShipmentS
 export function mountSourcing(r: Router, d: Deps) {
   const { getDb, requireUser, requireAdmin, HttpError, wrap } = d
   const isAgent = (u: ApiUser) => u.admin || (u.role === 'shipper' && u.shipperId === SOURCING_SHIPPER && u.staffRole !== 'driver')
-  const agentOnly = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (!isAgent(u)) throw new HttpError(403, 'Ship Sync Sourcing team only.'); return u }
+  const agentOnly = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (!isAgent(u)) throw new HttpError(403, 'Ntemtem Sourcing team only.'); return u }
   const access = async (db: Db, req: Request, id: string) => {
     const u = await requireUser(db, req); const job = await jobById(db, id); if (!job) throw new HttpError(404, 'Sourcing request not found.')
     const agent = isAgent(u); const owner = u.role === 'customer' && job.user_id === u.id
@@ -369,7 +369,7 @@ export function mountSourcing(r: Router, d: Deps) {
     const id = 'esc_' + uid(); const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')
     const session = await stripe('/checkout/sessions', {
       mode: 'payment', client_reference_id: id, customer_email: u.email || undefined, success_url: `${base}/#/sourcing/${job.id}?paid=${id}`, cancel_url: `${base}/#/sourcing/${job.id}?paid=cancel`,
-      metadata: { payment_id: id, sourcing_id: job.id, sourcing_ref: job.ref, stage: dd.stage }, payment_intent_data: { description: `Ship Sync Sourcing ${job.ref} — ${dd.stage}`, metadata: { payment_id: id, sourcing_ref: job.ref } },
+      metadata: { payment_id: id, sourcing_id: job.id, sourcing_ref: job.ref, stage: dd.stage }, payment_intent_data: { description: `Ntemtem Sourcing ${job.ref} — ${dd.stage}`, metadata: { payment_id: id, sourcing_ref: job.ref } },
       line_items: dd.items.map((i) => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: Math.round(i.amountUsd * 100), product_data: { name: i.description } } })),
     })
     await db.query(`insert into escrow_payments (id,shipment_id,shipper_id,user_id,items,amount_usd,status,provider,provider_session_id,sourcing_id,stage) values ($1,null,$2,$3,$4,$5,'pending','stripe',$6,$7,$8)`, [id, SOURCING_SHIPPER, u.id, JSON.stringify(dd.items), dd.amountUsd, session.id, job.id, dd.stage])
@@ -401,7 +401,7 @@ export function mountSourcing(r: Router, d: Deps) {
     const id = 'msg_' + uid(); await db.query(`insert into sourcing_messages (id,sourcing_id,user_id,author,role,body) values ($1,$2,$3,$4,$5,$6)`, [id, job.id, u.id, u.name, viewer, b.body])
     await db.query('update sourcing_requests set updated_at = now() where id = $1', [job.id])
     if (viewer === 'customer') await tellAgents(db, job, `${job.ref}: message from ${u.name}`, b.body.slice(0, 160), `src:${job.id}:msg:${id}`)
-    else await tellCustomer(db, job, `${u.name} (Ship Sync Sourcing) — ${job.ref}`, b.body.slice(0, 160), `src:${job.id}:msg:${id}`)
+    else await tellCustomer(db, job, `${u.name} (Ntemtem Sourcing) — ${job.ref}`, b.body.slice(0, 160), `src:${job.id}:msg:${id}`)
     res.status(201).json({ message: { id, author: u.name, role: viewer, body: b.body, at: new Date().toISOString(), mine: true } })
   }))
   r.post('/sourcing/:id/files', wrap(async (req, res) => {
@@ -431,7 +431,7 @@ export function mountSourcing(r: Router, d: Deps) {
   r.post('/sourcing/:id/close', wrap(async (req, res) => {
     const db = await getDb(); const { job, u, viewer } = await access(db, req, String(req.params.id))
     if (!['delivered', 'shipped'].includes(job.status)) throw new HttpError(409, 'Close the request once the goods are delivered.')
-    await pushTimeline(db, job, 'closed', 'Closed — thanks for sourcing with Ship Sync.', u.name)
+    await pushTimeline(db, job, 'closed', 'Closed — thanks for sourcing with Ntemtem.', u.name)
     res.json(await detail(db, await jobById(db, job.id), viewer))
   }))
 
@@ -491,7 +491,7 @@ export function mountSourcing(r: Router, d: Deps) {
       if (held.length && !b.refund && !u.admin) throw new HttpError(409, 'Money has been collected — tick "refund" (admin) or settle with the customer first.')
       if (b.refund) { if (!u.admin) throw new HttpError(403, 'Only an admin can refund.'); for (const p of held) await refundPayment(db, p, null, b.note || 'Sourcing request cancelled') }
       await db.query(`update escrow_payments set status = 'cancelled' where sourcing_id = $1 and status = 'pending'`, [job.id])
-      await pushTimeline(db, job, 'cancelled', b.note || 'Cancelled by Ship Sync Sourcing.', u.name)
+      await pushTimeline(db, job, 'cancelled', b.note || 'Cancelled by Ntemtem Sourcing.', u.name)
       await tellCustomer(db, job, `${job.ref} was cancelled`, `${b.note || 'Our team cancelled this request.'}${held.length && b.refund ? ' Your payments are being refunded (3–10 business days).' : ''}`, `src:${job.id}:cancel`)
       return res.json(await detail(db, await jobById(db, job.id), u.admin ? 'admin' : 'agent'))
     }
@@ -584,9 +584,9 @@ export function mountSourcing(r: Router, d: Deps) {
     const px = priceOut(parent.tier as Tier, cfg, { unitPriceCny: unit, qty, freightUsd: r2(Number(q.freight_usd) * scale), insuranceUsd: r2(Number(q.insurance_usd) * scale), dutyEstUsd: r2(Number(q.duty_est_usd) * scale) }, originOf(parent))
     const id = 'src_' + uid(); const ref = 'SRC-' + makeRef().slice(3); const qid = 'sq_' + uid(); const now = new Date().toISOString()
     await db.query(`insert into sourcing_requests (id,ref,user_id,tier,title,description,links,quantity,unit,target_price_usd,destination,destination_city,mode,contact_name,contact_email,contact_phone,company,status,agent_user_id,timeline,reference,parent_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'quoted',$18,$19,$20,$21)`,
-      [id, ref, parent.user_id, parent.tier, parent.title, parent.description, parent.links, qty, parent.unit, parent.target_price_usd, parent.destination, parent.destination_city, parent.mode, parent.contact_name, parent.contact_email, parent.contact_phone, parent.company, parent.agent_user_id, JSON.stringify([{ at: now, status: 'requested', note: `${opts.auto ? 'Standing order' : 'Reorder'} of ${parent.ref} — ${qty.toLocaleString()} ${parent.unit}`, by }, ...(parent.agent_user_id ? [{ at: now, status: 'assigned', note: `${parent.agent_name ?? 'Your agent'} keeps this order.`, by: 'Ship Sync' }] : []), { at: now, status: 'quoted', note: `Repeat price from ${q.sup_name}: ${localPrice(unit, originOf(parent))} × ${qty.toLocaleString()} — $${px.total.toLocaleString()} landed. Accept to pay the deposit; your agent re-confirms with the factory.`, by: 'Ship Sync' }]), parent.reference, parent.id])
+      [id, ref, parent.user_id, parent.tier, parent.title, parent.description, parent.links, qty, parent.unit, parent.target_price_usd, parent.destination, parent.destination_city, parent.mode, parent.contact_name, parent.contact_email, parent.contact_phone, parent.company, parent.agent_user_id, JSON.stringify([{ at: now, status: 'requested', note: `${opts.auto ? 'Standing order' : 'Reorder'} of ${parent.ref} — ${qty.toLocaleString()} ${parent.unit}`, by }, ...(parent.agent_user_id ? [{ at: now, status: 'assigned', note: `${parent.agent_name ?? 'Your agent'} keeps this order.`, by: 'Ntemtem' }] : []), { at: now, status: 'quoted', note: `Repeat price from ${q.sup_name}: ${localPrice(unit, originOf(parent))} × ${qty.toLocaleString()} — $${px.total.toLocaleString()} landed. Accept to pay the deposit; your agent re-confirms with the factory.`, by: 'Ntemtem' }]), parent.reference, parent.id])
     await db.query(`insert into sourcing_quotes (id,sourcing_id,supplier_id,title,unit_price_cny,qty,moq,lead_days,factory_usd,service_fee_usd,inspection_usd,handling_usd,freight_usd,insurance_usd,duty_est_usd,total_usd,deposit_usd,notes,sample_available,status,created_by,tiers,base_price_cny) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,false,'proposed',$19,$20,$21)`,
-      [qid, id, q.supplier_id, `${q.title} (repeat)`, unit, qty, q.moq, q.lead_days, px.factory, px.fee, px.inspection, px.handling, px.freight, px.insurance, px.duty, px.total, px.deposit, `Same supplier and spec as ${parent.ref}. Price carried over — subject to the factory's re-confirmation.`, 'Ship Sync', JSON.stringify(tiers), q.base_price_cny ?? q.unit_price_cny])
+      [qid, id, q.supplier_id, `${q.title} (repeat)`, unit, qty, q.moq, q.lead_days, px.factory, px.fee, px.inspection, px.handling, px.freight, px.insurance, px.duty, px.total, px.deposit, `Same supplier and spec as ${parent.ref}. Price carried over — subject to the factory's re-confirmation.`, 'Ntemtem', JSON.stringify(tiers), q.base_price_cny ?? q.unit_price_cny])
     await db.query('update sourcing_requests set origin_country = $2 where id = $1', [id, originOf(parent)]); await db.query('update sourcing_quotes set currency = $2 where id = $1', [qid, q.currency ?? ORIGINS[originOf(parent)].currency])
     const job = await jobById(db, id)
     await tellCustomer(db, job, `${opts.auto ? 'Standing order placed' : 'Reorder ready'} — ${ref}`, `${qty.toLocaleString()} ${parent.unit} of "${parent.title}" from the same ${ORIGINS[originOf(parent)].seller} at $${px.total.toLocaleString()} landed. Accept the option and pay the $${px.deposit.toLocaleString()} deposit to start production.`, `src:${id}:reorder`)
@@ -780,8 +780,8 @@ export async function sweepStandingOrders(db: Db) {
       const px = priceOut(parent.tier as Tier, cfg, { unitPriceCny: unit, qty, freightUsd: r2(Number(q.freight_usd) * scale), insuranceUsd: r2(Number(q.insurance_usd) * scale), dutyEstUsd: r2(Number(q.duty_est_usd) * scale) }, originOf(parent))
       const id = 'src_' + uid(); const ref = 'SRC-' + makeRef().slice(3); const qid = 'sq_' + uid(); const now = new Date().toISOString()
       await db.query(`insert into sourcing_requests (id,ref,user_id,tier,title,description,links,quantity,unit,target_price_usd,destination,destination_city,mode,contact_name,contact_email,contact_phone,company,status,agent_user_id,timeline,reference,parent_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'quoted',$18,$19,$20,$21)`,
-        [id, ref, parent.user_id, parent.tier, parent.title, parent.description, parent.links, qty, parent.unit, parent.target_price_usd, parent.destination, parent.destination_city, parent.mode, parent.contact_name, parent.contact_email, parent.contact_phone, parent.company, parent.agent_user_id, JSON.stringify([{ at: now, status: 'requested', note: `Standing order of ${parent.ref} — ${qty.toLocaleString()} ${parent.unit}`, by: 'Ship Sync' }, { at: now, status: 'quoted', note: `Repeat price from ${q.sup_name}: ${localPrice(unit, originOf(parent))} × ${qty.toLocaleString()} — $${px.total.toLocaleString()} landed.`, by: 'Ship Sync' }]), parent.reference, parent.id])
-      await db.query(`insert into sourcing_quotes (id,sourcing_id,supplier_id,title,unit_price_cny,qty,moq,lead_days,factory_usd,service_fee_usd,inspection_usd,handling_usd,freight_usd,insurance_usd,duty_est_usd,total_usd,deposit_usd,notes,sample_available,status,created_by,tiers,base_price_cny) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,false,'proposed','Ship Sync',$19,$20)`,
+        [id, ref, parent.user_id, parent.tier, parent.title, parent.description, parent.links, qty, parent.unit, parent.target_price_usd, parent.destination, parent.destination_city, parent.mode, parent.contact_name, parent.contact_email, parent.contact_phone, parent.company, parent.agent_user_id, JSON.stringify([{ at: now, status: 'requested', note: `Standing order of ${parent.ref} — ${qty.toLocaleString()} ${parent.unit}`, by: 'Ntemtem' }, { at: now, status: 'quoted', note: `Repeat price from ${q.sup_name}: ${localPrice(unit, originOf(parent))} × ${qty.toLocaleString()} — $${px.total.toLocaleString()} landed.`, by: 'Ntemtem' }]), parent.reference, parent.id])
+      await db.query(`insert into sourcing_quotes (id,sourcing_id,supplier_id,title,unit_price_cny,qty,moq,lead_days,factory_usd,service_fee_usd,inspection_usd,handling_usd,freight_usd,insurance_usd,duty_est_usd,total_usd,deposit_usd,notes,sample_available,status,created_by,tiers,base_price_cny) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,false,'proposed','Ntemtem',$19,$20)`,
         [qid, id, q.supplier_id, `${q.title} (repeat)`, unit, qty, q.moq, q.lead_days, px.factory, px.fee, px.inspection, px.handling, px.freight, px.insurance, px.duty, px.total, px.deposit, `Standing order from ${parent.ref}.`, JSON.stringify(tiers), q.base_price_cny ?? q.unit_price_cny])
       await db.query('update sourcing_requests set origin_country = $2 where id = $1', [id, originOf(parent)]); await db.query('update sourcing_quotes set currency = $2 where id = $1', [qid, q.currency ?? ORIGINS[originOf(parent)].currency])
       const next = new Date(new Date(rec.nextAt).getTime() + Number(rec.everyWeeks) * 7 * 86400000).toISOString().slice(0, 10)
@@ -800,7 +800,7 @@ export function startSourcingSweeps(getDb: () => Promise<Db>) {
 /** Platform-owned shipper + demo agents in Guangzhou, London and Houston + a few suppliers in each. Idempotent. */
 export async function seedSourcingDemo(db: Db) {
   await db.query(`insert into shippers (id,name,tagline,hq,founded,modes,destinations,origins,cargo,rating,reviews,verified,response_hours,on_time,services,about,price_index,plan,initials,hue,demo,verified_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true,$12,$13,$14,$15,$16,$17,$18,$19,false,now()) on conflict (id) do nothing`,
-    [SOURCING_SHIPPER, 'Ship Sync Sourcing', 'Source, buy, inspect and ship from China — one team, one price', 'Guangzhou, China', 2026, JSON.stringify(['ocean', 'air']), JSON.stringify(['GH', 'NG', 'LR', 'TG', 'CI', 'SL', 'SN']), JSON.stringify(['Guangzhou, CN', 'Shenzhen, CN', 'Yiwu, CN']), JSON.stringify(['commercial', 'boxes', 'pallets', 'container20', 'container40']), 5, 0, 24, 98, JSON.stringify(['Supplier sourcing', 'Factory audits', 'Quality inspection', 'Consolidation', 'Export documents']), 'Ship Sync’s own sourcing team in Guangzhou, Shenzhen and Yiwu. We buy in Ship Sync’s name, inspect before anything ships, and hand your goods to the ocean or air leg.', 100, 'pro', 'SS', '#E3B54A'])
+    [SOURCING_SHIPPER, 'Ntemtem Sourcing', 'Source, buy, inspect and ship from China — one team, one price', 'Guangzhou, China', 2026, JSON.stringify(['ocean', 'air']), JSON.stringify(['GH', 'NG', 'LR', 'TG', 'CI', 'SL', 'SN']), JSON.stringify(['Guangzhou, CN', 'Shenzhen, CN', 'Yiwu, CN']), JSON.stringify(['commercial', 'boxes', 'pallets', 'container20', 'container40']), 5, 0, 24, 98, JSON.stringify(['Supplier sourcing', 'Factory audits', 'Quality inspection', 'Consolidation', 'Export documents']), 'Ntemtem’s own sourcing team in Guangzhou, Shenzhen and Yiwu. We buy in Ntemtem’s name, inspect before anything ships, and hand your goods to the ocean or air leg.', 100, 'pro', 'SS', '#F5B82E'])
   const { rows: ex } = await db.query('select 1 from users where email = $1', ['china@shipsync.demo'])
   if (!ex.length) {
     const bcrypt = await import('bcryptjs'); const hash = await bcrypt.default.hash('shipsync', 10)
@@ -810,7 +810,7 @@ export async function seedSourcingDemo(db: Db) {
   await db.query(`insert into sites (id,shipper_id,name,kind,address,city,country,free_days,rate_usd,vehicle_rate_usd,hours,active) values ('site_cn_gz',$1,'Guangzhou consolidation warehouse','origin','Huangpu District, Guangzhou','Guangzhou','CN',14,0.8,20,'Mon–Sat 9:00–18:00',true) on conflict (id) do nothing`, [SOURCING_SHIPPER])
   await db.query(`insert into sites (id,shipper_id,name,kind,address,city,country,free_days,rate_usd,vehicle_rate_usd,hours,active) values ('site_uk_lon',$1,'London sourcing warehouse','origin','Thurrock, Essex (for Tilbury)','London','GB',14,1.2,30,'Mon–Fri 9:00–17:30',true), ('site_us_hou',$1,'Houston sourcing warehouse','origin','Port of Houston area, TX','Houston','US',14,1,30,'Mon–Fri 8:00–17:00',true) on conflict (id) do nothing`, [SOURCING_SHIPPER])
   // One team, three buying countries.
-  await db.query(`update shippers set tagline = 'Source, buy, inspect and ship from China, the UK and the USA — one team, one price', origins = $2, about = $3 where id = $1 and tagline like '%from China — one team%'`, [SOURCING_SHIPPER, JSON.stringify(['Guangzhou, CN', 'Shenzhen, CN', 'Yiwu, CN', 'London, GB', 'Houston, US']), 'Ship Sync’s own sourcing team in China, the UK and the USA. We buy in Ship Sync’s name, inspect before anything ships, and hand your goods to the ocean or air leg.'])
+  await db.query(`update shippers set tagline = 'Source, buy, inspect and ship from China, the UK and the USA — one team, one price', origins = $2, about = $3 where id = $1 and tagline like '%from China — one team%'`, [SOURCING_SHIPPER, JSON.stringify(['Guangzhou, CN', 'Shenzhen, CN', 'Yiwu, CN', 'London, GB', 'Houston, US']), 'Ntemtem’s own sourcing team in China, the UK and the USA. We buy in Ntemtem’s name, inspect before anything ships, and hand your goods to the ocean or air leg.'])
   const { rows: agents } = await db.query('select email from users where email in ($1, $2)', ['uk@shipsync.demo', 'usa@shipsync.demo'])
   if (agents.length < 2) {
     const bcrypt = await import('bcryptjs'); const hash = await bcrypt.default.hash('shipsync', 10)
@@ -827,7 +827,7 @@ export async function seedSourcingDemo(db: Db) {
     ['sup_us_2', 'US', 'Lone Star Tools & Generators', 'Dallas', 'Texas', ['Power tools', 'Generators', 'Solar kits'], 'Karen Moore', '+1 214 555 0106', 'lonestartools.example.com', '', true, 4.5],
     ['sup_us_3', 'US', 'Liberty Medical Supply', 'Newark', 'New Jersey', ['Medical supplies', 'Lab equipment', 'Hospital beds'], 'Ruth Adeyemi', '+1 973 555 0107', 'libertymed.example.com', '', true, 4.8],
   ]
-  for (const s of westSup) await db.query(`insert into suppliers (id,country,name,city,province,products,contact,wechat,phone,website,storefront,notes,verified,rating,active,added_by) values ($1,$2,$3,$4,$5,$6,$7,'',$8,$9,$10,'',$11,$12,true,'Ship Sync') on conflict (id) do nothing`, [s[0], s[1], s[2], s[3], s[4], JSON.stringify(s[5]), s[6], s[7], s[8], s[9], s[10], s[11]])
+  for (const s of westSup) await db.query(`insert into suppliers (id,country,name,city,province,products,contact,wechat,phone,website,storefront,notes,verified,rating,active,added_by) values ($1,$2,$3,$4,$5,$6,$7,'',$8,$9,$10,'',$11,$12,true,'Ntemtem') on conflict (id) do nothing`, [s[0], s[1], s[2], s[3], s[4], JSON.stringify(s[5]), s[6], s[7], s[8], s[9], s[10], s[11]])
   const { rows } = await db.query(`select 1 from suppliers where country = 'CN' limit 1`); if (rows.length) return
   const list: [string, string, string, string, string[], string, string, string, string, string, boolean, number][] = [
     ['sup_demo_1', 'Guangzhou Huaxin Household Co.', 'Guangzhou', 'Guangdong', ['Kitchenware', 'Plastic housewares', 'Storage'], 'Ms. Lin Mei', 'linmei-hx', '+86 136 0000 1101', 'huaxin-house.example.cn', 'https://huaxin.1688.com', true, 4.8],
@@ -836,13 +836,13 @@ export async function seedSourcingDemo(db: Db) {
     ['sup_demo_4', 'Foshan Everlast Furniture', 'Foshan', 'Guangdong', ['Office chairs', 'School desks', 'Steel furniture'], 'Mr. Huang Lei', 'huanglei-el', '+86 138 0000 4404', 'everlast-fs.example.cn', '', false, 4.3],
     ['sup_demo_5', 'Ningbo Ocean Motor Parts', 'Ningbo', 'Zhejiang', ['Motorcycle parts', 'Tyres', 'Batteries'], 'Mr. Wang Tao', 'wangtao-om', '+86 139 0000 5505', '', 'https://oceanmotor.en.alibaba.com', true, 4.5],
   ]
-  for (const s of list) await db.query(`insert into suppliers (id,name,city,province,products,contact,wechat,phone,website,storefront,notes,verified,rating,active,added_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'',$11,$12,true,'Ship Sync') on conflict (id) do nothing`, [s[0], s[1], s[2], s[3], JSON.stringify(s[4]), s[5], s[6], s[7], s[8], s[9], s[10], s[11]])
+  for (const s of list) await db.query(`insert into suppliers (id,name,city,province,products,contact,wechat,phone,website,storefront,notes,verified,rating,active,added_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'',$11,$12,true,'Ntemtem') on conflict (id) do nothing`, [s[0], s[1], s[2], s[3], JSON.stringify(s[4]), s[5], s[6], s[7], s[8], s[9], s[10], s[11]])
   // One demo request so the boards aren't empty: Abena wants solar lanterns for a shop in Kumasi.
   const { rows: demoUser } = await db.query<Row>(`select id from users where email = 'demo@shipsync.demo'`)
   if (demoUser[0]) {
     const id = 'src_demo_lanterns'
     await db.query(`insert into sourcing_requests (id,ref,user_id,tier,title,description,links,quantity,unit,target_price_usd,destination,destination_city,mode,contact_name,contact_email,contact_phone,company,status,agent_user_id,timeline) values ($1,'SRC-DEMO01',$2,'order','Solar lanterns with phone charging','Rechargeable solar lanterns (around 5 W panel, USB out, 8–12 h light) for a shop in Kumasi. Boxed retail packaging with English manual. Open to brands; CE/RoHS preferred.','["https://www.alibaba.com/showroom/solar-lantern.html"]',500,'pcs',6,'GH','Kumasi','ocean','Abena Owusu','demo@shipsync.demo','+1 917 555 0142','Owusu Trading','sourcing','u_cn_wei',$3) on conflict (id) do nothing`,
-      [id, demoUser[0].id, JSON.stringify([{ at: new Date(Date.now() - 2 * 86400000).toISOString(), status: 'requested', note: 'Order & inspect — 500 pcs', by: 'Abena Owusu' }, { at: new Date(Date.now() - 86400000).toISOString(), status: 'assigned', note: 'Wei Zhang is your sourcing agent.', by: 'Ship Sync' }, { at: new Date(Date.now() - 80000000).toISOString(), status: 'sourcing', note: 'Contacting three Shenzhen factories.', by: 'Wei Zhang' }])])
+      [id, demoUser[0].id, JSON.stringify([{ at: new Date(Date.now() - 2 * 86400000).toISOString(), status: 'requested', note: 'Order & inspect — 500 pcs', by: 'Abena Owusu' }, { at: new Date(Date.now() - 86400000).toISOString(), status: 'assigned', note: 'Wei Zhang is your sourcing agent.', by: 'Ntemtem' }, { at: new Date(Date.now() - 80000000).toISOString(), status: 'sourcing', note: 'Contacting three Shenzhen factories.', by: 'Wei Zhang' }])])
     await db.query(`insert into sourcing_messages (id,sourcing_id,user_id,author,role,body) values ('msg_demo_1',$1,'u_cn_wei','Wei Zhang','agent','Hi Abena — I have samples from two Shenzhen factories arriving tomorrow. Do you want the version with a built-in radio as well, or just light + charging?') on conflict (id) do nothing`, [id])
   }
 }

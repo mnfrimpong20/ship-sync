@@ -29,7 +29,7 @@ export default function PartnerPortal() {
       <div className="container-x max-w-4xl py-6">
         <div className="flex items-center justify-between gap-3"><Logo /><span className="text-xs text-text-muted">For {d.partner.name}</span></div>
         <header className="mt-6">
-          <p className="eyebrow">{d.shipper.name} · destination partner</p>
+          <p className="eyebrow">{d.shipper.name} · destination agent</p>
           <h1 className="!text-[clamp(1.5rem,4vw,2.2rem)]" data-testid="partner-title">{c.ref}{c.number ? ` · ${c.number}` : ''}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-muted"><Ship size={14} aria-hidden="true" />{c.vesselName || 'Vessel tbc'}{c.voyage ? ` ${c.voyage}` : ''} → {c.destinationPort || countryByCode(c.destination)?.name}{c.eta ? ` · ETA ${fmtDate(c.eta + 'T12:00:00Z')}` : ''}<Pill tone="teal">{stageLabels[c.status as keyof typeof stageLabels] ?? c.status}</Pill></p>
           <p className="mt-1 text-sm text-text-muted">{d.totals.shipments} shipments · {d.totals.pieces || '—'} pieces{d.totals.weightKg ? ` · ${d.totals.weightKg} kg` : ''}</p>
@@ -43,7 +43,7 @@ export default function PartnerPortal() {
             <li key={s.id} className="card-dark p-4" data-testid="partner-shipment">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs text-gold">{s.ref}</span><Pill tone={s.status === 'delivered' ? 'green' : s.status === 'ready_for_collection' ? 'gold' : 'teal'}>{statusLabels[s.status]}</Pill><span className="text-xs text-text-muted">{s.handover === 'collection' ? 'Collects' : 'Door delivery'}</span>{s.paymentDue && <Pill tone="danger">Payment due — call {d.shipper.name}</Pill>}</p>
+                  <p className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs text-gold-deep">{s.ref}</span><Pill tone={s.status === 'delivered' ? 'green' : s.status === 'ready_for_collection' ? 'gold' : 'teal'}>{statusLabels[s.status]}</Pill><span className="text-xs text-text-muted">{s.handover === 'collection' ? 'Collects' : 'Door delivery'}</span>{s.paymentDue && <Pill tone="danger">Payment due — call {d.shipper.name}</Pill>}</p>
                   <p className="mt-1 text-sm">{s.description} · {s.pieces ?? '—'} pcs{s.weightKg ? ` · ${s.weightKg} kg` : ''}</p>
                   <p className="text-xs text-text-muted">From {s.sender}</p>
                   {s.recipient ? <p className="mt-1 text-sm"><strong>{s.recipient.name}</strong>{s.recipient.city ? ` · ${s.recipient.city}` : ''}{s.recipient.address ? ` · ${s.recipient.address}` : ''}{s.recipient.phone && <a href={`tel:${s.recipient.phone}`} className="ml-2 inline-flex items-center gap-1 text-gold-deep"><Phone size={12} aria-hidden="true" />{s.recipient.phone}</a>}</p> : <p className="mt-1 text-sm text-danger">No recipient on file</p>}

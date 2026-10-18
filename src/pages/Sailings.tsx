@@ -22,7 +22,7 @@ export function SailingCard({ s, onBook, compact = false }: { s: Sailing; onBook
         <div className="min-w-0"><p className="font-semibold">{s.line} <span className="font-normal text-text-muted">· {s.kind === 'roro' ? 'RoRo' : 'Container'}</span></p><p className="truncate text-xs text-text-muted">{s.vesselName} {s.voyage}{s.service ? ` · ${s.service}` : ''}</p></div>
         <span className="shrink-0"><Pill tone={s.spaceLeft === 0 ? 'danger' : cut <= 3 ? 'gold' : 'teal'}>{s.spaceLeft === 0 ? 'Full' : cut <= 0 ? 'Cut-off today' : cut <= 3 ? `Cut-off in ${cut}d` : `${s.spaceLeft} slots`}</Pill></span>
       </div>
-      <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm"><div><p className="font-semibold">{s.originPort}</p><p className="whitespace-nowrap text-xs text-text-muted">Sails {day(s.etd)}</p></div><Ship size={16} className="text-gold" aria-hidden="true" /><div className="text-right"><p className="font-semibold">{s.destinationPort}</p><p className="whitespace-nowrap text-xs text-text-muted">ETA {day(s.eta)} · {s.transitDays}d</p></div></div>
+      <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm"><div><p className="font-semibold">{s.originPort}</p><p className="whitespace-nowrap text-xs text-text-muted">Sails {day(s.etd)}</p></div><Ship size={16} className="text-gold-deep" aria-hidden="true" /><div className="text-right"><p className="font-semibold">{s.destinationPort}</p><p className="whitespace-nowrap text-xs text-text-muted">ETA {day(s.eta)} · {s.transitDays}d</p></div></div>
       {!compact && <dl className="mt-3 grid gap-1 text-xs">{units.map(([u, r]) => <div key={u} className="flex justify-between"><dt className="text-text-muted">{unitLabels[u]}</dt><dd className="font-semibold tabular-nums">{money(r)}</dd></div>)}</dl>}
       <div className="mt-auto flex items-center justify-between gap-2 pt-3"><span className="inline-flex items-center gap-1 text-[11px] text-text-muted"><Calendar size={11} aria-hidden="true" /> Docs by {day(s.cutoff)}</span>{onBook && <button onClick={() => onBook(s)} disabled={s.spaceLeft === 0} className="btn-gold !min-h-8 !px-3 text-xs disabled:opacity-60" data-testid="book-sailing">Book space</button>}</div>
     </div>
@@ -103,7 +103,7 @@ export default function Sailings() {
           </motion.div>
           <motion.div variants={fadeUp} className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {data === null && !error && <p className="text-sm text-text-muted">Loading…</p>}
-            {data && list.length === 0 && <div className="md:col-span-3"><Empty title="No open sailings on this lane" body="Try another destination, or ask Ship Sync to add a line." /></div>}
+            {data && list.length === 0 && <div className="md:col-span-3"><Empty title="No open sailings on this lane" body="Try another destination, or ask Ntemtem to add a line." /></div>}
             {list.map((s) => <SailingCard key={s.id} s={s} onBook={setBooking} />)}
           </motion.div>
           <motion.div variants={fadeUp} className="card-dark mt-8 overflow-hidden" data-testid="bookings">
@@ -112,7 +112,7 @@ export default function Sailings() {
               {bookings && bookings.length === 0 && <li className="px-5 py-4 text-text-muted">No bookings yet.</li>}
               {bookings?.map((b) => (
                 <li key={b.id} className={`flex flex-wrap items-center justify-between gap-3 px-5 py-3 ${b.status === 'cancelled' || b.status === 'rejected' ? 'opacity-60' : ''}`} data-testid="booking-row">
-                  <div className="min-w-0"><p className="font-semibold">{b.bookingRef || '—'} <span className="font-normal text-text-muted">· {b.sailing?.line} · {b.sailing?.vesselName} {b.sailing?.voyage}</span></p><p className="text-xs text-text-muted">{b.quantity} × {b.unitLabel} · {money(b.totalUsd)} · sails {day(b.sailing?.etd ?? null)} · docs by {day(b.sailing?.cutoff ?? null)}{b.containerRef ? <> · <Link to={`/dashboard/containers/${b.containerId}`} className="text-gold hover:underline">{b.containerRef}</Link></> : ''}{b.shipmentRef ? <> · <Link to={`/dashboard/shipments?q=${b.shipmentRef}&b=all`} className="text-gold hover:underline">{b.shipmentRef}</Link></> : ''}</p>{b.carrierNote && <p className="text-xs text-text-muted">{b.carrierNote}</p>}</div>
+                  <div className="min-w-0"><p className="font-semibold">{b.bookingRef || '—'} <span className="font-normal text-text-muted">· {b.sailing?.line} · {b.sailing?.vesselName} {b.sailing?.voyage}</span></p><p className="text-xs text-text-muted">{b.quantity} × {b.unitLabel} · {money(b.totalUsd)} · sails {day(b.sailing?.etd ?? null)} · docs by {day(b.sailing?.cutoff ?? null)}{b.containerRef ? <> · <Link to={`/dashboard/containers/${b.containerId}`} className="text-gold-deep hover:underline">{b.containerRef}</Link></> : ''}{b.shipmentRef ? <> · <Link to={`/dashboard/shipments?q=${b.shipmentRef}&b=all`} className="text-gold-deep hover:underline">{b.shipmentRef}</Link></> : ''}</p>{b.carrierNote && <p className="text-xs text-text-muted">{b.carrierNote}</p>}</div>
                   <div className="flex items-center gap-2"><Pill tone={b.status === 'confirmed' ? 'green' : b.status === 'rejected' ? 'danger' : 'muted'}>{b.status}</Pill>{b.status === 'confirmed' && <button onClick={() => cancel(b)} disabled={busy === b.id} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-danger focus-ring" aria-label="Cancel booking"><X size={13} /></button>}</div>
                 </li>
               ))}
@@ -137,7 +137,7 @@ export function PublicSailings() {
         <motion.div initial="hidden" animate="show" variants={stagger} className="mx-auto max-w-2xl text-center">
           <motion.p variants={fadeUp} className="eyebrow mb-2">Sailing schedule</motion.p>
           <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4vw,3rem)]">Next sailings to West Africa</motion.h1>
-          <motion.p variants={fadeUp} className="mt-2 text-text-muted">Container services and RoRo car carriers from the US and UK. Shippers on Ship Sync book space on these directly, so your goods are on the next departure.</motion.p>
+          <motion.p variants={fadeUp} className="mt-2 text-text-muted">Container services and RoRo car carriers from the US and UK. Shippers on Ntemtem book space on these directly, so your goods are on the next departure.</motion.p>
         </motion.div>
         <motion.div initial="hidden" animate="show" variants={stagger} className="mx-auto mt-8 max-w-5xl">
           <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2"><select aria-label="Destination" className="input-dark !min-h-10 !w-auto text-sm" value={dest} onChange={(e) => setDest(e.target.value)}>{countries.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select><Link to="/quote" className="btn-gold !min-h-10 !px-4 text-sm">Get a quote</Link></motion.div>

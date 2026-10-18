@@ -176,7 +176,7 @@ export function IssuesTab() {
   useEffect(() => { hubApi.issues().then(setList).catch(() => setList([])) }, [])
   return (
     <div className="mt-6 space-y-4" data-testid="issues-tab">
-      <p className="text-sm text-text-muted">Something wrong — late, damaged, missing pieces, charged more than agreed? Open a shipment and choose <b>Open a dispute</b>; add photos. Ship Sync holds any escrow payment and mediates.</p>
+      <p className="text-sm text-text-muted">Something wrong — late, damaged, missing pieces, charged more than agreed? Open a shipment and choose <b>Open a dispute</b>; add photos. Ntemtem holds any escrow payment and mediates.</p>
       {shipments.length > 0 && <p className="text-sm"><Link to={`/dashboard?tab=shipments&s=${shipments[0].id}`} className="font-semibold text-gold-deep hover:underline">Report a problem on a shipment →</Link></p>}
       {!list ? <NoData>Loading…</NoData> : !list.length ? <NoData>No problems reported. Good.</NoData> : <ul className="space-y-3">{list.map((x) => (
         <li key={x.id} className={`rounded-xl border bg-surface p-4 ${x.status === 'open' ? 'border-danger/40' : 'border-border'}`} data-testid="issue">
@@ -216,7 +216,7 @@ function Referral() {
   const [r, setR] = useState<R | null>(null); const [copied, setCopied] = useState(false)
   useEffect(() => { hubApi.referral().then(setR).catch(() => {}) }, [])
   if (!r) return null
-  const text = `I ship to West Africa with Ship Sync — verified shippers and live tracking. Sign up with my link and we both get ${money(r.creditUsd)} off: ${r.link}`
+  const text = `I ship to West Africa with Ntemtem — verified shippers and live tracking. Sign up with my link and we both get ${money(r.creditUsd)} off: ${r.link}`
   return (
     <Panel title="Invite a friend" sub={`You both get ${money(r.creditUsd)} credit when their first shipment arrives.`} testid="referral">
       <div className="flex gap-2"><input readOnly value={r.link} className={`${cls} flex-1 font-mono text-xs`} onFocus={(e) => e.currentTarget.select()} data-testid="ref-link" /><button type="button" className="btn-ghost !min-h-10" onClick={async () => { try { await navigator.clipboard.writeText(r.link); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { /* ignore */ } }}>{copied ? 'Copied' : 'Copy'}</button><a className="btn-gold !min-h-10" href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"><MessageCircle size={14} aria-hidden="true" /> Share</a></div>

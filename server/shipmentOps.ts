@@ -100,9 +100,9 @@ export async function afterBooking(db: Db, shipmentId: string, o: { delivery?: b
   const handover = o.handover ?? (o.delivery ? 'delivery' : prefs.defaultHandover)
   await db.query('update shipments set handover = $2, eta_original = coalesce(eta_original, eta) where id = $1', [s.id, handover]); s.handover = handover
   if (prefs.autoDocuments) {
-    await generateDocument(db, s, 'packing_list', 'shared', o.by ?? 'Ship Sync').catch((e) => console.error('[booking] packing list', e instanceof Error ? e.message : e))
+    await generateDocument(db, s, 'packing_list', 'shared', o.by ?? 'Ntemtem').catch((e) => console.error('[booking] packing list', e instanceof Error ? e.message : e))
     const b = (typeof s.booking === 'string' ? JSON.parse(s.booking) : s.booking) ?? {}
-    if (Number(b.declaredValueUsd) > 0) await generateDocument(db, s, 'commercial_invoice', 'shipper', o.by ?? 'Ship Sync').catch((e) => console.error('[booking] commercial invoice', e instanceof Error ? e.message : e))
+    if (Number(b.declaredValueUsd) > 0) await generateDocument(db, s, 'commercial_invoice', 'shipper', o.by ?? 'Ntemtem').catch((e) => console.error('[booking] commercial invoice', e instanceof Error ? e.message : e))
   }
 }
 

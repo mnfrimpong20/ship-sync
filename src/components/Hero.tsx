@@ -27,21 +27,21 @@ export default function Hero() {
 
       <div className="container-fluid relative grid gap-12 pb-20 pt-16 md:pb-28 md:pt-24 lg:grid-cols-12 lg:items-center">
         <motion.div className="lg:col-span-7" initial="hidden" animate="show" variants={stagger}>
-          <motion.p variants={fadeUp} className="eyebrow mb-5 flex items-center gap-2"><span className="h-px w-8 bg-gold" aria-hidden="true" />Air & ocean freight to West Africa</motion.p>
+          <motion.p variants={fadeUp} className="eyebrow mb-5 flex items-center gap-2"><span className="h-px w-8 bg-gold" aria-hidden="true" />Shipping home to Ghana & West Africa</motion.p>
           <motion.h1 variants={fadeUp} className="max-w-3xl">
-            Ship home with carriers you can <em className="not-italic text-gold">trust.</em>
+            Send it. <em className="not-italic text-gold-deep">Ntemtem.</em>
           </motion.h1>
           <motion.p variants={fadeUp} className="mt-6 max-w-xl text-lg text-text-muted md:text-xl">
-            Post your shipment once. Verified air and ocean shippers to Ghana, Nigeria, Liberia, Togo and beyond compete for it with real quotes — you pick, book, and track.
+            Boxes, barrels, cars or a full container — post it once and verified air and ocean shippers send you real quotes. Pick one, pay safely, and track it all the way home. <span className="whitespace-nowrap">Ntemtem is Twi for “quickly-quickly.”</span>
           </motion.p>
           <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-3 sm:flex-row">
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/quote" className="btn-gold w-full sm:w-auto">Get free quotes <ArrowRight size={18} aria-hidden="true" /></Link></motion.div>
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/signup?role=shipper" className="btn-ghost w-full !border-white/50 !text-white hover:!border-white hover:!bg-white/10 sm:w-auto">List your shipping company</Link></motion.div>
           </motion.div>
           <motion.ul variants={fadeUp} className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-text-muted">
-            <li className="flex items-center gap-2"><BadgeCheck size={16} className="text-gold" aria-hidden="true" /> {stats ? `${stats.verifiedShippers} verified shippers` : 'Verified shippers only'}</li>
-            <li className="flex items-center gap-2"><ShieldCheck size={16} className="text-gold" aria-hidden="true" /> Licence & insurance checked</li>
-            <li className="flex items-center gap-2"><Clock size={16} className="text-gold" aria-hidden="true" /> Quotes within 24 hours</li>
+            <li className="flex items-center gap-2"><BadgeCheck size={16} className="text-teal" aria-hidden="true" /> {stats ? `${stats.verifiedShippers} verified shippers` : 'Verified shippers only'}</li>
+            <li className="flex items-center gap-2"><ShieldCheck size={16} className="text-teal" aria-hidden="true" /> Payment protected until the shipper confirms</li>
+            <li className="flex items-center gap-2"><Clock size={16} className="text-gold-deep" aria-hidden="true" /> Quotes within 24 hours</li>
           </motion.ul>
         </motion.div>
 
@@ -53,7 +53,7 @@ export default function Hero() {
         >
           <div className="mb-5 flex items-center justify-between">
             <h2 className="!text-xl text-text">Quick quote</h2>
-            <span className="rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold">Free for customers</span>
+            <span className="rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold-deep">Free for customers</span>
           </div>
           <div className="grid gap-4">
             <div>
@@ -72,7 +72,7 @@ export default function Hero() {
               <legend className="label-dark">Mode</legend>
               <div className="grid grid-cols-3 gap-2" role="radiogroup">
                 {([['either', 'Either', null], ['ocean', 'Ocean', Ship], ['air', 'Air', Plane]] as const).map(([v, label, Icon]) => (
-                  <button type="button" key={v} role="radio" aria-checked={mode === v} onClick={() => setMode(v)} className={`flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border text-sm font-medium transition-colors focus-ring ${mode === v ? 'border-gold bg-gold/15 text-gold' : 'border-border bg-surface-2 text-text-muted hover:text-text'}`}>
+                  <button type="button" key={v} role="radio" aria-checked={mode === v} onClick={() => setMode(v)} className={`flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border text-sm font-medium transition-colors focus-ring ${mode === v ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border bg-surface-2 text-text-muted hover:text-text'}`}>
                     {Icon && <Icon size={15} aria-hidden="true" />}{label}
                   </button>
                 ))}
@@ -80,7 +80,7 @@ export default function Hero() {
             </fieldset>
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit" className="btn-gold mt-1 w-full">Compare shipper quotes <ArrowRight size={18} aria-hidden="true" /></motion.button>
           </div>
-          <p className="mt-4 text-center text-xs text-text-muted">No account needed to request quotes. Shippers reply by email and in your dashboard. <Link to="/shippers?match=1" className="text-gold underline-offset-2 hover:underline focus-ring">Not sure who to pick? Get matched →</Link></p>
+          <p className="mt-4 text-center text-xs text-text-muted">No account needed to request quotes. Shippers reply by email and in your dashboard. <Link to="/shippers?match=1" className="text-gold-deep underline-offset-2 hover:underline focus-ring">Not sure who to pick? Get matched →</Link></p>
         </motion.form>
       </div>
 
@@ -103,7 +103,7 @@ function RouteMap() {
   return (
     <svg className="absolute inset-x-0 top-0 hidden h-full w-full lg:block" viewBox="0 0 1440 800" fill="none" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <defs>
-        <linearGradient id="arc" x1="0" x2="1"><stop offset="0" stopColor="var(--color-gold)" stopOpacity="0" /><stop offset="0.5" stopColor="var(--color-gold)" stopOpacity="0.55" /><stop offset="1" stopColor="#2DD4BF" stopOpacity="0" /></linearGradient>
+        <linearGradient id="arc" x1="0" x2="1"><stop offset="0" stopColor="var(--color-gold)" stopOpacity="0" /><stop offset="0.5" stopColor="var(--color-gold)" stopOpacity="0.55" /><stop offset="1" stopColor="#6CC3DD" stopOpacity="0" /></linearGradient>
       </defs>
       {['M120 260 Q 620 60 1010 520', 'M420 140 Q 760 120 1030 540', 'M1380 200 Q 1200 380 1040 545', 'M60 420 Q 560 380 1010 530'].map((d, i) => (
         <motion.path key={d} d={d} stroke="url(#arc)" strokeWidth="1.5" strokeDasharray="6 10" initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: 2.2, delay: 0.6 + i * 0.25, ease: 'easeOut' }} />

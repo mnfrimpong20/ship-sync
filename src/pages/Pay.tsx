@@ -43,7 +43,7 @@ export default function Pay() {
           </motion.div>
           <motion.article variants={fadeUp} className="sheet rounded-lg bg-white p-8 text-[#1a1f2e] shadow-2xl md:p-12" aria-label={`Invoice ${inv.number}`}>
             <header className="flex flex-wrap items-start justify-between gap-6 border-b border-slate-200 pb-6">
-              <div className="flex items-center gap-3"><Avatar initials={inv.shipper.initials} hue={inv.shipper.hue} size={44} /><div><p className="text-lg font-bold">{inv.shipper.name}</p><p className="text-sm text-slate-600">{inv.shipper.hq}</p><p className="text-xs text-slate-500">via Ship Sync</p></div></div>
+              <div className="flex items-center gap-3"><Avatar initials={inv.shipper.initials} hue={inv.shipper.hue} size={44} /><div><p className="text-lg font-bold">{inv.shipper.name}</p><p className="text-sm text-slate-600">{inv.shipper.hq}</p><p className="text-xs text-slate-500">via Ntemtem</p></div></div>
               <div className="text-right"><p className="font-heading text-3xl font-bold tracking-tight">INVOICE</p><p className="mt-1 font-mono text-sm">{inv.number}</p><p className="mt-2 text-sm text-slate-600">Issued {fmtDate(inv.issuedAt)}</p>{inv.dueAt && <p className="text-sm text-slate-600">Due {fmtDate(inv.dueAt)}</p>}<p className={`mt-2 inline-block rounded-full px-3 py-0.5 text-xs font-semibold uppercase ${paid ? 'bg-emerald-100 text-emerald-800' : inv.overdue ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>{paid ? 'Paid' : inv.overdue ? 'Overdue' : 'Due'}</p></div>
             </header>
             <section className="mt-6 grid gap-6 sm:grid-cols-2">
@@ -62,7 +62,7 @@ export default function Pay() {
               {!paid && <div className="flex justify-between py-1 font-semibold"><dt>Balance due</dt><dd className="tabular-nums">{usd(inv.balance)}</dd></div>}
             </dl></div>
             {inv.notes && <p className="mt-6 whitespace-pre-line text-sm text-slate-600">{inv.notes}</p>}
-            {inv.payments.length > 0 && <div className="mt-6 text-xs text-slate-600"><p className="font-semibold uppercase tracking-wider text-slate-500">Payments</p><ul className="mt-1">{inv.payments.map((p) => <li key={p.id}>{fmtDate(p.at)} · {usd(p.amount)} · {p.method === 'ship_sync' ? 'paid online via Ship Sync' : p.method}{p.note ? ` — ${p.note}` : ''}</li>)}</ul></div>}
+            {inv.payments.length > 0 && <div className="mt-6 text-xs text-slate-600"><p className="font-semibold uppercase tracking-wider text-slate-500">Payments</p><ul className="mt-1">{inv.payments.map((p) => <li key={p.id}>{fmtDate(p.at)} · {usd(p.amount)} · {p.method === 'ship_sync' ? 'paid online via Ntemtem' : p.method}{p.note ? ` — ${p.note}` : ''}</li>)}</ul></div>}
           </motion.article>
           <motion.div variants={fadeUp} className="no-print mt-4 flex justify-end"><button onClick={() => window.print()} className="btn-ghost !min-h-9 !px-3 text-sm"><Printer size={14} aria-hidden="true" /> Print / save as PDF</button></motion.div>
         </motion.div>

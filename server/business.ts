@@ -1,5 +1,5 @@
 /**
- * The founder's view: how Ship Sync is doing as a company, and what on the platform needs a human today.
+ * The founder's view: how Ntemtem is doing as a company, and what on the platform needs a human today.
  *   GET /admin/business    revenue by stream, escrow position, growth series, conversion, lane demand, sourcing pipeline
  *   GET /admin/exceptions  stuck or waiting things across every module, grouped, with links
  * Everything is computed from existing tables; nothing here writes.

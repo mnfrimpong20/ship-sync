@@ -53,8 +53,8 @@ export async function buildWeekly(db: Db, sid: string) {
   const top = (a.insights as Row[]).slice(0, 3)
   const subject = `${sh?.name ?? 'Your'} week: ${a.sales ? `${k(a.sales.kpis.won)} won · ` : ''}${a.finance ? `${money(k(a.finance.kpis.invoiced) ?? 0)} invoiced` : 'your numbers'}`
   const body = `${lines.join('\n')}\n\nWorth a look:\n${top.map((i, n) => `${n + 1}. ${i.title}`).join('\n') || 'Nothing urgent — a steady week.'}`
-  const html = emailTemplate({ title: `Your week at ${sh?.name ?? 'Ship Sync'}`, body: `${lines.map(esc).join('<br>')}<br><br><b>Worth a look</b><br>${top.map((i, n) => `${n + 1}. ${esc(i.title)} — <span style="color:#9fb0c0">${esc(i.body)}</span>`).join('<br>') || 'Nothing urgent — a steady week.'}`, link: '/dashboard/analytics', cta: 'Open analytics' })
-  const whatsapp = `${sh?.name ?? 'Ship Sync'} — last 7 days\n${lines.join('\n')}\n\n${top.map((i, n) => `${n + 1}. ${i.title}`).join('\n')}\n${appUrl()}/#/dashboard/analytics`
+  const html = emailTemplate({ title: `Your week at ${sh?.name ?? 'Ntemtem'}`, body: `${lines.map(esc).join('<br>')}<br><br><b>Worth a look</b><br>${top.map((i, n) => `${n + 1}. ${esc(i.title)} — <span style="color:#9fb0c0">${esc(i.body)}</span>`).join('<br>') || 'Nothing urgent — a steady week.'}`, link: '/dashboard/analytics', cta: 'Open analytics' })
+  const whatsapp = `${sh?.name ?? 'Ntemtem'} — last 7 days\n${lines.join('\n')}\n\n${top.map((i, n) => `${n + 1}. ${i.title}`).join('\n')}\n${appUrl()}/#/dashboard/analytics`
   return { subject, body, html, whatsapp, week: weekKey() }
 }
 export async function sendWeekly(db: Db, sid: string, o: { preview?: boolean; to?: ApiUser } = {}) {

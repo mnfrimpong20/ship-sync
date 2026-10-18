@@ -20,7 +20,7 @@ import { AdminAnnouncements, AdminAudit, AdminBilling, AdminFeatures, AdminMarke
 const VIEWS = [['overview', 'Business'], ['attention', 'Attention'], ['shippers', 'Shippers'], ['disputes', 'Disputes'], ['payments', 'Payments'], ['brokers', 'Brokers'], ['sourcing', 'Sourcing'], ['insurance', 'Insurance'], ['destinations', 'Destinations'], ['system', 'System'], ['analytics', 'Platform'], ['marketplace', 'Marketplace'], ['scorecards', 'Scorecards'], ['risk', 'Risk'], ['messaging', 'Messaging'], ['billing', 'Billing'], ['announcements', 'Announcements'], ['audit', 'Audit log'], ['support', 'View as'], ['features', 'Features']] as const
 type View = (typeof VIEWS)[number][0]
 
-/** Ship Sync staff: the business overview, the attention board, and every admin work queue in tabs. */
+/** Ntemtem staff: the business overview, the attention board, and every admin work queue in tabs. */
 export default function Admin() {
   const { ready, user, adminShippers, adminVerify } = useStore()
   const [sp, setSp] = useSearchParams()
@@ -59,7 +59,7 @@ export default function Admin() {
     <>
       <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-2">
         {(['all', 'pending', 'verified'] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f} className={`rounded-full border px-4 py-1.5 text-sm capitalize focus-ring ${filter === f ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>{f}{f === 'pending' && pending > 0 ? ` (${pending})` : ''}</button>
+          <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f} className={`rounded-full border px-4 py-1.5 text-sm capitalize focus-ring ${filter === f ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{f}{f === 'pending' && pending > 0 ? ` (${pending})` : ''}</button>
         ))}
         <span className="ml-auto text-xs text-text-muted">{rows ? `${rows.length} shippers` : 'Loading…'}</span>
       </motion.div>
@@ -70,7 +70,7 @@ export default function Admin() {
               <div className="flex min-w-0 items-start gap-3">
                 <Avatar initials={s.initials} hue={s.hue} size={44} />
                 <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2 font-semibold text-text"><Link to={`/shippers/${s.id}`} className="hover:text-gold focus-ring rounded">{s.name}</Link>{s.verified && <BadgeCheck size={16} className="text-gold" aria-label="Verified" />}{s.demo && <Pill tone="muted">Demo</Pill>}{!s.verified && s.verificationRequestedAt && <Pill tone="gold">Review requested</Pill>}{s.docsPending > 0 && <Pill tone="sky">{s.docsPending} doc{s.docsPending === 1 ? '' : 's'} to check</Pill>}</p>
+                  <p className="flex flex-wrap items-center gap-2 font-semibold text-text"><Link to={`/shippers/${s.id}`} className="hover:text-gold-deep focus-ring rounded">{s.name}</Link>{s.verified && <BadgeCheck size={16} className="text-gold-deep" aria-label="Verified" />}{s.demo && <Pill tone="muted">Demo</Pill>}{!s.verified && s.verificationRequestedAt && <Pill tone="gold">Review requested</Pill>}{s.docsPending > 0 && <Pill tone="sky">{s.docsPending} doc{s.docsPending === 1 ? '' : 's'} to check</Pill>}</p>
                   <p className="text-xs text-text-muted">{s.tagline || 'No tagline'} · {s.hq || 'No HQ set'} · founded {s.founded}</p>
                   <p className="mt-1 text-xs text-text-muted">{s.owner ? <>{s.owner.name} · {s.owner.email}</> : 'No account linked'}{s.createdAt ? ` · joined ${fmtDate(s.createdAt)}` : ''}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-muted">
@@ -105,7 +105,7 @@ export default function Admin() {
     shippers: ['Shipper verification', 'Verified shippers get the badge, rank higher in matching and reassure customers. Check licence, insurance and a real office before granting it.'],
     disputes: ['Disputes', 'Customer and shipper disputes on escrow payments.'], payments: ['Money through the platform', 'Escrow, releases, holds and payouts.'], brokers: ['Customs brokers', 'Broker listings and assignments.'],
     sourcing: ['Sourcing settings', 'Pricing, exchange rates, agents and commissions for the China, UK and USA desks.'], insurance: ['Insurance', 'Cargo cover sold on the platform.'], destinations: ['Destinations', 'The countries customers can ship to — ports, airports, transit days and dial codes.'], system: ['Health, errors & backups', 'What is wired up, what broke, and a copy of the database you can download.'],
-    analytics: ['Platform analytics', 'Value booked through Ship Sync, our own revenue, growth and conversion across the marketplace.'],
+    analytics: ['Platform analytics', 'Value booked through Ntemtem, our own revenue, growth and conversion across the marketplace.'],
     marketplace: ['Marketplace health', 'Demand against supply on every lane — where requests go unanswered and which shippers to recruit.'],
     scorecards: ['Shipper scorecards', 'Quality scores that drive directory ranking, warnings, probation and pauses.'],
     risk: ['Risk & fraud', 'Patterns worth a look: withdrawn quotes, spikes, shared contact details, junk requests and off-platform attempts.'],
@@ -176,7 +176,7 @@ function ShipperDocs({ shipper, onDecline, busy }: { shipper: AdminShipper; onDe
           {d?.documents.map((x) => (
             <li key={x.id} className="py-2.5 text-sm">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0"><p className="flex flex-wrap items-center gap-2 font-semibold"><a href={x.url} target="_blank" rel="noreferrer" className="hover:text-gold focus-ring rounded">{x.title}</a><Pill tone={tone[x.status]}>{x.status}</Pill></p><p className="text-xs text-text-muted">{x.label} · {x.uploadedBy}, {fmtDateTime(x.createdAt)}{x.note ? ` · “${x.note}”` : ''}{x.reviewedBy ? ` · reviewed by ${x.reviewedBy}` : ''}{x.reviewNote ? ` — ${x.reviewNote}` : ''}</p></div>
+                <div className="min-w-0"><p className="flex flex-wrap items-center gap-2 font-semibold"><a href={x.url} target="_blank" rel="noreferrer" className="hover:text-gold-deep focus-ring rounded">{x.title}</a><Pill tone={tone[x.status]}>{x.status}</Pill></p><p className="text-xs text-text-muted">{x.label} · {x.uploadedBy}, {fmtDateTime(x.createdAt)}{x.note ? ` · “${x.note}”` : ''}{x.reviewedBy ? ` · reviewed by ${x.reviewedBy}` : ''}{x.reviewNote ? ` — ${x.reviewNote}` : ''}</p></div>
                 {x.status === 'submitted' && <div className="flex gap-1.5"><button onClick={() => review(x, 'accepted')} className="btn-gold !min-h-8 !px-2.5 text-xs"><Check size={13} aria-hidden="true" /> Accept</button><button onClick={() => setRej(rej === x.id ? null : x.id)} className="btn-ghost !min-h-8 !px-2.5 text-xs"><XCircle size={13} aria-hidden="true" /> Reject</button></div>}
               </div>
               {rej === x.id && <form onSubmit={(e) => { e.preventDefault(); review(x, 'rejected') }} className="mt-2 flex gap-2"><input className="input-dark !min-h-9 flex-1 text-xs" placeholder="Tell them what to fix (sent to the owner)" value={note} onChange={(e) => setNote(e.target.value)} autoFocus /><button className="btn-ghost !min-h-9 text-xs" disabled={note.trim().length < 3}>Send</button></form>}

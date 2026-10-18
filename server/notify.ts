@@ -67,14 +67,14 @@ export function emailTemplate(o: { title: string; body: string; link?: string; c
   return `<!doctype html><html><body style="margin:0;background:#0b1620;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#e8eef3">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0b1620;padding:32px 16px"><tr><td align="center">
 <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;width:100%;background:#12202b;border:1px solid #21323f;border-radius:14px;overflow:hidden">
-<tr><td style="padding:22px 28px;border-bottom:1px solid #21323f"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E3B54A;margin-right:8px"></span><strong style="letter-spacing:.08em;font-size:13px;color:#E3B54A">SHIP SYNC</strong></td></tr>
+<tr><td style="padding:22px 28px;border-bottom:1px solid #21323f"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#F5B82E;margin-right:8px"></span><strong style="letter-spacing:.08em;font-size:13px;color:#F5B82E">NTEMTEM</strong></td></tr>
 <tr><td style="padding:28px">
 ${o.name ? `<p style="margin:0 0 10px;color:#9fb0bd;font-size:14px">Hi ${esc(o.name)},</p>` : ''}
 <h1 style="margin:0 0 12px;font-size:20px;line-height:1.3;color:#fff">${esc(o.title)}</h1>
 <p style="margin:0 0 22px;font-size:15px;line-height:1.55;color:#c9d4dc">${esc(o.body)}</p>
-${url ? `<a href="${esc(url)}" style="display:inline-block;background:#E3B54A;color:#0b1620;text-decoration:none;font-weight:600;padding:11px 18px;border-radius:9px;font-size:14px">${esc(o.cta || 'Open in Ship Sync')}</a>` : ''}
+${url ? `<a href="${esc(url)}" style="display:inline-block;background:#F5B82E;color:#0b1620;text-decoration:none;font-weight:600;padding:11px 18px;border-radius:9px;font-size:14px">${esc(o.cta || 'Open in Ntemtem')}</a>` : ''}
 </td></tr>
-<tr><td style="padding:16px 28px;border-top:1px solid #21323f;color:#6f8291;font-size:12px;line-height:1.5">You're receiving this because notifications are on for your Ship Sync account. Turn individual alerts off under Notifications → Preferences.</td></tr>
+<tr><td style="padding:16px 28px;border-top:1px solid #21323f;color:#6f8291;font-size:12px;line-height:1.5">You're receiving this because notifications are on for your Ntemtem account. Turn individual alerts off under Notifications → Preferences.</td></tr>
 </table></td></tr></table></body></html>`
 }
 
@@ -166,7 +166,7 @@ const MILESTONES: Partial<Record<ShipmentStatus, { title: (s: Row) => string; bo
   arrived: { title: (s) => `${s.ref} has arrived`, body: (s, note) => note || `Your shipment has reached the destination ${s.mode === 'air' ? 'airport' : 'port'} and is going through clearance.` },
   ready_for_collection: { title: (s) => `${s.ref} is ready for collection`, body: (s, note) => note || `Your shipment is at the warehouse${s.collection_code ? ` — collection code ${s.collection_code}` : ''}. Your recipient brings a photo ID and the code.` },
   out_for_delivery: { title: (s) => `${s.ref} is out for delivery`, body: (_s, note) => note || 'A driver has your shipment today. Make sure someone is available to receive it.' },
-  delivered: { title: (s) => `${s.ref} delivered`, body: (_s, note) => note || 'Your shipment has been handed over. Thank you for shipping with Ship Sync.' },
+  delivered: { title: (s) => `${s.ref} delivered`, body: (_s, note) => note || 'Your shipment has been handed over. Thank you for shipping with Ntemtem.' },
 }
 
 /** Tell the customer (and, for delivery, the office) that a shipment moved. Safe to call from every status-change path — dedupes per shipment+status. */

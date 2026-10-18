@@ -1,6 +1,6 @@
 /**
  * Carrier "track & trace" — pulls container numbers, seals, vessel/voyage and milestone events from the shipping line
- * for a booking, so a container in Ship Sync fills itself in and moves forward without anyone typing.
+ * for a booking, so a container in Ntemtem fills itself in and moves forward without anyone typing.
  *
  * Provider-neutral: every adapter returns the same CarrierSnapshot. Pick one with CARRIER_TRACKING_PROVIDER:
  *   off   — feature hidden.

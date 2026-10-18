@@ -448,10 +448,10 @@ export async function sendPreAlerts(db: Db, c: Row, force = false) {
   for (const l of rows) {
     const m = await manifestFor(db, c)
     const title = `Pre-alert: ${c.ref}${c.number ? ` (${c.number})` : ''} — ${m.totals.shipments} shipments${c.eta ? `, ETA ${fmtDay(DATE(c.eta)!)}` : ''}`
-    const body = `${sh[0]?.name ?? 'Your partner'} has shipped ${c.ref}${c.vessel_name ? ` on ${c.vessel_name}${c.voyage ? ` ${c.voyage}` : ''}` : ''} to ${c.destination_port || destPlace({ destination: c.destination })}. ${m.totals.pieces ? `${m.totals.pieces} pieces. ` : ''}The manifest with every recipient and their phone number is on the link below — use the same page to mark customs, unloading and handovers.`
+    const body = `${sh[0]?.name ?? 'Your shipper'} has shipped ${c.ref}${c.vessel_name ? ` on ${c.vessel_name}${c.voyage ? ` ${c.voyage}` : ''}` : ''} to ${c.destination_port || destPlace({ destination: c.destination })}. ${m.totals.pieces ? `${m.totals.pieces} pieces. ` : ''}The manifest with every recipient and their phone number is on the link below — use the same page to mark customs, unloading and handovers.`
     try { await sendEmail(l.email, title, emailTemplate({ title, body, link: partnerUrl(l.token), cta: 'Open the manifest', name: l.name })); await db.query('update partner_links set pre_alert_sent_at = now() where id = $1', [l.id]); sent++ } catch (e) { console.error('[flow] pre-alert', e) }
   }
-  if (sent) await db.query('insert into container_events (container_id,status,place,note,by_name,source,code) values ($1,$2,$3,$4,$5,\'manual\',\'\')', [c.id, c.status, '', `Pre-alert with the manifest sent to ${sent} destination partner${sent === 1 ? '' : 's'}.`, 'Ship Sync'])
+  if (sent) await db.query('insert into container_events (container_id,status,place,note,by_name,source,code) values ($1,$2,$3,$4,$5,\'manual\',\'\')', [c.id, c.status, '', `Pre-alert with the manifest sent to ${sent} destination agent${sent === 1 ? '' : 's'}.`, 'Ntemtem'])
   return sent
 }
 

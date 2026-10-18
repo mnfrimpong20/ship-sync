@@ -29,11 +29,11 @@ export function ShippingBackdrop({ className = '' }: { className?: string }) {
           <path d="M-20 240 C40 290 60 360 90 420 C120 480 80 560 120 620 C150 660 130 700 160 740" stroke="currentColor" strokeOpacity="0.14" strokeWidth="1.5" />
           <path d="M1340 250 C1300 320 1330 380 1300 440 C1270 500 1320 560 1290 620 C1270 660 1300 700 1280 740" stroke="currentColor" strokeOpacity="0.14" strokeWidth="1.5" />
           {/* the lane: great-circle from the US Gulf to Tema, plus a Europe → Lagos feeder */}
-          <path d="M110 172 C400 40 1040 40 1330 172" className="text-gold" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.6" strokeDasharray="7 7" />
-          <path d="M1010 20 C1090 80 1200 100 1330 172" className="text-gold" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.2" strokeDasharray="4 8" />
+          <path d="M110 172 C400 40 1040 40 1330 172" className="text-gold-deep" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.6" strokeDasharray="7 7" />
+          <path d="M1010 20 C1090 80 1200 100 1330 172" className="text-gold-deep" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.2" strokeDasharray="4 8" />
           {/* ports */}
           {[[110, 172], [1330, 172], [1010, 20]].map(([x, y], i) => (
-            <g key={i} className="text-gold">
+            <g key={i} className="text-gold-deep">
               <circle cx={x} cy={y} r="11" stroke="currentColor" strokeOpacity="0.3" />
               <circle cx={x} cy={y} r="3.5" fill="currentColor" fillOpacity="0.8" />
             </g>
@@ -41,7 +41,7 @@ export function ShippingBackdrop({ className = '' }: { className?: string }) {
           {/* port labels */}
           {[[110, 172, 'Houston · Newark'], [1330, 172, 'Tema · Apapa'], [1010, 20, 'Rotterdam']].map(([x, y, l], i) => <text key={i} className="hidden md:block" x={x} y={Number(y) + 30} textAnchor="middle" fontSize="10.5" letterSpacing="1.2" fontFamily="ui-sans-serif, system-ui" fill="currentColor" fillOpacity="0.45">{String(l).toUpperCase()}</text>)}
           {/* vessel on the lane */}
-          <g transform="translate(720 78)" className="text-gold">
+          <g transform="translate(720 78)" className="text-gold-deep">
             <path d="M-26 6 L26 6 L18 16 L-18 16 Z" fill="currentColor" fillOpacity="0.85" />
             <path d="M-14 -2h26v8h-26z M-8 -9h10v7h-10z M2 -5h8v3h-8z" fill="currentColor" fillOpacity="0.6" />
             <path d="M-46 22 q10 -6 20 0 t20 0 t20 0 t20 0 t20 0" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.2" />
@@ -54,7 +54,7 @@ export function ShippingBackdrop({ className = '' }: { className?: string }) {
             <path d="M0 -52V-38 M0 38V52 M-52 0H-38 M38 0H52" strokeOpacity="0.35" strokeWidth="1.5" />
             <path d="M0 -30 L6 0 L0 30 L-6 0 Z" fill="currentColor" fillOpacity="0.16" strokeOpacity="0.3" />
             <path d="M-30 0 L0 6 L30 0 L0 -6 Z" fill="currentColor" fillOpacity="0.1" strokeOpacity="0.25" />
-            <path d="M0 -30 L6 0 L0 0 Z" className="text-gold" fill="currentColor" fillOpacity="0.8" strokeOpacity="0" />
+            <path d="M0 -30 L6 0 L0 0 Z" className="text-gold-deep" fill="currentColor" fillOpacity="0.8" strokeOpacity="0" />
             <text y="-58" textAnchor="middle" fontSize="11" fontFamily="ui-sans-serif, system-ui" fill="currentColor" fillOpacity="0.55" stroke="none">N</text>
           </g>
           {/* swell lines, low and quiet */}

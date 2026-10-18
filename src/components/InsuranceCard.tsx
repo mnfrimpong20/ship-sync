@@ -35,7 +35,7 @@ export function InsuranceCard({ shipmentId, cargo }: { shipmentId: string; cargo
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface p-4" data-testid="insurance-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Shield size={14} className="text-gold" aria-hidden="true" /> Insurance</p>
+        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Shield size={14} className="text-gold-deep" aria-hidden="true" /> Insurance</p>
         {p && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone[p.status]}`}>{policyStatusLabels[p.status]}</span>}
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
@@ -74,7 +74,7 @@ export function InsuranceCard({ shipmentId, cargo }: { shipmentId: string; cargo
             <label className="text-xs text-text-muted">Declared value (USD)<input type="number" min={1} aria-label="Declared value (USD)" className="input-dark mt-1 !min-h-9 text-sm tabular-nums" placeholder="What the goods are worth" value={value} onChange={(e) => setValue(e.target.value)} /></label>
             <div className="rounded-lg border border-border bg-surface-2/40 px-3 py-2 text-sm" data-testid="premium-quote">{q ? <><span className="text-xs text-text-muted">Premium</span><br /><strong className="tabular-nums">{money(q.premiumUsd)}</strong>{q.capped ? <span className="block text-[11px] text-danger">Cover capped at {money(prod.maxValueUsd)}</span> : null}</> : <span className="text-xs text-text-muted">Enter a value</span>}</div>
           </div>
-          <label className="mt-2 flex items-start gap-2 text-xs"><input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--color-gold)]" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>I’ve declared the true value and accept the <button type="button" onClick={() => setTerms((t) => !t)} className="text-gold hover:underline">cover terms</button>. The premium is collected by the shipper with the freight charge.</span></label>
+          <label className="mt-2 flex items-start gap-2 text-xs"><input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--color-gold)]" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>I’ve declared the true value and accept the <button type="button" onClick={() => setTerms((t) => !t)} className="text-gold-deep hover:underline">cover terms</button>. The premium is collected by the shipper with the freight charge.</span></label>
           {terms && <p className="mt-2 rounded-lg border border-border bg-surface-2/40 p-3 text-[11px] leading-relaxed text-text-muted">{prod.terms}</p>}
           <div className="mt-3 flex justify-end"><button onClick={() => act(() => insuranceApi.buy(shipmentId, Number(value)), 'Cover added — your certificate is in the documents.', 'buy')} disabled={!q || !agree || busy === 'buy'} className="btn-gold !min-h-9 !px-4 text-sm disabled:opacity-60"><ShieldCheck size={14} aria-hidden="true" /> {busy === 'buy' ? 'Adding…' : `Add cover${q ? ` for ${money(q.premiumUsd)}` : ''}`}</button></div>
         </div>

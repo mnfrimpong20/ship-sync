@@ -31,7 +31,7 @@ export default function Duty() {
         </motion.div>
         <motion.div initial="hidden" animate="show" variants={stagger} className="mx-auto mt-8 grid max-w-4xl gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <motion.div variants={fadeUp} className="card-dark p-5">
-            <h2 className="flex items-center gap-2 !text-base"><Calculator size={16} className="text-gold" aria-hidden="true" /> Your shipment</h2>
+            <h2 className="flex items-center gap-2 !text-base"><Calculator size={16} className="text-gold-deep" aria-hidden="true" /> Your shipment</h2>
             <div className="mt-3"><DutyForm value={input} onChange={setInput} meta={meta} /></div>
             <p className="mt-3 text-[11px] text-text-muted">Value = what the goods are worth (for used items, a fair second-hand value). Customs assess on CIF: value + freight + insurance.</p>
           </motion.div>
@@ -42,9 +42,9 @@ export default function Duty() {
         </motion.div>
         <motion.div initial="hidden" animate="show" variants={stagger} className="mx-auto mt-8 max-w-4xl">
           <motion.div variants={fadeUp} className="rounded-xl border border-border bg-surface p-5 text-sm">
-            <h2 className="flex items-center gap-2 !text-base"><ShieldCheck size={16} className="text-gold" aria-hidden="true" /> How this relates to the official GRA calculator</h2>
-            <p className="mt-2 text-text-muted">The Ghana Revenue Authority publishes two ICUMS calculators — one for <a href="https://external.unipassghana.com/cl/tm/tax/selectGeneralTaxCalculate.do?decorator=popup&MENU_ID=IIM01S03V01" target="_blank" rel="noopener" className="text-gold hover:underline">general goods</a> and one for <a href="https://external.unipassghana.com/cl/tm/tax/selectUsedVehicleTaxCalculate.do?decorator=popup&MENU_ID=IIM01S03V02" target="_blank" rel="noopener" className="text-gold hover:underline">used vehicles</a>. They need an HS code, a CPC and the CIF in cedis, and for vehicles they use GRA’s own valuation rather than your invoice. This page applies the same assessment structure to plain-English inputs so you can plan; use the official calculator, or your shipper’s clearing agent, for the exact figure. Once your shipment is cleared, your shipper records the official assessment on the shipment and you’ll see it replace the estimate.</p>
-            <p className="mt-2 text-text-muted">Ready to ship? <Link to={`/quote?destination=${input.destination}`} className="text-gold hover:underline">Get quotes from verified shippers</Link>.</p>
+            <h2 className="flex items-center gap-2 !text-base"><ShieldCheck size={16} className="text-gold-deep" aria-hidden="true" /> How this relates to the official GRA calculator</h2>
+            <p className="mt-2 text-text-muted">The Ghana Revenue Authority publishes two ICUMS calculators — one for <a href="https://external.unipassghana.com/cl/tm/tax/selectGeneralTaxCalculate.do?decorator=popup&MENU_ID=IIM01S03V01" target="_blank" rel="noopener" className="text-gold-deep hover:underline">general goods</a> and one for <a href="https://external.unipassghana.com/cl/tm/tax/selectUsedVehicleTaxCalculate.do?decorator=popup&MENU_ID=IIM01S03V02" target="_blank" rel="noopener" className="text-gold-deep hover:underline">used vehicles</a>. They need an HS code, a CPC and the CIF in cedis, and for vehicles they use GRA’s own valuation rather than your invoice. This page applies the same assessment structure to plain-English inputs so you can plan; use the official calculator, or your shipper’s clearing agent, for the exact figure. Once your shipment is cleared, your shipper records the official assessment on the shipment and you’ll see it replace the estimate.</p>
+            <p className="mt-2 text-text-muted">Ready to ship? <Link to={`/quote?destination=${input.destination}`} className="text-gold-deep hover:underline">Get quotes from verified shippers</Link>.</p>
           </motion.div>
         </motion.div>
       </div>

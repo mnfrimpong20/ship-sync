@@ -13,7 +13,7 @@ const T = {
   ready: ['Goods are ready', '货物已备齐'], delay: ['Report a delay', '报告延期'], note: ['Leave a note', '留言'], photos: ['Production photos', '生产照片'], addPhoto: ['Add photo', '上传照片'],
   qty: ['Quantity', '数量'], unit: ['Unit price', '单价'], readyBy: ['Ready by', '交货日期'], incoterm: ['Terms', '贸易条款'], lead: ['Lead time', '交期'], yourName: ['Your name', '您的姓名'],
   pct: ['Percent complete', '完成百分比'], newDate: ['New ready date', '新交货日期'], message: ['Message (optional)', '留言（可选）'], send: ['Send', '发送'], history: ['Updates', '更新记录'],
-  agent: ['Your Ship Sync agent', '您的 Ship Sync 专员'], spec: ['Specification', '产品规格'], closed: ['This order is closed.', '此订单已关闭。'], thanks: ['Sent — your agent has been notified.', '已发送，专员已收到通知。'],
+  agent: ['Your Ntemtem agent', '您的 Ntemtem 专员'], spec: ['Specification', '产品规格'], closed: ['This order is closed.', '此订单已关闭。'], thanks: ['Sent — your agent has been notified.', '已发送，专员已收到通知。'],
 } as const
 const L = ({ k }: { k: keyof typeof T }) => <>{T[k][0]} <span className="text-text-muted">{T[k][1]}</span></>
 

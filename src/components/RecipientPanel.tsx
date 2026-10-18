@@ -26,7 +26,7 @@ export function RecipientPanel({ shipmentId, shipmentRef, status }: { shipmentId
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface p-4" data-testid="recipient-panel">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><UserCheck size={14} className="text-gold" aria-hidden="true" /> Receiver</p>
+        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><UserCheck size={14} className="text-gold-deep" aria-hidden="true" /> Receiver</p>
         {d.receipt && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${d.receipt.allGood ? 'bg-teal/15 text-teal' : 'bg-danger/15 text-danger'}`}>{d.receipt.allGood ? 'Confirmed received' : 'Problem reported'}</span>}
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}

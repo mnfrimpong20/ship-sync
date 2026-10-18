@@ -27,7 +27,7 @@ export default function InvoiceView() {
       <style>{`@media print { header, footer, .no-print { display: none !important } body { background: #fff } .sheet { box-shadow: none !important; margin: 0 !important; max-width: none !important } }`}</style>
       <div className="container-x py-8">
         <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
-          <Link to={`/dashboard/clients/${c.id}?tab=invoices`} className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-gold focus-ring rounded"><ArrowLeft size={14} aria-hidden="true" /> {c.name}</Link>
+          <Link to={`/dashboard/clients/${c.id}?tab=invoices`} className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-gold-deep focus-ring rounded"><ArrowLeft size={14} aria-hidden="true" /> {c.name}</Link>
           <button onClick={() => window.print()} className="btn-gold !min-h-10 !px-4 text-sm"><Printer size={15} aria-hidden="true" /> Print / save as PDF</button>
         </div>
         <article className="sheet mx-auto max-w-3xl rounded-lg bg-white p-8 text-[#1a1f2e] shadow-2xl md:p-12" aria-label={`Invoice ${inv.number}`}>
@@ -36,7 +36,7 @@ export default function InvoiceView() {
               <Logo light={false} />
               <p className="mt-3 text-lg font-bold">{shipper.name}</p>
               <p className="text-sm text-slate-600">{shipper.hq}</p>
-              <p className="text-xs text-slate-500">via Ship Sync — shipsync.africa</p>
+              <p className="text-xs text-slate-500">via Ntemtem — ntemtem.com</p>
             </div>
             <div className="text-right">
               <p className="font-heading text-3xl font-bold tracking-tight">INVOICE</p>

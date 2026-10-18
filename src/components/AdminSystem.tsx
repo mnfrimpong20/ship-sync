@@ -27,7 +27,7 @@ function SystemCard() {
   const Flag = ({ on, label, warn = false }: { on: boolean; label: string; warn?: boolean }) => <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>{label}</span><Pill tone={on ? 'green' : warn ? 'danger' : 'muted'}>{on ? 'on' : 'off'}</Pill></li>
   return (
     <div className="card-dark p-5" data-testid="admin-system-card">
-      <h3 className="flex items-center gap-2 font-semibold"><ServerCog size={16} className="text-gold" aria-hidden="true" /> Wiring</h3>
+      <h3 className="flex items-center gap-2 font-semibold"><ServerCog size={16} className="text-gold-deep" aria-hidden="true" /> Wiring</h3>
       {err && <p role="alert" className="mt-3 text-sm text-danger">{err}</p>}
       {info && (
         <>
@@ -61,7 +61,7 @@ function ExportsCard() {
   return (
     <div className="card-dark p-5" data-testid="admin-exports-card">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 font-semibold"><Database size={16} className="text-gold" aria-hidden="true" /> Database backups</h3>
+        <h3 className="flex items-center gap-2 font-semibold"><Database size={16} className="text-gold-deep" aria-hidden="true" /> Database backups</h3>
         <button onClick={run} disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60"><RefreshCw size={14} className={busy ? 'animate-spin' : ''} aria-hidden="true" /> {busy ? 'Exporting…' : 'Export now'}</button>
       </div>
       {data && <p className="mt-2 text-xs text-text-muted">{data.nightly ? `Runs every night at ${String(data.hourUtc).padStart(2, '0')}:00 UTC` : 'Nightly export is off'} · keeps the last {data.keep} · JSON of every table.</p>}
@@ -91,7 +91,7 @@ function ErrorsCard() {
   return (
     <div className="card-dark mt-5 p-5" data-testid="admin-errors-card">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 font-semibold"><AlertTriangle size={16} className={data && data.open > 0 ? 'text-danger' : 'text-gold'} aria-hidden="true" /> Error log {data && <span className="text-xs font-normal text-text-muted">{data.open} open · {data.last24h} in the last 24h</span>}</h3>
+        <h3 className="flex items-center gap-2 font-semibold"><AlertTriangle size={16} className={data && data.open > 0 ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" /> Error log {data && <span className="text-xs font-normal text-text-muted">{data.open} open · {data.last24h} in the last 24h</span>}</h3>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-2 text-xs text-text-muted"><input type="checkbox" className="h-4 w-4 accent-gold" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} /> Show resolved</label>
           {data && data.open > 0 && <button onClick={resolveAll} className="btn-ghost !min-h-8 !px-2.5 text-xs"><Check size={13} aria-hidden="true" /> Resolve all</button>}
@@ -127,7 +127,7 @@ function ContactInbox() {
   const open = msgs?.filter((m) => !m.handled) ?? []
   return (
     <div className="card-dark mt-5 p-5" data-testid="admin-contact-card">
-      <h3 className="flex items-center gap-2 font-semibold"><Inbox size={16} className="text-gold" aria-hidden="true" /> Contact form inbox {msgs && <span className="text-xs font-normal text-text-muted">{open.length} unanswered</span>}</h3>
+      <h3 className="flex items-center gap-2 font-semibold"><Inbox size={16} className="text-gold-deep" aria-hidden="true" /> Contact form inbox {msgs && <span className="text-xs font-normal text-text-muted">{open.length} unanswered</span>}</h3>
       {err && <p role="alert" className="mt-3 text-sm text-danger">{err}</p>}
       <ul className="mt-3 divide-y divide-border">
         {msgs?.slice(0, 50).map((m) => (
@@ -135,7 +135,7 @@ function ContactInbox() {
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2 font-semibold">{m.name} <Pill tone="muted">{m.topic}</Pill> <span className="text-xs font-normal text-text-muted">{fmtDateTime(m.createdAt)}</span></p>
-                <p className="text-xs text-text-muted"><a href={`mailto:${m.email}`} className="hover:text-gold">{m.email}</a>{m.phone ? ` · ${m.phone}` : ''}{m.company ? ` · ${m.company}` : ''}</p>
+                <p className="text-xs text-text-muted"><a href={`mailto:${m.email}`} className="hover:text-gold-deep">{m.email}</a>{m.phone ? ` · ${m.phone}` : ''}{m.company ? ` · ${m.company}` : ''}</p>
                 <p className="mt-1 whitespace-pre-wrap break-words">{m.message}</p>
               </div>
               {!m.handled && <button onClick={() => handled(m.id)} className="btn-ghost !min-h-8 !px-2.5 text-xs"><Check size={13} aria-hidden="true" /> Handled</button>}

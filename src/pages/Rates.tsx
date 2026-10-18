@@ -53,7 +53,7 @@ function Preview({ origins }: { origins: string[] }) {
   const q = res?.quote
   return (
     <div className="card-dark p-5" data-testid="rate-preview">
-      <h2 className="flex items-center gap-2 !text-base"><Calculator size={16} className="text-gold" aria-hidden="true" /> Try a quote</h2>
+      <h2 className="flex items-center gap-2 !text-base"><Calculator size={16} className="text-gold-deep" aria-hidden="true" /> Try a quote</h2>
       <p className="mt-1 text-xs text-text-muted">What a customer would get from your cards right now.</p>
       <div className="mt-3 grid gap-2">
         <input list="pv-origins" aria-label="Origin" className="input-dark !min-h-9 text-sm" value={f.origin} onChange={(e) => setF({ ...f, origin: e.target.value })} /><datalist id="pv-origins">{origins.map((o) => <option key={o} value={o} />)}</datalist>

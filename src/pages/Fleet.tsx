@@ -144,7 +144,7 @@ export default function Fleet() {
                       <Fragment key={v.id}>
                         <tr className={trow(isOpen, v.status === 'retired')}>
                           <td className="px-3 py-3"><Expander open={isOpen} onClick={() => { setOpen(isOpen ? null : v.id); if (editing === v.id) setEditing(null) }} label={`details for ${v.name}`} /></td>
-                          <td className="px-3 py-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-gold" aria-hidden="true"><Truck size={16} /></span><div><p className="font-semibold">{v.name}</p><p className="font-mono text-xs text-text-muted">{v.plate || 'No plate'}</p></div></div></td>
+                          <td className="px-3 py-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-gold-deep" aria-hidden="true"><Truck size={16} /></span><div><p className="font-semibold">{v.name}</p><p className="font-mono text-xs text-text-muted">{v.plate || 'No plate'}</p></div></div></td>
                           <td className="whitespace-nowrap px-3 py-3">{vehicleTypeLabels[v.type]}</td>
                           <td className="px-3 py-3"><p>{v.city || (v.base === 'origin' ? 'Origin side' : 'Destination side')}</p><p className="text-[11px] text-text-muted">{v.base === 'origin' ? 'US / Europe' : 'West Africa'}</p></td>
                           <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">{v.capacityKg ? `${v.capacityKg.toLocaleString()} kg` : <span className="text-text-muted">—</span>}{v.capacityNote && <p className="text-[11px] text-text-muted">{v.capacityNote}</p>}</td>

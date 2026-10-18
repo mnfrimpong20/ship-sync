@@ -34,12 +34,12 @@ export interface InsuranceProduct {
   /** Premium as a fraction of declared value, by cargo class. */
   rates: Record<CargoType, number>
   minPremiumUsd: number; maxValueUsd: number; deductiblePct: number
-  /** Ship Sync's share of the premium. */
+  /** Ntemtem's share of the premium. */
   commissionPct: number
   terms: string
 }
 export const DEFAULT_PRODUCT: InsuranceProduct = {
-  enabled: true, provider: 'Ship Sync Cover (underwriting partner to be announced)', coverage: 'All-risk, door to door',
+  enabled: true, provider: 'Ntemtem Cover (underwriting partner to be announced)', coverage: 'All-risk, door to door',
   rates: { barrels: 0.02, boxes: 0.02, pallets: 0.02, vehicle: 0.015, container20: 0.015, container40: 0.015, commercial: 0.025 },
   minPremiumUsd: 15, maxValueUsd: 25000, deductiblePct: 0.05, commissionPct: 0.25,
   terms: 'Covers loss or damage from the moment the goods are received by the shipper until handover to the consignee, including transit at sea or by air. Excludes inherent vice, improper packing, undeclared items, cash, documents and wear and tear. Claims must be reported within 14 days of delivery with photos. Settlement is limited to the declared value less the deductible.',
@@ -112,14 +112,14 @@ export function mountInsurance(r: Router, d: Deps) {
     if (await policyFor(db, s.id)) throw new HttpError(409, 'This shipment is already insured.')
     const b = zBuy.parse(req.body)
     const q = quotePremium(p, s.cargo as CargoType, b.declaredValueUsd)
-    const id = 'pol_' + uid(); const cert = `SSC-${new Date().getFullYear()}-${s.ref.replace(/^SS-/, '')}`
+    const id = 'pol_' + uid(); const cert = `NTC-${new Date().getFullYear()}-${s.ref.replace(/^(SS|NT)-/, '')}`
     await db.query(`insert into insurance_policies (id,shipment_id,shipper_id,user_id,certificate_no,provider,coverage,declared_value_usd,rate,premium_usd,commission_usd,deductible_usd,status,payment_status,starts_at,ends_at,bought_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'active','due',now(),$13,$14)`,
       [id, s.id, s.shipper_id, s.user_id ?? null, cert, p.provider, p.coverage, q.valueUsd, q.rate, q.premiumUsd, q.commissionUsd, q.deductibleUsd, new Date(Date.now() + 120 * 86400000), u.name])
     // Certificate into the documents vault.
     const ctx = await shipmentContext(db, s)
     const docId = 'doc_' + uid()
     const payload = { ...ctx, generatedAt: new Date().toISOString(), number: cert, policy: { certificateNo: cert, provider: p.provider, coverage: p.coverage, declaredValueUsd: q.valueUsd, rate: q.rate, premiumUsd: q.premiumUsd, deductibleUsd: q.deductibleUsd, terms: p.terms, startsAt: new Date().toISOString(), insured: s.customer, cargo: cargoLabel(s.cargo as CargoType) } }
-    await db.query(`insert into documents (id,shipment_id,shipper_id,kind,title,filename,mime,size,payload,source,visibility,uploaded_by,uploaded_by_role) values ($1,$2,$3,'insurance',$4,'','',0,$5,'generated','shared','Ship Sync','shipper')`, [docId, s.id, s.shipper_id, `Insurance certificate ${cert}`, JSON.stringify(payload)])
+    await db.query(`insert into documents (id,shipment_id,shipper_id,kind,title,filename,mime,size,payload,source,visibility,uploaded_by,uploaded_by_role) values ($1,$2,$3,'insurance',$4,'','',0,$5,'generated','shared','Ntemtem','shipper')`, [docId, s.id, s.shipper_id, `Insurance certificate ${cert}`, JSON.stringify(payload)])
     await db.query('update insurance_policies set document_id = $2 where id = $1', [id, docId])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, s.origin, `All-risk cover added: $${q.valueUsd.toLocaleString()} declared, premium $${q.premiumUsd} (${cert}).`])
     await notifyShipperStaff(db, s.shipper_id, { kind: 'insurance', title: `Cover added on ${s.ref} — collect $${q.premiumUsd}`, body: `${s.customer} insured $${q.valueUsd.toLocaleString()} of ${cargoLabel(s.cargo as CargoType).toLowerCase()}. Add the premium to the freight invoice and mark it collected.`, link: `/dashboard/shipments?q=${s.ref}&b=all`, dedupe: `ins:${id}` }, ['owner', 'dispatcher', 'agent'])

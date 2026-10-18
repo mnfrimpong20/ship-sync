@@ -17,7 +17,7 @@ function CopyLink({ token }: { token: string }) {
   const copy = async () => { try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { /* clipboard blocked */ } }
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-xs">
-      <Link2 size={13} className="text-gold" aria-hidden="true" />
+      <Link2 size={13} className="text-gold-deep" aria-hidden="true" />
       <span className="text-text-muted">Invite link:</span>
       <input readOnly aria-label="Invitation link" value={link} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-text outline-none" />
       <button type="button" onClick={copy} className="btn-ghost !min-h-8 !px-2.5 text-xs">{copied ? <><Check size={13} aria-hidden="true" /> Copied</> : <><Copy size={13} aria-hidden="true" /> Copy</>}</button>
@@ -110,7 +110,7 @@ export default function Team() {
           <AnimatePresence>
             {showRoles && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-6 card-dark p-5">
-                <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><ShieldCheck size={14} className="text-gold" aria-hidden="true" /> What each role can do</p>
+                <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><ShieldCheck size={14} className="text-gold-deep" aria-hidden="true" /> What each role can do</p>
                 <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{(Object.keys(roleLabels) as StaffRole[]).map((r) => <div key={r}><dt className="flex items-center gap-2 text-sm font-semibold"><Pill tone={roleTone[r]}>{roleLabels[r]}</Pill></dt><dd className="mt-1 text-sm text-text-muted">{roleBlurb[r]}</dd></div>)}</dl>
                 <p className="mt-3 text-xs text-text-muted">Permissions are enforced by the server, not just hidden in the menu. Deactivating someone signs them out immediately.</p>
               </motion.div>
@@ -138,7 +138,7 @@ export default function Team() {
           </AnimatePresence>
           {justInvited?.inviteToken && !inviting && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-6 card-dark border-gold/40 p-5">
-              <p className="flex items-center gap-2 font-semibold"><UserCheck size={16} className="text-gold" aria-hidden="true" /> Invitation ready for {justInvited.name}</p>
+              <p className="flex items-center gap-2 font-semibold"><UserCheck size={16} className="text-gold-deep" aria-hidden="true" /> Invitation ready for {justInvited.name}</p>
               <p className="mt-1 text-sm text-text-muted">Send them this link. It works once and expires when they join.</p>
               <CopyLink token={justInvited.inviteToken} />
             </motion.div>
@@ -168,7 +168,7 @@ export default function Team() {
                       <Fragment key={s.id}>
                         <tr className={trow(isOpen, s.status === 'inactive')}>
                           <td className="px-3 py-3"><Expander open={isOpen} onClick={() => setOpen(isOpen ? null : s.id)} label={`details for ${s.name}`} /></td>
-                          <td className="px-3 py-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 font-heading text-xs font-bold text-gold" aria-hidden="true">{initialsOf(s.name)}</span><div><p className="font-semibold">{s.name}{isMe && <span className="ml-1.5 text-xs font-normal text-text-muted">(you)</span>}</p><p className="text-[11px] text-text-muted">Joined {fmtDate(s.createdAt)}</p></div></div></td>
+                          <td className="px-3 py-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 font-heading text-xs font-bold text-gold-deep" aria-hidden="true">{initialsOf(s.name)}</span><div><p className="font-semibold">{s.name}{isMe && <span className="ml-1.5 text-xs font-normal text-text-muted">(you)</span>}</p><p className="text-[11px] text-text-muted">Joined {fmtDate(s.createdAt)}</p></div></div></td>
                           <td className="whitespace-nowrap px-3 py-3">{canEdit && s.status !== 'inactive' ? <><label className="sr-only" htmlFor={`role-${s.id}`}>Role for {s.name}</label><select id={`role-${s.id}`} className="input-dark !min-h-8 !w-auto !py-0 text-xs" value={s.role} onChange={(e) => patch(s, { role: e.target.value as StaffRole }, `${s.name} is now ${roleLabels[e.target.value as StaffRole].toLowerCase()}.`)}>{(Object.keys(roleLabels) as StaffRole[]).filter((r) => r !== 'owner' || isOwner).map((r) => <option key={r} value={r}>{roleLabels[r]}</option>)}</select></> : <Pill tone={roleTone[s.role]}>{roleLabels[s.role]}</Pill>}</td>
                           <td className="px-3 py-3 text-xs"><p className="inline-flex items-center gap-1"><Mail size={11} aria-hidden="true" /> <a href={`mailto:${s.email}`} className="hover:text-gold-deep">{s.email}</a></p>{s.phone && <p className="inline-flex items-center gap-1 text-text-muted"><Phone size={11} aria-hidden="true" /> <a href={`tel:${s.phone}`} className="hover:text-gold-deep">{s.phone}</a></p>}</td>
                           <td className="px-3 py-3"><p>{s.city || (s.base === 'origin' ? 'Origin side' : 'Destination side')}</p><p className="text-[11px] text-text-muted">{s.base === 'origin' ? 'US / Europe' : 'West Africa'}</p></td>

@@ -34,7 +34,7 @@ export function AdminPlatform() {
       {d && <>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Stat label="Value booked (GMV)" value={money(k.gmv.value)} kpi={k.gmv as Kpi} icon={DollarSign} />
-          <Stat label="Ship Sync revenue" value={money(k.fees.value)} kpi={k.fees as Kpi} icon={DollarSign} hint={`MRR ${money(k.mrr)}`} />
+          <Stat label="Ntemtem revenue" value={money(k.fees.value)} kpi={k.fees as Kpi} icon={DollarSign} hint={`MRR ${money(k.mrr)}`} />
           <Stat label="Requests" value={k.requests.value} kpi={k.requests as Kpi} icon={Inbox} hint={`${k.quotesPerRequest ?? '—'} quotes each · first in ${k.hoursToFirstQuote ?? '—'} h`} />
           <Stat label="Request → booking" value={pc(k.conversionPct.value)} kpi={k.conversionPct as Kpi} icon={Gauge} hint={`${k.bookings.value} bookings`} />
           <Stat label="New customers" value={k.newCustomers.value} kpi={k.newCustomers as Kpi} icon={Users} />
@@ -46,7 +46,7 @@ export function AdminPlatform() {
           <Panel title="Requests and bookings" sub={`Per ${d.period.bucket}`}><Trend data={d.series} bucket={d.period.bucket} label="Requests and bookings" series={[{ key: 'requests', label: 'Requests', color: C.context }, { key: 'bookings', label: 'Bookings', color: C.focus }]} /></Panel>
           <Panel title="Value booked" sub={`Per ${d.period.bucket}`}><Trend data={d.series} bucket={d.period.bucket} label="GMV" format={compact} series={[{ key: 'gmv', label: 'GMV', color: C.focus }]} /></Panel>
           <Panel title="Sign-ups" sub={`Per ${d.period.bucket}`}><Trend data={d.series} bucket={d.period.bucket} label="New customers and shippers" series={[{ key: 'customers', label: 'Customers', color: C.focus }, { key: 'shippers', label: 'Shippers', color: C.alt }]} /></Panel>
-          <Panel title="Where Ship Sync’s revenue comes from"><HBars label="Revenue by stream" rows={d.feesBreakdown.map((f: R) => ({ label: f.label, value: f.amount, display: money(f.amount) }))} /></Panel>
+          <Panel title="Where Ntemtem’s revenue comes from"><HBars label="Revenue by stream" rows={d.feesBreakdown.map((f: R) => ({ label: f.label, value: f.amount, display: money(f.amount) }))} /></Panel>
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
           <Panel title="Conversion by destination" testid="conv-dest"><DataTable rows={d.byDestination} csvName="conversion-by-destination.csv" initialSort="requests" cols={[{ key: 'label', label: 'Destination' }, { key: 'requests', label: 'Requests', align: 'right' }, { key: 'quotedPct', label: 'Got a quote', align: 'right', format: (v) => pc(v as number) }, { key: 'bookedPct', label: 'Booked', align: 'right', format: (v) => pc(v as number) }]} /></Panel>

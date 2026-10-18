@@ -16,7 +16,7 @@ function Section({ icon: I, title, hint, children, aside }: { icon: typeof Packa
   return (
     <fieldset className="grid gap-3 border-t border-border pt-4 first:border-t-0 first:pt-0">
       <legend className="sr-only">{title}</legend>
-      <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="inline-flex items-center gap-2 text-sm font-semibold"><I size={15} className="text-gold" aria-hidden="true" /> {title}</p>{hint && <p className="text-xs text-text-muted">{hint}</p>}</div>{aside}</div>
+      <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="inline-flex items-center gap-2 text-sm font-semibold"><I size={15} className="text-gold-deep" aria-hidden="true" /> {title}</p>{hint && <p className="text-xs text-text-muted">{hint}</p>}</div>{aside}</div>
       {children}
     </fieldset>
   )
@@ -102,7 +102,7 @@ export function BookingForm({ client, consignees, onDone, onCancel }: { client: 
     <form onSubmit={submit} className="card-dark mt-4 grid gap-5 p-5" aria-label="New shipment" data-testid="booking-form">
       <Section icon={Package} title="Route & cargo" hint="What’s going where. The ETA fills in from the lane’s typical transit.">
         <div className="grid gap-3 md:grid-cols-3">
-          <L label="Mode"><div className="flex gap-2">{(['ocean', 'air'] as Mode[]).map((m) => <button type="button" key={m} onClick={() => setMode(m)} aria-pressed={mode === m} className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize focus-ring ${mode === m ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted'}`}>{m}</button>)}</div></L>
+          <L label="Mode"><div className="flex gap-2">{(['ocean', 'air'] as Mode[]).map((m) => <button type="button" key={m} onClick={() => setMode(m)} aria-pressed={mode === m} className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize focus-ring ${mode === m ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted'}`}>{m}</button>)}</div></L>
           <div className="grid gap-1 text-xs"><label htmlFor="bk-origin" className="text-text-muted">Ships from</label><OriginCombobox id="bk-origin" value={origin} onChange={setOrigin} /></div>
           <L label="Destination"><select className="input-dark !min-h-10" value={destination} onChange={(e) => setDestination(e.target.value)} data-testid="bk-dest">{countries.map((k) => <option key={k.code} value={k.code}>{k.flag} {k.name}</option>)}</select></L>
           <L label="Cargo"><select className="input-dark !min-h-10" value={cargo} onChange={(e) => setCargo(e.target.value as CargoType)} data-testid="bk-cargo">{cargoTypes.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</select></L>
@@ -187,13 +187,13 @@ export function BookingForm({ client, consignees, onDone, onCancel }: { client: 
       <Section icon={Zap} title="Automation" hint="These keep the status moving without anyone clicking.">
         <div className="flex flex-wrap gap-4 text-sm">
           {!isVehicle && <label className="flex items-center gap-2"><input type="checkbox" className="accent-gold" checked={labels} onChange={(e) => setLabels(e.target.checked)} /> Create {qty} scannable label{qty === 1 ? '' : 's'}</label>}
-          <label className={`flex items-center gap-2 ${client.userId ? '' : 'opacity-50'}`} title={client.userId ? '' : 'This client has no Ship Sync account yet'}><input type="checkbox" className="accent-gold" disabled={!client.userId} checked={sendTracking && !!client.userId} onChange={(e) => setSendTracking(e.target.checked)} /> Send the tracking link</label>
+          <label className={`flex items-center gap-2 ${client.userId ? '' : 'opacity-50'}`} title={client.userId ? '' : 'This client has no Ntemtem account yet'}><input type="checkbox" className="accent-gold" disabled={!client.userId} checked={sendTracking && !!client.userId} onChange={(e) => setSendTracking(e.target.checked)} /> Send the tracking link</label>
         </div>
         <L label="Internal note on the timeline (optional)"><input className="input-dark !min-h-10" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Fragile — keep upright" /></L>
       </Section>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-        <p className="flex min-w-0 flex-1 items-start gap-1.5 text-xs text-text-muted" data-testid="bk-summary"><MapPin size={13} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" />{steps.length ? <>On booking: {steps.join(' · ')}.</> : 'Books the shipment only.'}</p>
+        <p className="flex min-w-0 flex-1 items-start gap-1.5 text-xs text-text-muted" data-testid="bk-summary"><MapPin size={13} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" />{steps.length ? <>On booking: {steps.join(' · ')}.</> : 'Books the shipment only.'}</p>
         {err && <p role="alert" className="w-full text-sm text-danger" data-testid="bk-error">{err}</p>}
         <div className="flex gap-2"><button type="button" onClick={onCancel} className="btn-ghost !min-h-10 !px-4 text-sm">Cancel</button><button disabled={busy} className="btn-gold !min-h-10 !px-5 text-sm disabled:opacity-60" data-testid="bk-submit"><Check size={15} aria-hidden="true" /> {busy ? 'Booking…' : 'Book shipment'}</button></div>
       </div>

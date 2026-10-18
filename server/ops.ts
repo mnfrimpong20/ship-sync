@@ -74,7 +74,7 @@ export async function geocode(db: Db, q: string): Promise<{ lat: number; lon: nu
   let hit: { lat: number; lon: number; label: string } | null = null
   try {
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000)
-    const res = await fetch(`${NOMINATIM}/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`, { signal: ctl.signal, headers: { accept: 'application/json', 'user-agent': 'ShipSync route planner (+https://github.com/mnfrimpong20/ship-sync)' } })
+    const res = await fetch(`${NOMINATIM}/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`, { signal: ctl.signal, headers: { accept: 'application/json', 'user-agent': 'Ntemtem route planner (+https://github.com/mnfrimpong20/ship-sync)' } })
     clearTimeout(t)
     if (res.ok) { const [r] = (await res.json()) as any[]; if (r) hit = { lat: Number(r.lat), lon: Number(r.lon), label: r.display_name } }
     await db.query('insert into geocache (q,lat,lon,label) values ($1,$2,$3,$4) on conflict (q) do nothing', [key, hit?.lat ?? null, hit?.lon ?? null, hit?.label ?? null])
@@ -170,7 +170,7 @@ export function mountOps(r: Router, d: Deps) {
       if (plan.team != null && Number(cnt[0]?.n ?? 0) >= plan.team) throw new HttpError(402, `Your ${plan.label} plan includes ${plan.team} team members. Upgrade under Plan & billing to add more.`)
     }
     const { rows: existing } = await db.query<Row>('select id, shipper_id from users where email = $1', [email])
-    if (existing[0] && existing[0].shipper_id && existing[0].shipper_id !== shipperId) throw new HttpError(409, 'That email already belongs to another company on Ship Sync.')
+    if (existing[0] && existing[0].shipper_id && existing[0].shipper_id !== shipperId) throw new HttpError(409, 'That email already belongs to another company on Ntemtem.')
     const token = randomBytes(18).toString('base64url')
     const id = 'st_' + uid()
     await db.query(`insert into staff (id,shipper_id,user_id,name,email,phone,role,status,base,city,invite_token) values ($1,$2,$3,$4,$5,$6,$7,'invited',$8,$9,$10)`, [id, shipperId, null, b.name, email, b.phone, b.role, b.base, b.city, token])

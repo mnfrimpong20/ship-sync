@@ -26,13 +26,13 @@ export default function Receive() {
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<null | boolean>(null)
   useEffect(() => { recipientApi.page(token).then((r) => { setD(r); setForm((f) => ({ ...f, name: f.name || r.receiver?.name || '' })) }).catch((e) => setError(e instanceof Error ? e.message : 'This link is not valid.')) }, [token])
-  useEffect(() => { if (d) QRCode.toDataURL(d.trackUrl, { errorCorrectionLevel: 'M', margin: 1, width: 320, color: { dark: '#0B1B33', light: '#FFFFFF' } }).then(setQr).catch(() => {}) }, [d])
+  useEffect(() => { if (d) QRCode.toDataURL(d.trackUrl, { errorCorrectionLevel: 'M', margin: 1, width: 320, color: { dark: '#14213D', light: '#FFFFFF' } }).then(setQr).catch(() => {}) }, [d])
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); if (!d) return
     setBusy(true); setError('')
     try { const r = await recipientApi.received(token, form); setDone(r.delivered); const fresh = await recipientApi.page(token); setD(fresh) } catch (err) { setError(err instanceof Error ? err.message : 'Could not send.') } finally { setBusy(false) }
   }
-  if (error && !d) return <div className="container-x py-24 text-center"><Logo /><p className="mt-6 text-danger">{error}</p><p className="mt-2 text-sm text-text-muted">Ask the sender for a fresh link, or <Link to="/track" className="text-gold hover:underline">track with the reference</Link>.</p></div>
+  if (error && !d) return <div className="container-x py-24 text-center"><Logo /><p className="mt-6 text-danger">{error}</p><p className="mt-2 text-sm text-text-muted">Ask the sender for a fresh link, or <Link to="/track" className="text-gold-deep hover:underline">track with the reference</Link>.</p></div>
   if (!d) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
   const s = d.shipment
   const delivered = s.status === 'delivered'
@@ -46,7 +46,7 @@ export default function Receive() {
 
         <motion.div variants={fadeUp} className="card-dark mt-6 p-5" data-testid="receiver-status">
           <div className="flex items-center justify-between gap-3">
-            <p className="inline-flex items-center gap-2 text-sm font-semibold">{s.mode === 'air' ? <Plane size={16} className="text-sky" aria-hidden="true" /> : <Ship size={16} className="text-teal" aria-hidden="true" />} {s.statusLabel}</p>
+            <p className="inline-flex items-center gap-2 text-sm font-semibold">{s.mode === 'air' ? <Plane size={16} className="text-sky" aria-hidden="true" /> : <Ship size={16} className="text-sea" aria-hidden="true" />} {s.statusLabel}</p>
             {s.eta && !delivered && <p className="text-xs text-text-muted">Expected {fmtDate(s.eta + 'T12:00:00Z')}</p>}
           </div>
           <ol className="mt-4 grid grid-cols-4 gap-1 text-center text-[11px]">
@@ -54,10 +54,10 @@ export default function Receive() {
           </ol>
           {collect && (
             <div className="mt-4 rounded-lg border border-gold/40 bg-gold/10 p-3 text-sm" data-testid="collect-box">
-              <p className="flex items-start gap-2"><MapPin size={16} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" /><span>{d.readyForCollection ? <><strong>Ready for collection</strong> from {d.shipper.name}{s.port ? ` (${s.port})` : ''}. Bring an ID and this reference: <strong className="font-mono">{s.ref}</strong>.</> : <>It has reached {s.port || s.destinationName} and is going through clearance. We’ll text you when it’s ready.</>}</span></p>
+              <p className="flex items-start gap-2"><MapPin size={16} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" /><span>{d.readyForCollection ? <><strong>Ready for collection</strong> from {d.shipper.name}{s.port ? ` (${s.port})` : ''}. Bring an ID and this reference: <strong className="font-mono">{s.ref}</strong>.</> : <>It has reached {s.port || s.destinationName} and is going through clearance. We’ll text you when it’s ready.</>}</span></p>
             </div>
           )}
-          {s.vesselName && !delivered && statusOrder.indexOf(s.status as never) < statusOrder.indexOf('arrived') && <p className="mt-3 text-xs text-text-muted">Sailing on {s.vesselName}. <a href={d.trackUrl} className="text-gold hover:underline">See it on the map</a>.</p>}
+          {s.vesselName && !delivered && statusOrder.indexOf(s.status as never) < statusOrder.indexOf('arrived') && <p className="mt-3 text-xs text-text-muted">Sailing on {s.vesselName}. <a href={d.trackUrl} className="text-gold-deep hover:underline">See it on the map</a>.</p>}
           {d.pieces.length > 1 && <p className="mt-3 inline-flex items-center gap-2 text-xs text-text-muted"><Package size={14} aria-hidden="true" /> {d.pieces.length} pieces · {d.pieces.filter((p) => p.status === 'delivered').length} delivered</p>}
         </motion.div>
 
@@ -82,14 +82,14 @@ export default function Receive() {
 
         <motion.div variants={fadeUp} className="card-dark mt-4 flex items-center gap-4 p-5">
           {qr ? <img src={qr} alt={`QR code for ${s.ref}`} className="h-24 w-24 shrink-0 rounded-lg bg-white p-1" /> : <div className="h-24 w-24 shrink-0 rounded-lg bg-surface-2" />}
-          <div className="min-w-0 text-sm"><p className="font-semibold">Show this at collection</p><p className="mt-0.5 text-xs text-text-muted">Reference <span className="font-mono text-text">{s.ref}</span>. Staff can scan the code to pull up the shipment.</p><a href={d.trackUrl} className="mt-1 inline-block text-xs text-gold hover:underline">Full tracking page →</a></div>
+          <div className="min-w-0 text-sm"><p className="font-semibold">Show this at collection</p><p className="mt-0.5 text-xs text-text-muted">Reference <span className="font-mono text-text">{s.ref}</span>. Staff can scan the code to pull up the shipment.</p><a href={d.trackUrl} className="mt-1 inline-block text-xs text-gold-deep hover:underline">Full tracking page →</a></div>
         </motion.div>
 
         <motion.details variants={fadeUp} className="card-dark mt-4 p-5">
           <summary className="cursor-pointer text-sm font-semibold">History</summary>
           <ol className="mt-3 space-y-2 text-xs">{[...d.events].reverse().map((e, i) => <li key={i}><span className="font-semibold">{e.label}</span>{e.place ? ` · ${e.place}` : ''}{e.at ? <span className="text-text-muted"> · {fmtDateTime(e.at)}</span> : ''}{e.note ? <span className="block text-text-muted">{e.note}</span> : null}</li>)}</ol>
         </motion.details>
-        <p className="mt-6 text-center text-[11px] text-text-muted">Sent by {d.shipper.name} via Ship Sync. Questions about the goods go to the sender.</p>
+        <p className="mt-6 text-center text-[11px] text-text-muted">Sent by {d.shipper.name} via Ntemtem. Questions about the goods go to the sender.</p>
       </motion.div>
     </div>
   )

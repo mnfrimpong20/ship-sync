@@ -1,7 +1,7 @@
 /**
- * White-label — a shipper's own branded page on Ship Sync: `/#/t/<slug>` with their logo, colour,
+ * White-label — a shipper's own branded page on Ntemtem: `/#/t/<slug>` with their logo, colour,
  * tagline and contact details, a tracking box and a quote form whose leads go only to them (and are
- * priced instantly from their rate cards). A custom domain can point at Ship Sync; requests arriving
+ * priced instantly from their rate cards). A custom domain can point at Ntemtem; requests arriving
  * on that host are sent to the branded page.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
@@ -19,7 +19,7 @@ interface Deps {
 const J = (v: unknown) => (v == null ? null : typeof v === 'string' ? JSON.parse(v) : v)
 
 export interface Brand { slug: string; enabled: boolean; logo: string; accent: string; headline: string; tagline: string; intro: string; phone: string; whatsapp: string; email: string; website: string; domain: string; showRates: boolean; poweredBy: boolean; origins: string[] }
-export const DEFAULT_BRAND: Omit<Brand, 'slug'> = { enabled: false, logo: '', accent: '#E3B54A', headline: '', tagline: '', intro: '', phone: '', whatsapp: '', email: '', website: '', domain: '', showRates: true, poweredBy: true, origins: [] }
+export const DEFAULT_BRAND: Omit<Brand, 'slug'> = { enabled: false, logo: '', accent: '#F5B82E', headline: '', tagline: '', intro: '', phone: '', whatsapp: '', email: '', website: '', domain: '', showRates: true, poweredBy: true, origins: [] }
 const slugify = (s: string) => s.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
 export const brandOf = (sh: Row): Brand => ({ ...DEFAULT_BRAND, slug: slugify(sh.name), ...(J(sh.brand) ?? {}) })
 

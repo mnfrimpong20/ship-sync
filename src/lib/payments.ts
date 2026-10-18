@@ -16,7 +16,7 @@ export interface PaymentSettings { enabled: boolean; takeRatePct: number; releas
 export interface Balance { heldUsd: number; availableUsd: number; pendingPayoutUsd: number; paidOutUsd: number; collectedUsd: number; feesUsd: number }
 
 export const paymentStatusLabels: Record<PaymentStatus, string> = { pending: 'Awaiting payment', held: 'In escrow', released: 'Released', paid_out: 'Paid out', refunded: 'Refunded', cancelled: 'Cancelled', direct: 'Paid directly' }
-export const methodLabels: Record<string, string> = { card: 'Card', bank: 'Bank transfer', cash: 'Cash', mobile_money: 'Mobile money', other: 'Other', link: 'Link', ship_sync: 'Ship Sync' }
+export const methodLabels: Record<string, string> = { card: 'Card', bank: 'Bank transfer', cash: 'Cash', mobile_money: 'Mobile money', other: 'Other', link: 'Link', ship_sync: 'Ntemtem' }
 export const usd = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 }).format(n)
 
 export const paymentsApi = {

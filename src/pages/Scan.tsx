@@ -152,7 +152,7 @@ export default function Scan() {
             {!manual ? <Viewfinder onCode={onCode} paused={paused || busy} /> : (
               <form onSubmit={(e) => { e.preventDefault(); if (typed.trim()) onCode(typed.trim()) }} className="rounded-2xl border border-border bg-surface p-4">
                 <label htmlFor="scan-code" className="label-dark">Label code</label>
-                <div className="flex gap-2"><input id="scan-code" autoFocus className="input-dark !min-h-11 font-mono uppercase" placeholder="SS-9KD4LM-P2" value={typed} onChange={(e) => setTyped(e.target.value)} /><button disabled={busy || !typed.trim()} className="btn-gold !min-h-11 !px-4 text-sm disabled:opacity-60">Go</button></div>
+                <div className="flex gap-2"><input id="scan-code" autoFocus className="input-dark !min-h-11 font-mono uppercase" placeholder="NT-9KD4LM-P2" value={typed} onChange={(e) => setTyped(e.target.value)} /><button disabled={busy || !typed.trim()} className="btn-gold !min-h-11 !px-4 text-sm disabled:opacity-60">Go</button></div>
                 <p className="mt-2 text-xs text-text-muted">The code is printed under the barcode. A USB or Bluetooth barcode scanner types it here too — just keep this box focused.</p>
               </form>
             )}

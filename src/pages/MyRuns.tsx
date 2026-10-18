@@ -37,7 +37,7 @@ export default function MyRuns() {
             <Link to={`/dashboard/scan?kind=delivery${active[0] ? `&run=${active[0].id}` : ''}`} className="btn-gold !min-h-11 !px-5 text-sm"><ScanLine size={16} aria-hidden="true" /> Scan a delivery</Link>
             <Link to="/dashboard/scan?kind=check" className="btn-ghost !min-h-11 !px-4 text-sm">Check a piece</Link>
           </motion.div>
-          {active.length > 0 && <motion.section variants={fadeUp} className="mt-8" aria-label="In progress"><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold">In progress</p><ul className="space-y-2">{active.map((r) => <li key={r.id}><RunRow r={r} to={`/dashboard/routes/${r.id}`} /></li>)}</ul></motion.section>}
+          {active.length > 0 && <motion.section variants={fadeUp} className="mt-8" aria-label="In progress"><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold-deep">In progress</p><ul className="space-y-2">{active.map((r) => <li key={r.id}><RunRow r={r} to={`/dashboard/routes/${r.id}`} /></li>)}</ul></motion.section>}
           <motion.section variants={fadeUp} className="mt-8" aria-label="Upcoming">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">Upcoming</p>
             {runs && upcoming.length === 0 && <Empty title="No runs assigned" body="Your dispatcher will assign pickups and deliveries to you here." action={<span className="text-text-muted"><MapPinned size={16} className="inline" aria-hidden="true" /></span>} />}

@@ -171,8 +171,8 @@ export function AdminAttention() {
     <div className="mt-8" data-testid="admin-attention">
       <div className="flex flex-wrap items-center gap-2">
         <Pill tone={d.counts.high ? 'danger' : 'muted'}>{d.counts.high} urgent</Pill><Pill tone={d.counts.medium ? 'gold' : 'muted'}>{d.counts.medium} soon</Pill><Pill tone="muted">{d.counts.low} minor</Pill>
-        <button onClick={() => setKind('')} aria-pressed={!kind} className={`ml-2 rounded-full border px-3 py-1 text-xs focus-ring ${!kind ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>All</button>
-        {kinds.map((k) => <button key={k} onClick={() => setKind(k === kind ? '' : k)} aria-pressed={kind === k} className={`rounded-full border px-3 py-1 text-xs focus-ring ${kind === k ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>{KIND_LABEL[k] ?? k} ({d.exceptions.filter((e) => e.kind === k).length})</button>)}
+        <button onClick={() => setKind('')} aria-pressed={!kind} className={`ml-2 rounded-full border px-3 py-1 text-xs focus-ring ${!kind ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>All</button>
+        {kinds.map((k) => <button key={k} onClick={() => setKind(k === kind ? '' : k)} aria-pressed={kind === k} className={`rounded-full border px-3 py-1 text-xs focus-ring ${kind === k ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{KIND_LABEL[k] ?? k} ({d.exceptions.filter((e) => e.kind === k).length})</button>)}
         <button onClick={load} disabled={busy} className="btn-ghost ml-auto !min-h-8 !px-2.5 text-xs"><RefreshCw size={13} className={busy ? 'animate-spin' : ''} aria-hidden="true" /> Refresh</button>
       </div>
       {list.length === 0 ? (

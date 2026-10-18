@@ -50,7 +50,7 @@ export function PickupCard({ shipmentId, shipmentRef, origin, status }: { shipme
   return (
     <div className="rounded-xl border border-border bg-surface p-4" data-testid="pickup-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Truck size={14} className="text-gold" aria-hidden="true" /> Pickup</p>
+        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Truck size={14} className="text-gold-deep" aria-hidden="true" /> Pickup</p>
         {p && <Pill tone={tone[p.status]}>{pickupStatusLabels[p.status]}</Pill>}
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
@@ -58,13 +58,13 @@ export function PickupCard({ shipmentId, shipmentRef, origin, status }: { shipme
 
       {p && mode === 'view' && (
         <div className="mt-3 text-sm">
-          <p className="flex items-start gap-2"><CalendarCheck size={16} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" /><span><strong>{fmtDay(p.date)}</strong>, {p.windowLabel}</span></p>
+          <p className="flex items-start gap-2"><CalendarCheck size={16} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" /><span><strong>{fmtDay(p.date)}</strong>, {p.windowLabel}</span></p>
           <p className="mt-1.5 flex items-start gap-2 text-text-muted"><MapPin size={16} className="mt-0.5 shrink-0" aria-hidden="true" /><span>{p.address}{p.city ? `, ${p.city}` : ''} · {p.contactName} · {p.contactPhone}</span></p>
           {p.notes && <p className="mt-1.5 text-xs text-text-muted">“{p.notes}”</p>}
           {p.status === 'requested' && <p className="mt-2 text-xs text-text-muted">{data.canManage ? 'Confirm it from the Pickups page to put it on a run.' : 'Waiting for the shipper to confirm. You’ll get a notification.'}</p>}
           {p.status === 'confirmed' && !data.canManage && <p className="mt-2 text-xs text-text-muted">Have everything packed and labelled. The driver will call the contact number on arrival.</p>}
           {p.status === 'done' && <p className="mt-2 text-xs text-text-muted">Collected — thank you.</p>}
-          {data.canManage && p.runId && <Link to={`/dashboard/routes/${p.runId}`} className="mt-2 inline-block text-xs text-gold hover:underline">Open the run</Link>}
+          {data.canManage && p.runId && <Link to={`/dashboard/routes/${p.runId}`} className="mt-2 inline-block text-xs text-gold-deep hover:underline">Open the run</Link>}
           {p.status !== 'done' && p.status !== 'cancelled' && (
             <div className="mt-3 flex flex-wrap gap-2">
               <button onClick={() => { setMode('move'); setSlot(null) }} className="btn-ghost !min-h-8 !px-3 text-xs"><CalendarClock size={13} aria-hidden="true" /> Change time</button>

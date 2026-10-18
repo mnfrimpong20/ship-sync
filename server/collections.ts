@@ -122,7 +122,7 @@ export function mountCollections(r: Router, d: Deps) {
       mode: 'payment', client_reference_id: id, customer_email: email || undefined,
       success_url: `${returnBase}?paid=${id}`, cancel_url: `${returnBase}?paid=cancel`,
       metadata: { payment_id: id, invoice_id: inv.id, invoice_number: inv.number },
-      payment_intent_data: { description: `Ship Sync invoice ${inv.number} — ${inv.shipper_name}`, metadata: { payment_id: id, invoice_number: inv.number } },
+      payment_intent_data: { description: `Ntemtem invoice ${inv.number} — ${inv.shipper_name}`, metadata: { payment_id: id, invoice_number: inv.number } },
       line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: Math.round(balance * 100), product_data: { name: `Invoice ${inv.number} — ${inv.shipper_name}${inv.shipment_ref ? ` (${inv.shipment_ref})` : ''}` } } }],
     })
     await db.query(`insert into escrow_payments (id,shipment_id,shipper_id,user_id,invoice_id,items,amount_usd,status,provider,provider_session_id) values ($1,$2,$3,$4,$5,$6,$7,'pending','stripe',$8)`, [id, inv.shipment_id ?? null, inv.shipper_id, userId, inv.id, JSON.stringify([{ description: `Invoice ${inv.number}`, amountUsd: balance, kind: 'freight' }]), balance, session.id])

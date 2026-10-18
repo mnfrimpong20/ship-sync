@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, ArrowRight, BadgeCheck, Check, ChevronLeft, ChevronRight, Clock, Compass, Crown, Filter, Plane, Search, Ship, ShieldCheck, Sparkles, Star, TrendingUp, X, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Compass, Crown, Filter, Plane, Search, Ship, ShieldCheck, Sparkles, Star, TrendingUp, X, Zap } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { cargoLabel, cargoTypes, countries, countryByCode, origins, type CargoType, type Shipper } from '../lib/data'
 import { directoryApi, isFeatured, priorityOptions, sortLabels, urgencyOptions, type DirectorySort, type Match, type Needs, type Recommendation, type SearchResult } from '../lib/directory'
-import { Avatar, Empty, ModeBadge, Rating } from '../components/ui'
+import { Avatar, Empty, ModeBadge, Rating, VerifiedBadge } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 
 const PAGE = 9
@@ -14,7 +14,7 @@ const priceLabel = (i: number) => (i === 1 ? '$' : i === 2 ? '$$' : '$$$')
 /* ---------- card ---------- */
 function PlanBadge({ s }: { s: Shipper }) {
   if (s.plan === 'enterprise') return <span className="inline-flex items-center gap-1 rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent"><Crown size={11} aria-hidden="true" /> Featured</span>
-  if (s.plan === 'pro') return <span className="inline-flex items-center gap-1 rounded-full border border-gold/50 px-2 py-0.5 text-[11px] font-semibold text-gold">Pro</span>
+  if (s.plan === 'pro') return <span className="inline-flex items-center gap-1 rounded-full border border-gold/50 px-2 py-0.5 text-[11px] font-semibold text-gold-deep">Pro</span>
   return null
 }
 
@@ -25,8 +25,8 @@ export function DirectoryCard({ s, quote }: { s: Shipper; quote?: string }) {
       <div className="flex items-start gap-3.5">
         <Avatar initials={s.initials} hue={s.hue} size={52} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2"><PlanBadge s={s} />{s.verified && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal"><BadgeCheck size={13} aria-hidden="true" /> Verified</span>}</div>
-          <h3 className="mt-1 truncate !text-[17px] leading-tight"><Link to={`/shippers/${s.id}`} className="focus-ring hover:text-gold">{s.name}</Link></h3>
+          <div className="flex items-center gap-2"><PlanBadge s={s} />{s.verified && <VerifiedBadge />}</div>
+          <h3 className="mt-1 truncate !text-[17px] leading-tight"><Link to={`/shippers/${s.id}`} className="focus-ring hover:text-gold-deep">{s.name}</Link></h3>
           <p className="line-clamp-2 min-h-10 text-sm leading-5 text-text-muted">{s.tagline}</p>
         </div>
       </div>
@@ -106,8 +106,8 @@ function Wizard({ initial, onClose, onApply }: { initial: Partial<Needs>; onClos
   const quoteLink = (s: Shipper) => `/quote?shipper=${s.id}&destination=${n.destination}${n.origin ? `&origin=${encodeURIComponent(n.origin)}` : ''}&mode=${n.mode}${n.cargo ? `&cargo=${n.cargo}` : ''}`
   const Tile = ({ active, onClick, title, body, icon }: { active: boolean; onClick: () => void; title: string; body?: string; icon?: React.ReactNode }) => (
     <button type="button" role="radio" aria-checked={active} onClick={onClick} className={`flex min-h-16 items-start gap-3 rounded-xl border p-3.5 text-left transition-colors focus-ring ${active ? 'border-gold bg-gold/10' : 'border-border hover:border-gold/40'}`}>
-      {icon && <span className={`mt-0.5 ${active ? 'text-gold' : 'text-text-muted'}`}>{icon}</span>}
-      <span><span className={`block text-sm font-semibold ${active ? 'text-gold' : ''}`}>{title}</span>{body && <span className="block text-xs text-text-muted">{body}</span>}</span>
+      {icon && <span className={`mt-0.5 ${active ? 'text-gold-deep' : 'text-text-muted'}`}>{icon}</span>}
+      <span><span className={`block text-sm font-semibold ${active ? 'text-gold-deep' : ''}`}>{title}</span>{body && <span className="block text-xs text-text-muted">{body}</span>}</span>
     </button>
   )
   return (
@@ -162,11 +162,11 @@ function Wizard({ initial, onClose, onApply }: { initial: Partial<Needs>; onClos
                   <div className="flex items-start gap-4">
                     <FitRing fit={m.fit} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">{i === 0 && <span className="rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent">Best match</span>}<PlanBadge s={m.shipper} /><h3 className="!text-base"><Link to={`/shippers/${m.shipper.id}`} className="hover:text-gold focus-ring">{m.shipper.name}</Link></h3>{m.shipper.verified && <BadgeCheck size={15} className="text-teal" aria-label="Verified" />}</div>
-                      <p className="text-xs text-text-muted">{m.shipper.tagline} · <Star size={11} className="inline text-gold" aria-hidden="true" /> {m.shipper.rating} ({m.shipper.reviews}) · replies ~{m.shipper.responseHours}h · {priceLabel(m.shipper.priceIndex)}</p>
+                      <div className="flex flex-wrap items-center gap-2">{i === 0 && <span className="rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent">Best match</span>}<PlanBadge s={m.shipper} /><h3 className="!text-base"><Link to={`/shippers/${m.shipper.id}`} className="hover:text-gold-deep focus-ring">{m.shipper.name}</Link></h3>{m.shipper.verified && <VerifiedBadge />}</div>
+                      <p className="text-xs text-text-muted">{m.shipper.tagline} · <Star size={11} className="inline text-gold-deep" aria-hidden="true" /> {m.shipper.rating} ({m.shipper.reviews}) · replies ~{m.shipper.responseHours}h · {priceLabel(m.shipper.priceIndex)}</p>
                       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                         {m.reasons.map((r) => <li key={r} className="inline-flex items-center gap-1 text-teal"><Check size={12} aria-hidden="true" /> {r}</li>)}
-                        {m.cautions.map((r) => <li key={r} className="inline-flex items-center gap-1 text-gold"><Clock size={12} aria-hidden="true" /> {r}</li>)}
+                        {m.cautions.map((r) => <li key={r} className="inline-flex items-center gap-1 text-gold-deep"><Clock size={12} aria-hidden="true" /> {r}</li>)}
                       </ul>
                     </div>
                     <Link to={quoteLink(m.shipper)} className="btn-gold hidden !min-h-10 !px-4 text-sm sm:inline-flex">Get quote</Link>
@@ -221,14 +221,14 @@ export default function Directory() {
     <div className="grid gap-5">
       <fieldset><legend className="label-dark">Destination</legend>
         <div className="grid gap-1">
-          <button onClick={() => set({ destination: undefined })} aria-pressed={!dest} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${!dest ? 'bg-gold/15 font-semibold text-gold' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>All countries</span><span className="text-xs opacity-70">{res?.total != null && !dest && !q && active === 0 ? res.total : ''}</span></button>
-          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code })} aria-pressed={dest === c.code} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${dest === c.code ? 'bg-gold/15 font-semibold text-gold' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>{c.name}</span><span className="text-xs opacity-70">{facetCount(c.code) ?? ''}</span></button>)}
+          <button onClick={() => set({ destination: undefined })} aria-pressed={!dest} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${!dest ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>All countries</span><span className="text-xs opacity-70">{res?.total != null && !dest && !q && active === 0 ? res.total : ''}</span></button>
+          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code })} aria-pressed={dest === c.code} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${dest === c.code ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>{c.name}</span><span className="text-xs opacity-70">{facetCount(c.code) ?? ''}</span></button>)}
         </div>
       </fieldset>
       <div><label htmlFor="f-origin" className="label-dark">Shipping from</label><select id="f-origin" className="input-dark !min-h-10 text-sm" value={origin} onChange={(e) => set({ origin: e.target.value })}><option value="">Anywhere</option>{origins.map((o) => <option key={o}>{o}</option>)}</select></div>
-      <fieldset><legend className="label-dark">Mode</legend><div className="grid grid-cols-3 gap-1.5" role="radiogroup">{(['either', 'ocean', 'air'] as const).map((m) => <button key={m} role="radio" aria-checked={mode === m} onClick={() => set({ mode: m === 'either' ? undefined : m })} className={`min-h-9 rounded-lg border text-xs font-medium focus-ring ${mode === m ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>{m === 'either' ? 'Both' : m === 'ocean' ? 'Ocean' : 'Air'}</button>)}</div></fieldset>
+      <fieldset><legend className="label-dark">Mode</legend><div className="grid grid-cols-3 gap-1.5" role="radiogroup">{(['either', 'ocean', 'air'] as const).map((m) => <button key={m} role="radio" aria-checked={mode === m} onClick={() => set({ mode: m === 'either' ? undefined : m })} className={`min-h-9 rounded-lg border text-xs font-medium focus-ring ${mode === m ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{m === 'either' ? 'Both' : m === 'ocean' ? 'Ocean' : 'Air'}</button>)}</div></fieldset>
       <div><label htmlFor="f-cargo" className="label-dark">Cargo type</label><select id="f-cargo" className="input-dark !min-h-10 text-sm" value={cargo} onChange={(e) => set({ cargo: e.target.value })}><option value="">Any cargo</option>{cargoTypes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
-      <fieldset><legend className="label-dark">Price level</legend><div className="grid grid-cols-4 gap-1.5" role="radiogroup">{(['', '1', '2', '3'] as const).map((p) => <button key={p || 'any'} role="radio" aria-checked={price === p} onClick={() => set({ price: p || undefined })} className={`min-h-9 rounded-lg border text-xs font-medium focus-ring ${price === p ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>{p ? priceLabel(Number(p)) : 'Any'}</button>)}</div></fieldset>
+      <fieldset><legend className="label-dark">Price level</legend><div className="grid grid-cols-4 gap-1.5" role="radiogroup">{(['', '1', '2', '3'] as const).map((p) => <button key={p || 'any'} role="radio" aria-checked={price === p} onClick={() => set({ price: p || undefined })} className={`min-h-9 rounded-lg border text-xs font-medium focus-ring ${price === p ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{p ? priceLabel(Number(p)) : 'Any'}</button>)}</div></fieldset>
       <label className="flex min-h-10 cursor-pointer items-center gap-3 text-sm"><input type="checkbox" className="h-5 w-5 accent-gold" checked={verified} onChange={(e) => set({ verified: e.target.checked ? '1' : undefined })} /> Verified shippers only</label>
       {(active > 0 || q) && <button onClick={clear} className="btn-ghost !min-h-9 text-sm"><X size={15} aria-hidden="true" /> Clear all</button>}
     </div>
@@ -241,8 +241,8 @@ export default function Directory() {
         <div className="container-fluid py-12 md:py-16">
           <motion.div initial="hidden" animate="show" variants={stagger} className="max-w-3xl">
             <motion.p variants={fadeUp} className="eyebrow mb-2">Shipper directory</motion.p>
-            <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4.2vw,3.25rem)]">{res ? `${res.total}` : '…'} vetted shippers. <span className="text-gold">One right for your lane.</span></motion.h1>
-            <motion.p variants={fadeUp} className="mt-3 max-w-2xl text-text-muted md:text-lg">Every company has a public profile, real customer ratings and a response-time record. Verified shippers have had their licence and insurance checked by Ship Sync.</motion.p>
+            <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4.2vw,3.25rem)]">{res ? `${res.total}` : '…'} vetted shippers. <span className="text-gold-deep">One right for your lane.</span></motion.h1>
+            <motion.p variants={fadeUp} className="mt-3 max-w-2xl text-text-muted md:text-lg">Every company has a public profile, real customer ratings and a response-time record. Verified shippers have had their licence and insurance checked by Ntemtem.</motion.p>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="mt-8 grid gap-3 lg:grid-cols-[1fr_auto]">
             <div className="relative">
@@ -254,9 +254,9 @@ export default function Directory() {
           </motion.div>
           <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
             <span className="text-text-muted">Popular:</span>
-            {countries.slice(0, 5).map((c) => <button key={c.code} onClick={() => set({ destination: dest === c.code ? undefined : c.code })} aria-pressed={dest === c.code} className={`rounded-full border px-3 py-1 text-xs focus-ring ${dest === c.code ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>{c.name}</button>)}
-            <button onClick={() => set({ cargo: cargo === 'vehicle' ? undefined : 'vehicle' })} aria-pressed={cargo === 'vehicle'} className={`rounded-full border px-3 py-1 text-xs focus-ring ${cargo === 'vehicle' ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>Vehicles</button>
-            <button onClick={() => set({ mode: mode === 'air' ? undefined : 'air' })} aria-pressed={mode === 'air'} className={`rounded-full border px-3 py-1 text-xs focus-ring ${mode === 'air' ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>Air freight</button>
+            {countries.slice(0, 5).map((c) => <button key={c.code} onClick={() => set({ destination: dest === c.code ? undefined : c.code })} aria-pressed={dest === c.code} className={`rounded-full border px-3 py-1 text-xs focus-ring ${dest === c.code ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{c.name}</button>)}
+            <button onClick={() => set({ cargo: cargo === 'vehicle' ? undefined : 'vehicle' })} aria-pressed={cargo === 'vehicle'} className={`rounded-full border px-3 py-1 text-xs focus-ring ${cargo === 'vehicle' ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>Vehicles</button>
+            <button onClick={() => set({ mode: mode === 'air' ? undefined : 'air' })} aria-pressed={mode === 'air'} className={`rounded-full border px-3 py-1 text-xs focus-ring ${mode === 'air' ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>Air freight</button>
           </div>
         </div>
       </section>
@@ -267,8 +267,8 @@ export default function Directory() {
         <section className="border-b border-border bg-surface/40" aria-label="Featured shippers">
           <div className="container-fluid py-8">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gold"><Crown size={14} aria-hidden="true" /> Featured shippers{dest ? ` · ${countryByCode(dest)?.name}` : ''}</p><p className="mt-1 text-sm text-text-muted">Enterprise partners with priority placement. Sponsored.</p></div>
-              <Link to="/pricing" className="text-sm text-text-muted underline-offset-4 hover:text-gold hover:underline focus-ring">Get your company featured →</Link>
+              <div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gold-deep"><Crown size={14} aria-hidden="true" /> Featured shippers{dest ? ` · ${countryByCode(dest)?.name}` : ''}</p><p className="mt-1 text-sm text-text-muted">Enterprise partners with priority placement. Sponsored.</p></div>
+              <Link to="/pricing" className="text-sm text-text-muted underline-offset-4 hover:text-gold-deep hover:underline focus-ring">Get your company featured →</Link>
             </div>
             <FeaturedCarousel items={featured} />
           </div>
@@ -298,13 +298,13 @@ export default function Directory() {
             </div>
             {(active > 0 || q) && (
               <div className="mb-4 flex flex-wrap gap-2 text-xs">
-                {q && <button onClick={() => { setTyped(''); set({ q: undefined }) }} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">“{q}” <X size={12} /></button>}
-                {dest && <button onClick={() => set({ destination: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">{countryByCode(dest)?.name} <X size={12} /></button>}
-                {origin && <button onClick={() => set({ origin: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">From {origin} <X size={12} /></button>}
-                {mode !== 'either' && <button onClick={() => set({ mode: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">{mode === 'air' ? 'Air' : 'Ocean'} <X size={12} /></button>}
-                {cargo && <button onClick={() => set({ cargo: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">{cargoLabel(cargo as CargoType)} <X size={12} /></button>}
-                {price && <button onClick={() => set({ price: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">{priceLabel(Number(price))} <X size={12} /></button>}
-                {verified && <button onClick={() => set({ verified: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold focus-ring">Verified <X size={12} /></button>}
+                {q && <button onClick={() => { setTyped(''); set({ q: undefined }) }} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">“{q}” <X size={12} /></button>}
+                {dest && <button onClick={() => set({ destination: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">{countryByCode(dest)?.name} <X size={12} /></button>}
+                {origin && <button onClick={() => set({ origin: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">From {origin} <X size={12} /></button>}
+                {mode !== 'either' && <button onClick={() => set({ mode: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">{mode === 'air' ? 'Air' : 'Ocean'} <X size={12} /></button>}
+                {cargo && <button onClick={() => set({ cargo: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">{cargoLabel(cargo as CargoType)} <X size={12} /></button>}
+                {price && <button onClick={() => set({ price: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">{priceLabel(Number(price))} <X size={12} /></button>}
+                {verified && <button onClick={() => set({ verified: undefined })} className="inline-flex items-center gap-1 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-gold-deep focus-ring">Verified <X size={12} /></button>}
               </div>
             )}
             {error && <p role="alert" className="mb-4 text-sm text-danger">{error}</p>}
@@ -320,7 +320,7 @@ export default function Directory() {
             {res && res.pages > 1 && (
               <nav className="mt-8 flex items-center justify-center gap-1.5" aria-label="Pagination">
                 <button onClick={() => set({ page: String(res.page - 1) }, false)} disabled={res.page <= 1} className="grid h-10 w-10 place-items-center rounded-lg border border-border text-text-muted hover:text-text disabled:opacity-40 focus-ring" aria-label="Previous page"><ChevronLeft size={16} /></button>
-                {pageNums.map((n, i) => <span key={n} className="contents">{i > 0 && pageNums[i - 1] !== n - 1 && <span className="px-1 text-text-muted">…</span>}<button onClick={() => set({ page: String(n) }, false)} aria-current={n === res.page ? 'page' : undefined} className={`h-10 min-w-10 rounded-lg border px-3 text-sm focus-ring ${n === res.page ? 'border-gold bg-gold/15 font-semibold text-gold' : 'border-border text-text-muted hover:text-text'}`}>{n}</button></span>)}
+                {pageNums.map((n, i) => <span key={n} className="contents">{i > 0 && pageNums[i - 1] !== n - 1 && <span className="px-1 text-text-muted">…</span>}<button onClick={() => set({ page: String(n) }, false)} aria-current={n === res.page ? 'page' : undefined} className={`h-10 min-w-10 rounded-lg border px-3 text-sm focus-ring ${n === res.page ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{n}</button></span>)}
                 <button onClick={() => set({ page: String(res.page + 1) }, false)} disabled={res.page >= res.pages} className="grid h-10 w-10 place-items-center rounded-lg border border-border text-text-muted hover:text-text disabled:opacity-40 focus-ring" aria-label="Next page"><ChevronRight size={16} /></button>
               </nav>
             )}
@@ -342,7 +342,7 @@ function RecentlyViewed() {
   if (list.length === 0) return null
   return (
     <section className="border-b border-border" aria-label="Recently viewed" data-testid="recently-viewed">
-      <div className="container-fluid flex flex-wrap items-center gap-2 py-3 text-sm"><span className="mr-1 text-xs font-semibold uppercase tracking-wider text-text-muted">Recently viewed</span>{list.map((s) => <Link key={s.id} to={`/shippers/${s.id}`} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs hover:border-gold hover:text-gold"><Avatar initials={s.initials} hue={s.hue} size={18} />{s.name}</Link>)}</div>
+      <div className="container-fluid flex flex-wrap items-center gap-2 py-3 text-sm"><span className="mr-1 text-xs font-semibold uppercase tracking-wider text-text-muted">Recently viewed</span>{list.map((s) => <Link key={s.id} to={`/shippers/${s.id}`} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs hover:border-gold hover:text-gold-deep"><Avatar initials={s.initials} hue={s.hue} size={18} />{s.name}</Link>)}</div>
     </section>
   )
 }

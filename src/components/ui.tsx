@@ -1,26 +1,58 @@
 import { motion } from 'motion/react'
 import { Link } from 'react-router-dom'
-import { BadgeCheck, Plane, Ship, Star } from 'lucide-react'
+import { BadgeCheck, Plane, Ship, ShieldCheck, Star } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { fadeUp, stagger, viewport } from '../lib/motion'
 import { countryByCode, type Mode, type Shipper } from '../lib/data'
 
 /** Tagline under the wordmark. One place to change it. */
-export const TAGLINE = 'Air · Ocean · Door delivery'
+export const TAGLINE = 'Home, quickly'
 
-export function Logo({ light = true, className = '', tagline = true }: { light?: boolean; className?: string; tagline?: boolean }) {
+/** The Ntemtem mark: two rounded chevrons (green trailing, navy leading) sending a box forward, on a gold tile.
+ *  `partner` draws the shipper-side version on a charcoal tile. Colours are fixed brand values, not theme tokens. */
+export function Mark({ size = 34, partner = false }: { size?: number; partner?: boolean }) {
+  const tile = partner ? '#24211C' : '#F2A900', trail = partner ? '#37B07A' : '#0E7A4E', lead = partner ? '#F2A900' : '#14213D'
   return (
-    <Link to="/" className={`inline-flex items-center gap-2.5 focus-ring rounded-md ${className}`} aria-label="Ship Sync home">
-      <svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true">
-        <rect width="32" height="32" rx="8" fill={light ? 'var(--color-gold)' : 'var(--color-ink)'} />
-        <path d="M7 20h18l-2 4H9z" fill={light ? 'var(--color-on-accent)' : 'var(--color-gold)'} />
-        <path d="M11 18V9h4l6 6v3" fill="none" stroke={light ? 'var(--color-on-accent)' : 'var(--color-gold)'} strokeWidth="2.2" strokeLinejoin="round" />
-      </svg>
+    <svg width={size} height={size} viewBox="0 0 96 96" aria-hidden="true">
+      <rect width="96" height="96" rx="22" fill={tile} />
+      <path d="M17,28 L35,48 L17,68" fill="none" stroke={trail} strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M39,28 L57,48 L39,68" fill="none" stroke={lead} strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="64" y="38" width="20" height="20" rx="5" fill={lead} />
+    </svg>
+  )
+}
+
+export function Logo({ light = true, className = '', tagline = true, partner = false }: { light?: boolean; className?: string; tagline?: boolean; partner?: boolean }) {
+  return (
+    <Link to="/" className={`inline-flex items-center gap-2.5 focus-ring rounded-md ${className}`} aria-label={partner ? 'Ntemtem Partner home' : 'Ntemtem home'}>
+      <Mark size={34} partner={partner} />
       <span className="flex flex-col leading-none">
-        <span className={`font-heading text-[1.35rem] font-bold tracking-tight ${light ? 'text-text' : 'text-ink'}`}>Ship<span className={light ? 'text-gold' : 'text-gold-deep'}>Sync</span></span>
-        {tagline && <span className={`mt-1 whitespace-nowrap text-[9.5px] font-semibold uppercase tracking-[0.16em] ${light ? 'text-text-muted' : 'text-ink/70'}`}>{TAGLINE}</span>}
+        <span className={`font-heading text-[1.45rem] font-extrabold tracking-[-0.02em] ${light ? 'text-text' : 'text-ink'}`}>ntemtem</span>
+        {partner
+          ? <span className="mt-1 whitespace-nowrap text-[9.5px] font-bold uppercase tracking-[0.16em] text-gold-deep">Partner</span>
+          : tagline && <span className={`mt-1 whitespace-nowrap text-[9.5px] font-semibold uppercase tracking-[0.16em] ${light ? 'text-text-muted' : 'text-ink/70'}`}>{TAGLINE}</span>}
       </span>
     </Link>
+  )
+}
+
+/** "Ntemtem Verified" — only for shippers who passed vetting. Green: verified is good news. */
+export function VerifiedBadge({ large = false }: { large?: boolean }) {
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-teal/30 bg-teal/10 font-semibold text-teal ${large ? 'px-2.5 py-1 text-xs' : 'px-2 py-0.5 text-[11px]'}`} title="Passed Ntemtem vetting: business registration, insurance, warehouse and track record">
+      <BadgeCheck size={large ? 14 : 12} aria-hidden="true" /> Ntemtem Verified
+    </span>
+  )
+}
+
+/** The payment-protection line — same words at every booking and payment step. */
+export const PROTECTED_LINE = 'You don’t pay the shipper until they confirm your shipment. If something goes wrong, we hold the money.'
+export function ProtectedNote({ className = '' }: { className?: string }) {
+  return (
+    <p className={`flex items-start gap-2 rounded-lg border border-teal/25 bg-teal/5 px-3 py-2 text-xs leading-relaxed text-text ${className}`} data-testid="payment-protected">
+      <ShieldCheck size={15} className="mt-px shrink-0 text-teal" aria-hidden="true" />
+      <span><strong className="font-semibold">Payment protected.</strong> {PROTECTED_LINE}</span>
+    </p>
   )
 }
 
@@ -47,7 +79,7 @@ export function SectionHeader({ eyebrow, title, body, light = false, align = 'ce
 export function ModeBadge({ mode, light = false }: { mode: Mode; light?: boolean }) {
   const air = mode === 'air'
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${air ? 'border-sky/40 text-sky' : 'border-teal/40 text-teal'} ${light ? 'bg-bg/90' : 'bg-surface-2'}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${air ? 'border-sky/40 text-sky' : 'border-sea/40 text-sea'} ${light ? 'bg-bg/90' : 'bg-surface-2'}`}>
       {air ? <Plane size={13} aria-hidden="true" /> : <Ship size={13} aria-hidden="true" />}{air ? 'Air' : 'Ocean'}
     </span>
   )
@@ -56,7 +88,7 @@ export function ModeBadge({ mode, light = false }: { mode: Mode; light?: boolean
 export function Rating({ value, count, light = false }: { value: number; count?: number; light?: boolean }) {
   return (
     <span className={`inline-flex items-center gap-1 text-sm ${light ? 'text-ink' : 'text-text'}`} aria-label={`Rated ${value} out of 5${count ? ` from ${count} reviews` : ''}`}>
-      <Star size={15} className="fill-gold text-gold" aria-hidden="true" />
+      <Star size={15} className="fill-gold text-gold-deep" aria-hidden="true" />
       <span className="font-semibold">{value.toFixed(1)}</span>
       {count !== undefined && <span className={light ? 'text-ink-muted' : 'text-text-muted'}>({count})</span>}
     </span>
@@ -79,7 +111,7 @@ export function ShipperCard({ s, light = false }: { s: Shipper; light?: boolean 
         <div className="min-w-0 flex-1">
           <h3 className={`flex items-center gap-1.5 text-lg ${light ? 'text-ink' : 'text-text'}`}>
             <span className="truncate">{s.name}</span>
-            {s.verified && <BadgeCheck size={18} className="shrink-0 text-gold" aria-label="Verified shipper" />}
+            {s.verified && <BadgeCheck size={18} className="shrink-0 text-gold-deep" aria-label="Verified shipper" />}
           </h3>
           <p className={`line-clamp-2 min-h-10 text-sm ${light ? 'text-ink-muted' : 'text-text-muted'}`}>{s.tagline}</p>
         </div>
@@ -105,10 +137,10 @@ export function ShipperCard({ s, light = false }: { s: Shipper; light?: boolean 
   )
 }
 
-export function Pill({ children, tone = 'gold' }: { children: ReactNode; tone?: 'gold' | 'teal' | 'sky' | 'muted' | 'danger' | 'green' }) {
+export function Pill({ children, tone = 'gold' }: { children: ReactNode; tone?: 'gold' | 'teal' | 'sea' | 'sky' | 'muted' | 'danger' | 'green' }) {
   const tones = {
-    gold: 'bg-gold/15 text-gold border-gold/30', teal: 'bg-teal/15 text-teal border-teal/30', sky: 'bg-sky/15 text-sky border-sky/30',
-    muted: 'bg-surface-2 text-text-muted border-border', danger: 'bg-danger/15 text-danger border-danger/30', green: 'bg-emerald-400/15 text-emerald-300 border-emerald-400/30',
+    gold: 'bg-gold/15 text-gold-deep border-gold/40', teal: 'bg-teal/15 text-teal border-teal/30', sea: 'bg-sea/15 text-sea border-sea/30', sky: 'bg-sky/15 text-sky border-sky/30',
+    muted: 'bg-surface-2 text-text-muted border-border', danger: 'bg-danger/15 text-danger border-danger/30', green: 'bg-teal/15 text-teal border-teal/30',
   }
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${tones[tone]}`}>{children}</span>
 }

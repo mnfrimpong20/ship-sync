@@ -24,7 +24,7 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
     finally { setBusy(false) }
   }
 
-  const chip = (active: boolean) => `rounded-full border px-3 py-1.5 text-sm transition-colors focus-ring ${active ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`
+  const chip = (active: boolean) => `rounded-full border px-3 py-1.5 text-sm transition-colors focus-ring ${active ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`
 
   return (
     <motion.form initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} onSubmit={submit} className="card-dark mt-6 p-6" aria-label="Edit company profile">
@@ -71,7 +71,7 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
       <div className="mt-4"><label htmlFor="pf-about" className="label-dark">About your company</label><textarea id="pf-about" rows={5} maxLength={2000} className="input-dark py-2" placeholder="Who you are, how long you've shipped to West Africa, what makes you different…" value={f.about} onChange={(e) => setF({ ...f, about: e.target.value })} /><p className="mt-1 text-right text-[11px] text-text-muted">{f.about.length}/2000</p></div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-        <p className="text-xs text-text-muted">Ratings, reviews and the verified badge are managed by Ship Sync and can't be edited here.</p>
+        <p className="text-xs text-text-muted">Ratings, reviews and the verified badge are managed by Ntemtem and can't be edited here.</p>
         <div className="flex gap-2"><button type="button" onClick={() => onDone('')} className="btn-ghost !min-h-10 !px-4 text-sm">Cancel</button><button disabled={busy || !f.modes.length || !f.destinations.length || !f.cargo.length} className="btn-gold !min-h-10 !px-5 text-sm disabled:opacity-60"><Check size={16} aria-hidden="true" /> {busy ? 'Saving…' : 'Save profile'}</button></div>
       </div>
     </motion.form>

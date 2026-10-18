@@ -66,7 +66,7 @@ export async function exportDatabase(db: Db, file: string) {
   return { tables: tables.length, bytes: statSync(file).size }
 }
 
-const exportName = (d = new Date()) => `shipsync-${d.toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`
+const exportName = (d = new Date()) => `ntemtem-${d.toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`
 const SAFE_NAME = /^shipsync-[\d-]+\.json$/
 
 export function listExports() {

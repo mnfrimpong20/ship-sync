@@ -5,7 +5,7 @@ import { money } from './ui'
 import { Confirm } from './board'
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '')
-export const Stars = ({ n, size = 14 }: { n: number; size?: number }) => <span className="inline-flex gap-0.5" aria-label={`${n} out of 5`}>{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={size} className={i < n ? 'fill-gold text-gold' : 'text-border'} aria-hidden="true" />)}</span>
+export const Stars = ({ n, size = 14 }: { n: number; size?: number }) => <span className="inline-flex gap-0.5" aria-label={`${n} out of 5`}>{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={size} className={i < n ? 'fill-gold text-gold-deep' : 'text-border'} aria-hidden="true" />)}</span>
 
 /** Customer rates a delivered shipment; the office replies. */
 export function ReviewCard({ shipmentId, shipperName }: { shipmentId: string; shipperName?: string }) {
@@ -20,7 +20,7 @@ export function ReviewCard({ shipmentId, shipperName }: { shipmentId: string; sh
   const act = async (fn: () => Promise<unknown>, msg: string) => { setBusy(true); setError(''); try { await fn(); await load(); setToast(msg) } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong.') } finally { setBusy(false) } }
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface p-4" data-testid="review-card">
-      <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Star size={14} className="text-gold" aria-hidden="true" /> {rv ? 'Review' : `Rate ${shipperName ?? 'your shipper'}`}</p>
+      <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Star size={14} className="text-gold-deep" aria-hidden="true" /> {rv ? 'Review' : `Rate ${shipperName ?? 'your shipper'}`}</p>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       {rv ? (
@@ -34,7 +34,7 @@ export function ReviewCard({ shipmentId, shipperName }: { shipmentId: string; sh
         </div>
       ) : (
         <form onSubmit={(e) => { e.preventDefault(); void act(() => reviewsApi.create(shipmentId, f), 'Thanks — your review is live on the shipper’s profile.') }} className="mt-2 grid gap-2" aria-label="Review" data-testid="review-form">
-          <div className="flex gap-1" role="radiogroup" aria-label="Rating">{[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" role="radio" aria-checked={f.rating === n} aria-label={`${n} star${n === 1 ? '' : 's'}`} onClick={() => setF({ ...f, rating: n })} className="focus-ring rounded"><Star size={24} className={n <= f.rating ? 'fill-gold text-gold' : 'text-border hover:text-gold'} /></button>)}</div>
+          <div className="flex gap-1" role="radiogroup" aria-label="Rating">{[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" role="radio" aria-checked={f.rating === n} aria-label={`${n} star${n === 1 ? '' : 's'}`} onClick={() => setF({ ...f, rating: n })} className="focus-ring rounded"><Star size={24} className={n <= f.rating ? 'fill-gold text-gold-deep' : 'text-border hover:text-gold-deep'} /></button>)}</div>
           <div className="flex flex-wrap gap-1.5">{d.tags.map((t) => <button key={t} type="button" onClick={() => setF({ ...f, tags: f.tags.includes(t) ? f.tags.filter((x) => x !== t) : [...f.tags, t].slice(0, 5) })} className={`rounded-full border px-2.5 py-1 text-xs ${f.tags.includes(t) ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{t}</button>)}</div>
           <textarea required minLength={10} rows={3} aria-label="Your review" className="input-dark py-2 text-sm" placeholder="How did it go? Packing, communication, timing, the handover…" value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} />
           <div className="flex justify-end"><button disabled={busy || !f.rating} className="btn-gold !min-h-9 !px-4 text-sm disabled:opacity-60" data-testid="submit-review">{busy ? 'Posting…' : 'Post review'}</button></div>
@@ -44,7 +44,7 @@ export function ReviewCard({ shipmentId, shipperName }: { shipmentId: string; sh
   )
 }
 
-const roleLabel: Record<string, string> = { customer: 'Customer', office: 'Shipper', shipsync: 'Ship Sync' }
+const roleLabel: Record<string, string> = { customer: 'Customer', office: 'Shipper', shipsync: 'Ntemtem' }
 
 /** Open a dispute, message in the thread, see the resolution. Escrow is held while it's open. */
 export function DisputeCard({ shipmentId }: { shipmentId: string }) {
@@ -64,7 +64,7 @@ export function DisputeCard({ shipmentId }: { shipmentId: string }) {
     <div className={`min-w-0 rounded-xl border bg-surface p-4 ${dp?.status === 'open' ? 'border-danger/40' : 'border-border'}`} data-testid="dispute-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><AlertOctagon size={14} className={dp?.status === 'open' ? 'text-danger' : 'text-text-muted'} aria-hidden="true" /> Dispute</p>
-        {dp && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${dp.status === 'open' ? 'bg-danger/15 text-danger' : 'bg-surface-2 text-text-muted'}`} data-testid="dispute-status">{dp.status === 'open' ? 'Open — Ship Sync mediating' : dp.status === 'withdrawn' ? 'Withdrawn' : `Resolved: ${outcomeLabels[dp.resolution?.outcome ?? ''] ?? ''}`}</span>}
+        {dp && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${dp.status === 'open' ? 'bg-danger/15 text-danger' : 'bg-surface-2 text-text-muted'}`} data-testid="dispute-status">{dp.status === 'open' ? 'Open — Ntemtem mediating' : dp.status === 'withdrawn' ? 'Withdrawn' : `Resolved: ${outcomeLabels[dp.resolution?.outcome ?? ''] ?? ''}`}</span>}
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
@@ -83,12 +83,12 @@ export function DisputeCard({ shipmentId }: { shipmentId: string }) {
         </div>
       ) : (
         <div className="mt-2">
-          <p className="text-xs text-text-muted">Something wrong with this shipment? Open a dispute — Ship Sync holds any escrow payment and mediates between you and the {d.role === 'office' ? 'customer' : 'shipper'}.</p>
+          <p className="text-xs text-text-muted">Something wrong with this shipment? Open a dispute — Ntemtem holds any escrow payment and mediates between you and the {d.role === 'office' ? 'customer' : 'shipper'}.</p>
           {!opening && <button onClick={() => setOpening(true)} className="btn-ghost mt-2 !min-h-8 !px-3 text-xs" data-testid="open-dispute">Open a dispute</button>}
         </div>
       )}
       {opening && (
-        <form onSubmit={(e) => { e.preventDefault(); void act(() => reviewsApi.openDispute(shipmentId, { reason: f.reason, description: f.description, amountClaimedUsd: f.amount ? Number(f.amount) : undefined, photos }), 'Dispute opened — Ship Sync has been notified.') }} className="mt-3 grid gap-2 rounded-lg border border-border bg-surface-2/40 p-3" aria-label="Open a dispute" data-testid="dispute-form">
+        <form onSubmit={(e) => { e.preventDefault(); void act(() => reviewsApi.openDispute(shipmentId, { reason: f.reason, description: f.description, amountClaimedUsd: f.amount ? Number(f.amount) : undefined, photos }), 'Dispute opened — Ntemtem has been notified.') }} className="mt-3 grid gap-2 rounded-lg border border-border bg-surface-2/40 p-3" aria-label="Open a dispute" data-testid="dispute-form">
           <select aria-label="Reason" className="input-dark !min-h-9 text-sm" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value as DisputeReason })}>{d.reasons.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select>
           <textarea required minLength={10} rows={3} aria-label="What happened" className="input-dark py-2 text-sm" placeholder="What happened, which pieces, when you noticed…" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
           <label className="text-xs text-text-muted">Photos (up to 4)<input type="file" accept="image/*" multiple className="mt-1 block text-xs" data-testid="dispute-photos" onChange={async (e) => { const fs = [...(e.target.files ?? [])].slice(0, 4); const { readImage } = await import('../lib/customerHub'); setPhotos(await Promise.all(fs.map((x) => readImage(x)))) }} />{photos.length > 0 && <span className="mt-1 flex gap-1">{photos.map((p, i) => <img key={i} src={p} alt="" className="h-12 w-12 rounded object-cover" />)}</span>}</label>

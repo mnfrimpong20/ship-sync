@@ -4,7 +4,7 @@
  *   shipper can reply once; admins can hide. The shipper's public rating blends the real reviews with
  *   the listing's baseline so a new shipper's first review doesn't swing it to 1.0 or 5.0.
  *   Disputes — either side opens one on a shipment (damaged, missing, late, overcharged, other). Opening
- *   a dispute puts the escrow on hold (no release while open); messages go back and forth with Ship Sync
+ *   a dispute puts the escrow on hold (no release while open); messages go back and forth with Ntemtem
  *   in the thread; an admin resolves with a full / partial refund, a release, or no action.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
@@ -138,8 +138,8 @@ export function mountReviews(r: Router, d: Deps) {
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, s.destination, `Dispute opened by ${u.name}: ${DISPUTE_REASONS[b.reason]}.${pay ? ' Escrow on hold.' : ''}`])
     const { rows: admins } = await db.query<Row>('select id from users where is_admin')
     for (const a of admins) await notify(db, { userId: a.id, kind: 'dispute', title: `Dispute: ${DISPUTE_REASONS[b.reason]} — ${s.ref}`, body: `${u.name} (${office ? 'shipper' : 'customer'})${b.amountClaimedUsd ? ` claims $${b.amountClaimedUsd.toLocaleString()}` : ''}. ${pay ? `$${Number(pay.amount_usd).toLocaleString()} in escrow is on hold.` : 'No platform payment on this shipment.'}`, link: '/admin', dedupe: `dsp:${id}:a` })
-    if (owner) await notifyShipperStaff(db, s.shipper_id, { kind: 'dispute', title: `${s.customer} opened a dispute on ${s.ref}`, body: `${DISPUTE_REASONS[b.reason]}: “${b.description.slice(0, 160)}”. Reply on the shipment; Ship Sync mediates.${pay ? ' The escrow payment is on hold until it is resolved.' : ''}`, link: `/dashboard/shipments?q=${s.ref}&b=all`, dedupe: `dsp:${id}:o` }, ['owner', 'dispatcher'])
-    else if (s.user_id) await notify(db, { userId: s.user_id, kind: 'dispute', title: `${u.company ?? 'Your shipper'} opened a dispute on ${s.ref}`, body: `${DISPUTE_REASONS[b.reason]}: “${b.description.slice(0, 160)}”. Reply from your dashboard; Ship Sync mediates.`, link: `/dashboard?tab=shipments&s=${s.id}`, dedupe: `dsp:${id}:c` })
+    if (owner) await notifyShipperStaff(db, s.shipper_id, { kind: 'dispute', title: `${s.customer} opened a dispute on ${s.ref}`, body: `${DISPUTE_REASONS[b.reason]}: “${b.description.slice(0, 160)}”. Reply on the shipment; Ntemtem mediates.${pay ? ' The escrow payment is on hold until it is resolved.' : ''}`, link: `/dashboard/shipments?q=${s.ref}&b=all`, dedupe: `dsp:${id}:o` }, ['owner', 'dispatcher'])
+    else if (s.user_id) await notify(db, { userId: s.user_id, kind: 'dispute', title: `${u.company ?? 'Your shipper'} opened a dispute on ${s.ref}`, body: `${DISPUTE_REASONS[b.reason]}: “${b.description.slice(0, 160)}”. Reply from your dashboard; Ntemtem mediates.`, link: `/dashboard?tab=shipments&s=${s.id}`, dedupe: `dsp:${id}:c` })
     res.status(201).json({ dispute: disputeOut(await disputeById(db, id)) })
   }))
   r.post('/disputes/:id/message', wrap(async (req, res) => {
@@ -175,7 +175,7 @@ export function mountReviews(r: Router, d: Deps) {
     const resolution = { outcome: b.outcome, amountUsd: amount, note: b.note, by: admin.name, at: new Date().toISOString() }
     await db.query(`update disputes set status = 'resolved', resolution = $2, updated_at = now() where id = $1`, [dp.id, JSON.stringify(resolution)])
     const label = b.outcome === 'refund_full' ? `full refund of $${amount.toLocaleString()}` : b.outcome === 'refund_partial' ? `partial refund of $${amount.toLocaleString()}` : b.outcome === 'release' ? 'payment released to the shipper' : 'no action'
-    await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [dp.shipment_id, (await db.query<Row>('select status from shipments where id = $1', [dp.shipment_id])).rows[0].status, '', `Dispute resolved by Ship Sync: ${label}. ${b.note}`])
+    await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [dp.shipment_id, (await db.query<Row>('select status from shipments where id = $1', [dp.shipment_id])).rows[0].status, '', `Dispute resolved by Ntemtem: ${label}. ${b.note}`])
     if (dp.user_id) await notify(db, { userId: dp.user_id, kind: 'dispute', title: `Dispute resolved — ${dp.ref}`, body: `Outcome: ${label}. ${b.note}`, link: `/dashboard?tab=shipments&s=${dp.shipment_id}`, dedupe: `dsp:${dp.id}:res` })
     await notifyShipperStaff(db, dp.shipper_id, { kind: 'dispute', title: `Dispute resolved — ${dp.ref}`, body: `Outcome: ${label}. ${b.note}`, link: `/dashboard/shipments?q=${dp.ref}&b=all`, dedupe: `dsp:${dp.id}:res:o` }, ['owner', 'dispatcher'])
     res.json({ dispute: disputeOut(await disputeById(db, dp.id)) })

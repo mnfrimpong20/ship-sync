@@ -64,7 +64,7 @@ function GettingStarted({ s }: { s: Summary }) {
 function Tile({ to, icon: Icon, label, value, hint, tone, testid }: { to: string; icon: typeof Wallet; label: string; value: string | number; hint: string; tone?: 'bad' | 'gold'; testid?: string }) {
   return (
     <motion.div variants={fadeUp}><Link to={to} className={`card-dark block h-full p-5 transition-colors hover:border-gold/50 focus-ring ${tone === 'bad' ? '!border-danger/40' : tone === 'gold' ? '!border-gold/50' : ''}`} data-testid={testid}>
-      <div className="flex items-center justify-between"><p className="text-sm text-text-muted">{label}</p><Icon size={18} className={tone === 'bad' ? 'text-danger' : 'text-gold'} aria-hidden="true" /></div>
+      <div className="flex items-center justify-between"><p className="text-sm text-text-muted">{label}</p><Icon size={18} className={tone === 'bad' ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" /></div>
       <p className="mt-2 font-heading text-3xl font-bold">{value}</p><p className="mt-1 text-xs text-text-muted">{hint}</p>
     </Link></motion.div>
   )

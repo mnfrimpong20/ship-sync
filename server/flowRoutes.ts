@@ -146,7 +146,7 @@ export function mountFlow(r: Router, d: Deps) {
     const b = z.object({ name: z.string().trim().min(2, 'Name the agent or company.').max(80), email: z.string().trim().email().or(z.literal('')).default(''), phone: z.string().trim().max(30).default('') }).parse(req.body)
     const id = 'pl_' + uid(); const token = randomBytes(15).toString('base64url')
     await db.query('insert into partner_links (id,token,shipper_id,container_id,name,email,phone,created_by) values ($1,$2,$3,$4,$5,$6,$7,$8)', [id, token, c.shipper_id, c.id, b.name, b.email, b.phone, u.name])
-    await db.query('insert into container_events (container_id,status,place,note,by_name,source,code) values ($1,$2,$3,$4,$5,\'manual\',\'\')', [c.id, c.status, '', `Destination partner link created for ${b.name}.`, u.name])
+    await db.query('insert into container_events (container_id,status,place,note,by_name,source,code) values ($1,$2,$3,$4,$5,\'manual\',\'\')', [c.id, c.status, '', `Destination agent link created for ${b.name}.`, u.name])
     if (b.email && ['sailed', 'arrived', 'customs'].includes(c.status)) await sendPreAlerts(db, c)
     const { rows } = await db.query<Row>('select * from partner_links where id = $1', [id]); res.status(201).json({ partner: linkOut(rows[0]) })
   }))
@@ -158,7 +158,7 @@ export function mountFlow(r: Router, d: Deps) {
   r.post('/partners/:id/pre-alert', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select l.*, c.id as cid from partner_links l join containers c on c.id = l.container_id where l.id = $1 and l.shipper_id = $2 and l.revoked_at is null', [req.params.id, u.shipperId ?? '']); if (!rows[0] || u.staffRole === 'driver') throw new HttpError(404, 'Link not found.')
-    if (!rows[0].email) throw new HttpError(400, 'Add an email for this partner first.')
+    if (!rows[0].email) throw new HttpError(400, 'Add an email for this agent first.')
     const { rows: c } = await db.query<Row>('select * from containers where id = $1', [rows[0].cid]); await db.query('update partner_links set pre_alert_sent_at = null where id = $1', [rows[0].id])
     res.json({ sent: await sendPreAlerts(db, c[0]) })
   }))
@@ -183,20 +183,20 @@ export function mountFlow(r: Router, d: Deps) {
     const order = ['sailed', 'arrived', 'customs', 'devanned']
     if (order.indexOf(b.stage) <= order.indexOf(c.status)) throw new HttpError(409, `${c.ref} is already past that.`)
     if (order.indexOf(c.status) < 0) throw new HttpError(409, `${c.ref} hasn’t sailed yet.`)
-    await advanceContainer(db, c, b.stage, { note: b.note || `Updated by ${l.name} (destination partner).`, by: `${l.name} (partner)`, place: c.destination_port || '' })
-    await notifyShipperStaff(db, c.shipper_id, { kind: 'container_update', title: `${l.name}: ${c.ref} ${b.stage === 'devanned' ? 'unloaded at the warehouse' : b.stage === 'customs' ? 'in customs' : 'arrived'}`, body: b.note || 'Updated from the partner link.', link: `/dashboard/containers/${c.id}`, dedupe: `partner:${c.id}:${b.stage}` }, ['owner', 'dispatcher'])
+    await advanceContainer(db, c, b.stage, { note: b.note || `Updated by ${l.name} (destination agent).`, by: `${l.name} (agent)`, place: c.destination_port || '' })
+    await notifyShipperStaff(db, c.shipper_id, { kind: 'container_update', title: `${l.name}: ${c.ref} ${b.stage === 'devanned' ? 'unloaded at the warehouse' : b.stage === 'customs' ? 'in customs' : 'arrived'}`, body: b.note || 'Updated from the agent link.', link: `/dashboard/containers/${c.id}`, dedupe: `partner:${c.id}:${b.stage}` }, ['owner', 'dispatcher'])
     res.json(await manifestFor(db, (await db.query<Row>('select * from containers where id = $1', [c.id])).rows[0]))
   }))
   const partnerShipment = async (db: Db, c: Row, sid: string) => { const { rows } = await db.query<Row>('select * from shipments where id = $1 and container_id = $2 and cancelled_at is null', [sid, c.id]); if (!rows[0]) throw new HttpError(404, 'That shipment isn’t in this container.'); return rows[0] }
   r.post('/p/:token/shipments/:sid/handover', wrap(async (req, res) => {
     const db = await getDb(); const { l, c } = await partner(db, String(req.params.token)); const s = await partnerShipment(db, c, String(req.params.sid))
     const b = z.object({ code: z.string().trim().max(12).optional(), receivedBy: z.string().trim().min(2, 'Enter the name of the person receiving it.').max(80) }).parse(req.body)
-    if (s.handover === 'collection') await collect(db, s, { code: b.code, receivedBy: b.receivedBy, by: `${l.name} (partner)`, partner: true })
+    if (s.handover === 'collection') await collect(db, s, { code: b.code, receivedBy: b.receivedBy, by: `${l.name} (agent)`, partner: true })
     else {
       if (!['arrived', 'customs', 'out_for_delivery', 'ready_for_collection'].includes(s.status)) throw new HttpError(409, `${s.ref} hasn’t reached you yet.`)
       const { assertRelease } = await import('./flow'); await assertRelease(db, s, { by: l.name, override: null })
       await db.query(`update pieces set status = 'delivered', site_id = null, bin_id = null, released_at = now() where shipment_id = $1`, [s.id])
-      await raiseStatus(db, s, 'delivered', countryByCode(s.destination)?.name ?? s.destination, `Delivered to ${b.receivedBy} by ${l.name} (destination partner).`, { receivedBy: b.receivedBy })
+      await raiseStatus(db, s, 'delivered', countryByCode(s.destination)?.name ?? s.destination, `Delivered to ${b.receivedBy} by ${l.name} (destination agent).`, { receivedBy: b.receivedBy })
     }
     res.json({ ok: true })
   }))

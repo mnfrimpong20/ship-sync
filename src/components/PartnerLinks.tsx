@@ -18,16 +18,16 @@ export function PartnerLinksCard({ containerId, containerRef }: { containerId: s
   return (
     <section className="card-dark p-5" aria-labelledby="partners-h" data-testid="partner-links">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h2 id="partners-h" className="flex items-center gap-2 !text-lg"><Handshake size={18} className="text-gold" aria-hidden="true" /> Destination partner</h2><p className="mt-1 text-sm text-text-muted">Give your agent in {containerRef}’s destination a link — no account. They see the manifest with every recipient, mark customs and unloading, and hand over with the recipient’s code. With an email, they get a pre-alert the moment it sails.</p></div>
-        {!f && <button onClick={() => setF({ name: '', email: '', phone: '' })} className="btn-ghost !min-h-9 !px-3 text-xs" data-testid="partner-add">Add partner</button>}
+        <div><h2 id="partners-h" className="flex items-center gap-2 !text-lg"><Handshake size={18} className="text-gold-deep" aria-hidden="true" /> Destination agent</h2><p className="mt-1 text-sm text-text-muted">Give your agent in {containerRef}’s destination a link — no account. They see the manifest with every recipient, mark customs and unloading, and hand over with the recipient’s code. With an email, they get a pre-alert the moment it sails.</p></div>
+        {!f && <button onClick={() => setF({ name: '', email: '', phone: '' })} className="btn-ghost !min-h-9 !px-3 text-xs" data-testid="partner-add">Add agent</button>}
       </div>
       {err && <p role="alert" className="mt-2 text-xs text-danger">{err}</p>}
       {note && <p role="status" className="mt-2 text-xs text-teal">{note}</p>}
       {f && (
         <form onSubmit={add} className="mt-3 grid gap-2 sm:grid-cols-3">
-          <input autoFocus required minLength={2} className="input-dark !min-h-9 text-sm" placeholder="Agent or company" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} aria-label="Partner name" data-testid="partner-name" />
-          <input type="email" className="input-dark !min-h-9 text-sm" placeholder="Email (for the pre-alert)" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} aria-label="Partner email" data-testid="partner-email" />
-          <input className="input-dark !min-h-9 text-sm" placeholder="Phone / WhatsApp" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} aria-label="Partner phone" />
+          <input autoFocus required minLength={2} className="input-dark !min-h-9 text-sm" placeholder="Agent or company" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} aria-label="Agent name" data-testid="partner-name" />
+          <input type="email" className="input-dark !min-h-9 text-sm" placeholder="Email (for the pre-alert)" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} aria-label="Agent email" data-testid="partner-email" />
+          <input className="input-dark !min-h-9 text-sm" placeholder="Phone / WhatsApp" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} aria-label="Agent phone" />
           <div className="flex justify-end gap-1.5 sm:col-span-3"><button type="button" onClick={() => setF(null)} className="btn-ghost !min-h-8 !px-2.5 text-xs">Cancel</button><button disabled={busy === 'add'} className="btn-gold !min-h-8 !px-3 text-xs" data-testid="partner-save">Create link</button></div>
         </form>
       )}
@@ -43,7 +43,7 @@ export function PartnerLinksCard({ containerId, containerRef }: { containerId: s
             </div>
           </li>
         ))}
-        {list && list.length === 0 && !f && <li className="py-3 text-sm text-text-muted">No partner yet.</li>}
+        {list && list.length === 0 && !f && <li className="py-3 text-sm text-text-muted">No agent yet.</li>}
       </ul>
     </section>
   )

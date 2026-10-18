@@ -28,12 +28,12 @@ export function GroupageCard({ g, onJoin }: { g: Groupage; onJoin?: (g: Groupage
     <div className="card-dark flex h-full min-w-0 flex-col p-5" data-testid="groupage-card">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          {g.shipperInitials && <Avatar initials={g.shipperInitials} hue={g.shipperHue ?? '#E3B54A'} size={40} />}
+          {g.shipperInitials && <Avatar initials={g.shipperInitials} hue={g.shipperHue ?? '#F5B82E'} size={40} />}
           <div className="min-w-0"><p className="truncate font-semibold">{g.title}</p><p className="truncate text-xs text-text-muted">{g.shipperName}{g.shipperVerified ? ' · verified' : ''}</p></div>
         </div>
         <Pill tone={g.status === 'full' ? 'teal' : 'gold'}>{g.status === 'full' ? 'Full' : 'Open'}</Pill>
       </div>
-      <p className="mt-3 flex items-start gap-1.5 text-sm"><I size={14} className="mt-1 shrink-0 text-gold" aria-hidden="true" /><span className="line-clamp-2">{g.kindLabel} · {g.origin} → {g.destinationCity || g.destinationName}</span></p>
+      <p className="mt-3 flex items-start gap-1.5 text-sm"><I size={14} className="mt-1 shrink-0 text-gold-deep" aria-hidden="true" /><span className="line-clamp-2">{g.kindLabel} · {g.origin} → {g.destinationCity || g.destinationName}</span></p>
       <div className="mt-3"><FillBar g={g} /></div>
       <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
         <div><dt className="text-text-muted">Per {g.unit}</dt><dd className="font-semibold tabular-nums">{money(g.pricePerUnitUsd)}</dd></div>
@@ -117,9 +117,9 @@ export default function GroupagePage() {
             {list.map((g) => <GroupageCard key={g.id} g={g} onJoin={setJoining} />)}
           </motion.div>
           <motion.div variants={fadeUp} className="mt-10 grid gap-4 text-sm text-text-muted md:grid-cols-3">
-            <div className="card-dark p-5"><Boxes size={18} className="text-gold" aria-hidden="true" /><p className="mt-2 font-semibold text-text">1. Reserve</p><p className="mt-1">Pick a slot on your lane and say how many bags, boxes or barrels. Nothing is charged yet.</p></div>
-            <div className="card-dark p-5"><Ship size={18} className="text-gold" aria-hidden="true" /><p className="mt-2 font-semibold text-text">2. Drop off or get picked up</p><p className="mt-1">When the slot closes you get a shipment reference, a payment link (held in escrow) and a pickup booking.</p></div>
-            <div className="card-dark p-5"><Check size={18} className="text-gold" aria-hidden="true" /><p className="mt-2 font-semibold text-text">3. Track to the door</p><p className="mt-1">Your pieces get stickers and scans like any shipment; the receiver gets texted when it lands.</p></div>
+            <div className="card-dark p-5"><Boxes size={18} className="text-gold-deep" aria-hidden="true" /><p className="mt-2 font-semibold text-text">1. Reserve</p><p className="mt-1">Pick a slot on your lane and say how many bags, boxes or barrels. Nothing is charged yet.</p></div>
+            <div className="card-dark p-5"><Ship size={18} className="text-gold-deep" aria-hidden="true" /><p className="mt-2 font-semibold text-text">2. Drop off or get picked up</p><p className="mt-1">When the slot closes you get a shipment reference, a payment link (held in escrow) and a pickup booking.</p></div>
+            <div className="card-dark p-5"><Check size={18} className="text-gold-deep" aria-hidden="true" /><p className="mt-2 font-semibold text-text">3. Track to the door</p><p className="mt-1">Your pieces get stickers and scans like any shipment; the receiver gets texted when it lands.</p></div>
           </motion.div>
         </motion.div>
       </div>

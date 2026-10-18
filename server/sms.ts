@@ -93,7 +93,7 @@ export async function sendText(to: string, text: string, channel: 'sms' | 'whats
     return j.sid ?? 'ok'
   }
   if (p.id === 'termii') {
-    const res = await fetch(`${base('https://api.ng.termii.com')}/api/sms/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: process.env.TERMII_API_KEY, to: to.replace('+', ''), from: process.env.TERMII_SENDER_ID || 'ShipSync', sms: text, type: 'plain', channel: channel === 'whatsapp' ? 'whatsapp' : 'generic' }) })
+    const res = await fetch(`${base('https://api.ng.termii.com')}/api/sms/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: process.env.TERMII_API_KEY, to: to.replace('+', ''), from: process.env.TERMII_SENDER_ID || 'Ntemtem', sms: text, type: 'plain', channel: channel === 'whatsapp' ? 'whatsapp' : 'generic' }) })
     const j: any = await res.json().catch(() => ({}))
     if (!res.ok || (j.code && j.code !== 'ok')) throw new Error(`Termii ${res.status}: ${j.message ?? 'send failed'}`)
     return j.message_id ?? 'ok'

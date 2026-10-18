@@ -51,7 +51,7 @@ export function VesselCard({ mmsi, v, err = '', onClose, footer, className = 'mb
         <>
           <div className="mt-3 flex flex-wrap gap-1.5">
             <Pill tone={moving ? 'teal' : 'muted'}><Navigation size={11} className="mr-1" aria-hidden="true" />{status ?? (moving ? 'Under way' : 'Stopped')}</Pill>
-            {v.watched && <Pill tone="gold"><Ship size={11} className="mr-1" aria-hidden="true" />Carrying a Ship Sync shipment</Pill>}
+            {v.watched && <Pill tone="gold"><Ship size={11} className="mr-1" aria-hidden="true" />Carrying a Ntemtem shipment</Pill>}
           </div>
           <dl className="mt-3 divide-y divide-border">
             <Row label="Reported destination" value={v.destination} />
@@ -105,7 +105,7 @@ export function FlightCard({ f, err = '', onClose, footer, className = 'mb-4' }:
           </div>
           {f.route ? (
             <div className="mt-3 rounded-lg bg-surface-2 p-3 text-sm">
-              <div className="flex items-center gap-2"><span className="text-text">{airportLabel(f.route.origin)}</span><ArrowRight size={14} className="shrink-0 text-gold" aria-hidden="true" /><span className="text-text">{airportLabel(f.route.destination)}</span></div>
+              <div className="flex items-center gap-2"><span className="text-text">{airportLabel(f.route.origin)}</span><ArrowRight size={14} className="shrink-0 text-gold-deep" aria-hidden="true" /><span className="text-text">{airportLabel(f.route.destination)}</span></div>
               <p className="mt-1 text-xs text-text-muted">{f.route.origin.name} → {f.route.destination.name}{f.route.via?.length ? ` via ${f.route.via.map(airportLabel).join(', ')}` : ''}{f.route.plausible ? '' : ' · route unconfirmed'}</p>
             </div>
           ) : (

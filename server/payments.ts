@@ -1,5 +1,5 @@
 /**
- * Payments & escrow — the customer pays Ship Sync, the money is held until the goods are on their way
+ * Payments & escrow — the customer pays Ntemtem, the money is held until the goods are on their way
  * (or delivered — platform setting), then it is released to the shipper's balance less the take-rate;
  * the shipper requests a payout and the platform pays it out by bank transfer (Stripe Connect / mobile
  * money partners can slot in behind the same ledger later).
@@ -40,7 +40,7 @@ const J = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : v)
 /* ------------------------------------------------------------------ settings */
 export interface PaymentSettings {
   enabled: boolean
-  /** Ship Sync's share of every freight payment collected online. */
+  /** Ntemtem's share of every freight payment collected online. */
   takeRatePct: number
   /** Milestone that releases held funds to the shipper's balance. */
   releaseOn: 'in_transit' | 'delivered'
@@ -51,7 +51,7 @@ export interface PaymentSettings {
 }
 export const DEFAULT_SETTINGS: PaymentSettings = {
   enabled: true, takeRatePct: 0.08, releaseOn: 'in_transit',
-  customerNote: 'Your money is held by Ship Sync and only released to the shipper once your goods are on their way. Card, Apple Pay and Google Pay.',
+  customerNote: 'Your money is held by Ntemtem and only released to the shipper once your goods are on their way. Card, Apple Pay and Google Pay.',
   payoutNote: 'Payouts are sent by bank transfer within 2 business days of your request. Mobile money payouts for Ghana and Nigeria are coming.',
 }
 export async function getSettings(db: Db): Promise<PaymentSettings> {
@@ -134,7 +134,7 @@ export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; m
   if (!['pending'].includes(p.status)) return p
   const cfg = await getSettings(db)
   const amount = Number(p.amount_usd)
-  const fee = opts.direct || p.sourcing_id ? 0 : r2(amount * cfg.takeRatePct) // Ship Sync Sourcing is the platform — no take rate on its own jobs
+  const fee = opts.direct || p.sourcing_id ? 0 : r2(amount * cfg.takeRatePct) // Ntemtem Sourcing is the platform — no take rate on its own jobs
   // No shipment behind the payment (a standalone invoice) → nothing to escrow against; released to the shipper's balance at once.
   const status: PaymentStatus = opts.direct ? 'direct' : p.shipment_id || p.sourcing_id ? 'held' : 'released'
   await db.query(`update escrow_payments set status = $2, fee_usd = $3, net_usd = $4, provider_payment_intent = coalesce($5, provider_payment_intent), method = coalesce($6, method), paid_at = now(), recorded_by = coalesce($7, recorded_by), released_at = case when $2 = 'released' then now() else released_at end, release_reason = case when $2 = 'released' then 'invoice:no-shipment' else release_reason end where id = $1`, [p.id, status, fee, r2(amount - fee), opts.intent ?? null, opts.method ?? null, opts.by ?? null])
@@ -146,7 +146,7 @@ export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; m
   const { rows: inv } = p.invoice_id ? await db.query<Row>(`select * from invoices where id = $1`, [p.invoice_id]) : p.shipment_id ? await db.query<Row>(`select * from invoices where shipment_id = $1 and status in ('sent','draft') order by created_at desc limit 1`, [p.shipment_id]) : { rows: [] as Row[] }
   if (inv[0]) {
     const freight = (J(p.items ?? '[]') as { kind?: string; amountUsd: number }[]).filter((i) => i.kind !== 'insurance').reduce((n, i) => n + i.amountUsd, 0)
-    await db.query('insert into payments (id,invoice_id,amount,method,at,note) values ($1,$2,$3,$4,current_date,$5)', ['pay_' + uid(), inv[0].id, Math.round(freight), opts.direct ? opts.method ?? 'bank' : 'ship_sync', opts.direct ? `Recorded by ${opts.by ?? 'office'}` : `Paid online via Ship Sync (${p.id})`])
+    await db.query('insert into payments (id,invoice_id,amount,method,at,note) values ($1,$2,$3,$4,current_date,$5)', ['pay_' + uid(), inv[0].id, Math.round(freight), opts.direct ? opts.method ?? 'bank' : 'ship_sync', opts.direct ? `Recorded by ${opts.by ?? 'office'}` : `Paid online via Ntemtem (${p.id})`])
     const { rows: sum } = await db.query<{ s: string }>('select coalesce(sum(amount),0)::text as s from payments where invoice_id = $1', [inv[0].id])
     await db.query(`update invoices set status = case when $2::int >= total then 'paid' else 'sent' end where id = $1`, [inv[0].id, Number(sum[0].s)])
     if (Number(sum[0].s) >= Number(inv[0].total) && !opts.direct) await onInvoicePaid(db, inv[0].id)
@@ -155,14 +155,14 @@ export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; m
   // Receipt into the documents vault (online payments only — the office issues its own receipt for cash).
   if (!opts.direct && s) {
     const ctx = await shipmentContext(db, s)
-    const docId = 'doc_' + uid(); const number = `RCT-${new Date().getFullYear()}-${s.ref.replace(/^SS-/, '')}`
-    const payload = { ...ctx, generatedAt: new Date().toISOString(), number, receipt: { id: p.id, number, items: J(p.items ?? '[]'), amountUsd: amount, method: opts.method ?? 'card', paidAt: new Date().toISOString(), payer: s.customer, escrow: `Held by Ship Sync until the shipment is ${cfg.releaseOn === 'delivered' ? 'delivered' : 'on its way'}, then released to ${ctx.shipper.name}.` } }
-    await db.query(`insert into documents (id,shipment_id,shipper_id,kind,title,filename,mime,size,payload,source,visibility,uploaded_by,uploaded_by_role) values ($1,$2,$3,'receipt',$4,'','',0,$5,'generated','shared','Ship Sync','shipper')`, [docId, s.id, s.shipper_id, `Payment receipt ${number}`, JSON.stringify(payload)])
+    const docId = 'doc_' + uid(); const number = `RCT-${new Date().getFullYear()}-${s.ref.replace(/^(SS|NT)-/, '')}`
+    const payload = { ...ctx, generatedAt: new Date().toISOString(), number, receipt: { id: p.id, number, items: J(p.items ?? '[]'), amountUsd: amount, method: opts.method ?? 'card', paidAt: new Date().toISOString(), payer: s.customer, escrow: `Held by Ntemtem until the shipment is ${cfg.releaseOn === 'delivered' ? 'delivered' : 'on its way'}, then released to ${ctx.shipper.name}.` } }
+    await db.query(`insert into documents (id,shipment_id,shipper_id,kind,title,filename,mime,size,payload,source,visibility,uploaded_by,uploaded_by_role) values ($1,$2,$3,'receipt',$4,'','',0,$5,'generated','shared','Ntemtem','shipper')`, [docId, s.id, s.shipper_id, `Payment receipt ${number}`, JSON.stringify(payload)])
     await db.query('update escrow_payments set receipt_document_id = $2 where id = $1', [p.id, docId])
   }
   if (s) {
-    await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, s.origin, opts.direct ? `Payment of $${amount.toLocaleString()} recorded (${opts.method ?? 'bank'}).` : `$${amount.toLocaleString()} paid online — held in escrow by Ship Sync.`])
-    if (s.user_id) await notify(db, { userId: s.user_id, kind: 'payment', title: opts.direct ? `Payment recorded on ${s.ref}` : `Payment received — ${s.ref}`, body: opts.direct ? `${p.shipper_name ?? 'The shipper'} recorded your $${amount.toLocaleString()} payment.` : `$${amount.toLocaleString()} is held safely by Ship Sync and will be released to the shipper once your goods are ${cfg.releaseOn === 'delivered' ? 'delivered' : 'on their way'}. Your receipt is in the documents.`, link: `/dashboard?tab=shipments&s=${s.id}`, dedupe: `pay:${p.id}:paid`, emailSubject: `Payment received — ${s.ref}` })
+    await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, s.origin, opts.direct ? `Payment of $${amount.toLocaleString()} recorded (${opts.method ?? 'bank'}).` : `$${amount.toLocaleString()} paid online — held in escrow by Ntemtem.`])
+    if (s.user_id) await notify(db, { userId: s.user_id, kind: 'payment', title: opts.direct ? `Payment recorded on ${s.ref}` : `Payment received — ${s.ref}`, body: opts.direct ? `${p.shipper_name ?? 'The shipper'} recorded your $${amount.toLocaleString()} payment.` : `$${amount.toLocaleString()} is held safely by Ntemtem and will be released to the shipper once your goods are ${cfg.releaseOn === 'delivered' ? 'delivered' : 'on their way'}. Your receipt is in the documents.`, link: `/dashboard?tab=shipments&s=${s.id}`, dedupe: `pay:${p.id}:paid`, emailSubject: `Payment received — ${s.ref}` })
     if (!opts.direct) await notifyShipperStaff(db, s.shipper_id, { kind: 'payment', title: `${s.customer} paid $${amount.toLocaleString()} on ${s.ref}`, body: `Held in escrow. $${r2(amount - fee).toLocaleString()} (after the ${Math.round(cfg.takeRatePct * 100)}% platform fee) is released to your balance when the shipment is ${cfg.releaseOn === 'delivered' ? 'delivered' : 'in transit'}.`, link: '/dashboard/payments', dedupe: `pay:${p.id}:office` }, ['owner', 'dispatcher'])
   }
   if (p.sourcing_id) await onSourcingPaid(db, { ...p, status })
@@ -295,7 +295,7 @@ export function mountPayments(r: Router, d: Deps) {
       mode: 'payment', client_reference_id: id, customer_email: u.email || undefined,
       success_url: `${base}/#/dashboard?tab=shipments&s=${s.id}&paid=${id}`, cancel_url: `${base}/#/dashboard?tab=shipments&s=${s.id}&paid=cancel`,
       metadata: { payment_id: id, shipment_id: s.id, shipment_ref: s.ref },
-      payment_intent_data: { description: `Ship Sync ${s.ref} — ${s.origin} → ${s.destination}`, metadata: { payment_id: id, shipment_ref: s.ref } },
+      payment_intent_data: { description: `Ntemtem ${s.ref} — ${s.origin} → ${s.destination}`, metadata: { payment_id: id, shipment_ref: s.ref } },
       line_items: due.items.map((i) => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: Math.round(i.amountUsd * 100), product_data: { name: i.description } } })),
     })
     await db.query(`insert into escrow_payments (id,shipment_id,shipper_id,user_id,items,amount_usd,status,provider,provider_session_id) values ($1,$2,$3,$4,$5,$6,'pending','stripe',$7)`, [id, s.id, s.shipper_id, u.id, JSON.stringify(due.items), due.amountUsd, session.id])
@@ -330,7 +330,7 @@ export function mountPayments(r: Router, d: Deps) {
     const db = await getDb(); const p = await byId(db, String(req.params.id)); const { u, office: isOffice } = await access(db, req, p.shipment_id)
     if (!isOffice && !u.admin) throw new HttpError(403, 'Not allowed.')
     if (!['held', 'released'].includes(p.status)) throw new HttpError(409, 'Only held or released (not yet paid out) funds can be refunded.')
-    if (p.status === 'released' && !u.admin) throw new HttpError(409, 'Released funds can only be refunded by Ship Sync — contact support.')
+    if (p.status === 'released' && !u.admin) throw new HttpError(409, 'Released funds can only be refunded by Ntemtem — contact support.')
     const b = zRefund.parse(req.body)
     await refundPayment(db, p, null, b.reason)
     res.json({ payment: paymentOut(await byId(db, p.id)) })
@@ -427,7 +427,7 @@ export async function seedPaymentsDemo(db: Db) {
       [id, s.id, s.shipper_id, s.user_id, JSON.stringify([{ description: `Ocean freight ${s.origin} → ${s.destination} — ${s.ref}`, amountUsd: amount, kind: 'freight' }]), amount, fee, r2(amount - fee), status, new Date(Date.now() - daysAgo * 86400000), status === 'held' ? null : new Date(Date.now() - (daysAgo - 2) * 86400000), payoutId])
   }
   await mk('esc_demo_1', ss[0], 1450, 'paid_out', 30, 'po_demo_1')
-  await db.query(`insert into payouts (id,shipper_id,amount_usd,status,method,details,reference,requested_by,requested_at,paid_at,paid_by) values ('po_demo_1','gold-coast-freight',$1,'paid','bank','{"bankName":"Chase","accountName":"Gold Coast Freight LLC","accountNumber":"····4417","country":"US"}','ACH 88213','Nana Boateng',$2,$3,'Ship Sync') on conflict (id) do nothing`, [r2(1450 * (1 - cfg.takeRatePct)), new Date(Date.now() - 26 * 86400000), new Date(Date.now() - 25 * 86400000)])
+  await db.query(`insert into payouts (id,shipper_id,amount_usd,status,method,details,reference,requested_by,requested_at,paid_at,paid_by) values ('po_demo_1','gold-coast-freight',$1,'paid','bank','{"bankName":"Chase","accountName":"Gold Coast Freight LLC","accountNumber":"····4417","country":"US"}','ACH 88213','Nana Boateng',$2,$3,'Ntemtem') on conflict (id) do nothing`, [r2(1450 * (1 - cfg.takeRatePct)), new Date(Date.now() - 26 * 86400000), new Date(Date.now() - 25 * 86400000)])
   const { rows: held } = await db.query<Row>(`select s.* from shipments s where s.shipper_id = 'gold-coast-freight' and s.status in ('booked','picked_up','at_origin_port') and s.user_id is not null and s.id not in (select shipment_id from escrow_payments) order by s.created_at desc limit 1`)
   if (held[0]) await mk('esc_demo_2', held[0], 980, 'held', 4, null)
 }

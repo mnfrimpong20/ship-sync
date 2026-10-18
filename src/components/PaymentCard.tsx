@@ -4,6 +4,7 @@ import { Check, CreditCard, FileText, Lock, RotateCcw, Wallet } from 'lucide-rea
 import { NOTIFY_EVENT } from '../lib/notifications'
 import { methodLabels, paymentStatusLabels, paymentsApi, usd, type Payment } from '../lib/payments'
 import { Confirm } from './board'
+import { ProtectedNote } from './ui'
 
 const tone: Record<Payment['status'], string> = { pending: 'bg-gold/15 text-gold-deep', held: 'bg-teal/15 text-teal', released: 'bg-teal/15 text-teal', paid_out: 'bg-teal/15 text-teal', refunded: 'bg-danger/15 text-danger', cancelled: 'bg-surface-2 text-text-muted', direct: 'bg-teal/15 text-teal' }
 const fmt = (v: string | null) => (v ? new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '')
@@ -40,7 +41,7 @@ export function PaymentCard({ shipmentId }: { shipmentId: string }) {
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface p-4" data-testid="payment-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Wallet size={14} className="text-gold" aria-hidden="true" /> Payment</p>
+        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Wallet size={14} className="text-gold-deep" aria-hidden="true" /> Payment</p>
         {p && p.status !== 'cancelled' && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone[p.status]}`} data-testid="payment-status">{paymentStatusLabels[p.status]}</span>}
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
@@ -50,7 +51,7 @@ export function PaymentCard({ shipmentId }: { shipmentId: string }) {
         <div className="mt-3 text-sm" data-testid="payment-paid">
           <p><strong className="tabular-nums">{usd(p.amountUsd)}</strong> {p.status === 'refunded' ? 'refunded' : 'paid'} {p.paidAt ? `on ${fmt(p.paidAt)}` : ''}{p.method ? ` · ${methodLabels[p.method] ?? p.method}` : ''}{p.provider === 'manual' && p.recordedBy ? ` · recorded by ${p.recordedBy}` : ''}</p>
           <ul className="mt-1 text-xs text-text-muted">{p.items.map((i, k) => <li key={k} className="flex justify-between gap-3"><span className="min-w-0 truncate">{i.description}</span><span className="tabular-nums">{usd(i.amountUsd)}</span></li>)}</ul>
-          {p.status === 'held' && <p className="mt-2 inline-flex items-start gap-1.5 text-xs text-text-muted"><Lock size={12} className="mt-0.5 shrink-0 text-teal" aria-hidden="true" /> Held by Ship Sync. Released to the shipper once the shipment is {milestone}.</p>}
+          {p.status === 'held' && <p className="mt-2 inline-flex items-start gap-1.5 text-xs text-text-muted"><Lock size={12} className="mt-0.5 shrink-0 text-teal" aria-hidden="true" /> Held by Ntemtem. Released to the shipper once the shipment is {milestone}.</p>}
           {(p.status === 'released' || p.status === 'paid_out') && <p className="mt-2 text-xs text-text-muted">Released to the shipper {fmt(p.releasedAt)}.{d.canManage ? ` Your share after the platform fee: ${usd(p.netUsd)}.` : ''}</p>}
           {p.status === 'refunded' && <p className="mt-2 text-xs text-text-muted">{p.refundReason}</p>}
           <div className="mt-2 flex flex-wrap gap-2">
@@ -66,7 +67,7 @@ export function PaymentCard({ shipmentId }: { shipmentId: string }) {
           {d.canPay ? (
             <>
               <p className="mt-2 inline-flex items-start gap-1.5 text-xs text-text-muted"><Lock size={12} className="mt-0.5 shrink-0 text-teal" aria-hidden="true" /> {d.config.customerNote}</p>
-              <div className="mt-3 flex justify-end"><button onClick={checkout} disabled={busy === 'pay' || busy === 'verify'} className="btn-gold !min-h-9 !px-4 text-sm disabled:opacity-60" data-testid="pay-now"><CreditCard size={14} aria-hidden="true" /> {busy === 'pay' ? 'Opening secure checkout…' : busy === 'verify' ? 'Confirming…' : `Pay ${usd(d.due.amountUsd)} securely`}</button></div>
+              <ProtectedNote className="mt-3" /><div className="mt-3 flex justify-end"><button onClick={checkout} disabled={busy === 'pay' || busy === 'verify'} className="btn-gold !min-h-9 !px-4 text-sm disabled:opacity-60" data-testid="pay-now"><CreditCard size={14} aria-hidden="true" /> {busy === 'pay' ? 'Opening secure checkout…' : busy === 'verify' ? 'Confirming…' : `Pay ${usd(d.due.amountUsd)} securely`}</button></div>
               {d.config.mode === 'test' && <p className="mt-2 text-right text-[11px] text-text-muted">Test mode — use card 4242 4242 4242 4242.</p>}
             </>
           ) : d.canManage ? (

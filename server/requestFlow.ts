@@ -5,7 +5,7 @@
  *              POST /requests/:id/open-market (a "chose one shipper" request nobody answered → every matching shipper)
  *   Shipper    POST /quotes/:id/withdraw
  *   Both       GET|POST /requests/:id/messages — one thread per request × shipper. Before booking, emails and phone
- *              numbers are stripped so the deal (and its protection) stays on Ship Sync.
+ *              numbers are stripped so the deal (and its protection) stays on Ntemtem.
  *   Sweeps     quotes past valid-until → expired (shipper told) · quotes 2 days from expiry → client reminded
  *              requests past expires_at → expired (client + quoting shippers told) · no quotes after 24 h → client told
  *              (one-shipper requests are offered the open marketplace) · leads unanswered past a shipper's usual reply time → one reminder

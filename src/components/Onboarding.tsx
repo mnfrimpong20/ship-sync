@@ -24,7 +24,7 @@ export function OnboardingChecklist({ canDismiss }: { canDismiss: boolean }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="eyebrow mb-1 flex items-center gap-2"><Sparkles size={14} aria-hidden="true" /> {o.complete ? 'All set' : 'Getting started'}</p>
-          <h2 id="onb-h" className="!text-xl">{o.complete ? `${o.companyName} is ready to win work` : `Set up ${o.companyName} on Ship Sync`}</h2>
+          <h2 id="onb-h" className="!text-xl">{o.complete ? `${o.companyName} is ready to win work` : `Set up ${o.companyName} on Ntemtem`}</h2>
           <p className="mt-1 text-sm text-text-muted">{o.complete ? 'The core steps are done. Two optional ones remain below.' : next ? <>Next: <b className="text-text">{next.title}</b> — {o.doneCore} of {o.totalCore} done.</> : null}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -44,7 +44,7 @@ export function OnboardingChecklist({ canDismiss }: { canDismiss: boolean }) {
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-2 text-sm font-semibold"><span className={s.done ? 'line-through decoration-text-muted/50' : ''}>{s.title}</span>{s.optional && !s.done && <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">optional</span>}</p>
                 <p className="mt-0.5 text-xs text-text-muted">{s.detail}</p>
-                {!s.done && <Link to={s.to} className={`mt-2 inline-flex items-center gap-1 text-xs font-semibold focus-ring rounded ${s === next ? 'text-gold' : 'text-text hover:text-gold'}`} data-testid={`onb-${s.id}`}>{s.cta} <ArrowRight size={12} aria-hidden="true" /></Link>}
+                {!s.done && <Link to={s.to} className={`mt-2 inline-flex items-center gap-1 text-xs font-semibold focus-ring rounded ${s === next ? 'text-gold-deep' : 'text-text hover:text-gold-deep'}`} data-testid={`onb-${s.id}`}>{s.cta} <ArrowRight size={12} aria-hidden="true" /></Link>}
               </div>
             </li>
           ))}

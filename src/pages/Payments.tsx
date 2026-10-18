@@ -23,11 +23,11 @@ function PayoutDetailsCard({ details, canEdit, onSaved }: { details: PayoutDetai
   const save = async () => { setBusy(true); setError(''); try { const d = await paymentsApi.savePayoutDetails(f); onSaved(d, 'Payout details saved.'); setEdit(false) } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.') } finally { setBusy(false) } }
   return (
     <div className="card-dark p-5" data-testid="payout-details">
-      <div className="flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 !text-base"><Landmark size={16} className="text-gold" aria-hidden="true" /> Payout account</h2>{canEdit && !edit && <button onClick={() => setEdit(true)} className="btn-ghost !min-h-8 !px-3 text-xs">{has ? 'Change' : 'Add'}</button>}</div>
+      <div className="flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 !text-base"><Landmark size={16} className="text-gold-deep" aria-hidden="true" /> Payout account</h2>{canEdit && !edit && <button onClick={() => setEdit(true)} className="btn-ghost !min-h-8 !px-3 text-xs">{has ? 'Change' : 'Add'}</button>}</div>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       {!edit ? (
         has ? <dl className="mt-3 grid gap-1 text-sm">{details.bankName && <div className="flex justify-between gap-3"><dt className="text-text-muted">Bank</dt><dd>{details.bankName}{details.country ? ` (${details.country})` : ''}</dd></div>}{details.accountName && <div className="flex justify-between gap-3"><dt className="text-text-muted">Account name</dt><dd>{details.accountName}</dd></div>}{details.accountNumber && <div className="flex justify-between gap-3"><dt className="text-text-muted">Account</dt><dd className="font-mono text-xs">{details.accountNumber}</dd></div>}{details.routing && <div className="flex justify-between gap-3"><dt className="text-text-muted">Routing / SWIFT</dt><dd className="font-mono text-xs">{details.routing}</dd></div>}{details.mobileMoney && <div className="flex justify-between gap-3"><dt className="text-text-muted">Mobile money</dt><dd>{details.mobileMoney}</dd></div>}</dl>
-          : <p className="mt-2 text-sm text-text-muted">{canEdit ? 'Add the bank or mobile-money account Ship Sync should pay you into.' : 'The owner hasn’t added a payout account yet.'}</p>
+          : <p className="mt-2 text-sm text-text-muted">{canEdit ? 'Add the bank or mobile-money account Ntemtem should pay you into.' : 'The owner hasn’t added a payout account yet.'}</p>
       ) : (
         <form onSubmit={(e) => { e.preventDefault(); void save() }} className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="Payout account">
           <label className="text-xs text-text-muted">Bank name<input className="input-dark mt-1 !min-h-9 text-sm" value={f.bankName} onChange={(e) => setF({ ...f, bankName: e.target.value })} /></label>
@@ -35,7 +35,7 @@ function PayoutDetailsCard({ details, canEdit, onSaved }: { details: PayoutDetai
           <label className="text-xs text-text-muted sm:col-span-2">Account holder name<input className="input-dark mt-1 !min-h-9 text-sm" value={f.accountName} onChange={(e) => setF({ ...f, accountName: e.target.value })} /></label>
           <label className="text-xs text-text-muted">Account number / IBAN<input className="input-dark mt-1 !min-h-9 font-mono text-sm" value={f.accountNumber} onChange={(e) => setF({ ...f, accountNumber: e.target.value })} /></label>
           <label className="text-xs text-text-muted">Routing / sort code / SWIFT<input className="input-dark mt-1 !min-h-9 font-mono text-sm" value={f.routing} onChange={(e) => setF({ ...f, routing: e.target.value })} /></label>
-          <label className="text-xs text-text-muted sm:col-span-2">Mobile money (MTN MoMo, Vodafone Cash…) — number and network<input className="input-dark mt-1 !min-h-9 text-sm" placeholder="e.g. 024 555 0190 · MTN" value={f.mobileMoney} onChange={(e) => setF({ ...f, mobileMoney: e.target.value })} /></label>
+          <label className="text-xs text-text-muted sm:col-span-2">Mobile money (MTN MoMo, Telecel Cash, AT Money…) — number and network<input className="input-dark mt-1 !min-h-9 text-sm" placeholder="e.g. 024 555 0190 · MTN" value={f.mobileMoney} onChange={(e) => setF({ ...f, mobileMoney: e.target.value })} /></label>
           <div className="flex justify-end gap-2 sm:col-span-2"><button type="button" onClick={() => { setEdit(false); setF(details) }} className="btn-ghost !min-h-9 !px-3 text-xs">Cancel</button><button disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60"><Save size={13} aria-hidden="true" /> {busy ? 'Saving…' : 'Save'}</button></div>
         </form>
       )}
@@ -66,14 +66,14 @@ export default function Payments() {
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/payments" replace />
   if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
   const b = data?.balance
-  const requestPayout = async () => { setBusy(true); setError(''); try { await paymentsApi.requestPayout(); await load(); setToast('Payout requested — Ship Sync will send it within 2 business days.') } catch (e) { setError(e instanceof Error ? e.message : 'Could not request a payout.') } finally { setBusy(false); setRequesting(false) } }
+  const requestPayout = async () => { setBusy(true); setError(''); try { await paymentsApi.requestPayout(); await load(); setToast('Payout requested — Ntemtem will send it within 2 business days.') } catch (e) { setError(e instanceof Error ? e.message : 'Could not request a payout.') } finally { setBusy(false); setRequesting(false) } }
 
   return (
     <div className="bg-bg text-text">
       <div className="container-x py-10 md:py-14">
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Payments</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{b && b.availableUsd > 0 ? `${usd(b.availableUsd)} ready to pay out` : 'Payments & payouts'}</motion.h1><motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Customers pay Ship Sync; the money is held in escrow and released to your balance once the shipment is {data?.config.releaseOn === 'delivered' ? 'delivered' : 'in transit'}, less the {Math.round((data?.config.takeRatePct ?? 0) * 100)}% platform fee. Request a payout whenever you like.</motion.p></div>
+            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Payments</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{b && b.availableUsd > 0 ? `${usd(b.availableUsd)} ready to pay out` : 'Payments & payouts'}</motion.h1><motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Customers pay Ntemtem; the money is held in escrow and released to your balance once the shipment is {data?.config.releaseOn === 'delivered' ? 'delivered' : 'in transit'}, less the {Math.round((data?.config.takeRatePct ?? 0) * 100)}% platform fee. Request a payout whenever you like.</motion.p></div>
             {data?.canPayout && <motion.div variants={fadeUp}><button onClick={() => setRequesting(true)} disabled={!b || b.availableUsd <= 0} className="btn-gold disabled:opacity-60" data-testid="request-payout"><Banknote size={16} aria-hidden="true" /> Request payout</button></motion.div>}
           </div>
           {toast && <p role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</p>}
@@ -108,7 +108,7 @@ export default function Payments() {
                       {pg.rows.map((p) => (
                         <tr key={p.id} className={trow(false, p.status === 'refunded' || p.status === 'cancelled')} data-testid="payment-row">
                           <td className="whitespace-nowrap px-3 py-3 text-xs">{fmt(p.paidAt)}<p className="text-text-muted">{p.method ? methodLabels[p.method] ?? p.method : ''}</p></td>
-                          <td className="px-3 py-3"><Link to={`/dashboard/shipments?q=${p.shipmentRef}&b=all`} className="whitespace-nowrap font-mono text-xs text-gold hover:underline">{p.shipmentRef}</Link><p className="text-xs text-text-muted">{p.customer}</p></td>
+                          <td className="px-3 py-3"><Link to={`/dashboard/shipments?q=${p.shipmentRef}&b=all`} className="whitespace-nowrap font-mono text-xs text-gold-deep hover:underline">{p.shipmentRef}</Link><p className="text-xs text-text-muted">{p.customer}</p></td>
                           <td className="px-3 py-3 text-xs text-text-muted"><p className="max-w-[170px] truncate" title={p.items.map((i) => i.description).join(', ')}>{p.items.map((i) => i.description).join(', ')}</p>{p.recordedBy && <p>Recorded by {p.recordedBy}</p>}</td>
                           <td className="px-3 py-3 text-right tabular-nums">{usd(p.amountUsd)}</td>
                           <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-text-muted">{p.feeUsd ? `−${usd(p.feeUsd)}` : "—"}</td>
@@ -125,7 +125,7 @@ export default function Payments() {
             <motion.div variants={fadeUp} className="min-w-0 space-y-6">
               {data && <PayoutDetailsCard details={data.payoutDetails} canEdit={data.canPayout} onSaved={(d, msg) => { setData({ ...data, payoutDetails: d }); setToast(msg) }} />}
               <div className="card-dark p-5" data-testid="payouts">
-                <h2 className="flex items-center gap-2 !text-base"><Banknote size={16} className="text-gold" aria-hidden="true" /> Payouts</h2>
+                <h2 className="flex items-center gap-2 !text-base"><Banknote size={16} className="text-gold-deep" aria-hidden="true" /> Payouts</h2>
                 <p className="mt-1 text-xs text-text-muted">{data?.config.payoutNote}</p>
                 <ul className="mt-3 divide-y divide-border/70 text-sm">
                   {data && data.payouts.length === 0 && <li className="py-2 text-text-muted">No payouts yet.</li>}
@@ -141,7 +141,7 @@ export default function Payments() {
           </div>
         </motion.div>
       </div>
-      {requesting && b && <Confirm title={`Request a payout of ${usd(b.availableUsd)}?`} danger={false} body={<p>Ship Sync sends it to {data?.payoutDetails.mobileMoney && !data.payoutDetails.accountNumber ? `your mobile money (${data.payoutDetails.mobileMoney})` : `${data?.payoutDetails.bankName || 'your bank'} ${data?.payoutDetails.accountNumber || ''}`} within 2 business days. Released funds from {all.filter((p) => p.status === 'released' && !p.payoutId).length} shipment{all.filter((p) => p.status === 'released' && !p.payoutId).length === 1 ? '' : 's'} are included.</p>} confirmLabel="Request payout" busy={busy} onClose={() => setRequesting(false)} onConfirm={requestPayout} />}
+      {requesting && b && <Confirm title={`Request a payout of ${usd(b.availableUsd)}?`} danger={false} body={<p>Ntemtem sends it to {data?.payoutDetails.mobileMoney && !data.payoutDetails.accountNumber ? `your mobile money (${data.payoutDetails.mobileMoney})` : `${data?.payoutDetails.bankName || 'your bank'} ${data?.payoutDetails.accountNumber || ''}`} within 2 business days. Released funds from {all.filter((p) => p.status === 'released' && !p.payoutId).length} shipment{all.filter((p) => p.status === 'released' && !p.payoutId).length === 1 ? '' : 's'} are included.</p>} confirmLabel="Request payout" busy={busy} onClose={() => setRequesting(false)} onConfirm={requestPayout} />}
     </div>
   )
 }

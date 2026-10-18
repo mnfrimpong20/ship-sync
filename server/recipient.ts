@@ -51,18 +51,20 @@ export async function consigneeOf(db: Db, s: Row) {
 const firstName = (n: string) => String(n ?? '').trim().split(' ')[0] || 'there'
 /** Short, plain texts — SMS segments cost money and signal is patchy. */
 function compose(kind: RecipientKind, s: Row, shipperName: string, link: string, receiver: Row | null, extra?: { note?: string }) {
-  const hi = `Hi ${firstName(receiver?.name ?? '')},`
+  const name = firstName(receiver?.name ?? '')
+  const hi = s.destination === 'GH' ? `Akwaaba, ${name}!` : `Hi ${name},`
   const dest = countryByCode(s.destination)
   const port = dest?.ports?.[0] ?? dest?.name ?? s.destination
   const ref = s.ref
+  // Ntemtem voice: greeting, the news, the next step, the link. No emoji — it doubles SMS cost.
   switch (kind) {
-    case 'notice': return `${hi} ${s.customer} is sending you a shipment via ${shipperName}. Ref ${ref}. Track it and confirm when it arrives: ${link}`
-    case 'sailed': return `${hi} shipment ${ref} from ${s.customer} is on its way${s.vessel_name ? ` on ${s.vessel_name}` : ''}${s.eta ? `, expected around ${new Date(s.eta).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}. Follow it: ${link}`
-    case 'arrived': return `${hi} shipment ${ref} has arrived at ${port} and is going through clearance. We'll tell you when it's ready. ${link}`
-    case 'ready': return `${hi} shipment ${ref} is cleared and ready for collection at ${shipperName}${extra?.note ? ` — ${extra.note}` : ''}. Bring your ID and the ref. ${link}`
-    case 'out_for_delivery': return `${hi} shipment ${ref} is out for delivery today. Please keep ${receiver?.phone || 'this number'} reachable. ${link}`
-    case 'delivered': return `${hi} shipment ${ref} has been delivered. If that's right, tap to confirm: ${link} — or reply if something is missing.`
-    case 'reminder': return `${hi} reminder: shipment ${ref} is waiting for collection at ${shipperName}. ${link}`
+    case 'notice': return `${hi} ${s.customer} is sending you a package with ${shipperName} on Ntemtem. Ref ${ref}. Track it here: ${link}`
+    case 'sailed': return `${hi} your package from ${s.customer} is on its way${s.vessel_name ? ` on ${s.vessel_name}` : ''}${s.eta ? `, arriving around ${new Date(s.eta).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}. Ref ${ref}. Follow it: ${link}`
+    case 'arrived': return `${hi} your package ${ref} has landed at ${port} and is going through customs. We'll message you the moment it's ready. ${link}`
+    case 'ready': return `Good news, ${name} — your package ${ref} is ready for collection at ${shipperName}${extra?.note ? ` (${extra.note})` : ''}. Bring your ID and this ref. ${link}`
+    case 'out_for_delivery': return `${hi} your package ${ref} is out for delivery today. Please keep ${receiver?.phone || 'this number'} on. ${link}`
+    case 'delivered': return `${hi} your package ${ref} has been delivered. Tap to confirm you have it: ${link} — or reply if anything is missing.`
+    case 'reminder': return `${hi} a reminder: your package ${ref} is waiting for you at ${shipperName}. ${link}`
   }
 }
 

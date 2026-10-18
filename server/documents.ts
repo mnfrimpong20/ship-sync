@@ -76,7 +76,7 @@ export type ShipmentContext = Awaited<ReturnType<typeof shipmentContext>>
 async function buildPayload(db: Db, s: Row, kind: DocKind, HttpError: Deps['HttpError']) {
   const ctx = await shipmentContext(db, s)
   if (kind === 'proof_of_delivery' && !ctx.pod && s.status !== 'delivered') throw new HttpError(409, 'No delivery has been recorded for this shipment yet. Scan the pieces at handover first.')
-  const number = (prefix: string) => `${prefix}-${s.ref.replace(/^SS-/, '')}`
+  const number = (prefix: string) => `${prefix}-${s.ref.replace(/^(SS|NT)-/, '')}`
   return { ...ctx, generatedAt: new Date().toISOString(), number: kind === 'packing_list' ? number('PL') : kind === 'commercial_invoice' ? number('CI') : number('POD') }
 }
 

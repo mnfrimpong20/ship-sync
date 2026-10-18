@@ -163,9 +163,9 @@ export function ShipmentManage({ s, consignees, onChanged, onDeleted }: { s: Shi
 
       {/* automation */}
       <div className="mt-4 border-t border-border pt-3" data-testid="automation">
-        <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-muted"><Bot size={14} className="text-gold" aria-hidden="true" /> Moves on its own</p>
+        <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-muted"><Bot size={14} className="text-gold-deep" aria-hidden="true" /> Moves on its own</p>
         {s.status === 'delivered' ? <p className="mt-1 text-sm text-teal">Delivered — nothing left to move.</p>
-          : auto?.next ? <p className="mt-1 text-sm"><Zap size={13} className="mr-1 inline text-gold" aria-hidden="true" />Goes to <strong>{statusLabels[auto.next.to]}</strong> when {auto.next.how}.</p>
+          : auto?.next ? <p className="mt-1 text-sm"><Zap size={13} className="mr-1 inline text-gold-deep" aria-hidden="true" />Goes to <strong>{statusLabels[auto.next.to]}</strong> when {auto.next.how}.</p>
           : <p className="mt-1 text-sm text-text-muted">Loading…</p>}
         {auto && (auto.wired.pickupRun || auto.wired.container || auto.wired.deliveryRun || auto.wired.pieces > 0 || auto.wired.vessel) && (
           <ul className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
@@ -178,7 +178,7 @@ export function ShipmentManage({ s, consignees, onChanged, onDeleted }: { s: Shi
         )}
         {auto && auto.missing.length > 0 && s.status !== 'delivered' && (
           <ul className="mt-2 space-y-1 text-xs text-text-muted" aria-label="To automate the next steps">
-            {auto.missing.map((m) => <li key={m} className="flex gap-1.5"><CircleDashed size={12} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" />{m}</li>)}
+            {auto.missing.map((m) => <li key={m} className="flex gap-1.5"><CircleDashed size={12} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" />{m}</li>)}
           </ul>
         )}
       </div>

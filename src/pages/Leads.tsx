@@ -82,7 +82,7 @@ function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (ms
       {error && <p role="alert" className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
       {sg && !prev && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs" data-testid="suggested-quote">
-          <span><Tag size={12} className="mr-1 inline text-gold" aria-hidden="true" /><strong>{money(sg.price)}</strong> · {sg.transitDays} days from your rate card{sg.breakdown.minApplied ? ' (minimum charge)' : ''}</span>
+          <span><Tag size={12} className="mr-1 inline text-gold-deep" aria-hidden="true" /><strong>{money(sg.price)}</strong> · {sg.transitDays} days from your rate card{sg.breakdown.minApplied ? ' (minimum charge)' : ''}</span>
           {String(sg.price) !== form.price && <button type="button" onClick={() => setForm({ ...form, price: String(sg.price), transit: String(sg.transitDays), notes: form.notes || sg.notes })} className="btn-ghost !min-h-7 !px-2 text-[11px]">Use suggested</button>}
         </div>
       )}

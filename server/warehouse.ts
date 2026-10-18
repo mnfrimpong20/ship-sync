@@ -108,7 +108,7 @@ export function mountWarehouse(r: Router, d: Deps) {
     let bin: Row | null = null; if (b.binId) { const { rows } = await db.query<Row>(`${BIN_SELECT} where b.id = $1 and b.site_id = $2`, [b.binId, site.id]); bin = rows[0]; if (!bin) throw new HttpError(404, 'Bin not found at this site.') }
     let pieces: Row[] = []; let shipment: Row | null = null
     if (b.code) {
-      const parsed = parseCode(b.code); if (!parsed) throw new HttpError(400, 'That doesn’t look like a Ship Sync sticker code.')
+      const parsed = parseCode(b.code); if (!parsed) throw new HttpError(400, 'That doesn’t look like a Ntemtem sticker code.')
       const { rows: ss } = await db.query<Row>('select * from shipments where upper(ref) = $1 and shipper_id = $2', [parsed.ref, u.shipperId]); shipment = ss[0]; if (!shipment) throw new HttpError(404, `${parsed.ref} is not one of your shipments.`)
       const all = await ensurePieces(db, shipment); const one = all.find((p) => Number(p.seq) === parsed.seq); if (!one) throw new HttpError(404, `Piece ${parsed.seq} does not exist on ${parsed.ref}.`)
       pieces = [one]

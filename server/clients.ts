@@ -1,5 +1,5 @@
 /**
- * Client management for shippers: the people they ship for, whether they came through the Ship Sync marketplace or are
+ * Client management for shippers: the people they ship for, whether they came through the Ntemtem marketplace or are
  * long-standing offline customers. Everything here is scoped to the signed-in shipper's company.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
@@ -97,7 +97,7 @@ export async function attachShipmentToClient(db: Db, shipperId: string, userId: 
   const { rows } = await db.query<Row>('select id from clients where shipper_id = $1 and user_id = $2', [shipperId, userId])
   if (rows[0]) {
     await db.query('update shipments set client_id = $2 where id = $1', [shipmentId, rows[0].id])
-    await db.query(`insert into client_activities (id,client_id,shipper_id,type,body) values ($1,$2,$3,'system',$4)`, [uid(), rows[0].id, shipperId, 'Booked through Ship Sync.'])
+    await db.query(`insert into client_activities (id,client_id,shipper_id,type,body) values ($1,$2,$3,'system',$4)`, [uid(), rows[0].id, shipperId, 'Booked through Ntemtem.'])
   }
 }
 

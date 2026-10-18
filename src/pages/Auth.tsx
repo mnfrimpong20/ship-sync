@@ -26,7 +26,7 @@ function RoleToggle({ role, setRole }: { role: Role; setRole: (r: Role) => void 
   return (
     <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Account type">
       {([['customer', 'I’m shipping cargo', User], ['shipper', 'I’m a shipping company', Building2]] as const).map(([v, l, Icon]) => (
-        <button type="button" key={v} role="radio" aria-checked={role === v} onClick={() => setRole(v)} className={`flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-sm)] border text-sm font-medium transition-colors focus-ring ${role === v ? 'border-gold bg-gold/15 text-gold' : 'border-border bg-surface-2 text-text-muted hover:text-text'}`}><Icon size={16} aria-hidden="true" />{l}</button>
+        <button type="button" key={v} role="radio" aria-checked={role === v} onClick={() => setRole(v)} className={`flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-sm)] border text-sm font-medium transition-colors focus-ring ${role === v ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border bg-surface-2 text-text-muted hover:text-text'}`}><Icon size={16} aria-hidden="true" />{l}</button>
       ))}
     </div>
   )
@@ -66,10 +66,10 @@ export function Login() {
       <form onSubmit={submit} className="grid gap-4" noValidate>
         <RoleToggle role={role} setRole={setRole} />
         <div><label htmlFor="email" className="label-dark">Email</label><input id="email" type="email" className="input-dark" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder={role === 'shipper' ? 'ops@yourcompany.com' : 'you@example.com'} /></div>
-        <div><div className="flex items-baseline justify-between"><label htmlFor="pw" className="label-dark">Password</label><Link to="/forgot" className="text-xs text-gold hover:underline">Forgot password?</Link></div><input id="pw" type="password" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" /></div>
+        <div><div className="flex items-baseline justify-between"><label htmlFor="pw" className="label-dark">Password</label><Link to="/forgot" className="text-xs text-gold-deep hover:underline">Forgot password?</Link></div><input id="pw" type="password" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" /></div>
         {err && <p role="alert" className="text-sm text-danger">{err}</p>}
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Signing in</> : 'Sign in'}</motion.button>
-        <p className="text-center text-sm text-text-muted">New here? <Link to={`/signup?role=${role}${sp.get('next') ? `&next=${encodeURIComponent(sp.get('next')!)}` : ''}`} className="text-gold hover:underline">Create an account</Link></p>
+        <p className="text-center text-sm text-text-muted">New here? <Link to={`/signup?role=${role}${sp.get('next') ? `&next=${encodeURIComponent(sp.get('next')!)}` : ''}`} className="text-gold-deep hover:underline">Create an account</Link></p>
         <DemoNote role={role} />
       </form>
     </Shell>
@@ -108,7 +108,7 @@ export function Signup() {
         <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm text-text-muted"><input type="checkbox" className="mt-0.5 h-5 w-5 accent-gold" checked={f.agree} onChange={(e) => setF({ ...f, agree: e.target.checked })} /> I agree to the Terms of Service{role === 'shipper' ? ' and Shipper Agreement' : ''} and Privacy Policy.</label>
         {err && <p role="alert" className="text-sm text-danger">{err}</p>}
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Creating account</> : role === 'shipper' ? 'Create shipper account' : 'Create account'}</motion.button>
-        <p className="text-center text-sm text-text-muted">Already have an account? <Link to={`/login?role=${role}`} className="text-gold hover:underline">Sign in</Link></p>
+        <p className="text-center text-sm text-text-muted">Already have an account? <Link to={`/login?role=${role}`} className="text-gold-deep hover:underline">Sign in</Link></p>
       </form>
     </Shell>
   )
@@ -120,9 +120,9 @@ function Aside({ shipper = false }: { shipper?: boolean }) {
     : ['Quotes from verified shippers within 24h', 'Compare price, transit and inclusions side by side', 'One reference to track pickup → delivery', 'Free forever for customers']
   return (
     <div className="card-dark p-7">
-      <p className="eyebrow">{shipper ? 'Why list on Ship Sync' : 'What you get'}</p>
-      <ul className="mt-4 space-y-3">{items.map((i) => <li key={i} className="flex gap-3 text-text"><span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gold/15 text-gold"><Check size={14} aria-hidden="true" /></span>{i}</li>)}</ul>
-      <blockquote className="mt-6 border-t border-border pt-5 text-sm text-text-muted">“{shipper ? 'Listing on Ship Sync replaced our Facebook-group lead hunting.' : 'Four quotes in a day, picked one, cleared Tema in nine days.'}”<footer className="mt-2 text-xs">— {shipper ? 'Kwame Asante, Atlantic Bridge Logistics' : 'Abena Owusu, Houston → Accra'}</footer></blockquote>
+      <p className="eyebrow">{shipper ? 'Why list on Ntemtem' : 'What you get'}</p>
+      <ul className="mt-4 space-y-3">{items.map((i) => <li key={i} className="flex gap-3 text-text"><span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gold/15 text-gold-deep"><Check size={14} aria-hidden="true" /></span>{i}</li>)}</ul>
+      <blockquote className="mt-6 border-t border-border pt-5 text-sm text-text-muted">“{shipper ? 'Listing on Ntemtem replaced our Facebook-group lead hunting.' : 'Four quotes in a day, picked one, cleared Tema in nine days.'}”<footer className="mt-2 text-xs">— {shipper ? 'Kwame Asante, Atlantic Bridge Logistics' : 'Abena Owusu, Houston → Accra'}</footer></blockquote>
     </div>
   )
 }
@@ -142,17 +142,17 @@ export function ForgotPassword() {
     <Shell title="Reset your password" sub="Enter the email you signed up with and we’ll send a link that works for one hour." aside={<Aside />}>
       {sent ? (
         <div className="grid gap-3 text-center" data-testid="forgot-sent">
-          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-gold/15 text-gold"><MailCheck size={22} aria-hidden="true" /></span>
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-gold/15 text-gold-deep"><MailCheck size={22} aria-hidden="true" /></span>
           <p className="font-semibold">Check your inbox</p>
           <p className="text-sm text-text-muted">If an account exists for <span className="font-mono text-text">{email}</span>, a reset link is on its way. It expires in an hour — check spam if it hasn’t arrived in a few minutes.</p>
-          <p className="text-sm text-text-muted"><Link to="/login" className="text-gold hover:underline">Back to sign in</Link></p>
+          <p className="text-sm text-text-muted"><Link to="/login" className="text-gold-deep hover:underline">Back to sign in</Link></p>
         </div>
       ) : (
         <form onSubmit={submit} className="grid gap-4" noValidate>
           <div><label htmlFor="femail" className="label-dark">Email</label><input id="femail" type="email" className="input-dark" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" /></div>
           {err && <p role="alert" className="text-sm text-danger">{err}</p>}
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Sending</> : 'Email me a reset link'}</motion.button>
-          <p className="text-center text-sm text-text-muted">Remembered it? <Link to="/login" className="text-gold hover:underline">Sign in</Link></p>
+          <p className="text-center text-sm text-text-muted">Remembered it? <Link to="/login" className="text-gold-deep hover:underline">Sign in</Link></p>
         </form>
       )}
     </Shell>
@@ -178,12 +178,12 @@ export function ResetPassword() {
   return (
     <Shell title={sp.get('welcome') ? 'Set your password' : 'Choose a new password'} sub={sp.get('welcome') ? 'So you can sign back in to compare and book your quotes from any device.' : 'You’ll be signed in here and signed out everywhere else.'} aside={<Aside />}>
       {!token ? (
-        <p className="text-sm text-text-muted">This link is missing its token. <Link to="/forgot" className="text-gold hover:underline">Request a new reset link</Link>.</p>
+        <p className="text-sm text-text-muted">This link is missing its token. <Link to="/forgot" className="text-gold-deep hover:underline">Request a new reset link</Link>.</p>
       ) : (
         <form onSubmit={submit} className="grid gap-4" noValidate>
           <div><label htmlFor="rpw" className="label-dark">New password</label><input id="rpw" type="password" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /><p className="mt-1 text-xs text-text-muted">At least 8 characters.</p></div>
           <div><label htmlFor="rpw2" className="label-dark">Repeat password</label><input id="rpw2" type="password" className="input-dark" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></div>
-          {err && <p role="alert" className="text-sm text-danger">{err} {/expired|used/i.test(err) && <Link to="/forgot" className="text-gold hover:underline">Request a new link</Link>}</p>}
+          {err && <p role="alert" className="text-sm text-danger">{err} {/expired|used/i.test(err) && <Link to="/forgot" className="text-gold-deep hover:underline">Request a new link</Link>}</p>}
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Saving</> : 'Save new password'}</motion.button>
         </form>
       )}

@@ -32,7 +32,7 @@ export function Destinations() {
           <div>
             <p className="eyebrow">More lanes</p>
             <h3 className="mt-3 text-text">Don’t see your country?</h3>
-            <p className="mt-2 text-sm text-text-muted">Shippers on Ship Sync also serve Benin, Guinea, Gambia, Cameroon and Burkina Faso via Lomé and Tema.</p>
+            <p className="mt-2 text-sm text-text-muted">Shippers on Ntemtem also serve Benin, Guinea, Gambia, Cameroon and Burkina Faso via Lomé and Tema.</p>
           </div>
           <Link to="/quote" className="btn-gold mt-5 !min-h-10 text-sm">Ask for a quote</Link>
         </motion.div>
@@ -45,7 +45,7 @@ export function Destinations() {
 const steps = [
   { icon: ClipboardList, title: 'Post your shipment', body: 'Tell us what you’re sending, from where, to which country, and whether you want pickup and door delivery. Takes two minutes, no account required.' },
   { icon: Scale, title: 'Compare real quotes', body: 'Matching shippers reply with itemised quotes, transit times and what’s included. See their verification status, ratings and on-time history side by side.' },
-  { icon: Radar, title: 'Book and track', body: 'Accept the quote you like. Your shipment gets a Ship Sync reference and a live timeline from pickup to delivery at the door in Accra, Lagos or Monrovia.' },
+  { icon: Radar, title: 'Book and track', body: 'Accept the quote you like. Your shipment gets a Ntemtem reference and a live timeline from pickup to delivery at the door in Accra, Lagos or Monrovia.' },
 ]
 export function HowItWorks() {
   return (
@@ -55,7 +55,7 @@ export function HowItWorks() {
         {steps.map((s, i) => (
           <motion.li key={s.title} variants={fadeUp} className="card-dark relative p-7">
             <span className="absolute right-6 top-5 font-heading text-5xl font-bold text-gold/15" aria-hidden="true">0{i + 1}</span>
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gold/15 text-gold"><s.icon size={22} aria-hidden="true" /></span>
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gold/15 text-gold-deep"><s.icon size={22} aria-hidden="true" /></span>
             <h3 className="mt-5 text-text">{s.title}</h3>
             <p className="mt-2 text-text-muted">{s.body}</p>
           </motion.li>
@@ -78,7 +78,7 @@ const features = [
 export function Features() {
   return (
     <Section id="features" light>
-      <SectionHeader light eyebrow="Why Ship Sync" title="Built for the way West Africa actually ships" body="Most freight to Africa is still booked through word of mouth and WhatsApp. We keep the relationships and add the guardrails." />
+      <SectionHeader light eyebrow="Why Ntemtem" title="Built for the way West Africa actually ships" body="Most freight to Africa is still booked through word of mouth and WhatsApp. We keep the relationships and add the guardrails." />
       <div className="grid gap-5 md:grid-cols-6">
         {features.map((f) => (
           <motion.div key={f.title} variants={fadeUp} whileHover={{ y: -4 }} className={`${f.accent ? 'bg-bg text-text border-bg' : 'card-light'} rounded-[var(--radius-lg)] border p-7 ${f.span}`}>
@@ -101,10 +101,10 @@ export function ForShippers() {
         <div>
           <motion.p variants={fadeUp} className="eyebrow mb-3">For shipping companies</motion.p>
           <motion.h2 variants={fadeUp}>Stop chasing leads in Facebook groups.</motion.h2>
-          <motion.p variants={fadeUp} className="mt-4 text-lg text-text-muted">Ship Sync sends you shipment requests that match your origins, destinations and cargo types. Reply with a quote, win the booking, get paid directly by the customer.</motion.p>
+          <motion.p variants={fadeUp} className="mt-4 text-lg text-text-muted">Ntemtem sends you shipment requests that match your origins, destinations and cargo types. Reply with a quote, win the booking, get paid directly by the customer.</motion.p>
           <ul className="mt-6 space-y-3">
             {perks.map((p) => (
-              <motion.li key={p} variants={fadeUp} className="flex items-start gap-3 text-text"><span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gold/15 text-gold"><Check size={14} aria-hidden="true" /></span>{p}</motion.li>
+              <motion.li key={p} variants={fadeUp} className="flex items-start gap-3 text-text"><span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gold/15 text-gold-deep"><Check size={14} aria-hidden="true" /></span>{p}</motion.li>
             ))}
           </ul>
           <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -129,7 +129,7 @@ export function ForShippers() {
           </ul>
           <div className="mt-5 grid grid-cols-3 gap-3 border-t border-border pt-5 text-center">
             {[['38', 'Bookings / mo'], ['4.8', 'Rating'], ['2h', 'Avg. response']].map(([v, l]) => (
-              <div key={l}><p className="font-heading text-2xl font-bold text-gold">{v}</p><p className="text-xs text-text-muted">{l}</p></div>
+              <div key={l}><p className="font-heading text-2xl font-bold text-gold-deep">{v}</p><p className="text-xs text-text-muted">{l}</p></div>
             ))}
           </div>
         </motion.div>
@@ -143,7 +143,7 @@ export function FeaturedShippers() {
   const featured = shippers.filter((s) => ['gold-coast-freight', 'atlantic-bridge', 'sahel-air-cargo'].includes(s.id))
   return (
     <Section id="featured" light>
-      <SectionHeader light eyebrow="Shipper directory" title="Companies customers book again" body="Ratings come only from customers who booked through Ship Sync." />
+      <SectionHeader light eyebrow="Shipper directory" title="Companies customers book again" body="Ratings come only from customers who booked through Ntemtem." />
       <div className="grid gap-6 md:grid-cols-3">
         {featured.map((s) => <ShipperCard key={s.id} s={s} light />)}
       </div>
@@ -156,7 +156,7 @@ export function FeaturedShippers() {
 
 /* ---------- Testimonials ---------- */
 export function Testimonials() {
-  const hues = ['#E3B54A', '#2DD4BF', '#7DD3FC']
+  const hues = ['#F5B82E', '#6CC3DD', '#7DD3FC']
   return (
     <Section id="testimonials">
       <SectionHeader eyebrow="Customer stories" title="Trusted by families and businesses shipping home" />
@@ -187,16 +187,16 @@ export function Pricing() {
   useEffect(() => { fetch('/api/pricing').then((r) => r.json()).then((d: { plans?: { key: string; priceUsd: number }[] }) => setLive(Object.fromEntries((d.plans ?? []).map((p) => [p.key, p.priceUsd])))).catch(() => {}) }, [])
   return (
     <Section id="pricing" light>
-      <SectionHeader light eyebrow="Pricing" title="Free for customers. Simple plans for shippers." body="Customers never pay Ship Sync. Shippers pay a flat monthly fee for leads and tools; a small platform fee applies only when a customer pays you through Ship Sync's escrow." />
+      <SectionHeader light eyebrow="Pricing" title="Free for customers. Simple plans for shippers." body="Customers never pay Ntemtem. Shippers pay a flat monthly fee for leads and tools; a small platform fee applies only when a customer pays you through Ntemtem's escrow." />
       <div className="grid gap-6 lg:grid-cols-3">
         {plans.map((p) => (
           <motion.div key={p.name} variants={fadeUp} whileHover={{ y: -4 }} className={`relative flex flex-col rounded-[var(--radius-lg)] border p-7 ${p.highlight ? 'border-gold bg-bg text-text shadow-[var(--shadow-dark)]' : 'card-light'}`}>
             {p.highlight && <span className="absolute -top-3 left-7 rounded-full bg-gold px-3 py-1 text-xs font-bold text-on-accent">{p.tag}</span>}
             <h3 className={p.highlight ? 'text-text' : 'text-ink'}>{p.name}</h3>
             <p className={`text-sm ${p.highlight ? 'text-text-muted' : 'text-ink-muted'}`}>{p.highlight ? 'Growing forwarders' : p.tag}</p>
-            <p className="mt-4 flex items-baseline gap-1"><span className={`font-heading text-5xl font-bold ${p.highlight ? 'text-gold' : 'text-ink'}`}>${live[p.key] ?? p.price}</span><span className={p.highlight ? 'text-text-muted' : 'text-ink-muted'}>{p.per}</span></p>
+            <p className="mt-4 flex items-baseline gap-1"><span className={`font-heading text-5xl font-bold ${p.highlight ? 'text-gold-deep' : 'text-ink'}`}>${live[p.key] ?? p.price}</span><span className={p.highlight ? 'text-text-muted' : 'text-ink-muted'}>{p.per}</span></p>
             <ul className="mt-6 flex-1 space-y-2.5 text-sm">
-              {p.features.map((f) => <li key={f} className={`flex gap-2 ${p.highlight ? 'text-text' : 'text-ink'}`}><Check size={16} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" />{f}</li>)}
+              {p.features.map((f) => <li key={f} className={`flex gap-2 ${p.highlight ? 'text-text' : 'text-ink'}`}><Check size={16} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" />{f}</li>)}
               {p.missing.map((f) => <li key={f} className="flex gap-2 text-ink-muted/70"><Minus size={16} className="mt-0.5 shrink-0" aria-hidden="true" />{f}</li>)}
             </ul>
             <Link to="/signup?role=shipper" className={`mt-7 ${p.highlight ? 'btn-gold' : 'btn-light'}`}>{p.price === 0 ? 'Start free' : `Choose ${p.name}`}</Link>
@@ -216,12 +216,12 @@ export function FAQ() {
       <div className="grid gap-10 lg:grid-cols-12">
         <div className="lg:col-span-4">
           <SectionHeader align="left" eyebrow="FAQ" title="Questions people ask before their first shipment" />
-          <motion.p variants={fadeUp} className="-mt-8 text-text-muted">Still unsure? Email <a href="mailto:hello@shipsync.africa" className="text-gold hover:underline">hello@shipsync.africa</a> — a real person replies.</motion.p>
+          <motion.p variants={fadeUp} className="-mt-8 text-text-muted">Still unsure? Email <a href="mailto:hello@ntemtem.com" className="text-gold-deep hover:underline">hello@ntemtem.com</a> — a real person replies.</motion.p>
         </div>
         <div className="lg:col-span-8">
           {faqs.map((f, i) => (
             <motion.div key={f.q} variants={fadeUp} className="border-b border-border">
-              <button onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i} aria-controls={`faq-${i}`} className="flex min-h-14 w-full items-center justify-between gap-4 py-4 text-left text-[17px] font-semibold text-text hover:text-gold focus-ring rounded">
+              <button onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i} aria-controls={`faq-${i}`} className="flex min-h-14 w-full items-center justify-between gap-4 py-4 text-left text-[17px] font-semibold text-text hover:text-gold-deep focus-ring rounded">
                 {f.q}
                 <motion.span animate={{ rotate: open === i ? 180 : 0 }} transition={{ duration: 0.2 }} className="shrink-0 text-text-muted"><ChevronDown size={20} aria-hidden="true" /></motion.span>
               </button>

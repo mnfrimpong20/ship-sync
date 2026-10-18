@@ -68,7 +68,8 @@ export async function getDb(): Promise<Db> {
 }
 
 export const uid = () => randomBytes(6).toString('hex')
-export const makeRef = () => 'SS-' + randomBytes(4).toString('base64url').replace(/[^A-Z0-9]/gi, '').toUpperCase().padEnd(6, 'X').slice(0, 6)
+/** New references start NT- (Ntemtem); older shipments keep their SS- refs and still work everywhere. */
+export const makeRef = () => 'NT-' + randomBytes(4).toString('base64url').replace(/[^A-Z0-9]/gi, '').toUpperCase().padEnd(6, 'X').slice(0, 6)
 
 const schema = `
 create table if not exists users (
@@ -105,7 +106,7 @@ create table if not exists shippers (
   price_index int not null default 2,
   plan text not null default 'starter',
   initials text not null,
-  hue text not null default '#E3B54A',
+  hue text not null default '#F5B82E',
   demo boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -723,7 +724,7 @@ create table if not exists brokers (
   verified boolean not null default false,
   active boolean not null default true,
   initials text not null default '',
-  hue text not null default '#E3B54A',
+  hue text not null default '#F5B82E',
   created_at timestamptz not null default now()
 );
 create table if not exists broker_jobs (
@@ -1342,7 +1343,7 @@ async function seed(d: Db) {
 /** Admin accounts: the demo admin (password `shipsync`) plus any emails in ADMIN_EMAILS. Idempotent, runs on every boot. */
 async function ensureAdmins(d: Db) {
   const hash = await bcrypt.hash(DEMO_PASSWORD, 10)
-  await d.query(`insert into users (id,email,name,password_hash,role,shipper_id,is_admin) values ('u_admin','admin@shipsync.demo','Ship Sync Admin',$1,'customer',null,true) on conflict (email) do update set is_admin = true`, [hash])
+  await d.query(`insert into users (id,email,name,password_hash,role,shipper_id,is_admin) values ('u_admin','admin@shipsync.demo','Ntemtem Admin',$1,'customer',null,true) on conflict (email) do update set is_admin = true`, [hash])
   const extra = (process.env.ADMIN_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
   if (extra.length) await d.query('update users set is_admin = true where email = any($1::text[])', [extra])
 }

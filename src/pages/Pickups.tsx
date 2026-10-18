@@ -25,7 +25,7 @@ function Availability({ onSaved }: { onSaved: (msg: string) => void }) {
   const save = async () => { if (!wins) return; setBusy(true); setError(''); try { const r = await pickupsApi.saveAvailability(lead, wins); setWins(r.windows); onSaved('Pickup hours saved — customers see them right away.') } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.') } finally { setBusy(false) } }
   return (
     <div className="card-dark p-5" data-testid="pickup-availability">
-      <div className="flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 !text-base"><Settings2 size={16} className="text-gold" aria-hidden="true" /> Pickup hours</h2>{canEdit && <button onClick={save} disabled={busy || !wins} className="btn-gold !min-h-8 !px-3 text-xs disabled:opacity-60"><Save size={13} aria-hidden="true" /> {busy ? 'Saving…' : 'Save'}</button>}</div>
+      <div className="flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 !text-base"><Settings2 size={16} className="text-gold-deep" aria-hidden="true" /> Pickup hours</h2>{canEdit && <button onClick={save} disabled={busy || !wins} className="btn-gold !min-h-8 !px-3 text-xs disabled:opacity-60"><Save size={13} aria-hidden="true" /> {busy ? 'Saving…' : 'Save'}</button>}</div>
       <p className="mt-1 text-xs text-text-muted">Customers can only book inside these windows. Leave the area blank for every pickup city you serve.</p>
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       <label className="mt-3 flex items-center justify-between gap-3 text-sm"><span>Notice needed</span><span className="inline-flex items-center gap-2"><input type="number" min={0} max={14} disabled={!canEdit} className="input-dark !min-h-8 !w-16 text-sm tabular-nums" value={lead} onChange={(e) => setLead(Math.max(0, Math.min(14, Number(e.target.value) || 0)))} /> day{lead === 1 ? '' : 's'}</span></label>
@@ -120,10 +120,10 @@ export default function Pickups() {
                       {pg.rows.map((p) => (
                         <tr key={p.id} className={trow(false, p.status === 'cancelled')} data-testid="pickup-row">
                           <td className="whitespace-nowrap px-3 py-3"><p className="font-semibold">{fmtDay(p.date)}</p><p className="text-xs text-text-muted">{p.windowLabel}</p></td>
-                          <td className="px-3 py-3"><Link to={`/dashboard/shipments?q=${p.shipmentRef}&b=all`} className="font-mono text-xs text-gold hover:underline">{p.shipmentRef}</Link><p className="text-xs text-text-muted">{p.customer}</p></td>
+                          <td className="px-3 py-3"><Link to={`/dashboard/shipments?q=${p.shipmentRef}&b=all`} className="font-mono text-xs text-gold-deep hover:underline">{p.shipmentRef}</Link><p className="text-xs text-text-muted">{p.customer}</p></td>
                           <td className="px-3 py-3"><p>{p.address}</p><p className="text-xs text-text-muted">{p.city}{p.notes ? ` · ${p.notes}` : ''}</p></td>
                           <td className="px-3 py-3 text-xs"><p>{p.contactName}</p><p className="text-text-muted">{p.contactPhone}</p></td>
-                          <td className="whitespace-nowrap px-3 py-3"><Pill tone={tone[p.status]}>{pickupStatusLabels[p.status]}</Pill>{p.runId && p.status !== 'cancelled' && <Link to={`/dashboard/routes/${p.runId}`} className="ml-2 text-xs text-text-muted hover:text-gold">run →</Link>}{p.note && <p className="mt-1 max-w-[200px] truncate text-[11px] text-text-muted" title={p.note}>“{p.note}”</p>}</td>
+                          <td className="whitespace-nowrap px-3 py-3"><Pill tone={tone[p.status]}>{pickupStatusLabels[p.status]}</Pill>{p.runId && p.status !== 'cancelled' && <Link to={`/dashboard/routes/${p.runId}`} className="ml-2 text-xs text-text-muted hover:text-gold-deep">run →</Link>}{p.note && <p className="mt-1 max-w-[200px] truncate text-[11px] text-text-muted" title={p.note}>“{p.note}”</p>}</td>
                           <td className="px-3 py-3 text-right">
                             {(p.status === 'requested' || p.status === 'confirmed') && (
                               <div className="inline-flex gap-1.5">

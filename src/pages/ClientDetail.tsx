@@ -44,13 +44,13 @@ export default function ClientDetailPage() {
   return (
     <div className="bg-bg text-text">
       <div className="container-x py-8 md:py-12">
-        <Link to="/dashboard/clients" className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-gold focus-ring rounded"><ArrowLeft size={14} aria-hidden="true" /> All clients</Link>
+        <Link to="/dashboard/clients" className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-gold-deep focus-ring rounded"><ArrowLeft size={14} aria-hidden="true" /> All clients</Link>
         <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
             <ClientAvatar c={c} size={56} />
             <div>
               <h1 className="!text-[clamp(1.6rem,3vw,2.25rem)] leading-tight">{c.name}</h1>
-              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-muted">{c.company && <span>{c.company}</span>}{c.city && <span className="inline-flex items-center gap-1"><MapPin size={12} aria-hidden="true" />{c.city}</span>}{c.source === 'marketplace' ? <Pill tone="teal">Booked via Ship Sync</Pill> : <Pill tone="muted">Own client</Pill>}{c.status === 'archived' && <Pill tone="muted">Archived</Pill>}</p>
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-muted">{c.company && <span>{c.company}</span>}{c.city && <span className="inline-flex items-center gap-1"><MapPin size={12} aria-hidden="true" />{c.city}</span>}{c.source === 'marketplace' ? <Pill tone="teal">Booked via Ntemtem</Pill> : <Pill tone="muted">Own client</Pill>}{c.status === 'archived' && <Pill tone="muted">Archived</Pill>}</p>
               {c.tags.length > 0 && <p className="mt-2 flex flex-wrap gap-1">{c.tags.map((t) => <span key={t} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted">{t}</span>)}</p>}
             </div>
           </div>
@@ -69,7 +69,7 @@ export default function ClientDetailPage() {
           {editing && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-6 card-dark p-6">
               <div className="mb-4 flex items-center justify-between"><h2 className="!text-lg">Edit client</h2>
-                <button onClick={() => run(async () => { await clientsApi.update(c.id, { status: c.status === 'archived' ? 'active' : 'archived' }); await reload(); setEditing(false) }, c.status === 'archived' ? 'Client restored.' : 'Client archived.')} className="text-xs text-text-muted hover:text-gold focus-ring rounded">{c.status === 'archived' ? 'Restore client' : 'Archive client'}</button></div>
+                <button onClick={() => run(async () => { await clientsApi.update(c.id, { status: c.status === 'archived' ? 'active' : 'archived' }); await reload(); setEditing(false) }, c.status === 'archived' ? 'Client restored.' : 'Client archived.')} className="text-xs text-text-muted hover:text-gold-deep focus-ring rounded">{c.status === 'archived' ? 'Restore client' : 'Archive client'}</button></div>
               <ClientForm initial={{ name: c.name, company: c.company, email: c.email, phone: c.phone, whatsapp: c.whatsapp, city: c.city, tags: c.tags, notes: c.notes }} busy={busy} error="" onCancel={() => setEditing(false)} onSave={(f) => run(async () => { await clientsApi.update(c.id, f); await reload(); setEditing(false) }, 'Client updated.')} />
             </motion.div>
           )}
@@ -78,13 +78,13 @@ export default function ClientDetailPage() {
         <div className="mt-6 grid gap-3 sm:grid-cols-4">
           <div className="card-dark p-4"><p className="text-xs text-text-muted">Shipments</p><p className="font-heading text-2xl font-bold">{d.shipments.length}</p><p className="text-xs text-text-muted">{d.shipments.filter((s) => s.status !== 'delivered').length} in progress</p></div>
           <div className="card-dark p-4"><p className="text-xs text-text-muted">Invoiced</p><p className="font-heading text-2xl font-bold">{money(d.invoices.filter((i) => i.status !== 'void').reduce((n, i) => n + i.total, 0))}</p><p className="text-xs text-text-muted">{d.invoices.length} invoice{d.invoices.length === 1 ? '' : 's'}</p></div>
-          <div className="card-dark p-4"><p className="text-xs text-text-muted">Outstanding</p><p className={`font-heading text-2xl font-bold ${owing ? 'text-gold' : ''}`}>{money(owing)}</p><p className="text-xs text-text-muted">{owing ? 'Awaiting payment' : 'All settled'}</p></div>
+          <div className="card-dark p-4"><p className="text-xs text-text-muted">Outstanding</p><p className={`font-heading text-2xl font-bold ${owing ? 'text-gold-deep' : ''}`}>{money(owing)}</p><p className="text-xs text-text-muted">{owing ? 'Awaiting payment' : 'All settled'}</p></div>
           <div className="card-dark p-4"><p className="text-xs text-text-muted">Client since</p><p className="font-heading text-2xl font-bold">{fmtDate(c.createdAt)}</p><p className="text-xs text-text-muted">{c.lastActivityAt ? `Last touch ${fmtDate(c.lastActivityAt)}` : ''}</p></div>
         </div>
 
         <div className="mt-8 flex gap-1 overflow-x-auto border-b border-border [scrollbar-width:none]" role="tablist">
           {([['overview', 'Overview'], ['shipments', `Shipments (${d.shipments.length})`], ['invoices', `Invoices (${d.invoices.length})`], ['activity', `Activity (${d.activities.length})`]] as [Tab, string][]).map(([t, label]) => (
-            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium focus-ring rounded-t sm:px-4 ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{label}{tab === t && <motion.span layoutId="ctab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium focus-ring rounded-t sm:px-4 ${tab === t ? 'text-gold-deep' : 'text-text-muted hover:text-text'}`}>{label}{tab === t && <motion.span layoutId="ctab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
           ))}
         </div>
 
@@ -144,7 +144,7 @@ function Overview({ d, busy, run, reload }: Common) {
             {d.consignees.map((k: Consignee) => (
               <li key={k.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
                 <div className="text-sm">
-                  <p className="flex items-center gap-2 font-semibold text-text">{k.name}{k.isDefault && <Star size={13} className="fill-gold text-gold" aria-label="Default" />}{k.relationship && <span className="font-normal text-text-muted">· {k.relationship}</span>}</p>
+                  <p className="flex items-center gap-2 font-semibold text-text">{k.name}{k.isDefault && <Star size={13} className="fill-gold text-gold-deep" aria-label="Default" />}{k.relationship && <span className="font-normal text-text-muted">· {k.relationship}</span>}</p>
                   <p className="text-text-muted">{[k.address, k.city].filter(Boolean).join(', ')} {countryByCode(k.country)?.flag}</p>
                   {k.phone && <p className="text-text-muted"><Phone size={11} className="mr-1 inline" aria-hidden="true" />{k.phone}</p>}
                 </div>
@@ -173,7 +173,7 @@ function Shipments({ d, busy, run, reload, advance }: Common & { advance: (id: s
   return (
     <div className="mt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-text-muted">Bookings made here get a Ship Sync reference the client can track publicly — no quote request needed.</p>
+        <p className="text-sm text-text-muted">Bookings made here get a Ntemtem reference the client can track publicly — no quote request needed.</p>
         <button onClick={() => setOpen((o) => !o)} className="btn-gold !min-h-10 !px-4 text-sm" aria-expanded={open} data-testid="new-shipment"><Plus size={15} aria-hidden="true" /> New shipment</button>
       </div>
       {note && <p role="status" className="mt-4 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal" data-testid="ship-toast"><Check size={16} aria-hidden="true" />{note}</p>}
@@ -189,7 +189,7 @@ function Shipments({ d, busy, run, reload, advance }: Common & { advance: (id: s
             <li key={s.id} className={`card-dark p-4 ${s.cancelledAt ? 'opacity-60' : ''}`} data-testid="client-shipment">
               <div className="flex flex-wrap items-center gap-4">
                 <div className="min-w-0 flex-1">
-                  <p className="flex flex-wrap items-center gap-2"><Link to={`/track?ref=${s.ref}`} className="font-mono text-xs text-gold hover:underline focus-ring rounded">{s.ref}</Link><ModeBadge mode={s.mode} />{s.cancelledAt ? <Pill tone="muted">Cancelled</Pill> : <Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill>}{!s.consigneeId && !s.cancelledAt && <Pill tone="danger">No recipient</Pill>}{s.handover === 'collection' && !s.cancelledAt && s.status !== 'delivered' && <Pill tone="muted">Collects</Pill>}{s.stuck && <Pill tone="danger">Stuck {s.stuck.days}d</Pill>}{inv && <Pill tone={inv.status === 'paid' ? 'green' : 'gold'}>{inv.number} · {money(inv.total)}</Pill>}</p>
+                  <p className="flex flex-wrap items-center gap-2"><Link to={`/track?ref=${s.ref}`} className="font-mono text-xs text-gold-deep hover:underline focus-ring rounded">{s.ref}</Link><ModeBadge mode={s.mode} />{s.cancelledAt ? <Pill tone="muted">Cancelled</Pill> : <Pill tone={s.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[s.status]}</Pill>}{!s.consigneeId && !s.cancelledAt && <Pill tone="danger">No recipient</Pill>}{s.handover === 'collection' && !s.cancelledAt && s.status !== 'delivered' && <Pill tone="muted">Collects</Pill>}{s.stuck && <Pill tone="danger">Stuck {s.stuck.days}d</Pill>}{inv && <Pill tone={inv.status === 'paid' ? 'green' : 'gold'}>{inv.number} · {money(inv.total)}</Pill>}</p>
                   <p className="mt-1 text-sm font-semibold text-text">{s.origin} → {dest?.flag} {dest?.name}</p>
                   <p className="text-xs text-text-muted">{s.description} · {cargoLabel(s.cargo)}{cons ? ` · to ${cons.name}${cons.city ? `, ${cons.city}` : ''}` : ''} · ETA {fmtDate(s.eta)}</p>
                 </div>
@@ -408,7 +408,7 @@ function ActivityTab({ d, busy, run, reload }: Common) {
       <div className="lg:col-span-5 space-y-4">
         <form onSubmit={(e) => { e.preventDefault(); if (body.trim()) submit() }} className="card-dark p-5">
           <h2 className="!text-base">Log something</h2>
-          <div className="mt-3 flex flex-wrap gap-1.5">{(['note', 'call', 'email', 'whatsapp', 'meeting', 'reminder'] as const).map((t) => <button type="button" key={t} onClick={() => setType(t)} aria-pressed={type === t} className={`rounded-full border px-3 py-1 text-xs focus-ring ${type === t ? 'border-gold bg-gold/15 text-gold' : 'border-border text-text-muted hover:text-text'}`}>{activityLabel[t]}</button>)}</div>
+          <div className="mt-3 flex flex-wrap gap-1.5">{(['note', 'call', 'email', 'whatsapp', 'meeting', 'reminder'] as const).map((t) => <button type="button" key={t} onClick={() => setType(t)} aria-pressed={type === t} className={`rounded-full border px-3 py-1 text-xs focus-ring ${type === t ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{activityLabel[t]}</button>)}</div>
           <textarea aria-label="Details" rows={3} className="input-dark mt-3 py-2 text-sm" placeholder={type === 'reminder' ? 'What to follow up on…' : 'What happened?'} value={body} onChange={(e) => setBody(e.target.value)} />
           {type === 'reminder' && <div className="mt-2"><label className="label-dark" htmlFor="a-due">Remind me on</label><input id="a-due" type="date" min={today()} className="input-dark !min-h-9 text-sm" value={due} onChange={(e) => setDue(e.target.value)} /></div>}
           <div className="mt-3 flex justify-end"><button disabled={busy || !body.trim()} className="btn-gold !min-h-9 !px-4 text-xs disabled:opacity-60">{type === 'reminder' ? 'Set reminder' : 'Log'}</button></div>
@@ -417,7 +417,7 @@ function ActivityTab({ d, busy, run, reload }: Common) {
           <div className="card-dark p-5">
             <h2 className="!text-base">Open follow-ups</h2>
             <ul className="mt-3 space-y-2">{open.map((a) => (
-              <li key={a.id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-gold" aria-label={`Mark done: ${a.body}`} onChange={() => run(async () => { await clientsApi.updateActivity(a.id, { done: true }); await reload() }, 'Done.')} /><span><span className="text-text">{a.body}</span><span className={`block text-xs ${a.dueAt && new Date(a.dueAt).getTime() < Date.now() ? 'text-gold' : 'text-text-muted'}`}>{a.dueAt ? fmtDate(a.dueAt) : ''}{a.dueAt && new Date(a.dueAt).getTime() < Date.now() ? ' · overdue' : ''}</span></span></li>
+              <li key={a.id} className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-gold" aria-label={`Mark done: ${a.body}`} onChange={() => run(async () => { await clientsApi.updateActivity(a.id, { done: true }); await reload() }, 'Done.')} /><span><span className="text-text">{a.body}</span><span className={`block text-xs ${a.dueAt && new Date(a.dueAt).getTime() < Date.now() ? 'text-gold-deep' : 'text-text-muted'}`}>{a.dueAt ? fmtDate(a.dueAt) : ''}{a.dueAt && new Date(a.dueAt).getTime() < Date.now() ? ' · overdue' : ''}</span></span></li>
             ))}</ul>
           </div>
         )}
@@ -428,7 +428,7 @@ function ActivityTab({ d, busy, run, reload }: Common) {
           {d.activities.map((a: Activity, i) => (
             <li key={a.id} className="relative flex gap-3 pb-5 last:pb-0">
               {i < d.activities.length - 1 && <span className="absolute left-[13px] top-7 h-full w-px bg-border" aria-hidden="true" />}
-              <span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full ${a.type === 'system' ? 'bg-surface-2 text-text-muted' : a.type === 'reminder' ? (a.done ? 'bg-surface-2 text-text-muted' : 'bg-gold/20 text-gold') : 'bg-teal/15 text-teal'}`}>{icon(a.type)}</span>
+              <span className={`relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full ${a.type === 'system' ? 'bg-surface-2 text-text-muted' : a.type === 'reminder' ? (a.done ? 'bg-surface-2 text-text-muted' : 'bg-gold/20 text-gold-deep') : 'bg-teal/15 text-teal'}`}>{icon(a.type)}</span>
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-2 text-xs text-text-muted"><span className="font-semibold text-text">{activityLabel[a.type]}</span>{fmtDateTime(a.at)}{a.type === 'reminder' && a.dueAt && <span>· due {fmtDate(a.dueAt)}{a.done ? ' · done' : ''}</span>}
                   {a.type !== 'system' && <button onClick={() => run(async () => { await clientsApi.deleteActivity(a.id); await reload() })} className="ml-auto text-text-muted hover:text-danger focus-ring rounded" aria-label="Delete entry"><Trash2 size={12} aria-hidden="true" /></button>}</p>

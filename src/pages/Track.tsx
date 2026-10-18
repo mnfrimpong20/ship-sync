@@ -25,7 +25,7 @@ export default function Track() {
     if (!r) { setCurrent(undefined); return }
     let live = true
     setLoading(true); setError('')
-    track(r).then((s) => { if (!live) return; if (s) setCurrent(s); else { setCurrent(undefined); setError('We couldn’t find a shipment with that reference. Check the format (SS-XXXXXX) or try a sample below.') } })
+    track(r).then((s) => { if (!live) return; if (s) setCurrent(s); else { setCurrent(undefined); setError('We couldn’t find a shipment with that reference. Check the format (NT-XXXXXX or SS-XXXXXX) or try a sample below.') } })
       .catch((e) => live && setError(e instanceof Error ? e.message : 'Lookup failed.'))
       .finally(() => live && setLoading(false))
     return () => { live = false }
@@ -44,16 +44,16 @@ export default function Track() {
         <motion.div initial="hidden" animate="show" variants={stagger} className="mx-auto max-w-2xl text-center">
           <motion.p variants={fadeUp} className="eyebrow mb-2">Track</motion.p>
           <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4vw,3rem)]">Where is my shipment?</motion.h1>
-          <motion.p variants={fadeUp} className="mt-2 text-text-muted">Enter the Ship Sync reference from your booking confirmation.</motion.p>
+          <motion.p variants={fadeUp} className="mt-2 text-text-muted">Enter the Ntemtem reference from your booking confirmation.</motion.p>
           <motion.form variants={fadeUp} onSubmit={lookup} className="mt-6 flex flex-col gap-2 sm:flex-row">
             <div className="relative flex-1">
               <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" />
-              <input aria-label="Shipment reference" className="input-dark !min-h-12 !pl-10 uppercase" placeholder="SS-4F7K2Q" value={ref} onChange={(e) => setRef(e.target.value)} aria-invalid={!!error} />
+              <input aria-label="Shipment reference" className="input-dark !min-h-12 !pl-10 uppercase" placeholder="NT-4F7K2Q" value={ref} onChange={(e) => setRef(e.target.value)} aria-invalid={!!error} />
             </div>
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold !min-h-12" disabled={loading}>{loading ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Looking up</> : 'Track'}</motion.button>
           </motion.form>
           {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
-          <motion.p variants={fadeUp} className="mt-3 text-xs text-text-muted">Try a sample: {samples.map((r) => <button key={r} onClick={() => { setRef(r); setSp({ ref: r }) }} className="ml-2 font-mono text-gold hover:underline focus-ring rounded">{r}</button>)}</motion.p>
+          <motion.p variants={fadeUp} className="mt-3 text-xs text-text-muted">Try a sample: {samples.map((r) => <button key={r} onClick={() => { setRef(r); setSp({ ref: r }) }} className="ml-2 font-mono text-gold-deep hover:underline focus-ring rounded">{r}</button>)}</motion.p>
         </motion.div>
 
         <AnimatePresence mode="wait">
@@ -83,7 +83,7 @@ function LivePanel({ s }: { s: Shipment }) {
     <div className="mt-6">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-2 text-sm font-semibold text-text">
-          <Icon size={16} className="text-gold" aria-hidden="true" />
+          <Icon size={16} className="text-gold-deep" aria-hidden="true" />
           {pos.carrier.vesselName ?? pos.carrier.flight ?? (pos.mode === 'air' ? 'Flight' : 'Vessel')}
           {pos.carrier.mmsi && <span className="font-mono text-xs font-normal text-text-muted">MMSI {pos.carrier.mmsi}</span>}
         </p>
@@ -140,7 +140,7 @@ function PiecesStrip({ pieces }: { pieces: NonNullable<Shipment['pieces']> }) {
 
 export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: boolean }) {
   const { shipperById } = useStore()
-  const shipper = shipperById(s.shipperId) ?? { id: s.shipperId, name: 'Shipper', hq: '', initials: 'SS', hue: '#E3B54A' }
+  const shipper = shipperById(s.shipperId) ?? { id: s.shipperId, name: 'Shipper', hq: '', initials: 'SS', hue: '#F5B82E' }
   const dest = countryByCode(s.destination)!
   const flow = flowFor(s.handover)
   const idx = flowIndex(s.status, s.handover)
@@ -151,7 +151,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
         <div className="card-dark p-6 md:p-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="font-mono text-sm text-gold">{s.ref}</p>
+              <p className="font-mono text-sm text-gold-deep">{s.ref}</p>
               <h2 className="mt-1 !text-2xl">{s.origin} → {dest.flag} {dest.name}</h2>
               <p className="mt-1 text-sm text-text-muted">{s.description} · {cargoLabel(s.cargo)}</p>
             </div>
@@ -217,7 +217,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
 function ShareTracking({ s }: { s: Shipment }) {
   const [copied, setCopied] = useState(false)
   const url = `${location.origin}/#/track?ref=${s.ref}`
-  const text = `Track our shipment ${s.ref} (${s.origin} → ${countryByCode(s.destination)?.name ?? s.destination}) on Ship Sync: ${url}`
+  const text = `Track our shipment ${s.ref} (${s.origin} → ${countryByCode(s.destination)?.name ?? s.destination}) on Ntemtem: ${url}`
   const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { prompt('Copy this link', url) } }
   return (
     <div className="no-print flex gap-1.5" data-testid="share-tracking">

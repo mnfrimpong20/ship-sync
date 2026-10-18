@@ -24,8 +24,8 @@ export interface PositionPayload {
 /** Free, keyless dark basemap (CARTO, attribution required and shown). */
 export const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
 
-const shipSvg = (color: string) => `<svg width="40" height="40" viewBox="0 0 24 24" fill="${color}" stroke="#0B1220" stroke-width="0.6" stroke-linejoin="round"><path d="M12 1.5 L16.5 8 L16.5 17 L12 22.5 L7.5 17 L7.5 8 Z"/><rect x="10" y="7" width="4" height="7" rx="0.8" fill="#0B1220" opacity="0.55"/></svg>`
-const planeSvg = (color: string) => `<svg width="40" height="40" viewBox="0 0 24 24" fill="${color}" stroke="#0B1220" stroke-width="0.6" stroke-linejoin="round"><path d="M12 2 L14 9 L21 12 L14 13.5 L13 20 L15 22 L12 21 L9 22 L11 20 L10 13.5 L3 12 L10 9 Z"/></svg>`
+const shipSvg = (color: string) => `<svg width="40" height="40" viewBox="0 0 24 24" fill="${color}" stroke="#0D1424" stroke-width="0.6" stroke-linejoin="round"><path d="M12 1.5 L16.5 8 L16.5 17 L12 22.5 L7.5 17 L7.5 8 Z"/><rect x="10" y="7" width="4" height="7" rx="0.8" fill="#0D1424" opacity="0.55"/></svg>`
+const planeSvg = (color: string) => `<svg width="40" height="40" viewBox="0 0 24 24" fill="${color}" stroke="#0D1424" stroke-width="0.6" stroke-linejoin="round"><path d="M12 2 L14 9 L21 12 L14 13.5 L13 20 L15 22 L12 21 L9 22 L11 20 L10 13.5 L3 12 L10 9 Z"/></svg>`
 
 function bearing(a: LngLat, b: LngLat) {
   const toRad = (d: number) => (d * Math.PI) / 180
@@ -34,12 +34,12 @@ function bearing(a: LngLat, b: LngLat) {
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360
 }
 
-/** CARTO dark-matter is near-black; tint it so sea and land read in Ship Sync's navy palette. */
+/** CARTO dark-matter is near-black; tint it so sea and land read in Ntemtem's navy palette. */
 export function brandBasemap(m: maplibregl.Map) {
   for (const layer of m.getStyle().layers ?? []) {
     try {
       if (layer.type === 'background') m.setPaintProperty(layer.id, 'background-color', '#1A2640')
-      else if (layer.type === 'fill' && /water|ocean|sea/i.test(layer.id)) m.setPaintProperty(layer.id, 'fill-color', '#0B1220')
+      else if (layer.type === 'fill' && /water|ocean|sea/i.test(layer.id)) m.setPaintProperty(layer.id, 'fill-color', '#0D1424')
       else if (layer.type === 'fill' && /land|earth|park|green/i.test(layer.id)) m.setPaintProperty(layer.id, 'fill-color', '#1A2640')
     } catch { /* layer may not support the property */ }
   }
@@ -47,7 +47,7 @@ export function brandBasemap(m: maplibregl.Map) {
 
 function markerEl(kind: 'live' | 'last' | 'est', mode: 'air' | 'ocean', course?: number) {
   const el = document.createElement('div')
-  const color = kind === 'live' ? '#E3B54A' : kind === 'last' ? '#A3AEC2' : '#2DD4BF'
+  const color = kind === 'live' ? '#F5B82E' : kind === 'last' ? '#A8AFC3' : '#6CC3DD'
   el.innerHTML = mode === 'air' ? planeSvg(color) : shipSvg(color)
   el.style.width = '40px'; el.style.height = '40px'; el.style.transform = `rotate(${course ?? 0}deg)`
   el.style.filter = kind === 'live' ? 'drop-shadow(0 0 8px rgba(227,181,74,0.8))' : 'none'
@@ -87,8 +87,8 @@ export default function LiveMap({ data, className = '' }: { data: PositionPayloa
       if (src) src.setData(fc)
       else {
         m.addSource('route', { type: 'geojson', data: fc })
-        m.addLayer({ id: 'route-glow', type: 'line', source: 'route', paint: { 'line-color': '#E3B54A', 'line-width': 6, 'line-opacity': 0.15 } })
-        m.addLayer({ id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#E3B54A', 'line-width': 1.5, 'line-dasharray': [2, 3], 'line-opacity': 0.9 } })
+        m.addLayer({ id: 'route-glow', type: 'line', source: 'route', paint: { 'line-color': '#F5B82E', 'line-width': 6, 'line-opacity': 0.15 } })
+        m.addLayer({ id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#F5B82E', 'line-width': 1.5, 'line-dasharray': [2, 3], 'line-opacity': 0.9 } })
       }
     }
     let routeDone = false
@@ -113,14 +113,14 @@ export default function LiveMap({ data, className = '' }: { data: PositionPayloa
         const when = new Date(pos.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
         mk.setPopup(new maplibregl.Popup({ offset: 20, closeButton: false }).setHTML(`<strong>${pos.name ?? (data.mode === 'air' ? 'Flight' : 'Vessel')}</strong><br/>${kind === 'live' ? 'Live' : 'Last known'} · ${when}${pos.speed != null ? `<br/>${Math.round(pos.speed)} ${data.mode === 'air' ? 'kt' : 'kn'}` : ''}${pos.altitude != null ? ` · ${Math.round(pos.altitude).toLocaleString()} ft` : ''}`))
         markers.current.push(mk.addTo(m)); pts.push([pos.lon, pos.lat])
-        markers.current.push(new maplibregl.Marker({ element: tag(`${pos.name ?? (data.mode === 'air' ? 'Flight' : 'Vessel')} · ${kind === 'live' ? 'live' : 'last known'}`, kind === 'live' ? '#E3B54A' : '#A3AEC2'), anchor: 'left', offset: [24, 0] }).setLngLat([pos.lon, pos.lat]).addTo(m))
+        markers.current.push(new maplibregl.Marker({ element: tag(`${pos.name ?? (data.mode === 'air' ? 'Flight' : 'Vessel')} · ${kind === 'live' ? 'live' : 'last known'}`, kind === 'live' ? '#F5B82E' : '#A8AFC3'), anchor: 'left', offset: [24, 0] }).setLngLat([pos.lon, pos.lat]).addTo(m))
       } else if (data.estimated && data.phase === 'transit') {
         const at: LngLat = [data.estimated.lon, data.estimated.lat]
         const heading = data.route ? bearing(data.route.origin.at, data.route.destination.at) : 0
         const mk = new maplibregl.Marker({ element: markerEl('est', data.mode, heading), anchor: 'center', rotationAlignment: 'map' }).setLngLat(at)
         mk.setPopup(new maplibregl.Popup({ offset: 20, closeButton: false }).setHTML(`<strong>Estimated position</strong><br/>${Math.round(data.progress * 100)}% of the way, based on departure and ETA`))
         markers.current.push(mk.addTo(m)); pts.push(at)
-        markers.current.push(new maplibregl.Marker({ element: tag(`Estimated · ${Math.round(data.progress * 100)}% of the way`, '#2DD4BF'), anchor: 'left', offset: [24, 0] }).setLngLat(at).addTo(m))
+        markers.current.push(new maplibregl.Marker({ element: tag(`Estimated · ${Math.round(data.progress * 100)}% of the way`, '#6CC3DD'), anchor: 'left', offset: [24, 0] }).setLngLat(at).addTo(m))
       }
       if (pts.length >= 2) {
         const b = pts.reduce((bb, p) => bb.extend(p), new maplibregl.LngLatBounds(pts[0], pts[0]))

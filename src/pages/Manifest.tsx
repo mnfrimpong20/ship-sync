@@ -44,7 +44,7 @@ export default function ManifestPage() {
     <div className="bg-bg text-text print:bg-white print:text-black">
       <div className="container-x py-8 print:py-0">
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <Link to={`/dashboard/containers/${c.id}`} className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-gold"><ArrowLeft size={14} aria-hidden="true" /> {c.ref}</Link>
+          <Link to={`/dashboard/containers/${c.id}`} className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-gold-deep"><ArrowLeft size={14} aria-hidden="true" /> {c.ref}</Link>
           <button onClick={() => window.print()} className="btn-gold !min-h-10 !px-4 text-sm"><Printer size={15} aria-hidden="true" /> Print</button>
         </div>
         <header className="mt-4">

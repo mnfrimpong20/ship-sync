@@ -93,7 +93,7 @@ function Standing({ a }: { a: Analytics }) {
   const tone = s.standing === 'good' ? 'text-teal' : s.standing === 'warning' ? 'text-gold-deep' : 'text-danger'
   const m = s.metrics
   return (
-    <Panel title="Your marketplace standing" sub="Ship Sync’s 90-day quality score — it decides where you rank in the directory." testid="standing">
+    <Panel title="Your marketplace standing" sub="Ntemtem’s 90-day quality score — it decides where you rank in the directory." testid="standing">
       <div className="flex flex-wrap items-center gap-6">
         <div><p className="font-heading text-4xl font-bold tabular-nums">{s.score}<span className="text-base font-normal text-text-muted">/100</span></p><p className={`text-sm font-semibold capitalize ${tone}`}>{s.standing === 'good' ? 'Good standing' : s.standing}</p>{s.rank && <p className="text-xs text-text-muted">#{s.rank} of {s.of} shippers</p>}</div>
         <ul className="grid flex-1 grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">

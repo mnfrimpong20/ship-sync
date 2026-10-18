@@ -181,8 +181,8 @@ export async function onDelivered(db: Db, s: Row) {
   if (done.length) return
   const amt = CREDIT_USD()
   await db.query(`insert into credits (id,user_id,amount_usd,reason,source_user_id) values ($1,$2,$3,'referral',$4), ($5,$4,$3,'welcome',$4)`, ['cr_' + uid(), u.referred_by, amt, u.id, 'cr_' + uid()])
-  await notify(db, { userId: u.referred_by, kind: 'payment', title: `You earned ${money(amt)} credit`, body: `${u.name.split(' ')[0]}’s first shipment arrived. The credit comes off your next payment on Ship Sync.`, link: '/dashboard?tab=money' })
-  await notify(db, { userId: u.id, kind: 'payment', title: `${money(amt)} welcome credit`, body: 'Thanks for shipping with Ship Sync — it comes off your next online payment.', link: '/dashboard?tab=money' })
+  await notify(db, { userId: u.referred_by, kind: 'payment', title: `You earned ${money(amt)} credit`, body: `${u.name.split(' ')[0]}’s first shipment arrived. The credit comes off your next payment on Ntemtem.`, link: '/dashboard?tab=money' })
+  await notify(db, { userId: u.id, kind: 'payment', title: `${money(amt)} welcome credit`, body: 'Thanks for shipping with Ntemtem — it comes off your next online payment.', link: '/dashboard?tab=money' })
 }
 export async function creditBalance(db: Db, userId: string) { const { rows } = await db.query<Row>('select coalesce(sum(amount_usd),0)::float as v from credits where user_id = $1 and used_at is null', [userId]); return num(rows[0]?.v) }
 
@@ -297,8 +297,8 @@ export function mountCustomerHub(r: Router, d: Deps) {
     }
     const tot = inv.reduce((a, i) => a + num(i.total), 0), paid = inv.reduce((a, i) => a + num(i.paid), 0)
     res.set('Content-Type', 'text/html')
-    res.send(`<!doctype html><html><head><meta charset="utf-8"><title>Statement ${key}</title><style>body{font:14px system-ui,sans-serif;color:#0B1B33;margin:40px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}td.n,th.n{text-align:right}h1{margin:0}.muted{color:#5B6578}@media print{button{display:none}}</style></head><body>
-<button onclick="print()" style="float:right">Print / save as PDF</button><h1>Statement — ${esc(key)}</h1><p class="muted">Ship Sync · generated ${new Date().toDateString()}</p>
+    res.send(`<!doctype html><html><head><meta charset="utf-8"><title>Statement ${key}</title><style>body{font:14px system-ui,sans-serif;color:#14213D;margin:40px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}td.n,th.n{text-align:right}h1{margin:0}.muted{color:#5B6578}@media print{button{display:none}}</style></head><body>
+<button onclick="print()" style="float:right">Print / save as PDF</button><h1>Statement — ${esc(key)}</h1><p class="muted">Ntemtem · generated ${new Date().toDateString()}</p>
 <p><b>${esc(me?.company_name || me?.name || '')}</b>${me?.company_name ? `<br>Attn: ${esc(me.name)}` : ''}<br>${esc(me?.email ?? '')}${me?.billing_address ? `<br>${esc(me.billing_address).replace(/\n/g, '<br>')}` : ''}${me?.tax_id ? `<br>Tax ID: ${esc(me.tax_id)}` : ''}</p>
 <table><thead><tr><th>Date</th><th>Invoice</th><th>Shipper</th><th>Shipment</th><th>PO</th><th class="n">Total</th><th class="n">Paid</th><th class="n">Balance</th></tr></thead><tbody>
 ${inv.map((i) => `<tr><td>${D(i.issued_at)}</td><td>${esc(i.number)}</td><td>${esc(i.shipper_name)}</td><td>${esc(i.shipment_ref ?? '')}</td><td>${esc(poOf.get(i.shipment_id) ?? '')}</td><td class="n">${money(num(i.total))}</td><td class="n">${money(num(i.paid))}</td><td class="n">${money(i.balance)}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">No invoices in this period.</td></tr>'}
@@ -453,7 +453,7 @@ ${inv.map((i) => `<tr><td>${D(i.issued_at)}</td><td>${esc(i.number)}</td><td>${e
       }
     }
     const inv = await myInvoices(db, u.id)
-    const index = `<!doctype html><meta charset="utf-8"><title>Your Ship Sync documents</title><body style="font:14px system-ui;margin:32px"><h1>Your Ship Sync documents</h1><p>Downloaded ${new Date().toDateString()}.</p><h2>Generated documents</h2><ul>${links.join('') || '<li>None</li>'}</ul><h2>Invoices</h2><ul>${inv.map((i) => `<li>${esc(i.number)} · ${esc(i.shipper_name)} · ${money(num(i.total))}${i.pay_token ? ` — <a href="${appUrl()}/#/pay/${i.pay_token}">view</a>` : ''}</li>`).join('') || '<li>None</li>'}</ul></body>`
+    const index = `<!doctype html><meta charset="utf-8"><title>Your Ntemtem documents</title><body style="font:14px system-ui;margin:32px"><h1>Your Ntemtem documents</h1><p>Downloaded ${new Date().toDateString()}.</p><h2>Generated documents</h2><ul>${links.join('') || '<li>None</li>'}</ul><h2>Invoices</h2><ul>${inv.map((i) => `<li>${esc(i.number)} · ${esc(i.shipper_name)} · ${money(num(i.total))}${i.pay_token ? ` — <a href="${appUrl()}/#/pay/${i.pay_token}">view</a>` : ''}</li>`).join('') || '<li>None</li>'}</ul></body>`
     files.unshift({ name: 'index.html', data: Buffer.from(index) })
     res.set('Content-Type', 'application/zip'); res.set('Content-Disposition', 'attachment; filename="ship-sync-documents.zip"'); res.send(zip(files))
   }))
@@ -466,7 +466,7 @@ ${inv.map((i) => `<tr><td>${D(i.issued_at)}</td><td>${esc(i.number)}</td><td>${e
     const { rows: [rc] } = await db.query<Row>('select name, note, all_good, created_at from recipient_receipts where shipment_id = $1 order by created_at desc limit 1', [s.id])
     const { rows: [sh] } = await db.query<Row>('select name from shippers where id = $1', [s.shipper_id])
     const code = s.status === 'ready_for_collection' ? s.collection_code ?? null : null
-    const text = `Hi${c?.name ? ` ${String(c.name).split(' ')[0]}` : ''}, I’m sending you a shipment with ${sh?.name ?? 'Ship Sync'} (${s.ref}). Follow it here: ${link}${code ? `\nIt’s ready to collect — your code is ${code}. Bring a photo ID.` : ''}`
+    const text = `Hi${c?.name ? ` ${String(c.name).split(' ')[0]}` : ''}, I’m sending you a shipment with ${sh?.name ?? 'Ntemtem'} (${s.ref}). Follow it here: ${link}${code ? `\nIt’s ready to collect — your code is ${code}. Bring a photo ID.` : ''}`
     const phone = c?.phone ? (normalisePhone(c.phone, s.destination) ?? c.phone) : null
     res.json({ link, code, recipient: c ? { name: c.name, phone } : null, text, whatsapp: `https://wa.me/${phone ? String(phone).replace(/\D/g, '') : ''}?text=${encodeURIComponent(text)}`, receipt: rc ? { name: rc.name, note: rc.note, allGood: !!rc.all_good, at: ISO(rc.created_at) } : null })
   }))
@@ -613,7 +613,7 @@ ${inv.map((i) => `<tr><td>${D(i.issued_at)}</td><td>${esc(i.number)}</td><td>${e
     const token = randomBytes(18).toString('base64url'); const { rows: [ex] } = await db.query<Row>(`select id from users where email = $1 and role = 'customer'`, [email])
     await db.query('insert into account_members (id,owner_id,member_id,email,role,token,status) values ($1,$2,$3,$4,$5,$6,$7)', ['am_' + uid(), u.id, null, email, b.role, token, 'invited'])
     const link = `${appUrl()}/#/dashboard?tab=account&invite=${token}`
-    await sendEmail(email, `${u.name} invited you to their Ship Sync account`, emailTemplate({ title: `Join ${u.name}’s Ship Sync account`, body: `${esc(u.name)} added you so you can book, pay and track their shipments. ${ex ? 'Sign in and accept the invite.' : 'Create a free account with this email, then accept the invite.'}`, link, cta: 'Accept invite' })).catch(() => {})
+    await sendEmail(email, `${u.name} invited you to their Ntemtem account`, emailTemplate({ title: `Join ${u.name}’s Ntemtem account`, body: `${esc(u.name)} added you so you can book, pay and track their shipments. ${ex ? 'Sign in and accept the invite.' : 'Create a free account with this email, then accept the invite.'}`, link, cta: 'Accept invite' })).catch(() => {})
     if (ex) await notify(db, { userId: ex.id, kind: 'system', title: `${u.name} invited you to their account`, body: 'Accept it to book and track shipments on their behalf.', link: `/dashboard?tab=account&invite=${token}` })
     res.status(201).json({ ok: true, link })
   }))

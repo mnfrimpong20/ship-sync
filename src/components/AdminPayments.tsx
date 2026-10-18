@@ -28,7 +28,7 @@ export function AdminPayments() {
     <section className="mt-14" data-testid="admin-payments">
       <p className="eyebrow mb-1">Payments & escrow</p>
       <h2 className="!text-[clamp(1.5rem,3vw,2rem)]">Money through the platform</h2>
-      <p className="mt-1 text-text-muted">Customers pay Ship Sync; funds are released to the shipper’s balance at the milestone below, less the take-rate. Payouts are sent by bank transfer and marked here.</p>
+      <p className="mt-1 text-text-muted">Customers pay Ntemtem; funds are released to the shipper’s balance at the milestone below, less the take-rate. Payouts are sent by bank transfer and marked here.</p>
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -86,7 +86,7 @@ export function AdminPayments() {
           <label className="mt-3 block text-sm">Release funds when the shipment is<select className="input-dark mt-1 !min-h-9 w-full text-sm" value={st.releaseOn} onChange={(e) => setSt({ ...st, releaseOn: e.target.value as PaymentSettings['releaseOn'] })}><option value="in_transit">In transit (sailed / flown)</option><option value="delivered">Delivered</option></select></label>
           <label className="mt-3 block text-xs text-text-muted">Note shown to customers<textarea rows={3} className="input-dark mt-1 w-full py-2 text-sm" value={st.customerNote} onChange={(e) => setSt({ ...st, customerNote: e.target.value })} /></label>
           <label className="mt-3 block text-xs text-text-muted">Note shown to shippers<textarea rows={3} className="input-dark mt-1 w-full py-2 text-sm" value={st.payoutNote} onChange={(e) => setSt({ ...st, payoutNote: e.target.value })} /></label>
-          <p className="mt-4 text-[11px] text-text-muted">Mobile money collection (MTN MoMo, Vodafone Cash, Paystack/Flutterwave) plugs in behind the same escrow ledger when a partner is signed. <Link to="/dashboard/payments" className="text-gold hover:underline">Shipper view →</Link></p>
+          <p className="mt-4 text-[11px] text-text-muted">Mobile money collection (MTN MoMo, Telecel Cash, AT Money via Paystack/Flutterwave) plugs in behind the same escrow ledger when a partner is signed. <Link to="/dashboard/payments" className="text-gold-deep hover:underline">Shipper view →</Link></p>
         </div>
       </div>
     </section>

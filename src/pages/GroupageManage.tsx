@@ -103,7 +103,7 @@ export default function GroupageManage() {
                     {g.spots.map((s: Spot) => (
                       <li key={s.id} className={`flex flex-wrap items-center justify-between gap-2 py-2 ${s.status === 'cancelled' ? 'opacity-60' : ''}`}>
                         <div className="min-w-0"><p className="font-medium">{s.name} <span className="font-normal text-text-muted">· {unitsLabel(g, s.units)} · {money(s.amountUsd)}{s.pickup ? ' · wants pickup' : ''}</span></p><p className="truncate text-xs text-text-muted">{s.description} · {s.phone}</p></div>
-                        <div className="flex items-center gap-2">{s.shipmentRef ? <Link to={`/dashboard/shipments?q=${s.shipmentRef}&b=all`} className="font-mono text-xs text-gold hover:underline">{s.shipmentRef}</Link> : <Pill tone={s.status === 'cancelled' ? 'muted' : 'gold'}>{s.status}</Pill>}{s.status === 'reserved' && <button onClick={() => act(() => groupageApi.cancelSpot(s.id), 'Reservation removed.', s.id)} disabled={busy === s.id} className="text-xs text-text-muted hover:text-danger">Remove</button>}</div>
+                        <div className="flex items-center gap-2">{s.shipmentRef ? <Link to={`/dashboard/shipments?q=${s.shipmentRef}&b=all`} className="font-mono text-xs text-gold-deep hover:underline">{s.shipmentRef}</Link> : <Pill tone={s.status === 'cancelled' ? 'muted' : 'gold'}>{s.status}</Pill>}{s.status === 'reserved' && <button onClick={() => act(() => groupageApi.cancelSpot(s.id), 'Reservation removed.', s.id)} disabled={busy === s.id} className="text-xs text-text-muted hover:text-danger">Remove</button>}</div>
                       </li>
                     ))}
                   </ul>

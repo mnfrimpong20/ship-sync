@@ -25,7 +25,7 @@ interface RegionPayload {
 
 type Selection = { kind: 'vessel' | 'flight'; id: string }
 
-/** The lanes Ship Sync's shippers actually run — drawn as great-circle arcs into the Gulf of Guinea. */
+/** The lanes Ntemtem's shippers actually run — drawn as great-circle arcs into the Gulf of Guinea. */
 const lanes: [string, string][] = [
   ['New York, NY', 'GH'], ['Houston, TX', 'GH'], ['Atlanta, GA', 'NG'], ['Philadelphia, PA', 'LR'], ['Minneapolis, MN', 'LR'],
   ['London, UK', 'GH'], ['London, UK', 'NG'], ['Hamburg, DE', 'TG'], ['Paris, FR', 'SN'], ['Paris, FR', 'CI'], ['Guangzhou, CN', 'NG'], ['Dubai, AE', 'GH'],
@@ -97,19 +97,19 @@ export default function Live() {
       brandBasemap(m)
       const laneFc: FeatureCollection = { type: 'FeatureCollection', features: lanes.filter(([o, d]) => originCoords[o] && destGeo[d]).map(([o, d]) => ({ type: 'Feature', properties: { o, d }, geometry: { type: 'LineString', coordinates: greatCircle(originCoords[o], destGeo[d].port.at, 64) } })) }
       m.addSource('lanes', { type: 'geojson', data: laneFc })
-      m.addLayer({ id: 'lanes-glow', type: 'line', source: 'lanes', paint: { 'line-color': '#E3B54A', 'line-width': 5, 'line-opacity': 0.08 } })
-      m.addLayer({ id: 'lanes', type: 'line', source: 'lanes', paint: { 'line-color': '#E3B54A', 'line-width': 1, 'line-dasharray': [2, 4], 'line-opacity': 0.55 } })
+      m.addLayer({ id: 'lanes-glow', type: 'line', source: 'lanes', paint: { 'line-color': '#F5B82E', 'line-width': 5, 'line-opacity': 0.08 } })
+      m.addLayer({ id: 'lanes', type: 'line', source: 'lanes', paint: { 'line-color': '#F5B82E', 'line-width': 1, 'line-dasharray': [2, 4], 'line-opacity': 0.55 } })
       const portFc: FeatureCollection = { type: 'FeatureCollection', features: Object.entries(destGeo).map(([code, g]) => ({ type: 'Feature', properties: { code, name: g.port.name }, geometry: { type: 'Point', coordinates: g.port.at } })) }
       m.addSource('ports', { type: 'geojson', data: portFc })
-      m.addLayer({ id: 'ports-halo', type: 'circle', source: 'ports', paint: { 'circle-radius': 12, 'circle-color': '#E3B54A', 'circle-opacity': 0.15 } })
-      m.addLayer({ id: 'ports', type: 'circle', source: 'ports', paint: { 'circle-radius': 4.5, 'circle-color': '#E3B54A', 'circle-stroke-color': '#0B1220', 'circle-stroke-width': 1.5 } })
+      m.addLayer({ id: 'ports-halo', type: 'circle', source: 'ports', paint: { 'circle-radius': 12, 'circle-color': '#F5B82E', 'circle-opacity': 0.15 } })
+      m.addLayer({ id: 'ports', type: 'circle', source: 'ports', paint: { 'circle-radius': 4.5, 'circle-color': '#F5B82E', 'circle-stroke-color': '#0D1424', 'circle-stroke-width': 1.5 } })
       m.addSource('vessels', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
-      m.addLayer({ id: 'vessels', type: 'circle', source: 'vessels', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1.5, 1.4, 4, 2.5, 7, 5], 'circle-color': ['case', ['<', ['get', 'speed'], 1], '#A3AEC2', '#2DD4BF'], 'circle-opacity': 0.9, 'circle-stroke-color': '#0B1220', 'circle-stroke-width': 0.5 } })
+      m.addLayer({ id: 'vessels', type: 'circle', source: 'vessels', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1.5, 1.4, 4, 2.5, 7, 5], 'circle-color': ['case', ['<', ['get', 'speed'], 1], '#A8AFC3', '#6CC3DD'], 'circle-opacity': 0.9, 'circle-stroke-color': '#0D1424', 'circle-stroke-width': 0.5 } })
       m.addSource('selected', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
-      m.addLayer({ id: 'selected-halo', type: 'circle', source: 'selected', paint: { 'circle-radius': 14, 'circle-color': '#E3B54A', 'circle-opacity': 0.25 } })
-      m.addLayer({ id: 'selected', type: 'circle', source: 'selected', paint: { 'circle-radius': 6, 'circle-color': '#E3B54A', 'circle-stroke-color': '#0B1220', 'circle-stroke-width': 1.5 } })
+      m.addLayer({ id: 'selected-halo', type: 'circle', source: 'selected', paint: { 'circle-radius': 14, 'circle-color': '#F5B82E', 'circle-opacity': 0.25 } })
+      m.addLayer({ id: 'selected', type: 'circle', source: 'selected', paint: { 'circle-radius': 6, 'circle-color': '#F5B82E', 'circle-stroke-color': '#0D1424', 'circle-stroke-width': 1.5 } })
       m.addSource('flights', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
-      m.addLayer({ id: 'flights', type: 'circle', source: 'flights', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1.5, 1.6, 4, 3, 7, 6], 'circle-color': ['case', ['get', 'cargo'], '#7DD3FC', '#5B8DB8'], 'circle-opacity': ['case', ['get', 'cargo'], 0.95, 0.7], 'circle-stroke-color': '#0B1220', 'circle-stroke-width': 0.6 } })
+      m.addLayer({ id: 'flights', type: 'circle', source: 'flights', paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 1.5, 1.6, 4, 3, 7, 6], 'circle-color': ['case', ['get', 'cargo'], '#7DD3FC', '#5B8DB8'], 'circle-opacity': ['case', ['get', 'cargo'], 0.95, 0.7], 'circle-stroke-color': '#0D1424', 'circle-stroke-width': 0.6 } })
       const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 })
       for (const layer of ['vessels', 'flights']) {
         m.on('mouseenter', layer, (e) => {
@@ -117,7 +117,7 @@ export default function Live() {
           const f = e.features?.[0]; if (!f) return
           const p = f.properties as { name: string; speed?: number; altitude?: number; at: string }
           const g = f.geometry as Point
-          popup.setLngLat(g.coordinates as LngLat).setHTML(`<strong>${p.name || (layer === 'flights' ? 'Aircraft' : 'Vessel')}</strong><br/>${p.speed != null ? `${Math.round(p.speed)} ${layer === 'flights' ? 'kt' : 'kn'}` : ''}${p.altitude != null ? ` · ${Math.round(p.altitude).toLocaleString()} ft` : ''}<br/><span style="color:#A3AEC2">${new Date(p.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>`).addTo(m)
+          popup.setLngLat(g.coordinates as LngLat).setHTML(`<strong>${p.name || (layer === 'flights' ? 'Aircraft' : 'Vessel')}</strong><br/>${p.speed != null ? `${Math.round(p.speed)} ${layer === 'flights' ? 'kt' : 'kn'}` : ''}${p.altitude != null ? ` · ${Math.round(p.altitude).toLocaleString()} ft` : ''}<br/><span style="color:#A8AFC3">${new Date(p.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>`).addTo(m)
         })
         m.on('mouseleave', layer, () => { m.getCanvas().style.cursor = ''; popup.remove() })
       }
@@ -180,7 +180,7 @@ export default function Live() {
             </select>
           </label>
         )}
-        {assignMsg && <p className="mt-2 text-xs text-gold" role="status">{assignMsg}</p>}
+        {assignMsg && <p className="mt-2 text-xs text-gold-deep" role="status">{assignMsg}</p>}
       </div>
     )
   }
@@ -195,7 +195,7 @@ export default function Live() {
           <div className="max-w-2xl">
             <motion.p variants={fadeUp} className="eyebrow mb-2">Live lanes</motion.p>
             <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4vw,3rem)]">The Gulf of Guinea, right now</motion.h1>
-            <motion.p variants={fadeUp} className="mt-2 text-text-muted">Ships across Europe, the US coasts, the Atlantic approach and the West African coast, and aircraft over them, from public AIS and ADS-B feeds — plus the lanes Ship Sync shippers sail from North America, Europe and Asia.</motion.p>
+            <motion.p variants={fadeUp} className="mt-2 text-text-muted">Ships across Europe, the US coasts, the Atlantic approach and the West African coast, and aircraft over them, from public AIS and ADS-B feeds — plus the lanes Ntemtem shippers sail from North America, Europe and Asia.</motion.p>
           </div>
           <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2 text-sm">
             <Pill tone={data?.ais.status === 'live' ? 'gold' : 'muted'}><Radio size={12} className={`mr-1 ${data?.ais.status === 'live' ? 'animate-pulse' : ''}`} aria-hidden="true" /> {aisLabel}</Pill>
@@ -228,7 +228,7 @@ export default function Live() {
                       <span className="flex items-center gap-2 text-text"><span aria-hidden="true">{c.flag}</span>{destGeo[c.code]?.port.name.replace('Port of ', '') ?? c.name}</span>
                       <span className="flex items-center gap-3 tabular-nums">
                         <span className="text-text-muted" title="Vessels in approach"><Ship size={12} className="mr-1 inline" aria-hidden="true" />{cg?.total ?? '–'}</span>
-                        <span className={cg && cg.anchored >= 8 ? 'text-gold' : 'text-text'} title="Stopped / at anchor"><Anchor size={12} className="mr-1 inline" aria-hidden="true" />{cg?.anchored ?? '–'}</span>
+                        <span className={cg && cg.anchored >= 8 ? 'text-gold-deep' : 'text-text'} title="Stopped / at anchor"><Anchor size={12} className="mr-1 inline" aria-hidden="true" />{cg?.anchored ?? '–'}</span>
                       </span>
                     </li>
                   )
@@ -237,7 +237,7 @@ export default function Live() {
               {data && !data.ais.enabled && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">Vessel data appears once an AISStream key is configured on the server.</p>}
               {data && data.ais.status === 'live' && (data.ais.coastVessels ?? 0) === 0 && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">Counts are 0 because no community AIS receiver on the Gulf of Guinea coast is feeding AISStream right now. Ships are still tracked across Europe, the US coasts and the Atlantic approach, and reappear here when a coastal receiver comes online.</p>}
               {data && data.flights.length === 0 && <p className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">No aircraft right now — the public ADS-B feeds (adsb.fi, adsb.lol) may be briefly unavailable. Aircraft are polled around the hub airports on these lanes; community receivers over West Africa itself are sparse.</p>}
-              {anchoredTotal >= 15 && <p className="mt-3 text-xs text-gold">High congestion across the region — expect extra days for clearance.</p>}
+              {anchoredTotal >= 15 && <p className="mt-3 text-xs text-gold-deep">High congestion across the region — expect extra days for clearance.</p>}
             </div>
             <div className="card-dark mt-4 p-5">
               <h2 className="!text-lg">Ship on these lanes</h2>

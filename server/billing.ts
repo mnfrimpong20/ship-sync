@@ -94,7 +94,7 @@ export function mountBilling(r: Router, d: Deps) {
   const { getDb, requireUser, requireAdmin, HttpError, wrap } = d
   const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || !['owner', 'finance'].includes(u.staffRole ?? 'owner')) throw new HttpError(403, 'Owners and finance only.'); return u }
 
-  /** Public: what Ship Sync costs, for the /pricing page. Live numbers from settings. */
+  /** Public: what Ntemtem costs, for the /pricing page. Live numbers from settings. */
   r.get('/pricing', wrap(async (_req, res) => {
     const db = await getDb(); const prices = await planPrices(db)
     const { getSettings } = await import('./payments'); const pay = await getSettings(db)
@@ -126,11 +126,11 @@ export function mountBilling(r: Router, d: Deps) {
   r.post('/billing/checkout', wrap(async (req, res) => {
     const db = await getDb(); const u = await office(db, req); const { plan } = zPlan.parse(req.body)
     if (u.staffRole && u.staffRole !== 'owner') throw new HttpError(403, 'Only the owner can change the plan.')
-    if (stripeMode() === 'off') throw new HttpError(409, 'Online billing isn’t switched on yet — contact Ship Sync and we’ll change your plan for you.')
+    if (stripeMode() === 'off') throw new HttpError(409, 'Online billing isn’t switched on yet — contact Ntemtem and we’ll change your plan for you.')
     const prices = await planPrices(db); const base = appUrl(req)
     const session = await stripe<Row>('/checkout/sessions', {
       mode: 'subscription', client_reference_id: `sub:${u.shipperId}:${plan}`, customer_email: u.email,
-      'line_items[0][quantity]': 1, 'line_items[0][price_data][currency]': 'usd', 'line_items[0][price_data][unit_amount]': Math.round(prices[plan] * 100), 'line_items[0][price_data][recurring][interval]': 'month', 'line_items[0][price_data][product_data][name]': `Ship Sync ${PLANS[plan].label}`,
+      'line_items[0][quantity]': 1, 'line_items[0][price_data][currency]': 'usd', 'line_items[0][price_data][unit_amount]': Math.round(prices[plan] * 100), 'line_items[0][price_data][recurring][interval]': 'month', 'line_items[0][price_data][product_data][name]': `Ntemtem ${PLANS[plan].label}`,
       'metadata[kind]': 'subscription', 'metadata[shipper_id]': u.shipperId!, 'metadata[plan]': plan,
       success_url: `${base}/#/dashboard/billing?session={CHECKOUT_SESSION_ID}`, cancel_url: `${base}/#/dashboard/billing?canceled=1`,
     })

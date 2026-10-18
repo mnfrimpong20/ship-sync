@@ -1,3 +1,4 @@
+import { pageMeta } from './pageMeta'
 import { useEffect, useState } from 'react'
 import { api } from './store'
 
@@ -30,24 +31,11 @@ export function useSiteConfig() {
   return c
 }
 
-/** Per-route browser title + description + Open Graph tags. */
-const TITLES: [RegExp, string, string?][] = [
-  [/^\/$/, '', 'Compare verified shippers to Ghana, Nigeria and across West Africa. Clear prices, protected payments, tracked all the way home.'],
-  [/^\/for-shippers/, 'For shipping companies', 'Run your shipping business on Ntemtem: matched leads, rate cards, containers, warehouse scanning, protected payments and more.'],
-  [/^\/quote/, 'Get freight quotes', 'Post your shipment once and let verified shippers compete with itemised quotes.'],
-  [/^\/shippers\/[^/]+/, 'Shipper profile'], [/^\/shippers/, 'Verified shippers directory'], [/^\/track/, 'Track a shipment'], [/^\/duty/, 'Duty & landed-cost estimator'],
-  [/^\/groupage/, 'Fill a barrel — shared barrels & containers'], [/^\/brokers/, 'Customs brokers'], [/^\/sailings/, 'Sailing schedule'], [/^\/lanes/, 'Lane prices'], [/^\/live/, 'Live map'],
-  [/^\/sourcing\/new/, 'Start a sourcing request'], [/^\/sourcing\/[^/]+/, 'Sourcing request'], [/^\/sourcing/, 'Source from China, the UK and the USA', 'Our own team finds the factory, wholesaler or store, buys in Ntemtem’s name, inspects and ships it to you.'],
-  [/^\/about/, 'About Ntemtem'], [/^\/contact/, 'Contact us'], [/^\/privacy/, 'Privacy policy'], [/^\/terms/, 'Terms of service'], [/^\/shipper-agreement/, 'Shipper agreement'],
-  [/^\/s\//, 'Supplier portal · 供应商门户'], [/^\/order\//, 'Place your order'], [/^\/login/, 'Sign in'], [/^\/forgot/, 'Reset your password'], [/^\/reset/, 'Choose a new password'], [/^\/signup/, 'Create an account'], [/^\/dashboard\/shipper/, 'Shipper workspace'], [/^\/dashboard\/sourcing/, 'Sourcing board'], [/^\/dashboard\/verification/, 'Verification'], [/^\/dashboard\/(\w+)/, 'Workspace'], [/^\/dashboard/, 'My dashboard'], [/^\/admin/, 'Admin'],
-]
-const DEFAULT_DESC = 'Ntemtem — Twi for quickly-quickly — connects you with verified air and ocean shippers carrying boxes, barrels, cars and cargo home to Ghana, Nigeria and across West Africa.'
+/** Per-route browser title + description + Open Graph tags (shared table in pageMeta.ts). */
 export function applyPageMeta(pathname: string) {
-  const hit = TITLES.find(([re]) => re.test(pathname))
-  const HOME_TITLE = 'Ntemtem — Send it. Shipping home to Ghana & West Africa'
-  const title = hit && hit[1] ? `${hit[1]} · Ntemtem` : HOME_TITLE
-  const desc = hit?.[2] ?? DEFAULT_DESC
+  const { title, description: desc } = pageMeta(pathname)
   document.title = title
   const set = (sel: string, attr: string, val: string) => { let el = document.head.querySelector<HTMLMetaElement>(sel); if (!el) { el = document.createElement('meta'); const [k, v] = sel.replace('meta[', '').replace(']', '').split('='); el.setAttribute(k, v.replace(/"/g, '')); document.head.appendChild(el) } el.setAttribute(attr, val) }
-  set('meta[name="description"]', 'content', desc); set('meta[property="og:title"]', 'content', title); set('meta[property="og:description"]', 'content', desc); set('meta[property="og:url"]', 'content', `${location.origin}/#${pathname}`)
+  set('meta[name="description"]', 'content', desc); set('meta[property="og:title"]', 'content', title); set('meta[property="og:description"]', 'content', desc); set('meta[property="og:url"]', 'content', `${location.origin}${pathname}`)
+  let can = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]'); if (!can) { can = document.createElement('link'); can.rel = 'canonical'; document.head.appendChild(can) } can.href = `${location.origin}${pathname}`
 }

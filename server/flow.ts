@@ -237,7 +237,7 @@ export async function ensureDetailsToken(db: Db, s: Row) {
   const { rows } = await db.query<Row>('select details_token from shipments where id = $1', [s.id]); s.details_token = rows[0]?.details_token ?? t
   return s.details_token as string
 }
-export const recipientFormUrl = (token: string) => `${appUrl()}/#/add-recipient/${token}`
+export const recipientFormUrl = (token: string) => `${appUrl()}/add-recipient/${token}`
 
 /** minAgeMin: give the office time to add the recipient themselves before the client is asked. */
 export async function sweepRecipientNudges(db: Db, minAgeMin = 10) {
@@ -438,7 +438,7 @@ export async function manifestFor(db: Db, c: Row) {
     totals: { shipments: out.length, pieces: out.reduce((n, x) => n + (x.pieces ?? 0), 0), weightKg: out.reduce((n, x) => n + Number(x.weightKg ?? 0), 0) || null },
   }
 }
-export const partnerUrl = (token: string) => `${appUrl()}/#/p/${token}`
+export const partnerUrl = (token: string) => `${appUrl()}/p/${token}`
 
 /** Container sailed → email each destination partner the manifest link once. */
 export async function sendPreAlerts(db: Db, c: Row, force = false) {

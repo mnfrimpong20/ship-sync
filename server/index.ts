@@ -4,6 +4,7 @@ import compression from 'compression'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { apiRouter } from './api'
+import { mountSeo } from './seo'
 import { getDb } from './db'
 import { ais, startAirSweep } from './live'
 import { startCarrierSync } from './containers'
@@ -43,12 +44,12 @@ async function main() {
   app.use(cookieParser())
   app.use('/api', apiRouter())
   // White-label custom domains: a shipper's own host lands on their branded page.
-  app.get('/', async (req, res, next) => { try { const slug = await slugForHost(await getDb(), req.headers.host); if (slug && !req.url.includes('#')) return res.redirect(302, `/#/t/${slug}`) } catch { /* ignore */ } next() })
+  app.get('/', async (req, res, next) => { try { const slug = await slugForHost(await getDb(), req.headers.host); if (slug && !req.url.includes('#')) return res.redirect(302, `/t/${slug}`) } catch { /* ignore */ } next() })
 
   if (isProd) {
     const dist = path.join(root, 'dist')
     app.use(express.static(dist, { index: false, maxAge: '1h' }))
-    app.get('*path', (_req, res) => res.sendFile(path.join(dist, 'index.html')))
+    mountSeo(app, getDb, dist)
   } else {
     const { createServer } = await import('vite')
     const vite = await createServer({ root, server: { middlewareMode: true, host: true, allowedHosts: true }, appType: 'spa' })

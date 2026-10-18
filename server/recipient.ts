@@ -1,7 +1,7 @@
 /**
  * Recipient experience — the person in Ghana / Nigeria / … who is actually waiting for the goods.
  *
- * Each shipment gets a receiver link (`/#/r/<token>`): a phone-friendly page with the status, where and
+ * Each shipment gets a receiver link (`/r/<token>`): a phone-friendly page with the status, where and
  * when to expect it, the pieces, a QR of the reference, and an "I received it" button. The consignee is
  * texted (SMS or WhatsApp, see sms.ts) when the shipment sails, lands, is out for delivery, is ready for
  * collection, and when it is delivered — only if the shipper has recipient messages on and a provider is
@@ -26,7 +26,7 @@ interface Deps {
 
 const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v))
 const appUrl = () => (process.env.APP_URL || '').replace(/\/$/, '')
-export const receiverUrl = (token: string) => `${appUrl()}/#/r/${token}`
+export const receiverUrl = (token: string) => `${appUrl()}/r/${token}`
 
 export type RecipientKind = 'notice' | 'sailed' | 'arrived' | 'ready' | 'out_for_delivery' | 'delivered' | 'reminder'
 export const messageOut = (m: Row) => ({ id: m.id, shipmentId: m.shipment_id, to: m.to_phone, channel: m.channel as 'sms' | 'whatsapp', kind: m.kind as RecipientKind, text: m.text, status: m.status as 'pending' | 'sent' | 'skipped' | 'failed', error: m.error ?? '', attempts: Number(m.attempts ?? 0), createdAt: ISO(m.created_at), sentAt: ISO(m.sent_at) })
@@ -202,7 +202,7 @@ export function mountRecipient(r: Router, d: Deps) {
       shipment: { ref: s.ref, status: s.status, statusLabel: statusLabels[s.status as ShipmentStatus] ?? s.status, mode: s.mode, origin: s.origin, destination: s.destination, destinationName: dest?.name ?? s.destination, port: dest?.ports?.[0] ?? '', description: s.description, eta: ISO(s.eta)?.slice(0, 10) ?? null, sender: s.customer, vesselName: s.vessel_name ?? '' },
       shipper: { name: sh?.name ?? '' }, receiver: receiver ? { name: receiver.name } : null, readyForCollection: ready.length > 0,
       events: events.map((e) => ({ status: e.status, label: statusLabels[e.status as ShipmentStatus] ?? e.status, at: ISO(e.at), place: e.place, note: e.note ?? '' })),
-      pieces: pieces.map((p) => ({ seq: Number(p.seq), status: p.status })), trackUrl: `${appUrl()}/#/track?ref=${s.ref}`,
+      pieces: pieces.map((p) => ({ seq: Number(p.seq), status: p.status })), trackUrl: `${appUrl()}/track?ref=${s.ref}`,
       receipt: rc[0] ? { name: rc[0].name, note: rc[0].note, allGood: Boolean(rc[0].all_good), at: ISO(rc[0].created_at) } : null,
     })
   }))

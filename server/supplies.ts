@@ -307,7 +307,7 @@ export function mountSupplies(r: Router, d: Deps) {
     try {
       const session = await stripe<Row>('/checkout/sessions', {
         mode: monthly > 0 ? 'subscription' : 'payment', client_reference_id: `eq:${id}`, customer_email: u.email || undefined,
-        success_url: `${base}/#/dashboard/supplies?order=${id}&paid=1`, cancel_url: `${base}/#/dashboard/supplies?order=${id}&paid=cancel`,
+        success_url: `${base}/dashboard/supplies?order=${id}&paid=1`, cancel_url: `${base}/dashboard/supplies?order=${id}&paid=cancel`,
         metadata: { kind: 'supply_order', order_id: id, order_ref: ref, shipper_id: u.shipperId }, line_items: items,
         ...(monthly > 0 ? { subscription_data: { metadata: { kind: 'supply_order', order_id: id } } } : { payment_intent_data: { description: `Ntemtem equipment ${ref}`, metadata: { order_id: id } } }),
       })

@@ -228,7 +228,7 @@ function Household() {
   const [sp] = useSearchParams(); const [a, setA] = useState<R | null>(null); const [email, setEmail] = useState(''); const [msg, setMsg] = useState(''); const [err, setErr] = useState('')
   const load = () => hubApi.accounts().then(setA).catch(() => {})
   useEffect(() => { const t = sp.get('invite'); if (t) hubApi.accept(t).then(() => { setMsg('You joined the account — switch to it below.'); load() }).catch((e) => setErr(e.message)); else void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  const sw = async (id: string | null) => { await hubApi.switchTo(id); window.location.hash = '#/dashboard'; window.location.reload() }
+  const sw = async (id: string | null) => { await hubApi.switchTo(id); window.location.assign('/dashboard') }
   if (!a) return null
   return (
     <Panel title="Family & team" sub="Let family members or colleagues book, pay and track on your account. Everything they do is logged with their name." testid="household">
@@ -302,7 +302,7 @@ function SecurityCard() {
 function DataCard() {
   const { user } = useStore(); const [open, setOpen] = useState(false); const [pw, setPw] = useState(''); const [word, setWord] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false)
   if (user?.actingBy) return null
-  const del = async (e: React.FormEvent) => { e.preventDefault(); setErr(''); setBusy(true); try { await accountApi.remove(pw); window.location.hash = '#/'; window.location.reload() } catch (x) { setErr(x instanceof Error ? x.message : 'Could not delete the account.'); setBusy(false) } }
+  const del = async (e: React.FormEvent) => { e.preventDefault(); setErr(''); setBusy(true); try { await accountApi.remove(pw); window.location.assign('/') } catch (x) { setErr(x instanceof Error ? x.message : 'Could not delete the account.'); setBusy(false) } }
   return (
     <Panel title="Your data" sub="Download everything we hold about you, or close your account." testid="your-data">
       <div className="flex flex-wrap gap-2"><a href={accountApi.exportUrl} className="btn-ghost !min-h-10 text-sm" data-testid="data-export"><Download size={14} aria-hidden="true" /> Download my data (JSON)</a>{!open && <button type="button" onClick={() => setOpen(true)} className="btn-ghost !min-h-10 text-sm text-danger" data-testid="data-delete-open"><Trash2 size={14} aria-hidden="true" /> Delete my account</button>}</div>

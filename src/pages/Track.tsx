@@ -216,7 +216,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
 /** Copy the public tracking link or send it on WhatsApp — how most receivers get it. */
 function ShareTracking({ s }: { s: Shipment }) {
   const [copied, setCopied] = useState(false)
-  const url = `${location.origin}/#/track?ref=${s.ref}`
+  const url = `${location.origin}/track?ref=${s.ref}`
   const text = `Track our shipment ${s.ref} (${s.origin} → ${countryByCode(s.destination)?.name ?? s.destination}) on Ntemtem: ${url}`
   const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { prompt('Copy this link', url) } }
   return (

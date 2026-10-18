@@ -33,7 +33,7 @@ export function NeedsYou({ items }: { items: AttentionItem[] }) {
 /** The one shipment they're most likely asking about, with the progress line and a one-tap share. */
 export function NextArrivalCard({ s }: { s: NextArrival }) {
   const [copied, setCopied] = useState(false)
-  const trackUrl = `${location.origin}/#/track?ref=${s.ref}`
+  const trackUrl = `${location.origin}/track?ref=${s.ref}`
   const receiverUrl = s.receiverPath ? `${location.origin}/#${s.receiverPath}` : trackUrl
   const text = `${s.recipient ? `Hi ${s.recipient.name.split(' ')[0]}, ` : ''}our shipment ${s.ref} (${s.origin} → ${s.destinationName}) is ${statusLabels[s.status as ShipmentStatus].toLowerCase()}${s.daysToEta > 0 ? `, expected around ${fmtDate(s.eta)}` : ''}. Follow it here: ${receiverUrl}`
   const copy = async () => { try { await navigator.clipboard.writeText(receiverUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch { prompt('Copy this link', receiverUrl) } }

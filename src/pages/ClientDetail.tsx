@@ -165,7 +165,7 @@ function Overview({ d, busy, run, reload }: Common) {
 /* ---------------- Shipments: history + book directly ---------------- */
 function Shipments({ d, busy, run, reload, advance }: Common & { advance: (id: string) => Promise<void> }) {
   const c = d.client
-  const [open, setOpen] = useState(() => new URLSearchParams(location.hash.split('?')[1] ?? '').get('book') === '1')
+  const [open, setOpen] = useState(() => new URLSearchParams(window.location.search).get('book') === '1')
   const [manage, setManage] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const say = async (m: string) => { await reload(); setNote(m) }

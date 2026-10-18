@@ -64,12 +64,12 @@ function Accounting() {
 function Widget({ shipperId }: { shipperId: string }) {
   const base = window.location.origin
   const script = `<script src="${base}/api/widget.js?s=${shipperId}" async></script>`
-  const iframe = `<iframe src="${base}/#/embed/track/${shipperId}" title="Track your shipment" style="width:100%;max-width:520px;height:460px;border:0"></iframe>`
+  const iframe = `<iframe src="${base}/embed/track/${shipperId}" title="Track your shipment" style="width:100%;max-width:520px;height:460px;border:0"></iframe>`
   return (
     <Panel title="Tracking widget for your website" sub="Clients type their reference on your site and see the live status — only your shipments are found." testid="widget">
       <p className="label-dark mb-1">Paste this where the box should appear</p><CopyBox text={script} testid="widget-script" />
       <p className="label-dark mb-1 mt-3">Or use an iframe</p><CopyBox text={iframe} />
-      <a href={`#/embed/track/${shipperId}`} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm font-semibold text-gold-deep hover:underline">Open a preview</a>
+      <a href={`/embed/track/${shipperId}`} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm font-semibold text-gold-deep hover:underline">Open a preview</a>
     </Panel>
   )
 }
@@ -83,7 +83,7 @@ function Webhooks() {
   if (!d) return <Panel title="Webhooks">{err ? <p className="text-sm text-danger">{err}</p> : <NoData>Loading…</NoData>}</Panel>
   const add = async (e: React.FormEvent) => { e.preventDefault(); setErr(''); try { const r = await platformApi.addWebhook({ url, events }); setSecret(r.secret); setUrl(''); load() } catch (x) { setErr(x instanceof Error ? x.message : 'Could not add.') } }
   return (
-    <Panel title="Webhooks" sub="We POST a signed JSON event to your system when things happen. Header X-ShipSync-Signature: t=…,v1=HMAC-SHA256(secret, “t.body”)." testid="webhooks">
+    <Panel title="Webhooks" sub="We POST a signed JSON event to your system when things happen. Header X-Ntemtem-Signature: t=…,v1=HMAC-SHA256(secret, “t.body”)." testid="webhooks">
       {!d.enabled && <p className="mb-3 rounded-lg bg-surface-2 p-3 text-sm text-text-muted">Webhooks are switched off for your account.</p>}
       <form onSubmit={add} className="space-y-2">
         <input type="url" required placeholder="https://your-system.example.com/shipsync" className={cls} value={url} onChange={(e) => setUrl(e.target.value)} data-testid="wh-url" />

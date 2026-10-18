@@ -16,7 +16,7 @@ import { fadeUp, stagger } from '../lib/motion'
 /** Pay · Message · Share · Pickup, straight from a shipment card. */
 export function ShipmentQuickActions({ s, due }: { s: Shipment; due?: number }) {
   const [copied, setCopied] = useState(false)
-  const link = `${location.origin}/#/track?ref=${s.ref}`
+  const link = `${location.origin}/track?ref=${s.ref}`
   const share = async (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation()
     const text = `Follow our shipment ${s.ref} here: ${link}`

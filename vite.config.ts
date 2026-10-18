@@ -4,7 +4,7 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: './',
+  base: '/',
   server: { host: true, port: 5000, allowedHosts: true },
   preview: { host: true, port: 5000, allowedHosts: true },
 })

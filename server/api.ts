@@ -224,7 +224,7 @@ async function loadUserWithCompany(db: Db, id: string) {
 async function sendSetPasswordLink(db: Db, userId: string, name: string, email: string, req: Request) {
   const token = randomBytes(24).toString('base64url')
   await db.query(`insert into password_resets (token,user_id,expires_at) values ($1,$2,now() + interval '3 days')`, [token, userId])
-  const link = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/#/reset?token=${token}&welcome=1`
+  const link = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/reset?token=${token}&welcome=1`
   if (emailProvider().id === 'off') { console.log('[auth] set-password link (email off):', link); return false }
   try { await sendEmail(email, 'Your Ntemtem quotes — set a password', emailTemplate({ name, title: 'Your request is in', body: 'Shippers are pricing your shipment now. Quotes appear in your dashboard and we email you as each one arrives. Set a password so you can sign back in from any device.', link, cta: 'Set my password' })); return true } catch (e) { console.error('[auth] set-password email', e); return false }
 }
@@ -471,7 +471,7 @@ export function apiRouter() {
     if (rows[0]) {
       const token = randomBytes(24).toString('base64url')
       await db.query(`insert into password_resets (token,user_id,expires_at) values ($1,$2,now() + interval '1 hour')`, [token, rows[0].id])
-      const link = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/#/reset?token=${token}`
+      const link = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/reset?token=${token}`
       if (emailProvider().id !== 'off') { try { await sendEmail(e, 'Reset your Ntemtem password', emailTemplate({ name: rows[0].name, title: 'Reset your password', body: 'Someone asked to reset the password for this Ntemtem account. The link below works for one hour. If that was not you, you can ignore this email — nothing changes.', link, cta: 'Choose a new password' })) } catch (err) { console.error('[auth] reset email', err) } }
       else console.log('[auth] password reset link (email off):', link)
     }

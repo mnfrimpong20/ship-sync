@@ -11,7 +11,7 @@ export function PlatformBanners() {
   const [busy, setBusy] = useState(false)
   useEffect(() => { if (user) platformApi.announcements().then(setItems).catch(() => setItems([])) }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!user) return null
-  const exit = async () => { setBusy(true); try { await platformApi.exitViewAs() } finally { window.location.hash = '#/admin?view=support'; window.location.reload() } }
+  const exit = async () => { setBusy(true); try { await platformApi.exitViewAs() } finally { window.location.assign('/admin?view=support') } }
   const tone = { critical: 'border-danger/40 bg-danger/10 text-danger', warning: 'border-gold/50 bg-gold/15 text-gold-deep', info: 'border-sky/40 bg-sky/10 text-sky' } as const
   const Icon = { critical: AlertTriangle, warning: Megaphone, info: Info } as const
   return (

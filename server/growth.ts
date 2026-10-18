@@ -54,7 +54,7 @@ export async function buildWeekly(db: Db, sid: string) {
   const subject = `${sh?.name ?? 'Your'} week: ${a.sales ? `${k(a.sales.kpis.won)} won · ` : ''}${a.finance ? `${money(k(a.finance.kpis.invoiced) ?? 0)} invoiced` : 'your numbers'}`
   const body = `${lines.join('\n')}\n\nWorth a look:\n${top.map((i, n) => `${n + 1}. ${i.title}`).join('\n') || 'Nothing urgent — a steady week.'}`
   const html = emailTemplate({ title: `Your week at ${sh?.name ?? 'Ntemtem'}`, body: `${lines.map(esc).join('<br>')}<br><br><b>Worth a look</b><br>${top.map((i, n) => `${n + 1}. ${esc(i.title)} — <span style="color:#9fb0c0">${esc(i.body)}</span>`).join('<br>') || 'Nothing urgent — a steady week.'}`, link: '/dashboard/analytics', cta: 'Open analytics' })
-  const whatsapp = `${sh?.name ?? 'Ntemtem'} — last 7 days\n${lines.join('\n')}\n\n${top.map((i, n) => `${n + 1}. ${i.title}`).join('\n')}\n${appUrl()}/#/dashboard/analytics`
+  const whatsapp = `${sh?.name ?? 'Ntemtem'} — last 7 days\n${lines.join('\n')}\n\n${top.map((i, n) => `${n + 1}. ${i.title}`).join('\n')}\n${appUrl()}/dashboard/analytics`
   return { subject, body, html, whatsapp, week: weekKey() }
 }
 export async function sendWeekly(db: Db, sid: string, o: { preview?: boolean; to?: ApiUser } = {}) {
@@ -186,7 +186,7 @@ export function mountGrowth(r: Router, d: Deps) {
     if (b.channel === 'email' && !b.subject) throw new HttpError(400, 'Add a subject line for an email campaign.')
     const { rows: [sh] } = await db.query<Row>('select id, name, brand from shippers where id = $1', [u.shipperId])
     const slug = (J(sh.brand) ?? {}).slug || String(sh.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-    const link = `${appUrl()}/#/order/${slug}`
+    const link = `${appUrl()}/order/${slug}`
     let list = await audience(db, u.shipperId!, b.audience, b.clientIds)
     if (b.test) list = [{ id: '', name: u.name, company: '', email: u.email, phone: '', shipments: 0, lastAt: null }]
     const reach = list.filter((c) => (b.channel === 'email' ? /@/.test(c.email) : /\d{7,}/.test(String(c.phone).replace(/\D/g, ''))))

@@ -292,7 +292,7 @@ export function mountCustomerHub(r: Router, d: Deps) {
     const { rows: [me] } = await db.query<Row>('select name, email, company_name, tax_id, billing_address from users where id = $1', [u.id])
     const { rows: po } = await db.query<Row>(`select s.id, r.po_number from shipments s join requests r on r.id = s.request_id where s.user_id = $1 and r.po_number <> ''`, [u.id]); const poOf = new Map(po.map((x) => [x.id, x.po_number]))
     if (req.query.format === 'csv') {
-      res.set('Content-Type', 'text/csv'); res.set('Content-Disposition', `attachment; filename="ship-sync-statement-${key}.csv"`)
+      res.set('Content-Type', 'text/csv'); res.set('Content-Disposition', `attachment; filename="ntemtem-statement-${key}.csv"`)
       return res.send(['Date,Invoice,Shipper,Shipment,PO,Destination,Total,Paid,Balance', ...inv.map((i) => [D(i.issued_at), i.number, i.shipper_name, i.shipment_ref ?? '', poOf.get(i.shipment_id) ?? '', i.destination ? dest(i.destination) : '', num(i.total), num(i.paid), i.balance].map(csvCell).join(','))].join('\n'))
     }
     const tot = inv.reduce((a, i) => a + num(i.total), 0), paid = inv.reduce((a, i) => a + num(i.paid), 0)
@@ -333,7 +333,7 @@ ${inv.map((i) => `<tr><td>${D(i.issued_at)}</td><td>${esc(i.number)}</td><td>${e
     const group = 'grp_' + uid()
     let left = credit
     const line = (x: { inv: Row; amount: number }) => { const off = Math.min(left, x.amount - 0.5); left -= off; return Math.round((x.amount - off) * 100) }
-    const params: Record<string, unknown> = { mode: 'payment', client_reference_id: group, customer_email: u.email, success_url: `${base}/#/dashboard?tab=money&session={CHECKOUT_SESSION_ID}`, cancel_url: `${base}/#/dashboard?tab=money&paid=cancel`, 'metadata[group]': group }
+    const params: Record<string, unknown> = { mode: 'payment', client_reference_id: group, customer_email: u.email, success_url: `${base}/dashboard?tab=money&session={CHECKOUT_SESSION_ID}`, cancel_url: `${base}/dashboard?tab=money&paid=cancel`, 'metadata[group]': group }
     rows.forEach((x, k) => { params[`line_items[${k}][quantity]`] = 1; params[`line_items[${k}][price_data][currency]`] = 'usd'; params[`line_items[${k}][price_data][unit_amount]`] = line(x); params[`line_items[${k}][price_data][product_data][name]`] = `${x.inv.number} — ${x.inv.shipper_name}${x.amount < x.inv.balance ? ' (part payment)' : ''}` })
     const session = await stripe<Row>('/checkout/sessions', params)
     for (const x of rows) await db.query(`insert into escrow_payments (id,shipment_id,shipper_id,user_id,invoice_id,items,amount_usd,status,provider,provider_session_id) values ($1,$2,$3,$4,$5,$6,$7,'pending','stripe',$8)`, ['esc_' + uid(), x.inv.shipment_id ?? null, x.inv.shipper_id, u.id, x.inv.id, JSON.stringify([{ kind: 'invoice', label: `Invoice ${x.inv.number}`, amountUsd: x.amount }]), x.amount, session.id])
@@ -446,16 +446,16 @@ ${inv.map((i) => `<tr><td>${D(i.issued_at)}</td><td>${esc(i.number)}</td><td>${e
     for (const x of docs) {
       if (x.source === 'generated' || !x.filename) {
         let token = x.share_token; if (!token) { token = randomBytes(12).toString('base64url'); await db.query('update documents set share_token = $2 where id = $1', [x.id, token]) }
-        links.push(`<li>${esc(x.ref)} · ${esc(x.title)} — <a href="${appUrl()}/#/doc/${token}">open</a></li>`)
+        links.push(`<li>${esc(x.ref)} · ${esc(x.title)} — <a href="${appUrl()}/doc/${token}">open</a></li>`)
       } else {
         const { rows: [f] } = await db.query<Row>('select data from documents where id = $1', [x.id]); const b64 = String(f?.data ?? '').replace(/^data:[^,]*,/, '')
         if (b64) files.push({ name: `${x.ref}/${x.filename}`, data: Buffer.from(b64, 'base64') })
       }
     }
     const inv = await myInvoices(db, u.id)
-    const index = `<!doctype html><meta charset="utf-8"><title>Your Ntemtem documents</title><body style="font:14px system-ui;margin:32px"><h1>Your Ntemtem documents</h1><p>Downloaded ${new Date().toDateString()}.</p><h2>Generated documents</h2><ul>${links.join('') || '<li>None</li>'}</ul><h2>Invoices</h2><ul>${inv.map((i) => `<li>${esc(i.number)} · ${esc(i.shipper_name)} · ${money(num(i.total))}${i.pay_token ? ` — <a href="${appUrl()}/#/pay/${i.pay_token}">view</a>` : ''}</li>`).join('') || '<li>None</li>'}</ul></body>`
+    const index = `<!doctype html><meta charset="utf-8"><title>Your Ntemtem documents</title><body style="font:14px system-ui;margin:32px"><h1>Your Ntemtem documents</h1><p>Downloaded ${new Date().toDateString()}.</p><h2>Generated documents</h2><ul>${links.join('') || '<li>None</li>'}</ul><h2>Invoices</h2><ul>${inv.map((i) => `<li>${esc(i.number)} · ${esc(i.shipper_name)} · ${money(num(i.total))}${i.pay_token ? ` — <a href="${appUrl()}/pay/${i.pay_token}">view</a>` : ''}</li>`).join('') || '<li>None</li>'}</ul></body>`
     files.unshift({ name: 'index.html', data: Buffer.from(index) })
-    res.set('Content-Type', 'application/zip'); res.set('Content-Disposition', 'attachment; filename="ship-sync-documents.zip"'); res.send(zip(files))
+    res.set('Content-Type', 'application/zip'); res.set('Content-Disposition', 'attachment; filename="ntemtem-documents.zip"'); res.send(zip(files))
   }))
 
   /* ---------- 7 · share with family ---------- */
@@ -593,7 +593,7 @@ ${inv.map((i) => `<tr><td>${D(i.issued_at)}</td><td>${esc(i.number)}</td><td>${e
     const db = await getDb(); const u = await customer(db, req); const code = await codeFor(db, u.id)
     const { rows: refs } = await db.query<Row>(`select u.name, u.created_at, exists (select 1 from credits c where c.source_user_id = u.id and c.reason = 'referral') as earned from users u where u.referred_by = $1 order by u.created_at desc`, [u.id])
     const { rows: cr } = await db.query<Row>('select amount_usd, reason, used_at, created_at from credits where user_id = $1 order by created_at desc', [u.id])
-    res.json({ code, link: `${appUrl()}/#/signup?ref=${code}`, creditUsd: CREDIT_USD(), available: await creditBalance(db, u.id), referred: refs.map((x) => ({ name: String(x.name).split(' ')[0], joinedAt: ISO(x.created_at), earned: !!x.earned })), credits: cr.map((c) => ({ amount: num(c.amount_usd), reason: c.reason, usedAt: ISO(c.used_at), at: ISO(c.created_at) })) })
+    res.json({ code, link: `${appUrl()}/signup?ref=${code}`, creditUsd: CREDIT_USD(), available: await creditBalance(db, u.id), referred: refs.map((x) => ({ name: String(x.name).split(' ')[0], joinedAt: ISO(x.created_at), earned: !!x.earned })), credits: cr.map((c) => ({ amount: num(c.amount_usd), reason: c.reason, usedAt: ISO(c.used_at), at: ISO(c.created_at) })) })
   }))
 
   /* ---------- 16 · household / business accounts ---------- */
@@ -612,7 +612,7 @@ ${inv.map((i) => `<tr><td>${D(i.issued_at)}</td><td>${esc(i.number)}</td><td>${e
     const { rows: dup } = await db.query('select 1 from account_members where owner_id = $1 and email = $2', [u.id, email]); if (dup.length) throw new HttpError(409, 'Already invited.')
     const token = randomBytes(18).toString('base64url'); const { rows: [ex] } = await db.query<Row>(`select id from users where email = $1 and role = 'customer'`, [email])
     await db.query('insert into account_members (id,owner_id,member_id,email,role,token,status) values ($1,$2,$3,$4,$5,$6,$7)', ['am_' + uid(), u.id, null, email, b.role, token, 'invited'])
-    const link = `${appUrl()}/#/dashboard?tab=account&invite=${token}`
+    const link = `${appUrl()}/dashboard?tab=account&invite=${token}`
     await sendEmail(email, `${u.name} invited you to their Ntemtem account`, emailTemplate({ title: `Join ${u.name}’s Ntemtem account`, body: `${esc(u.name)} added you so you can book, pay and track their shipments. ${ex ? 'Sign in and accept the invite.' : 'Create a free account with this email, then accept the invite.'}`, link, cta: 'Accept invite' })).catch(() => {})
     if (ex) await notify(db, { userId: ex.id, kind: 'system', title: `${u.name} invited you to their account`, body: 'Accept it to book and track shipments on their behalf.', link: `/dashboard?tab=account&invite=${token}` })
     res.status(201).json({ ok: true, link })

@@ -56,7 +56,7 @@ export function mountSupplierPortal(r: Router, d: Deps) {
     await db.query('update supplier_links set last_seen_at = now() where token = $1', [token])
     return l
   }
-  const linkOut = (l: Row, req: Request) => ({ token: l.token, url: `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/#/s/${l.token}`, supplierId: l.supplier_id, createdAt: ISO(l.created_at), lastSeenAt: ISO(l.last_seen_at), revokedAt: ISO(l.revoked_at) })
+  const linkOut = (l: Row, req: Request) => ({ token: l.token, url: `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/s/${l.token}`, supplierId: l.supplier_id, createdAt: ISO(l.created_at), lastSeenAt: ISO(l.last_seen_at), revokedAt: ISO(l.revoked_at) })
 
   /* ---- agent side ---- */
   r.get('/sourcing/:id/supplier-link', wrap(async (req, res) => {

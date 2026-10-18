@@ -1,5 +1,5 @@
 /**
- * White-label — a shipper's own branded page on Ntemtem: `/#/t/<slug>` with their logo, colour,
+ * White-label — a shipper's own branded page on Ntemtem: `/t/<slug>` with their logo, colour,
  * tagline and contact details, a tracking box and a quote form whose leads go only to them (and are
  * priced instantly from their rate cards). A custom domain can point at Ntemtem; requests arriving
  * on that host are sent to the branded page.
@@ -69,7 +69,7 @@ export function mountBrand(r: Router, d: Deps) {
     res.json({ brand: next })
   }))
 
-  /** Public: the shipper behind an order link (`/#/order/<slug-or-id>`), enough to show who the customer is ordering from. */
+  /** Public: the shipper behind an order link (`/order/<slug-or-id>`), enough to show who the customer is ordering from. */
   r.get('/order/:code', wrap(async (req, res) => {
     const db = await getDb(); const code = String(req.params.code).toLowerCase()
     let { rows } = await db.query<Row>('select * from shippers where id = $1', [code]); let sh = rows[0]
@@ -87,7 +87,7 @@ export function mountBrand(r: Router, d: Deps) {
     const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')
     const { rows: c } = await db.query<Row>(`select count(*)::int as n, count(*) filter (where created_at > now() - interval '30 days')::int as n30 from requests where preferred_shipper_id = $1 and source in ('link','branded')`, [u.shipperId])
     res.set('Cache-Control', 'no-store')
-    res.json({ url: `${base}/#/order/${b.slug}`, slug: b.slug, shipperName: sh.name, viaLink: c[0].n, viaLink30: c[0].n30, brandedEnabled: !!b.enabled, brandedUrl: b.enabled ? `${base}/#/t/${b.slug}` : null })
+    res.json({ url: `${base}/order/${b.slug}`, slug: b.slug, shipperName: sh.name, viaLink: c[0].n, viaLink30: c[0].n30, brandedEnabled: !!b.enabled, brandedUrl: b.enabled ? `${base}/t/${b.slug}` : null })
   }))
 
   /** Public: everything the branded page needs. */

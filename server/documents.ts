@@ -9,7 +9,7 @@
  * storage when volume grows — only `data` would move).
  *
  * Visibility: `shipper` (office only) or `shared` (the customer sees it too). Anyone with a share link
- * (`/#/doc/<token>`) can open a document without signing in; links can be revoked.
+ * (`/doc/<token>`) can open a document without signing in; links can be revoked.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
 import { randomBytes } from 'node:crypto'

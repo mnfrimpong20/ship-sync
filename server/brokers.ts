@@ -1,7 +1,7 @@
 /**
  * Customs-broker marketplace — licensed clearing agents at Tema, Takoradi, Lagos (Apapa / Tin Can)
  * and Onne listed with their fees. A customer or the shipper books one on a shipment; the broker
- * works the job from a no-login portal (`/#/broker/<token>`): accept, documents received, assessed
+ * works the job from a no-login portal (`/broker/<token>`): accept, documents received, assessed
  * (which records the official duty on the shipment), duty paid, released, delivered to the yard.
  *
  * Brokers are platform listings (admin-verified); they do not need a Ntemtem account.
@@ -135,7 +135,7 @@ export function mountBrokers(r: Router, d: Deps) {
       [id, s.id, broker.id, s.shipper_id, u.id, u.name, office ? 'office' : 'customer', fee, s.destination === 'NG' ? 'NGN' : 'GHS', b.note, token, JSON.stringify([{ at: new Date().toISOString(), status: 'requested', note: b.note, by: u.name }])])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, s.destination, `Customs broker booked: ${broker.name}${broker.company ? ` (${broker.company})` : ''} — ${cargoLabel(s.cargo as CargoType).toLowerCase()} clearance $${fee}.`])
     // Tell the broker (email with the portal link) and the other side.
-    const link = `${appUrl()}/#/broker/${token}`
+    const link = `${appUrl()}/broker/${token}`
     if (broker.email && emailProvider().id !== 'off') { try { await sendEmail(broker.email, `New clearance job — ${s.ref} at ${s.destination === 'NG' ? 'Lagos' : 'Tema'}`, emailTemplate({ name: broker.name, title: `Clearance request: ${s.ref}`, body: `${u.company ?? u.name} booked you to clear ${cargoLabel(s.cargo as CargoType).toLowerCase()} for ${s.customer} (${s.origin} → ${s.destination}). Fee on file: $${fee}. ${b.note ? `Note: ${b.note}` : ''} Open the job to accept it and keep everyone updated.`, link, cta: 'Open the job' })) } catch (e) { console.error('[brokers] email', e) } }
     if (!owner && s.user_id) await notify(db, { userId: s.user_id, kind: 'customs', title: `Customs broker booked for ${s.ref}`, body: `${broker.name}${broker.company ? ` (${broker.company})` : ''} will clear your goods at ${s.destination === 'NG' ? 'Lagos' : 'Tema'}. Clearance fee $${fee}.`, link: `/dashboard?tab=shipments&s=${s.id}`, dedupe: `cust:${id}:booked` })
     if (!office) await notifyShipperStaff(db, s.shipper_id, { kind: 'customs', title: `${s.customer} booked ${broker.name} to clear ${s.ref}`, body: `Clearance fee $${fee}. The broker's job link is on the shipment.`, link: `/dashboard/shipments?q=${s.ref}&b=all`, dedupe: `cust:${id}:booked:o` }, ['owner', 'dispatcher', 'agent'])
@@ -143,7 +143,7 @@ export function mountBrokers(r: Router, d: Deps) {
   }))
   r.get('/customs/jobs/:id/link', wrap(async (req, res) => {
     const db = await getDb(); const job = await jobById(db, String(req.params.id)); const { office, u } = await access(db, req, job.shipment_id); if (!office && !u.admin) throw new HttpError(403, 'Office only.')
-    res.json({ portalLink: `${appUrl()}/#/broker/${job.token}` })
+    res.json({ portalLink: `${appUrl()}/broker/${job.token}` })
   }))
   r.post('/customs/jobs/:id/step', wrap(async (req, res) => {
     const db = await getDb(); const job = await jobById(db, String(req.params.id)); const { u, office, owner } = await access(db, req, job.shipment_id)
@@ -162,7 +162,7 @@ export function mountBrokers(r: Router, d: Deps) {
     const { rows: veh } = await db.query<Row>('select vin, year, make, model, engine_l, body, declared_value_usd from shipment_vehicles where shipment_id = $1', [job.shipment_id])
     const { rows: cont } = await db.query<Row>(`select c.number, c.vessel_name, c.eta from containers c join shipments s on s.container_id = c.id where s.id = $1`, [job.shipment_id])
     res.set('Cache-Control', 'no-store')
-    res.json({ job: jobOut(job), shipment: { ref: job.ref, customer: job.customer, destination: job.destination, cargo: job.cargo, cargoLabel: cargoLabel(job.cargo as CargoType), status: job.s_status, pieces: pieces[0]?.n ?? 0, consignee: cons[0] ?? null, vehicle: veh[0] ? { vin: veh[0].vin, label: [veh[0].year, veh[0].make, veh[0].model].filter(Boolean).join(' '), engineL: veh[0].engine_l, body: veh[0].body, valueUsd: veh[0].declared_value_usd } : null, container: cont[0] ? { number: cont[0].number, vessel: cont[0].vessel_name, eta: ISO(cont[0].eta)?.slice(0, 10) } : null }, documents: docs.map((x) => ({ id: x.id, kind: x.kind, title: x.title, link: x.share_token ? `/#/doc/${x.share_token}` : null })), steps: JOB_STEPS.map((id) => ({ id, label: jobStepLabels[id] })) })
+    res.json({ job: jobOut(job), shipment: { ref: job.ref, customer: job.customer, destination: job.destination, cargo: job.cargo, cargoLabel: cargoLabel(job.cargo as CargoType), status: job.s_status, pieces: pieces[0]?.n ?? 0, consignee: cons[0] ?? null, vehicle: veh[0] ? { vin: veh[0].vin, label: [veh[0].year, veh[0].make, veh[0].model].filter(Boolean).join(' '), engineL: veh[0].engine_l, body: veh[0].body, valueUsd: veh[0].declared_value_usd } : null, container: cont[0] ? { number: cont[0].number, vessel: cont[0].vessel_name, eta: ISO(cont[0].eta)?.slice(0, 10) } : null }, documents: docs.map((x) => ({ id: x.id, kind: x.kind, title: x.title, link: x.share_token ? `/doc/${x.share_token}` : null })), steps: JOB_STEPS.map((id) => ({ id, label: jobStepLabels[id] })) })
   }))
   r.post('/broker/:token/step', wrap(async (req, res) => {
     const db = await getDb(); const job = await jobByToken(db, String(req.params.token))

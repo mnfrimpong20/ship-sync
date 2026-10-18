@@ -37,7 +37,7 @@ export const documentsApi = {
   shared: (token: string) => api<DocFull>(`/docs/${encodeURIComponent(token)}`),
 }
 
-export const shareUrl = (token: string) => `${location.origin}/#/doc/${token}`
+export const shareUrl = (token: string) => `${location.origin}/doc/${token}`
 export const fmtBytes = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`)
 
 /** Read a File as base64 (no data: prefix). Photos larger than ~1.5 MB are downscaled first so a phone snap doesn't blow the 6 MB cap. */

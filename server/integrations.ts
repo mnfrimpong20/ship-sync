@@ -6,7 +6,7 @@
  *                       shipments), GET /widget.js?s=ID (drop-in script that adds the iframe)
  *   Webhooks            GET|POST /webhooks, PATCH|DELETE /webhooks/:id, POST /webhooks/:id/test,
  *                       GET /webhooks/:id/deliveries, POST /webhook-deliveries/:id/retry
- *                       Events are signed (X-ShipSync-Signature: t=…,v1=HMAC-SHA256(secret, "t.body")) and retried
+ *                       Events are signed (X-Ntemtem-Signature: t=…,v1=HMAC-SHA256(secret, "t.body")) and retried
  *                       with back-off (1m, 5m, 30m, 2h, 6h); 20 failures in a row switch the hook off.
  */
 import { createHmac, randomBytes } from 'node:crypto'
@@ -75,7 +75,7 @@ export function deliverDue(db: Db): Promise<void> {
       let status = 0, err = ''
       try {
         const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 10_000)
-        const r = await fetch(d.url, { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'Ntemtem-Webhooks/1', 'x-shipsync-event': d.event, 'x-shipsync-delivery': d.id, 'x-shipsync-signature': `t=${t},v1=${sig}` }, body, signal: ctl.signal })
+        const r = await fetch(d.url, { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'Ntemtem-Webhooks/1', 'x-ntemtem-event': d.event, 'x-ntemtem-delivery': d.id, 'x-ntemtem-signature': `t=${t},v1=${sig}` }, body, signal: ctl.signal })
         clearTimeout(timer); status = r.status; if (!r.ok) err = `HTTP ${r.status}`
       } catch (e) { err = e instanceof Error ? (e.name === 'AbortError' ? 'Timed out after 10 s' : e.message) : String(e) }
       const attempts = Number(d.attempts) + 1
@@ -151,7 +151,7 @@ export function mountIntegrations(r: Router, d: Deps) {
     const sid = String(req.query.s ?? '').replace(/[^a-z0-9_-]/gi, '').slice(0, 60)
     const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')
     res.set('Content-Type', 'application/javascript'); res.set('Cache-Control', 'public, max-age=3600')
-    res.send(`(function(){var s=document.currentScript;var f=document.createElement('iframe');f.src='${base}/#/embed/track/${sid}';f.title='Track your shipment';f.style.cssText='width:100%;max-width:520px;height:460px;border:0;border-radius:16px;';f.loading='lazy';(s&&s.parentNode?s.parentNode.insertBefore(f,s):document.body.appendChild(f));})();`)
+    res.send(`(function(){var s=document.currentScript;var f=document.createElement('iframe');f.src='${base}/embed/track/${sid}';f.title='Track your shipment';f.style.cssText='width:100%;max-width:520px;height:460px;border:0;border-radius:16px;';f.loading='lazy';(s&&s.parentNode?s.parentNode.insertBefore(f,s):document.body.appendChild(f));})();`)
   })
 
   /* webhooks */

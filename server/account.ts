@@ -145,7 +145,7 @@ export function mountAccount(r: Router, d: Deps) {
       credits: await q('select amount_usd, reason, used_at, created_at from credits where user_id = $1'),
       familyMembers: await q('select email, role, status, created_at from account_members where owner_id = $1'),
     }
-    res.set('Content-Type', 'application/json'); res.set('Content-Disposition', `attachment; filename="ship-sync-my-data-${new Date().toISOString().slice(0, 10)}.json"`)
+    res.set('Content-Type', 'application/json'); res.set('Content-Disposition', `attachment; filename="ntemtem-my-data-${new Date().toISOString().slice(0, 10)}.json"`)
     res.send(JSON.stringify(out, (_k, v) => (v instanceof Date ? v.toISOString() : v), 2))
   }))
   r.post('/me/delete', wrap(async (req, res) => {

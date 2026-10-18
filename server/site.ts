@@ -61,7 +61,7 @@ export function mountSite(r: Router, d: Deps) {
     await db.query(`insert into contact_messages (id,name,email,phone,company,topic,message,ip) values ($1,$2,$3,$4,$5,$6,$7,$8)`, [id, b.name, b.email, b.phone, b.company, b.topic, b.message, ip])
     const cfg = siteConfig()
     if (cfg.email && emailProvider().id !== 'off') {
-      try { await sendEmail(cfg.email, `[Ntemtem contact] ${b.topic} — ${b.name}`, emailTemplate({ title: `New message from ${b.name}`, body: `${b.message}\n\nFrom: ${b.name} <${b.email}>${b.phone ? ` · ${b.phone}` : ''}${b.company ? ` · ${b.company}` : ''}\nTopic: ${b.topic}`, link: `${(process.env.APP_URL || '').replace(/\/$/, '')}/#/admin`, cta: 'Open admin' })) } catch (e) { console.error('[site] contact email', e) }
+      try { await sendEmail(cfg.email, `[Ntemtem contact] ${b.topic} — ${b.name}`, emailTemplate({ title: `New message from ${b.name}`, body: `${b.message}\n\nFrom: ${b.name} <${b.email}>${b.phone ? ` · ${b.phone}` : ''}${b.company ? ` · ${b.company}` : ''}\nTopic: ${b.topic}`, link: `${(process.env.APP_URL || '').replace(/\/$/, '')}/admin`, cta: 'Open admin' })) } catch (e) { console.error('[site] contact email', e) }
     }
     res.status(201).json({ ok: true, id })
   }))

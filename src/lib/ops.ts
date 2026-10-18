@@ -89,4 +89,4 @@ export const opsApi = {
 }
 
 /** The one-time link a teammate opens to set their password and join the company. */
-export const joinLink = (token: string) => `${location.origin}${location.pathname}#/join?token=${encodeURIComponent(token)}`
+export const joinLink = (token: string) => `${location.origin}/join?token=${encodeURIComponent(token)}`

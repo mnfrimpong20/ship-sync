@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
-import { HashRouter, Link, Navigate, Route, Routes, useLocation, useOutlet } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useOutlet } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
@@ -138,7 +138,7 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <StoreProvider>
-        <HashRouter>
+        <BrowserRouter>
           <ScrollManager />
           <Suspense fallback={<PageLoading />}>
           <Routes>
@@ -233,7 +233,7 @@ export default function App() {
             <Route path="/embed/track/:id" element={<EmbedTrack />} />
           </Routes>
           </Suspense>
-        </HashRouter>
+        </BrowserRouter>
       </StoreProvider>
     </MotionConfig>
   )

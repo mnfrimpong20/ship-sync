@@ -1,6 +1,6 @@
 /**
  * Online invoices & collections — the customer side of invoicing. Every invoice gets a pay link
- * (`/#/pay/<token>`, no sign-in needed) that shows the invoice and takes a card through the same
+ * (`/pay/<token>`, no sign-in needed) that shows the invoice and takes a card through the same
  * Stripe / escrow rails as shipment payments; customers with an account also see all their invoices
  * on the dashboard. The office sends the invoice by email/SMS with one click, and reminders go out
  * automatically before the due date and after it (per-shipper schedule), with a log on the invoice.
@@ -46,7 +46,7 @@ async function ensureToken(db: Db, inv: Row) {
   if (inv.pay_token) return inv.pay_token as string
   const t = randomBytes(12).toString('base64url'); await db.query('update invoices set pay_token = $2 where id = $1', [inv.id, t]); return t
 }
-const payLink = (token: string) => `${appUrl()}/#/pay/${token}`
+const payLink = (token: string) => `${appUrl()}/pay/${token}`
 
 /** Email (+ optional SMS) the invoice or a reminder to the client. Returns which channels went out. */
 export async function sendInvoiceMessage(db: Db, inv: Row, kind: 'invoice' | 'reminder' | 'overdue' | 'receipt', opts: { by?: string; note?: string } = {}) {
@@ -140,7 +140,7 @@ export function mountCollections(r: Router, d: Deps) {
     const db = await getDb(); const inv = await byToken(db, String(req.params.token))
     let userId: string | null = null; try { userId = (await requireUser(db, req)).id } catch { /* guest */ }
     const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')
-    res.status(201).json(await checkout(db, inv, inv.client_email || null, userId, `${base}/#/pay/${inv.pay_token}`))
+    res.status(201).json(await checkout(db, inv, inv.client_email || null, userId, `${base}/pay/${inv.pay_token}`))
   }))
   r.post('/pay/:token/verify', wrap(async (req, res) => {
     const db = await getDb(); const inv = await byToken(db, String(req.params.token))

@@ -298,7 +298,7 @@ export function mountPayments(r: Router, d: Deps) {
     const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')
     const session = await stripe('/checkout/sessions', {
       mode: 'payment', client_reference_id: id, customer_email: u.email || undefined,
-      success_url: `${base}/#/dashboard?tab=shipments&s=${s.id}&paid=${id}`, cancel_url: `${base}/#/dashboard?tab=shipments&s=${s.id}&paid=cancel`,
+      success_url: `${base}/dashboard?tab=shipments&s=${s.id}&paid=${id}`, cancel_url: `${base}/dashboard?tab=shipments&s=${s.id}&paid=cancel`,
       metadata: { payment_id: id, shipment_id: s.id, shipment_ref: s.ref },
       payment_intent_data: { description: `Ntemtem ${s.ref} — ${s.origin} → ${s.destination}`, metadata: { payment_id: id, shipment_ref: s.ref } },
       line_items: due.items.map((i) => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: Math.round(i.amountUsd * 100), product_data: { name: i.description } } })),

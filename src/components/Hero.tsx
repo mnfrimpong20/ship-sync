@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
 import { siteApi, type SiteStats } from '../lib/site'
 import { Link, useNavigate } from 'react-router-dom'
-import { motion } from 'motion/react'
-import { ArrowRight, Plane, Ship, ShieldCheck, Clock } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { ArrowRight, Plane, Ship, ShieldCheck, Clock, Pause, Play } from 'lucide-react'
 import { VerifiedMark } from './ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { countries, origins, type Mode } from '../lib/data'
-import HeroVideo from './HeroVideo'
+import HeroVideo, { scenes } from './HeroVideo'
+
+/** What the hero says during each backdrop scene (same order as `scenes`). */
+const sceneCopy: Record<string, { tab: string; eyebrow: string; text: string; short: string }> = {
+  barrels: { tab: 'Barrels', eyebrow: 'Barrels & boxes home', text: 'Pack a barrel in Houston, unpack it in Kumasi. Post it once and verified shippers send you real quotes — pick one, pay safely, and track it all the way home.', short: 'Barrels and boxes home — compare real quotes.' },
+  port: { tab: 'Containers', eyebrow: 'Full containers', text: 'Moving home or restocking a shop? Get door-to-door prices for a 20ft or 40ft container to Tema, Lagos, Lomé and more.', short: 'Full 20ft and 40ft containers, door to door.' },
+  car: { tab: 'Cars', eyebrow: 'Cars & vehicles', text: 'Ship your car by RoRo or in a container. Shippers check the title and estimate the duty before you commit.', short: 'Ship a car — title and duty sorted up front.' },
+  air: { tab: 'Air', eyebrow: 'Urgent by air', text: 'Documents, medicine and gifts by air in 3 to 7 days, with the same protected payment.', short: 'Urgent items by air in 3 to 7 days.' },
+  family: { tab: 'Door to door', eyebrow: 'To the family’s door', text: 'Delivered to the door in Accra, Kumasi, Lagos or Monrovia — and the family gets WhatsApp updates at every step.', short: 'To the family’s door, with WhatsApp updates.' },
+}
 
 export default function Hero() {
   const [stats, setStats] = useState<SiteStats | null>(null)
@@ -15,11 +24,21 @@ export default function Hero() {
   const [origin, setOrigin] = useState('New York, NY')
   const [dest, setDest] = useState('GH')
   const [mode, setMode] = useState<Mode | 'either'>('either')
+  const [scene, setScene] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const [staticOnly, setStaticOnly] = useState(false)
+  useEffect(() => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true
+    if (reduce || saveData) setStaticOnly(true)
+    if (reduce) setPaused(true)
+  }, [])
+  const copy = sceneCopy[scenes[scene].id]
 
   return (
     <section className="theme-dark relative overflow-hidden bg-bg text-text">
       {/* backdrop: cycling video, then brand glows, grid and route arcs on top */}
-      <HeroVideo />
+      <HeroVideo active={scene} paused={paused} staticOnly={staticOnly} onNext={() => setScene((i) => (i + 1) % scenes.length)} />
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         <div className="absolute -top-40 left-1/2 h-[720px] w-[1200px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(227,181,74,0.14),transparent)]" />
         <svg className="absolute inset-0 h-full w-full opacity-[0.05]" aria-hidden="true"><defs><pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#fff" strokeWidth="1" /></pattern></defs><rect width="100%" height="100%" fill="url(#grid)" /></svg>
@@ -28,14 +47,30 @@ export default function Hero() {
 
       <div className="container-fluid relative grid gap-8 pb-16 pt-10 md:gap-12 md:pb-28 md:pt-24 lg:grid-cols-12 lg:items-center">
         <motion.div className="lg:col-span-7" initial="hidden" animate="show" variants={stagger}>
-          <motion.p variants={fadeUp} className="eyebrow mb-5 flex items-center gap-2"><span className="h-px w-8 bg-gold" aria-hidden="true" />Shipping home to Ghana & West Africa</motion.p>
+          <motion.p variants={fadeUp} className="eyebrow mb-5 flex items-center gap-2"><span className="h-px w-8 bg-gold" aria-hidden="true" />
+            <AnimatePresence mode="wait" initial={false}><motion.span key={copy.eyebrow} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.35 }} data-testid="hero-eyebrow">{copy.eyebrow}</motion.span></AnimatePresence>
+          </motion.p>
           <motion.h1 variants={fadeUp} className="max-w-3xl">
             Send it. <em className="not-italic text-gold-deep">Ntemtem.</em>
           </motion.h1>
-          <motion.p variants={fadeUp} className="mt-4 max-w-xl text-lg text-text-muted sm:hidden">Verified shippers quote you. You pick, pay safely, and track it home.</motion.p>
-          <motion.p variants={fadeUp} className="mt-6 hidden max-w-xl text-lg text-text-muted sm:block md:text-xl">
-            Boxes, barrels, cars or a full container — post it once and verified air and ocean shippers send you real quotes. Pick one, pay safely, and track it all the way home. <span className="whitespace-nowrap">Ntemtem is Twi for “quickly-quickly.”</span>
-          </motion.p>
+          <motion.div variants={fadeUp} className="relative mt-4 min-h-[3.5rem] max-w-xl sm:mt-6 sm:min-h-[5.25rem] md:min-h-[6rem]" aria-live="off">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.p key={scenes[scene].id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.4 }} className="text-lg text-text-muted md:text-xl" data-testid="hero-scene-text">
+                <span className="sm:hidden">{copy.short}</span><span className="hidden sm:inline">{copy.text}</span>
+              </motion.p>
+            </AnimatePresence>
+          </motion.div>
+          <motion.div variants={fadeUp} className="mt-4 flex flex-wrap items-center gap-1.5" role="group" aria-label="Hero scenes" data-testid="hero-scenes">
+            {scenes.map((sc, i) => (
+              <button key={sc.id} type="button" onClick={() => { setScene(i); setPaused(true) }} aria-pressed={i === scene} aria-label={`Show ${sceneCopy[sc.id].tab}`}
+                className={`group relative min-h-8 rounded-full px-1.5 text-xs font-semibold focus-ring sm:px-3 ${i === scene ? 'text-white' : 'text-white/60 hover:text-white'}`}>
+                <span className={`block h-1 w-6 rounded-full sm:hidden ${i === scene ? 'bg-gold' : 'bg-white/35'}`} aria-hidden="true" />
+                <span className="hidden sm:inline">{sceneCopy[sc.id].tab}</span>
+                <span className={`absolute inset-x-3 -bottom-0.5 hidden h-0.5 rounded-full sm:block ${i === scene ? 'bg-gold' : 'bg-transparent'}`} aria-hidden="true" />
+              </button>
+            ))}
+            <button type="button" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Play the scenes' : 'Pause the scenes'} className="ml-1 grid h-8 w-8 place-items-center rounded-full border border-white/30 text-white/80 hover:text-white focus-ring" data-testid="hero-pause">{paused ? <Play size={13} aria-hidden="true" /> : <Pause size={13} aria-hidden="true" />}</button>
+          </motion.div>
           <motion.div variants={fadeUp} className="mt-8 hidden gap-3 sm:flex sm:flex-row">
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/quote" className="btn-gold w-full sm:w-auto">Get free quotes <ArrowRight size={18} aria-hidden="true" /></Link></motion.div>
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/signup?role=shipper" className="btn-ghost w-full !border-white/50 !text-white hover:!border-white hover:!bg-white/10 sm:w-auto">List your shipping company</Link></motion.div>

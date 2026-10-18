@@ -132,7 +132,7 @@ export function mountBilling(r: Router, d: Deps) {
       mode: 'subscription', client_reference_id: `sub:${u.shipperId}:${plan}`, customer_email: u.email,
       'line_items[0][quantity]': 1, 'line_items[0][price_data][currency]': 'usd', 'line_items[0][price_data][unit_amount]': Math.round(prices[plan] * 100), 'line_items[0][price_data][recurring][interval]': 'month', 'line_items[0][price_data][product_data][name]': `Ntemtem ${PLANS[plan].label}`,
       'metadata[kind]': 'subscription', 'metadata[shipper_id]': u.shipperId!, 'metadata[plan]': plan,
-      success_url: `${base}/#/dashboard/billing?session={CHECKOUT_SESSION_ID}`, cancel_url: `${base}/#/dashboard/billing?canceled=1`,
+      success_url: `${base}/dashboard/billing?session={CHECKOUT_SESSION_ID}`, cancel_url: `${base}/dashboard/billing?canceled=1`,
     })
     await db.query(`insert into subscription_events (id,shipper_id,kind,plan,amount_usd,by_name) values ($1,$2,'checkout',$3,$4,$5)`, [evId(), u.shipperId, plan, prices[plan], u.name])
     res.json({ url: session.url, sessionId: session.id })

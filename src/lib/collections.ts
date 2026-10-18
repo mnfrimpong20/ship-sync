@@ -7,7 +7,7 @@ export interface InvoiceFull extends Invoice {
   payToken: string | null; sentAt: string | null; remindersSent: { kind: string; at: string; channel: string; by?: string; step?: string }[]; lastReminderAt: string | null
 }
 export interface CollectionSettings { autoRemind: boolean; beforeDays: number; afterDays: number[]; sms: boolean; message: string }
-export const payLink = (token: string) => `${window.location.origin}/#/pay/${token}`
+export const payLink = (token: string) => `${window.location.origin}/pay/${token}`
 
 export const collectionsApi = {
   pay: (token: string) => api<{ invoice: InvoiceFull; payment: Payment | null; online: boolean; mode: 'off' | 'test' | 'live'; bank: string | null }>(`/pay/${token}`),

@@ -165,7 +165,7 @@ export default function ForShippersPage() {
         {/* Live numbers — real, from the database */}
         <div className="container-x">
           <dl className="grid grid-cols-2 gap-6 border-t border-white/10 py-8 md:grid-cols-4" data-testid="fs-stats">
-            {[[stats?.requests30, 'Shipping requests in the last 30 days'], [stats?.quotes, 'Quotes sent by shippers'], [stats?.verifiedShippers, 'Verified shippers'], [stats?.destinations, 'West African countries served']].map(([v, l]) => (
+            {[[stats?.shipments, 'Shipments booked on Ntemtem'], [stats?.quotes, 'Quotes sent by shippers'], [stats?.verifiedShippers, 'Verified shippers'], [stats?.destinations, 'West African countries served']].map(([v, l]) => (
               <div key={String(l)}><dt className="text-sm text-[#C9C1B1]">{l}</dt><dd className="mt-1 font-heading text-3xl font-extrabold text-[#FBF6EC]">{v == null ? '—' : Number(v).toLocaleString()}</dd></div>
             ))}
           </dl>

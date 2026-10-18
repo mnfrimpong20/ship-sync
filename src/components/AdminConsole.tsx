@@ -82,7 +82,7 @@ export function AdminMarketplace() {
 const TIER = { top: 'text-teal', good: '', watch: 'text-gold-deep', at_risk: 'text-danger', new: 'text-text-muted' } as const
 export function AdminScorecards() {
   const { d, err, reload } = useLoad(() => adminConsoleApi.scorecards(), [])
-  const [q, setQ] = useState(new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('q') ?? ''); const [edit, setEdit] = useState<R | null>(null); const [rules, setRules] = useState<R | null>(null); const [busy, setBusy] = useState(false)
+  const [q, setQ] = useState(new URLSearchParams(window.location.search).get('q') ?? ''); const [edit, setEdit] = useState<R | null>(null); const [rules, setRules] = useState<R | null>(null); const [busy, setBusy] = useState(false)
   useEffect(() => { if (d) setRules(d.rules) }, [d])
   const rows = (d?.cards ?? []).filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase())).map((c): R => ({ ...c, onTime: c.metrics.onTimePct, reply: c.metrics.replyMedianH, rating: c.metrics.rating, disputes: c.metrics.disputePct, cancels: c.metrics.cancelPct, withdraws: c.metrics.withdrawPct, win: c.metrics.winRatePct }))
   return (
@@ -218,7 +218,7 @@ export function AdminAudit() { return <Panel title="Audit log" sub="Every change
 export function AdminSupport() {
   const [q, setQ] = useState(''); const [users, setUsers] = useState<R[]>([]); const [err, setErr] = useState('')
   useEffect(() => { const t = setTimeout(() => { if (q.trim().length >= 2) adminConsoleApi.users(q).then(setUsers).catch((e) => setErr(e.message)); else setUsers([]) }, 250); return () => clearTimeout(t) }, [q])
-  const go = async (id: string) => { setErr(''); try { await adminConsoleApi.viewAs(id); window.location.hash = '#/dashboard'; window.location.reload() } catch (e) { setErr(e instanceof Error ? e.message : 'Failed') } }
+  const go = async (id: string) => { setErr(''); try { await adminConsoleApi.viewAs(id); window.location.assign('/dashboard') } catch (e) { setErr(e instanceof Error ? e.message : 'Failed') } }
   return (
     <Panel title="View as a user" sub="See the app exactly as they do, read-only, for 2 hours. Every view-as session is written to the audit log." testid="admin-support">
       <label className="relative block max-w-md"><span className="sr-only">Find a user</span><Search size={14} className="absolute left-3 top-3 text-text-muted" aria-hidden="true" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Email, name or company" className={`${cls} !pl-8`} data-testid="support-search" /></label>

@@ -368,7 +368,7 @@ export function mountSourcing(r: Router, d: Deps) {
     await db.query(`update escrow_payments set status = 'cancelled' where sourcing_id = $1 and stage = $2 and status = 'pending'`, [job.id, dd.stage])
     const id = 'esc_' + uid(); const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')
     const session = await stripe('/checkout/sessions', {
-      mode: 'payment', client_reference_id: id, customer_email: u.email || undefined, success_url: `${base}/#/sourcing/${job.id}?paid=${id}`, cancel_url: `${base}/#/sourcing/${job.id}?paid=cancel`,
+      mode: 'payment', client_reference_id: id, customer_email: u.email || undefined, success_url: `${base}/sourcing/${job.id}?paid=${id}`, cancel_url: `${base}/sourcing/${job.id}?paid=cancel`,
       metadata: { payment_id: id, sourcing_id: job.id, sourcing_ref: job.ref, stage: dd.stage }, payment_intent_data: { description: `Ntemtem Sourcing ${job.ref} — ${dd.stage}`, metadata: { payment_id: id, sourcing_ref: job.ref } },
       line_items: dd.items.map((i) => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: Math.round(i.amountUsd * 100), product_data: { name: i.description } } })),
     })

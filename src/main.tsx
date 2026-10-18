@@ -6,6 +6,8 @@ import './index.css'
 import { installErrorReporting } from './lib/errors'
 
 installErrorReporting()
+// Old links used /#/page addresses (emails, WhatsApp messages, embeds). Move them to the clean address before the router starts.
+if (window.location.hash.startsWith('#/')) window.history.replaceState(null, '', window.location.hash.slice(1) || '/')
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(

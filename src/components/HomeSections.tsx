@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, Car, Check, ChevronDown, ClipboardList, Container, FileCheck2, Handshake, MapPinned, Minus, Plane, Radar, Scale, Ship, Truck } from 'lucide-react'
-import { fadeUp, stagger } from '../lib/motion'
+import { ArrowRight, Check, ChevronDown, ClipboardList, FileCheck2, Handshake, Minus, Plane, Radar, Scale, Ship, Truck } from 'lucide-react'
+import { fadeUp, stagger, viewport } from '../lib/motion'
 import { countries, faqs, shippers, testimonials } from '../lib/data'
-import { Section, SectionHeader, ShipperCard, Avatar, VerifiedMark, Flag } from './ui'
+import { Section, SectionHeader, ShipperCard, Avatar, VerifiedMark, Flag, Mark } from './ui'
 import { congestionLabel, useCongestion } from '../lib/useCongestion'
 import { useStore } from '../lib/store'
 
 /* ---------- Destinations ---------- */
 export function Destinations() {
   const cg = useCongestion()
+  const { shippers: live } = useStore()
+  const [lane, setLane] = useState<Record<string, { barrelUsd: number | null }>>({})
+  useEffect(() => { fetch('/api/lanes/destinations').then((r) => r.json()).then((d: { destinations?: Record<string, { barrelUsd: number | null }> }) => setLane(d.destinations ?? {})).catch(() => {}) }, [])
+  const servingCount = (code: string) => live.filter((s) => s.destinations.includes(code)).length
   return (
     <Section id="destinations" light>
       <SectionHeader light eyebrow="Destinations" title="Every major port and airport on the Gulf of Guinea" body="Pick a country to see typical transit times, then request quotes from shippers who run that lane every week." />
@@ -25,6 +29,11 @@ export function Destinations() {
               <div className="flex items-center justify-between"><dt className="flex items-center gap-1.5 text-ink-muted"><Ship size={14} aria-hidden="true" />Ocean</dt><dd className="font-semibold text-ink">{c.oceanDays} d</dd></div>
               <div className="flex items-center justify-between"><dt className="flex items-center gap-1.5 text-ink-muted"><Plane size={14} aria-hidden="true" />Air</dt><dd className="font-semibold text-ink">{c.airDays} d</dd></div>
             </dl>
+            {(() => { const n = servingCount(c.code), price = lane[c.code]?.barrelUsd; return (n > 0 || price) ? (
+              <div className="mt-4 flex flex-wrap gap-1.5 text-xs" data-testid={`dest-facts-${c.code}`}>
+                {n > 0 && <span className="rounded-full bg-surface-2 px-2.5 py-1 font-semibold text-ink">{n} shipper{n === 1 ? '' : 's'}</span>}
+                {price ? <span className="rounded-full bg-gold-soft px-2.5 py-1 font-semibold text-ink" title="Typical quoted price per barrel over the last 6 months">Barrel ≈ ${price}</span> : null}
+              </div>) : null })()}
             {(() => { const l = cg?.enabled ? congestionLabel(cg.congestion[c.code]) : null; return l ? <p className={`mt-3 flex items-center gap-1.5 text-xs ${l.level === 'heavy' ? 'text-danger' : l.level === 'busy' ? 'text-gold-deep' : 'text-ink-muted'}`}><span className={`h-1.5 w-1.5 rounded-full ${l.level === 'heavy' ? 'bg-danger' : l.level === 'busy' ? 'bg-gold-deep' : 'bg-teal'}`} aria-hidden="true" />Port now: {l.text}</p> : null })()}
             <Link to={`/quote?destination=${c.code}`} className="mt-5 inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-gold-deep hover:underline focus-ring rounded">Get quotes <ArrowRight size={15} aria-hidden="true" /></Link>
           </motion.div>
@@ -46,7 +55,7 @@ export function Destinations() {
 const steps = [
   { icon: ClipboardList, title: 'Post your shipment', body: 'Tell us what you’re sending, from where, to which country, and whether you want pickup and door delivery. Takes two minutes, no account required.' },
   { icon: Scale, title: 'Compare real quotes', body: 'Matching shippers reply with itemised quotes, transit times and what’s included. See their verification status, ratings and on-time history side by side.' },
-  { icon: Radar, title: 'Book and track', body: 'Accept the quote you like. Your shipment gets a Ntemtem reference and a live timeline from pickup to delivery at the door in Accra, Lagos or Monrovia.' },
+  { icon: Radar, title: 'Pay safely and track', body: 'Accept the quote you like and pay through Ntemtem — the shipper is paid once they confirm. Follow every step to the door, and your family gets WhatsApp updates too.' },
 ]
 export function HowItWorks() {
   return (
@@ -55,7 +64,7 @@ export function HowItWorks() {
       <ol className="grid gap-6 md:grid-cols-3">
         {steps.map((s, i) => (
           <motion.li key={s.title} variants={fadeUp} className="card-dark relative p-7">
-            <span className="absolute right-6 top-5 font-heading text-5xl font-bold text-gold/15" aria-hidden="true">0{i + 1}</span>
+            <span className="absolute right-6 top-5 font-heading text-5xl font-extrabold text-gold/70" aria-hidden="true">0{i + 1}</span>
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gold/15 text-gold-deep"><s.icon size={22} aria-hidden="true" /></span>
             <h3 className="mt-5 text-text">{s.title}</h3>
             <p className="mt-2 text-text-muted">{s.body}</p>
@@ -66,15 +75,52 @@ export function HowItWorks() {
   )
 }
 
+/* ---------- Family updates (WhatsApp / SMS) ---------- */
+const milestones: [string, string][] = [['Sailed', 'It’s on the water, with the expected arrival date'], ['Landed', 'It’s at the port and going through customs'], ['Ready', 'Where to collect it, with a pickup code'], ['Delivered', 'They tap to confirm they have it']]
+export function FamilyUpdates() {
+  return (
+    <section id="updates" className="theme-dark section-y bg-bg text-text" data-testid="family-updates">
+      <motion.div className="container-x grid items-center gap-12 lg:grid-cols-12" initial="hidden" whileInView="show" viewport={viewport} variants={stagger}>
+        <div className="lg:col-span-6">
+          <motion.p variants={fadeUp} className="eyebrow mb-3">For the family back home</motion.p>
+          <motion.h2 variants={fadeUp}>They know before they have to ask.</motion.h2>
+          <motion.p variants={fadeUp} className="mt-4 max-w-xl text-lg text-text-muted">Whoever is receiving your package gets a WhatsApp message — or a text — at every step. No app, no account, no calling you to ask where it is.</motion.p>
+          <ol className="mt-8 grid gap-3 sm:grid-cols-2">
+            {milestones.map(([t, b], i) => (
+              <motion.li key={t} variants={fadeUp} className="flex gap-3 rounded-[var(--radius-md)] border border-border bg-surface p-4">
+                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${i === 3 ? 'bg-teal text-bg' : 'bg-gold/20 text-gold'}`}>{i + 1}</span>
+                <span><strong className="block">{t}</strong><span className="text-sm text-text-muted">{b}</span></span>
+              </motion.li>
+            ))}
+          </ol>
+        </div>
+        <motion.div variants={fadeUp} className="flex justify-center lg:col-span-6">
+          <div className="w-full max-w-[340px] rounded-[2.5rem] border-[10px] border-[#202B48] bg-[#EFE9DE] p-0 shadow-[0_40px_80px_-30px_rgba(0,0,0,.7)]" aria-label="Example message to the receiver">
+            <div className="flex items-center gap-3 rounded-t-[1.9rem] bg-white px-4 pb-3 pt-5">
+              <Mark size={36} />
+              <div className="leading-tight"><p className="text-sm font-bold text-ink">Ntemtem</p><p className="text-[11px] text-ink-muted">Business account</p></div>
+              <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-ink-muted">Example</span>
+            </div>
+            <div className="space-y-2.5 px-3 py-4 text-[13.5px] leading-snug text-ink">
+              <div className="max-w-[88%] rounded-[4px_14px_14px_14px] bg-white px-3 py-2 shadow-sm">Akwaaba, Ama! Your package from Kofi is on its way on the MSC Lagos, arriving around 14 Nov. Ref NT-4821. Follow it: ntemtem.com/r/…</div>
+              <div className="max-w-[88%] rounded-[4px_14px_14px_14px] bg-white px-3 py-2 shadow-sm">Akwaaba, Ama! Your package NT-4821 has landed at Tema and is going through customs. We’ll message you the moment it’s ready.</div>
+              <div className="max-w-[88%] rounded-[4px_14px_14px_14px] bg-white px-3 py-2 shadow-sm"><strong>Good news, Ama</strong> — your package NT-4821 is ready for collection at Gold Coast Freight, Kumasi. Bring your ID and this ref.</div>
+              <div className="ml-auto max-w-[60%] rounded-[14px_4px_14px_14px] bg-[#D8EFE2] px-3 py-2 text-right shadow-sm">Medaase! I’ll come tomorrow 🙏🏾</div>
+            </div>
+            <p className="rounded-b-[1.9rem] bg-white/60 px-4 py-2.5 text-center text-[11px] text-ink-muted">WhatsApp or SMS · sent automatically</p>
+          </div>
+        </motion.div>
+      </motion.div>
+    </section>
+  )
+}
+
 /* ---------- Features bento ---------- */
 const features = [
-  { icon: VerifiedMark, title: 'Verified shippers only', body: 'Business registration, forwarder licence, insurance certificate and warehouse address checked before the badge appears.', span: 'md:col-span-4', accent: true },
-  { icon: Scale, title: 'Transparent, itemised quotes', body: 'Freight, pickup, delivery, insurance and destination fees listed separately. No “call for price”.', span: 'md:col-span-2' },
-  { icon: Truck, title: 'Door-to-door', body: 'Pickup in 40+ US, UK, Canadian and EU cities. Delivery to Accra, Kumasi, Lagos, Abuja, Monrovia, Lomé and more.', span: 'md:col-span-2' },
-  { icon: Car, title: 'Vehicles & containers', body: 'RoRo and containerised vehicle shipping with title handling and duty estimates before you commit.', span: 'md:col-span-2' },
-  { icon: MapPinned, title: 'Live tracking', body: 'One reference number, one timeline — from pickup through port, sailing, customs and delivery.', span: 'md:col-span-2' },
-  { icon: FileCheck2, title: 'Customs guidance', body: 'Destination-specific document checklists (Ghana Customs, Nigeria SONCAP, Liberia Freeport) attached to every booking.', span: 'md:col-span-3' },
-  { icon: Container, title: 'Barrels to full containers', body: 'Groupage barrels and boxes, pallets, LCL, or your own 20/40ft FCL — the same platform for a family and a business.', span: 'md:col-span-3' },
+  { icon: VerifiedMark, title: 'Verified shippers, clearly marked', body: 'Business registration, licence, insurance and warehouse checked before a company gets the Ntemtem Verified badge — so you always know who’s been vetted.', span: 'md:col-span-3', accent: true },
+  { icon: Scale, title: 'Transparent, itemised quotes', body: 'Freight, pickup, delivery, insurance and destination fees listed separately. No “call for price”.', span: 'md:col-span-3' },
+  { icon: Truck, title: 'Door to door, barrel to container', body: 'Pickup across the US, UK, Canada and Europe; delivery to Accra, Kumasi, Lagos, Abuja, Monrovia, Lomé and more. Boxes and barrels, cars by RoRo, or your own 20/40ft container.', span: 'md:col-span-3' },
+  { icon: FileCheck2, title: 'Customs guidance', body: 'Destination-specific document checklists (Ghana Customs, Nigeria SONCAP, Liberia Freeport) and a duty estimate before you commit.', span: 'md:col-span-3' },
 ]
 export function Features() {
   return (

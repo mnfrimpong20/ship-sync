@@ -35,7 +35,7 @@ export default function PricingPage() {
         <div className="container-x py-12 text-center md:py-16">
           <motion.div initial="hidden" animate="show" variants={stagger} className="mx-auto max-w-3xl">
             <motion.p variants={fadeUp} className="eyebrow mb-2">Pricing</motion.p>
-            <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4.2vw,3.25rem)]">Free for customers. <span className="text-gold-deep">Simple plans for shippers.</span></motion.h1>
+            <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4.2vw,3.25rem)]">Free for senders. <span className="text-gold-deep">Simple plans for shippers.</span></motion.h1>
             <motion.p variants={fadeUp} className="mt-3 text-text-muted md:text-lg">Customers never pay Ntemtem to request quotes, book or track. Shippers pick a monthly plan; a small platform fee applies only when a customer pays them online through Ntemtem.</motion.p>
           </motion.div>
           <div role="tablist" aria-label="Pricing for" className="mx-auto mt-8 inline-flex rounded-xl border border-border bg-surface p-1">

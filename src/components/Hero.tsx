@@ -26,21 +26,22 @@ export default function Hero() {
         <RouteMap />
       </div>
 
-      <div className="container-fluid relative grid gap-12 pb-20 pt-16 md:pb-28 md:pt-24 lg:grid-cols-12 lg:items-center">
+      <div className="container-fluid relative grid gap-8 pb-16 pt-10 md:gap-12 md:pb-28 md:pt-24 lg:grid-cols-12 lg:items-center">
         <motion.div className="lg:col-span-7" initial="hidden" animate="show" variants={stagger}>
           <motion.p variants={fadeUp} className="eyebrow mb-5 flex items-center gap-2"><span className="h-px w-8 bg-gold" aria-hidden="true" />Shipping home to Ghana & West Africa</motion.p>
           <motion.h1 variants={fadeUp} className="max-w-3xl">
             Send it. <em className="not-italic text-gold-deep">Ntemtem.</em>
           </motion.h1>
-          <motion.p variants={fadeUp} className="mt-6 max-w-xl text-lg text-text-muted md:text-xl">
+          <motion.p variants={fadeUp} className="mt-4 max-w-xl text-lg text-text-muted sm:hidden">Verified shippers quote you. You pick, pay safely, and track it home.</motion.p>
+          <motion.p variants={fadeUp} className="mt-6 hidden max-w-xl text-lg text-text-muted sm:block md:text-xl">
             Boxes, barrels, cars or a full container — post it once and verified air and ocean shippers send you real quotes. Pick one, pay safely, and track it all the way home. <span className="whitespace-nowrap">Ntemtem is Twi for “quickly-quickly.”</span>
           </motion.p>
-          <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <motion.div variants={fadeUp} className="mt-8 hidden gap-3 sm:flex sm:flex-row">
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/quote" className="btn-gold w-full sm:w-auto">Get free quotes <ArrowRight size={18} aria-hidden="true" /></Link></motion.div>
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/signup?role=shipper" className="btn-ghost w-full !border-white/50 !text-white hover:!border-white hover:!bg-white/10 sm:w-auto">List your shipping company</Link></motion.div>
           </motion.div>
-          <motion.ul variants={fadeUp} className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-text-muted">
-            <li className="flex items-center gap-2"><VerifiedMark size={16} aria-hidden="true" /> {stats ? `${stats.verifiedShippers} verified shippers` : 'Verified shippers only'}</li>
+          <motion.ul variants={fadeUp} className="mt-10 hidden flex-wrap gap-x-8 sm:flex gap-y-3 text-sm text-text-muted">
+            <li className="flex items-center gap-2"><VerifiedMark size={16} aria-hidden="true" /> {stats ? `${stats.verifiedShippers} verified shippers` : 'Verified shippers, clearly marked'}</li>
             <li className="flex items-center gap-2"><ShieldCheck size={16} className="text-teal" aria-hidden="true" /> Payment protected until the shipper confirms</li>
             <li className="flex items-center gap-2"><Clock size={16} className="text-gold-deep" aria-hidden="true" /> Quotes within 24 hours</li>
           </motion.ul>
@@ -54,7 +55,7 @@ export default function Hero() {
         >
           <div className="mb-5 flex items-center justify-between">
             <h2 className="!text-xl text-text">Quick quote</h2>
-            <span className="rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold-deep">Free for customers</span>
+            <span className="rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold-deep">Free for senders</span>
           </div>
           <div className="grid gap-4">
             <div>

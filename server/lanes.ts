@@ -77,6 +77,18 @@ export function mountLanes(r: Router, d: Deps) {
   const filt = (q: Request['query']): Filter => ({ origin: typeof q.origin === 'string' ? city(q.origin) : null, destination: typeof q.destination === 'string' && q.destination.length === 2 ? q.destination : null, cargo: typeof q.cargo === 'string' && q.cargo ? q.cargo : null, mode: typeof q.mode === 'string' ? q.mode : null })
 
   r.get('/lanes/benchmark', wrap(async (req, res) => { const db = await getDb(); res.set('Cache-Control', 'no-store'); res.json({ filter: filt(req.query), benchmark: await benchmark(db, filt(req.query)) }) }))
+  /** Home-page destination cards: typical price per barrel to each country (median of the last 180 days' quotes,
+   *  per barrel). Countries with fewer than 3 quotes get no figure rather than a misleading one. */
+  r.get('/lanes/destinations', wrap(async (_req, res) => {
+    const db = await getDb()
+    const { rows } = await db.query<Row>(`select r.destination, q.price::float / greatest(coalesce(r.quantity, 1), 1) as unit
+      from quotes q join requests r on r.id = q.request_id where r.cargo = 'barrels' and q.sent_at > now() - interval '180 days' and q.price > 0`)
+    const by = new Map<string, number[]>()
+    for (const x of rows) { const l = by.get(x.destination) ?? []; l.push(Number(x.unit)); by.set(x.destination, l) }
+    const out: Record<string, { barrelUsd: number | null; quotes: number }> = {}
+    for (const [d, l] of by) { l.sort((m, n) => m - n); out[d] = { barrelUsd: l.length >= 3 ? Math.round((pct(l, 0.5) ?? 0) / 5) * 5 : null, quotes: l.length } }
+    res.set('Cache-Control', 'public, max-age=600'); res.json({ destinations: out })
+  }))
   r.get('/lanes/top', wrap(async (_req, res) => { const db = await getDb(); res.set('Cache-Control', 'no-store'); res.json({ lanes: await topLanes(db) }) }))
   /** The shipper's lanes vs the market, plus demand they don't serve. */
   r.get('/shipper/lanes', wrap(async (req, res) => {

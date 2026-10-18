@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from './store'
 
 export interface SiteConfig { email: string; phone: string; whatsapp: string; whatsappUrl: string; address: string; social: Record<string, string>; hoursNote: string; demoHidden: boolean }
-export interface SiteStats { shippers: number; verifiedShippers: number; quotes: number; shipments: number; delivered: number; onTimePct: number; destinations: number }
+export interface SiteStats { shippers: number; verifiedShippers: number; quotes: number; shipments: number; delivered: number; onTimePct: number; destinations: number; requests30?: number }
 export interface ContactInput { name: string; email: string; phone: string; company: string; topic: 'quote' | 'tracking' | 'shipper' | 'sourcing' | 'partnership' | 'other'; message: string; website?: string }
 
 export const siteApi = {

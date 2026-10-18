@@ -48,8 +48,9 @@ export function mountSite(r: Router, d: Deps) {
     const { rows: s } = await db.query<Row>(`select count(*)::int as n, count(*) filter (where status = 'delivered')::int as d from shipments`)
     const { rows: ot } = await db.query<Row>(`select coalesce(round(avg(on_time))::int, 0) as p from shippers where on_time > 0 and id <> 'ship-sync-sourcing' and ${publicShipperSql()}`)
     const { rows: dests } = await db.query<Row>(`select count(distinct destination)::int as n from shipments`)
+    const { rows: rq } = await db.query<Row>(`select count(*)::int as n from requests where created_at > now() - interval '30 days'`)
     res.set('Cache-Control', 'public, max-age=120')
-    res.json({ shippers: sh[0].n, verifiedShippers: sh[0].v, quotes: q[0].n, shipments: s[0].n, delivered: s[0].d, onTimePct: Number(ot[0].p), destinations: Math.max(Number(dests[0].n), 7) })
+    res.json({ shippers: sh[0].n, verifiedShippers: sh[0].v, quotes: q[0].n, shipments: s[0].n, delivered: s[0].d, onTimePct: Number(ot[0].p), destinations: Math.max(Number(dests[0].n), 7), requests30: Number(rq[0]?.n ?? 0) })
   }))
 
   r.post('/site/contact', wrap(async (req, res) => {

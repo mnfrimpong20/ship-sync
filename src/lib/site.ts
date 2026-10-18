@@ -32,7 +32,7 @@ export function useSiteConfig() {
 
 /** Per-route browser title + description + Open Graph tags. */
 const TITLES: [RegExp, string, string?][] = [
-  [/^\/$/, 'Air & Ocean Freight to West Africa', 'Compare verified shippers to Ghana, Nigeria, Liberia, Togo and beyond. Transparent quotes, escrow payments, live tracking.'],
+  [/^\/$/, '', 'Compare verified shippers to Ghana, Nigeria and across West Africa. Clear prices, protected payments, tracked all the way home.'],
   [/^\/quote/, 'Get freight quotes', 'Post your shipment once and let verified shippers compete with itemised quotes.'],
   [/^\/shippers\/[^/]+/, 'Shipper profile'], [/^\/shippers/, 'Verified shippers directory'], [/^\/track/, 'Track a shipment'], [/^\/duty/, 'Duty & landed-cost estimator'],
   [/^\/groupage/, 'Fill a barrel — shared barrels & containers'], [/^\/brokers/, 'Customs brokers'], [/^\/sailings/, 'Sailing schedule'], [/^\/lanes/, 'Lane prices'], [/^\/live/, 'Live map'],
@@ -40,10 +40,11 @@ const TITLES: [RegExp, string, string?][] = [
   [/^\/about/, 'About Ntemtem'], [/^\/contact/, 'Contact us'], [/^\/privacy/, 'Privacy policy'], [/^\/terms/, 'Terms of service'], [/^\/shipper-agreement/, 'Shipper agreement'],
   [/^\/s\//, 'Supplier portal · 供应商门户'], [/^\/order\//, 'Place your order'], [/^\/login/, 'Sign in'], [/^\/forgot/, 'Reset your password'], [/^\/reset/, 'Choose a new password'], [/^\/signup/, 'Create an account'], [/^\/dashboard\/shipper/, 'Shipper workspace'], [/^\/dashboard\/sourcing/, 'Sourcing board'], [/^\/dashboard\/verification/, 'Verification'], [/^\/dashboard\/(\w+)/, 'Workspace'], [/^\/dashboard/, 'My dashboard'], [/^\/admin/, 'Admin'],
 ]
-const DEFAULT_DESC = 'Ntemtem connects air and ocean shippers with customers sending cargo to Ghana, Nigeria, Liberia, Togo and across West Africa. Compare verified quotes, book, and track.'
+const DEFAULT_DESC = 'Ntemtem — Twi for quickly-quickly — connects you with verified air and ocean shippers carrying boxes, barrels, cars and cargo home to Ghana, Nigeria and across West Africa.'
 export function applyPageMeta(pathname: string) {
   const hit = TITLES.find(([re]) => re.test(pathname))
-  const title = hit ? `${hit[1]} · Ntemtem` : 'Ntemtem — Air & Ocean Freight to West Africa'
+  const HOME_TITLE = 'Ntemtem — Send it. Shipping home to Ghana & West Africa'
+  const title = hit && hit[1] ? `${hit[1]} · Ntemtem` : HOME_TITLE
   const desc = hit?.[2] ?? DEFAULT_DESC
   document.title = title
   const set = (sel: string, attr: string, val: string) => { let el = document.head.querySelector<HTMLMetaElement>(sel); if (!el) { el = document.createElement('meta'); const [k, v] = sel.replace('meta[', '').replace(']', '').split('='); el.setAttribute(k, v.replace(/"/g, '')); document.head.appendChild(el) } el.setAttribute(attr, val) }

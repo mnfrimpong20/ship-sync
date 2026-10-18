@@ -6,7 +6,7 @@ import { fadeUp, stagger, viewport } from '../lib/motion'
 import { countryByCode, type Mode, type Shipper } from '../lib/data'
 
 /** Tagline under the wordmark. One place to change it. */
-export const TAGLINE = 'Home, quickly'
+export const TAGLINE = 'Air · Ocean · Door to door'
 
 /** The Ntemtem mark: two rounded chevrons (green trailing, navy leading) sending a box forward, on a gold tile.
  *  `partner` draws the shipper-side version on a charcoal tile. Colours are fixed brand values, not theme tokens. */

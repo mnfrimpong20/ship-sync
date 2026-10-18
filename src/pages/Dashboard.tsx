@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Inbox, Package, Pencil, PlusCircle, Send, Ship, X } from 'lucide-react'
+import { ArrowRight, BadgeCheck, Check, ChevronRight, Clock, FileText, Pencil, PlusCircle, Send, X } from 'lucide-react'
 import { cargoLabel, countryByCode, statusLabels, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
 import { Empty, ModeBadge, Pill, fmtDate, money } from '../components/ui'
@@ -12,8 +12,7 @@ import { RecipientPanel } from '../components/RecipientPanel'
 import { DutyCard } from '../components/Duty'
 import { SourcingTab } from './Sourcing'
 import { InsuranceCard } from '../components/InsuranceCard'
-import { NeedsYou, NextArrivalCard, Recipients } from '../components/CustomerHome'
-import { customerApi, type AttentionItem, type NextArrival } from '../lib/customer'
+import { Recipients } from '../components/CustomerHome'
 import { PaymentCard } from '../components/PaymentCard'
 import { QuoteList, RequestManage } from '../components/RequestPanel'
 import { CollectionNotice, OffersCard } from '../components/FlowCards'
@@ -25,26 +24,17 @@ import { collectionsApi, type InvoiceFull } from '../lib/collections'
 import ProfileEditor from '../components/ProfileEditor'
 import { fadeUp, stagger } from '../lib/motion'
 import ShipperOverview from '../components/ShipperOverview'
+import { CustomerOverview, ShipmentQuickActions, useSummary } from '../components/CustomerOverview'
 import { AccountTab, DocumentsTab, InboxTab, IssuesTab, MoneyTab, SavedTab, WeekTab } from '../components/CustomerTabs'
 import { DutyEarly, FamilyShare, NextStep, PackingList, ShipmentChat } from '../components/ShipmentExtras'
 
-function Stat({ icon: Icon, label, value, hint }: { icon: typeof Inbox; label: string; value: string | number; hint?: string }) {
-  return (
-    <motion.div variants={fadeUp} className="card-dark p-5">
-      <div className="flex items-center justify-between"><p className="text-sm text-text-muted">{label}</p><Icon size={18} className="text-gold" aria-hidden="true" /></div>
-      <p className="mt-2 font-heading text-3xl font-bold text-text">{value}</p>
-      {hint && <p className="mt-1 text-xs text-text-muted">{hint}</p>}
-    </motion.div>
-  )
-}
-
-function Layout({ title, sub, children, cta }: { title: string; sub: string; children: React.ReactNode; cta?: React.ReactNode }) {
+function Layout({ title, sub, children, cta, eyebrow = 'Workspace' }: { title: string; sub: string; children: React.ReactNode; cta?: React.ReactNode; eyebrow?: string }) {
   return (
     <div className="bg-bg text-text">
       <div className="container-x py-10 md:py-14">
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Workspace</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{title}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">{sub}</motion.p></div>
+            <div><motion.p variants={fadeUp} className="eyebrow mb-1">{eyebrow}</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{title}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">{sub}</motion.p></div>
             {cta && <motion.div variants={fadeUp}>{cta}</motion.div>}
           </div>
           {children}
@@ -55,31 +45,43 @@ function Layout({ title, sub, children, cta }: { title: string; sub: string; chi
 }
 
 /* ================= CUSTOMER ================= */
+const TABS = ['requests', 'shipments', 'money', 'week', 'inbox', 'documents', 'plans', 'groupage', 'sourcing', 'invoices', 'recipients', 'issues', 'account'] as const
+type Tab = typeof TABS[number] | 'overview'
+const SECTIONS: Record<typeof TABS[number], { title: string; sub: string; group: string; cta?: boolean }> = {
+  requests: { title: 'Quote requests', sub: 'Compare quotes, ask shippers questions and book.', group: 'Shipping', cta: true },
+  shipments: { title: 'Shipments', sub: 'Track, pay, share and manage everything you’ve booked.', group: 'Shipping', cta: true },
+  groupage: { title: 'Shared barrels', sub: 'Space you reserved in shared barrels and containers.', group: 'Shipping' },
+  sourcing: { title: 'Sourcing', sub: 'Goods we’re buying for you in China, the UK and the USA.', group: 'Shipping' },
+  money: { title: 'Money', sub: 'What you owe, what you’ve spent, and your statements.', group: 'Money' },
+  invoices: { title: 'Invoices', sub: 'Every invoice from your shippers, with pay links.', group: 'Money' },
+  week: { title: 'This week', sub: 'Pickups, cutoffs, arrivals, payments and collection days.', group: 'Organise' },
+  inbox: { title: 'Messages', sub: 'Every conversation with your shippers, before and after booking.', group: 'Organise' },
+  documents: { title: 'Documents', sub: 'Invoices, receipts, packing lists and customs papers in one place.', group: 'Organise' },
+  plans: { title: 'Saved & repeat', sub: 'Favourite shippers, repeat shipments and price alerts.', group: 'Organise' },
+  recipients: { title: 'Recipients', sub: 'The people who receive your goods — saved once, picked in a tap.', group: 'Organise' },
+  issues: { title: 'Problems', sub: 'Something went wrong? Report it and follow every reply here.', group: 'Help' },
+  account: { title: 'Account', sub: 'Your profile, security, alerts, family and business details.', group: 'Account' },
+}
 export function CustomerDashboard() {
   const { ready, user, requests, shipments, acceptQuote, shipperById } = useStore()
   const [sp, setSp] = useSearchParams()
-  const TABS = ['requests', 'shipments', 'money', 'week', 'inbox', 'documents', 'plans', 'groupage', 'sourcing', 'invoices', 'recipients', 'issues', 'account'] as const
-  type Tab = typeof TABS[number]
-  const TAB_LABEL: Record<Tab, string> = { requests: 'Quote requests', shipments: 'Shipments', money: 'Money', week: 'This week', inbox: 'Messages', documents: 'Documents', plans: 'Saved & repeat', groupage: 'Shared barrels', sourcing: 'Sourcing', invoices: 'Invoices', recipients: 'Recipients', issues: 'Problems', account: 'Account' }
-  const asTab = (t: string | null): Tab => ((TABS as readonly string[]).includes(t ?? '') ? t as Tab : 'requests')
-  const [tab, setTabState] = useState<Tab>(asTab(sp.get('tab')))
-  const setTab = (t: Tab) => { setTabState(t); setSp(t === 'requests' ? {} : { tab: t }, { replace: true }) }
-  useEffect(() => { setTabState(asTab(sp.get('tab'))) }, [sp])
+  // Each section is its own page (the sidebar is the menu); with no tab you get the overview.
+  // Old links that open a request (?request= / ?open=) land on Quote requests.
+  const asTab = (q: URLSearchParams): Tab => { const t = q.get('tab'); if (t && (TABS as readonly string[]).includes(t)) return t as Tab; return q.get('request') || q.get('open') ? 'requests' : 'overview' }
+  const [tab, setTabState] = useState<Tab>(asTab(sp))
+  const setTab = (t: Tab) => { setTabState(t); setSp(t === 'overview' ? {} : { tab: t }, { replace: true }) }
+  useEffect(() => { setTabState(asTab(sp)) }, [sp])
   const [openReq, setOpenReq] = useState<string | null>(sp.get('request') ?? (sp.get('tab') ? null : sp.get('open')))
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
   const [busyQuote, setBusyQuote] = useState<string | null>(null)
-  const [home, setHome] = useState<{ items: AttentionItem[]; nextArrival: NextArrival | null } | null>(null)
-  useEffect(() => { if (ready && user?.role === 'customer') customerApi.attention().then(setHome).catch(() => {}) }, [ready, user, requests, shipments])
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
   if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading your dashboard…</div></div>
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/dashboard${sp.toString() ? `?${sp}` : ''}`)}`} replace />
   if (user.role === 'shipper') return <Navigate to="/dashboard/shipper" replace />
 
-  const open = requests.filter((r) => r.status === 'open')
-  const quotesCount = requests.reduce((n, r) => n + r.quotes.length, 0)
-  const active = shipments.filter((s) => s.status !== 'delivered')
-
+  const meta = SECTIONS[tab as Exclude<Tab, 'overview'>]
+  void shipments
   const accept = async (r: QuoteRequest, qid: string) => {
     setBusyQuote(qid); setError('')
     try {
@@ -91,22 +93,10 @@ export function CustomerDashboard() {
   }
 
   return (
-    <Layout title={`Hello, ${user.name.split(' ')[0]}`} sub="Your quote requests, bookings and live shipments." cta={<Link to="/quote" className="btn-gold"><PlusCircle size={18} aria-hidden="true" /> New shipment request</Link>}>
+    <Layout eyebrow={tab === 'overview' ? 'Your account' : meta.group} title={tab === 'overview' ? `Hello, ${user.name.split(' ')[0]}` : meta.title} sub={tab === 'overview' ? 'What needs you, what’s on the way, and what you owe.' : meta.sub} cta={tab === 'overview' || meta.cta ? <Link to="/quote" className="btn-gold"><PlusCircle size={18} aria-hidden="true" /> New shipment request</Link> : undefined}>
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
       {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <Stat icon={Inbox} label="Open requests" value={open.length} hint={`${quotesCount} quotes received`} />
-        <Stat icon={Ship} label="Active shipments" value={active.length} hint="In transit or clearing" />
-        <Stat icon={Package} label="Delivered" value={shipments.filter((s) => s.status === 'delivered').length} hint="All time" />
-      </div>
-
-      {home && <NeedsYou items={home.items} />}
-      {home?.nextArrival && <NextArrivalCard s={home.nextArrival} />}
-      <div className="mt-8 flex gap-1 overflow-x-auto border-b border-border" role="tablist">
-        {TABS.map((t) => (
-          <button key={t} role="tab" data-testid={`ctab-${t}`} aria-selected={tab === t} onClick={() => setTab(t)} className={`relative min-h-11 shrink-0 whitespace-nowrap px-3 text-sm font-medium focus-ring rounded-t ${tab === t ? 'text-gold' : 'text-text-muted hover:text-text'}`}>{TAB_LABEL[t]}{tab === t && <motion.span layoutId="tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-gold" />}</button>
-        ))}
-      </div>
+      {tab === 'overview' && <CustomerOverview />}
 
       {tab === 'requests' && (
         <div className="mt-6 space-y-4">
@@ -226,30 +216,60 @@ function GroupageTab() {
   )
 }
 
+const SHIP_VIEWS = [
+  { id: 'tracking', label: 'Tracking' }, { id: 'inside', label: 'What’s inside' }, { id: 'pay', label: 'Pay' }, { id: 'customs', label: 'Customs & duty' },
+  { id: 'people', label: 'Recipient & pickup' }, { id: 'chat', label: 'Messages' }, { id: 'docs', label: 'Documents' }, { id: 'help', label: 'Help' },
+] as const
+type ShipView = (typeof SHIP_VIEWS)[number]['id']
 function ShipmentsTab() {
   const { shipments, shipperById } = useStore()
-  const [sp] = useSearchParams()
-  const [sel, setSel] = useState<string | null>(sp.get('s') ?? sp.get('open') ?? sp.get('recipient') ?? sp.get('review') ?? shipments[0]?.id ?? null)
+  const [sp, setSp] = useSearchParams()
+  const sum = useSummary()
+  // Old deep links: ?recipient= opens the recipient view, ?review= opens Help.
+  const initial = sp.get('s') ?? sp.get('open') ?? sp.get('recipient') ?? sp.get('review') ?? shipments.find((x) => x.status !== 'delivered')?.id ?? shipments[0]?.id ?? null
+  const [sel, setSel] = useState<string | null>(initial)
+  const viewParam = sp.get('view') ?? (sp.get('recipient') ? 'people' : sp.get('review') ? 'help' : 'tracking')
+  const view: ShipView = (SHIP_VIEWS.some((v) => v.id === viewParam) ? viewParam : 'tracking') as ShipView
+  useEffect(() => { const id = sp.get('s') ?? sp.get('open') ?? sp.get('recipient') ?? sp.get('review'); if (id) setSel(id) }, [sp])
+  const pick = (id: string, v: ShipView = 'tracking') => { setSel(id); setSp({ tab: 'shipments', s: id, ...(v !== 'tracking' ? { view: v } : {}) }, { replace: true }); if (window.innerWidth < 1024) setTimeout(() => document.getElementById('ship-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) }
   const s = shipments.find((x) => x.id === sel)
-  if (shipments.length === 0) return <div className="mt-6"><Empty title="No shipments yet" body="Accept a quote on one of your requests and it will appear here with live tracking." /></div>
+  if (shipments.length === 0) return <div className="mt-6"><Empty title="No shipments yet" body="Accept a quote on one of your requests and it will appear here with live tracking." action={<Link to="/quote" className="btn-gold">Get quotes</Link>} /></div>
+  const due = s ? sum?.dueByShipment[s.id] : undefined
   return (
     <div className="mt-6 grid gap-6 lg:grid-cols-12">
       <ul className="space-y-2 lg:col-span-4" aria-label="Your shipments">
         {shipments.map((x) => {
           const d = countryByCode(x.destination)!
           return (
-            <li key={x.id}>
-              <button onClick={() => setSel(x.id)} aria-current={sel === x.id} className={`w-full rounded-[var(--radius-md)] border p-4 text-left transition-colors focus-ring ${sel === x.id ? 'border-gold bg-surface' : 'border-border bg-surface/50 hover:bg-surface'}`}>
+            <li key={x.id} className={`rounded-[var(--radius-md)] border transition-colors ${sel === x.id ? 'border-gold bg-surface' : 'border-border bg-surface/50 hover:bg-surface'}`} data-testid="ship-row">
+              <button onClick={() => pick(x.id)} aria-current={sel === x.id} className="w-full rounded-[var(--radius-md)] p-4 pb-2 text-left focus-ring">
                 <div className="flex items-center justify-between"><p className="font-mono text-xs text-gold">{x.ref}</p><ModeBadge mode={x.mode} /></div>
                 <p className="mt-1.5 text-sm font-semibold text-text">{x.origin} → {d.flag} {d.name}</p>
-                <p className="text-xs text-text-muted">{x.description}</p>
+                <p className="truncate text-xs text-text-muted">{x.description}</p>
                 <p className="mt-2 text-xs"><Pill tone={x.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[x.status]}</Pill></p>
               </button>
+              <div className="px-4 pb-3"><ShipmentQuickActions s={x} due={sum?.dueByShipment[x.id]} /></div>
             </li>
           )
         })}
       </ul>
-      <div className="min-w-0 lg:col-span-8">{s && <ShipmentDetail s={s} compact />}{s && <Link to={`/track?ref=${s.ref}`} className="mt-4 inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link>}{s && <div className="mt-6 space-y-4"><NextStep shipmentId={s.id} /><CollectionNotice s={s} /><FamilyShare shipmentId={s.id} /><ShipmentChat shipmentId={s.id} /><PackingList shipmentId={s.id} destination={s.destination} /><DutyEarly shipmentId={s.id} /><OffersCard s={s} /><ReviewCard shipmentId={s.id} shipperName={shipperById(s.shipperId)?.name} /><DisputeCard shipmentId={s.id} /><PaymentCard shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}<PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><CustomsCard shipmentId={s.id} destination={s.destination} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /><DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} /></div>}</div>
+      <div className="min-w-0 scroll-mt-20 lg:col-span-8" id="ship-detail">
+        {s && <>
+          <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl border border-border bg-surface p-1 lg:flex-wrap" role="tablist" aria-label="Shipment sections" data-testid="ship-views">
+            {SHIP_VIEWS.map((v) => <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => pick(s.id, v.id)} className={`relative min-h-9 shrink-0 whitespace-nowrap rounded-lg px-3 text-sm font-medium focus-ring ${view === v.id ? 'bg-gold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid={`sv-${v.id}`}>{v.label}{v.id === 'pay' && due ? <span className={`ml-1.5 rounded-full px-1.5 text-[10px] font-bold ${view === v.id ? 'bg-on-accent/20' : 'bg-gold/20 text-gold-deep'}`}>{money(due)}</span> : null}</button>)}
+          </div>
+          <div className="space-y-4" data-testid={`ship-view-${view}`}>
+            {view === 'tracking' && <><ShipmentDetail s={s} compact /><Link to={`/track?ref=${s.ref}`} className="inline-flex items-center gap-1 text-sm text-gold hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link><NextStep shipmentId={s.id} /><CollectionNotice s={s} /><OffersCard s={s} /></>}
+            {view === 'inside' && <><PackingList shipmentId={s.id} destination={s.destination} /><DutyEarly shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}</>}
+            {view === 'pay' && <><PaymentCard shipmentId={s.id} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><p className="text-sm text-text-muted">Paying several shipments? <Link to="/dashboard?tab=money" className="text-gold-deep hover:underline">Pay everything you owe in one checkout</Link>.</p></>}
+            {view === 'customs' && <><CustomsCard shipmentId={s.id} destination={s.destination} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /></>}
+            {view === 'people' && <><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><FamilyShare shipmentId={s.id} /><PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /></>}
+            {view === 'chat' && <ShipmentChat shipmentId={s.id} />}
+            {view === 'docs' && <DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} />}
+            {view === 'help' && <><ReviewCard shipmentId={s.id} shipperName={shipperById(s.shipperId)?.name} /><DisputeCard shipmentId={s.id} /><p className="text-sm text-text-muted">See every problem you’ve reported under <Link to="/dashboard?tab=issues" className="text-gold-deep hover:underline">Problems</Link>.</p></>}
+          </div>
+        </>}
+      </div>
     </div>
   )
 }

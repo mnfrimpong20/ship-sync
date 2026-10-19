@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { Check, CreditCard, Sparkles, Users } from 'lucide-react'
@@ -18,7 +19,7 @@ export default function BillingPage() {
     if (session) platformApi.confirm(session).then((r) => { setOk(r.active ? 'Thanks — your new plan is active.' : 'Payment is still processing. This page updates when Stripe confirms it.'); setSp({}, { replace: true }) }).catch((e) => setErr(e.message)).finally(load)
     else { if (sp.get('canceled')) setErr('Checkout was cancelled — nothing was charged.'); load() }
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?next=/dashboard/billing" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   const upgrade = async (plan: 'pro' | 'enterprise') => { setBusy(plan); setErr(''); try { const r = await platformApi.checkout(plan); window.location.href = r.url } catch (e) { setErr(e instanceof Error ? e.message : 'Could not start checkout.'); setBusy('') } }

@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -191,7 +192,7 @@ export function BrokerProfile() {
   useEffect(() => { setD(null); brokersApi.profile(id).then(setD).catch((e) => setError(e instanceof Error ? e.message : 'Not found.')) }, [id])
   useEffect(() => { if (d && window.location.hash.endsWith('#book')) document.getElementById('book')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, [d])
   if (error) return <div className="container-x py-20 text-text"><Empty title="Broker not found" body="This listing may have been removed or the link is wrong." action={<Link to="/brokers" className="btn-gold">All brokers</Link>} /></div>
-  if (!d) return <div className="container-x py-20 text-center text-text-muted">Loading profile…</div>
+  if (!d) return <BrandLoader label="Loading profile…" />
   const { broker: b, stats, others } = d; const c = countryByCode(b.country)
   const bookLink = !user ? `/login?next=${encodeURIComponent('/dashboard?tab=shipments')}` : user.role === 'shipper' ? '/dashboard/shipments' : '/dashboard?tab=shipments'
   return (
@@ -260,7 +261,7 @@ export function BrokerPortal() {
   useEffect(() => { void load() }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 4000); return () => clearTimeout(t) }, [toast])
   if (error && !d) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center text-danger">{error}</div></div>
-  if (!d) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading…</div></div>
+  if (!d) return <div className="min-h-dvh bg-bg text-text"><BrandLoader /></div>
   const { job: j, shipment: s } = d
   const idx = JOB_STEPS.indexOf(j.status as JobStep); const next: JobStep | null = idx >= 0 && idx < JOB_STEPS.length - 1 ? JOB_STEPS[idx + 1] : null
   const closed = ['done', 'cancelled', 'declined'].includes(j.status)

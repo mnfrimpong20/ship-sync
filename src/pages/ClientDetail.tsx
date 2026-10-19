@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { AddressLookup } from '../components/AddressLookup'
 import { Fragment, useEffect, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
@@ -32,11 +33,11 @@ export default function ClientDetailPage() {
   useEffect(() => { if (ready && user?.role === 'shipper') reload() }, [ready, user, id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
 
-  if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading…</div></div>
+  if (!ready) return <div className="bg-bg text-text"><BrandLoader /></div>
   if (!user) return <Navigate to={`/login?role=shipper&next=/dashboard/clients/${id}`} replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   if (error && !d) return <div className="bg-bg text-text"><div className="container-x py-24 text-center"><p className="text-danger">{error}</p><Link to="/dashboard/clients" className="btn-ghost mt-6">Back to clients</Link></div></div>
-  if (!d) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading client…</div></div>
+  if (!d) return <div className="bg-bg text-text"><BrandLoader label="Loading client…" /></div>
 
   const { client: c } = d
   const owing = d.invoices.filter((i) => i.status !== 'void').reduce((n, i) => n + i.balance, 0)

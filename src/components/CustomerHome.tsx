@@ -6,27 +6,52 @@ import { AlertTriangle, Bell, Check, Globe2, Info, MapPin, MessageCircle, Packag
 import { customerApi, type AttentionItem, type Consignee, type ConsigneeInput, type NextArrival } from '../lib/customer'
 import { countries, countryByCode, flowFor, statusLabels, type ShipmentStatus } from '../lib/data'
 import { Pill, fmtDate, fmtDateTime, Flag } from './ui'
+import { useT, fmtDayRel } from '../lib/i18n'
+import { useLang } from '../lib/prefs'
 
 const sevCls = { critical: 'border-l-danger', warning: 'border-l-gold', info: 'border-l-sky' } as const
 const sevIcon = { critical: AlertTriangle, warning: Bell, info: Info } as const
 const kindIcon = { quote: Receipt, duty: Globe2, recipient: UserRound, invoice: Receipt, sourcing: Package, review: Star } as const
 
-/** "Needs you" — the things only the customer can do, pulled out of the tabs. */
+/** "Needs you" — the things only the customer can do, pulled out of the tabs. Most urgent first, look-alikes grouped. */
+const SEV_RANK = { critical: 0, warning: 1, info: 2 } as const
+type NeedRow = AttentionItem & { group?: AttentionItem[] }
+const ISO_IN_TEXT = /\b(\d{4}-\d{2}-\d{2})\b/g
 export function NeedsYou({ items }: { items: AttentionItem[] }) {
+  const t = useT(); const lang = useLang()
+  const [all, setAll] = useState(false)
   if (!items.length) return null
+  const readable = (x: string) => x.replace(ISO_IN_TEXT, (m) => fmtDayRel(m, lang))
+  const sorted = [...items].sort((x, y) => SEV_RANK[x.severity] - SEV_RANK[y.severity] || (x.at ?? '9').localeCompare(y.at ?? '9'))
+  // Three or more of the same kind (invoices, reviews…) fold into one row with a single action.
+  const rows: NeedRow[] = []
+  const byKind = new Map<string, AttentionItem[]>()
+  for (const it of sorted) byKind.set(it.kind, [...(byKind.get(it.kind) ?? []), it])
+  const seen = new Set<string>()
+  for (const it of sorted) {
+    const same = byKind.get(it.kind)!
+    if (same.length < 3) { rows.push(it); continue }
+    if (seen.has(it.kind)) continue
+    seen.add(it.kind)
+    const sev = same.some((x) => x.severity === 'critical') ? 'critical' : same[0].severity
+    if (it.kind === 'invoice') rows.push({ ...it, severity: sev, title: `${t('{n} invoices due', { n: same.length })} · ${t('Pay all')}`, body: readable(`${same.filter((x) => x.severity === 'critical').length ? `${same.filter((x) => x.severity === 'critical').length} overdue. ` : ''}Oldest: ${same[0].title.replace(/^(Overdue|Invoice due): /, '')}`), to: '/dashboard?tab=money', group: same })
+    else rows.push({ ...it, severity: sev, title: `${it.title}`, body: `${t('{n} more like this', { n: same.length - 1 })} · ${readable(it.body)}`, group: same })
+  }
+  const shown = all ? rows : rows.slice(0, 5)
   return (
     <section className="mt-8" aria-labelledby="needs-h" data-testid="needs-you">
-      <h2 id="needs-h" className="mb-3 !text-lg">Needs you <span className="text-sm font-normal text-text-muted">· {items.length}</span></h2>
+      <h2 id="needs-h" className="mb-3 !text-lg">{t('Needs you')} <span className="text-sm font-normal text-text-muted">· {items.length}</span></h2>
       <ul className="grid gap-3 md:grid-cols-2">
-        {items.slice(0, 6).map((a, i) => { const Sev = sevIcon[a.severity]; const K = kindIcon[a.kind]; return (
-          <li key={i}>
+        {shown.map((a, i) => { const Sev = sevIcon[a.severity]; const K = kindIcon[a.kind]; return (
+          <li key={i} data-testid={a.group ? 'needs-group' : 'needs-item'}>
             <Link to={a.to} className={`card-dark flex h-full gap-3 border-l-4 p-4 transition-colors hover:border-gold/40 focus-ring ${sevCls[a.severity]}`}>
               <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${a.severity === 'critical' ? 'bg-danger/10 text-danger' : a.severity === 'warning' ? 'bg-gold/15 text-gold-deep' : 'bg-sky/10 text-sky'}`}><K size={16} aria-hidden="true" /></span>
-              <span className="min-w-0"><span className="flex items-start gap-1.5 text-sm font-semibold leading-tight"><Sev size={12} className="mt-0.5 shrink-0 opacity-70" aria-hidden="true" /><span>{a.title}</span></span><span className="mt-1 block text-xs text-text-muted">{a.body}</span></span>
+              <span className="min-w-0"><span className="flex items-start gap-1.5 text-sm font-semibold leading-tight"><Sev size={12} className="mt-0.5 shrink-0 opacity-70" aria-hidden="true" /><span>{readable(a.title)}</span></span><span className="mt-1 block text-xs text-text-muted">{a.group ? a.body : readable(a.body)}</span></span>
             </Link>
           </li>
         ) })}
       </ul>
+      {rows.length > 5 && <button onClick={() => setAll((v) => !v)} aria-expanded={all} className="btn-ghost mt-3 !min-h-11 text-sm" data-testid="needs-toggle">{all ? t('Show fewer') : t('Show all {n}', { n: rows.length })}</button>}
     </section>
   )
 }

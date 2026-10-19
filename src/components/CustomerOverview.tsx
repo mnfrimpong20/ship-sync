@@ -14,6 +14,7 @@ import { countryByCode, statusLabels, type Shipment } from '../lib/data'
 import { Empty, ModeBadge, Pill, money, Flag } from './ui'
 import { NeedsYou, NextArrivalCard } from './CustomerHome'
 import { fadeUp, stagger } from '../lib/motion'
+import { useT } from '../lib/i18n'
 
 /** Pay · Message · Share · Pickup, straight from a shipment card. */
 export function ShipmentQuickActions({ s, due }: { s: Shipment; due?: number }) {
@@ -76,10 +77,12 @@ export function CustomerOverview() {
   const [sp, setSp] = useSearchParams()
   const tab = sp.get('ov') === 'activity' ? 'activity' : 'glance'
   const pick = (k: string) => { const n = new URLSearchParams(sp); if (k === 'glance') n.delete('ov'); else n.set('ov', k); setSp(n, { replace: true }) }
-  return <><OverviewTabs tabs={[['glance', 'At a glance'], ['activity', 'Activity & spending']]} active={tab} onPick={pick} />{tab === 'activity' ? <OpsOverview scope="customer" /> : <GlanceOverview />}</>
+  const t = useT()
+  return <><OverviewTabs tabs={[['glance', t('At a glance')], ['activity', t('Activity & spending')]]} active={tab} onPick={pick} />{tab === 'activity' ? <OpsOverview scope="customer" /> : <GlanceOverview />}</>
 }
 
 function GlanceOverview() {
+  const t = useT()
   const { user, shipments, requests } = useStore()
   const sum = useSummary()
   const [home, setHome] = useState<{ items: AttentionItem[]; nextArrival: NextArrival | null } | null>(null)
@@ -90,10 +93,10 @@ function GlanceOverview() {
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} data-testid="customer-overview">
       {sum && <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile to="/dashboard?tab=money" icon={Wallet} label="You owe" value={money(sum.owe)} hint={sum.overdue > 0 ? `${money(sum.overdue)} overdue` : sum.owe > 0 ? 'Pay all in one checkout' : sum.credit > 0 ? `${money(sum.credit)} credit to use` : 'All paid up'} tone={sum.overdue > 0 ? 'bad' : undefined} testid="ov-owe" />
-        <Tile to="/dashboard?tab=inbox" icon={MessageSquare} label="Messages" value={sum.unread} hint={sum.unread ? 'unread from shippers' : 'Nothing unread'} tone={sum.unread ? 'gold' : undefined} testid="ov-unread" />
-        <Tile to="/dashboard?tab=shipments" icon={Ship} label="On the way" value={sum.activeShipments} hint={`${sum.delivered} delivered so far`} testid="ov-active" />
-        <Tile to="/dashboard?tab=requests" icon={FileText} label="Quotes to review" value={sum.quotesWaiting} hint={`${sum.openRequests} open request${sum.openRequests === 1 ? '' : 's'}`} tone={sum.quotesWaiting ? 'gold' : undefined} testid="ov-quotes" />
+        <Tile to="/dashboard?tab=money" icon={Wallet} label={t('You owe')} value={money(sum.owe)} hint={sum.overdue > 0 ? `${money(sum.overdue)} overdue` : sum.owe > 0 ? t('Pay all in one checkout') : sum.credit > 0 ? `${money(sum.credit)} credit to use` : t('All paid up')} tone={sum.overdue > 0 ? 'bad' : undefined} testid="ov-owe" />
+        <Tile to="/dashboard?tab=inbox" icon={MessageSquare} label={t('Messages')} value={sum.unread} hint={sum.unread ? t('unread from shippers') : t('Nothing unread')} tone={sum.unread ? 'gold' : undefined} testid="ov-unread" />
+        <Tile to="/dashboard?tab=shipments" icon={Ship} label={t('On the way')} value={sum.activeShipments} hint={t('{n} delivered so far', { n: sum.delivered })} testid="ov-active" />
+        <Tile to="/dashboard?tab=requests" icon={FileText} label={t('Quotes to review')} value={sum.quotesWaiting} hint={`${sum.openRequests} open request${sum.openRequests === 1 ? '' : 's'}`} tone={sum.quotesWaiting ? 'gold' : undefined} testid="ov-quotes" />
       </div>}
       {sum && user?.role === 'customer' && <GettingStarted s={sum} />}
       {home && <NeedsYou items={home.items} />}

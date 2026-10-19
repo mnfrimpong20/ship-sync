@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { Mail, Megaphone, MessageCircle, Send, Smartphone } from 'lucide-react'
@@ -25,7 +26,7 @@ export default function CampaignsPage() {
   useEffect(() => { if (user?.role === 'shipper') platformApi.audience(aud).then((c) => { setClients(c); setPicked(new Set(c.map((x) => x.id))) }).catch(() => setClients([])) }, [user, aud])
   useEffect(() => { if (open) platformApi.campaign(open).then(setDetail).catch(() => {}); else setDetail(null) }, [open])
   const reach = useMemo(() => clients.filter((c) => picked.has(c.id) && (f.channel === 'email' ? /@/.test(c.email) : /\d{7,}/.test(String(c.phone).replace(/\D/g, '')))), [clients, picked, f.channel])
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?next=/dashboard/campaigns" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   const send = async (test: boolean) => {

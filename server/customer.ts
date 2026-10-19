@@ -25,6 +25,14 @@ interface Deps {
 }
 const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v))
 const DATE = (v: unknown) => (v == null ? null : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10))
+/** "Sun 1 Nov (in 14 days)" — people read dates, not ISO strings. */
+const NICE = (v: unknown) => {
+  const d0 = DATE(v); if (!d0) return ''
+  const d = new Date(d0 + 'T12:00:00Z'); const today = new Date(new Date().toISOString().slice(0, 10) + 'T12:00:00Z')
+  const days = Math.round((d.getTime() - today.getTime()) / 86400000)
+  const day = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC', ...(d.getUTCFullYear() !== today.getUTCFullYear() ? { year: 'numeric' } : {}) })
+  return `${day} (${days === 0 ? 'today' : days === 1 ? 'tomorrow' : days === -1 ? 'yesterday' : days > 0 ? `in ${days} days` : `${-days} days ago`})`
+}
 const J = (v: unknown) => (v == null ? null : typeof v === 'string' ? JSON.parse(v) : v)
 const n = (v: unknown) => Number(v ?? 0)
 
@@ -92,7 +100,7 @@ export async function customerAttention(db: Db, userId: string) {
   for (const i of inv) {
     const bal = n(i.total) - n(i.paid); if (bal <= 0) continue
     const overdue = i.due_at && new Date(i.due_at).getTime() < now
-    items.push({ kind: 'invoice', severity: overdue ? 'critical' : 'warning', title: `${overdue ? 'Overdue' : 'Invoice due'}: ${i.number} — $${bal.toLocaleString()} to ${i.shipper}`, body: i.due_at ? `Due ${DATE(i.due_at)}.` : 'Pay online or arrange a bank transfer.', to: `/dashboard?tab=invoices`, at: ISO(i.due_at) ?? undefined })
+    items.push({ kind: 'invoice', severity: overdue ? 'critical' : 'warning', title: `${overdue ? 'Overdue' : 'Invoice due'}: ${i.number} — $${bal.toLocaleString()} to ${i.shipper}`, body: i.due_at ? `Due ${NICE(i.due_at)}.` : 'Pay online or arrange a bank transfer.', to: `/dashboard?tab=invoices`, at: ISO(i.due_at) ?? undefined })
   }
   // sourcing: a stage is waiting on their payment or a decision
   const { rows: src } = await db.query<Row>(`select id, ref, title, status, updated_at from sourcing_requests where user_id = $1 and status in ('quoted', 'inspected', 'sourcing')`, [userId])

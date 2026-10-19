@@ -130,5 +130,5 @@ export default function LiveMap({ data, className = '' }: { data: PositionPayloa
     draw()
   }, [data])
 
-  return <div ref={box} className={`ss-map ${className}`} role="img" aria-label="Map of the shipment route and current position" />
+  return <div ref={box} className={`ss-map ${className}`} role="region" aria-label="Map of the shipment route and current position" />
 }

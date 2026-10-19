@@ -1,3 +1,4 @@
+import { BrandLoader } from './components/BrandLoader'
 import { WhatsAppBubble } from './components/HelpBits'
 import { Suspense, lazy, useEffect, useState } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useOutlet } from 'react-router-dom'
@@ -99,7 +100,7 @@ function ScrollManager() {
 
 /** Shown for the few hundred ms while a lazily loaded page's code arrives. */
 function PageLoading() {
-  return <div className="bg-bg text-text" aria-busy="true"><div className="container-x py-24 text-center text-sm text-text-muted">Loading…</div></div>
+  return <div className="bg-bg text-text" aria-busy="true"><BrandLoader /></div>
 }
 
 /** Public marketing site: big header, footer, page transitions. */

@@ -107,5 +107,5 @@ export default function RunMap({ start, stops, draggable = false, onMove, onClic
   }, [focusId])
 
   // .ss-map is unlayered CSS (height:100%), so sizing utilities go on a wrapper.
-  return <div className={`overflow-hidden rounded-2xl border border-border bg-[#0D1424] ${className}`}><div ref={box} className="ss-map" role="img" aria-label="Route planning map" /></div>
+  return <div className={`overflow-hidden rounded-2xl border border-border bg-[#0D1424] ${className}`}><div ref={box} className="ss-map" role="region" aria-label="Route planning map" /></div>
 }

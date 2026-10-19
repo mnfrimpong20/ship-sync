@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -233,7 +234,7 @@ export default function AutopilotPage() {
   useEffect(() => { if (ready && user?.role === 'shipper') autopilotApi.get().then(setD).catch((e) => setErr(msgOf(e, 'Could not load.'))) }, [ready, user, tab])
   const save = async (p: Partial<AutopilotSettings>) => { if (!d) return; setD({ ...d, settings: { ...d.settings, ...p } }); try { await autopilotApi.save(p); setSaved(true); setTimeout(() => setSaved(false), 1500) } catch (e) { setErr(msgOf(e, 'Could not save.')) } }
   const total = useMemo(() => Object.values(d?.week ?? {}).reduce((a, b) => a + b, 0), [d])
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/autopilot" replace />
   if (user.role !== 'shipper' || !['owner', 'dispatcher'].includes(user.staffRole ?? 'owner')) return <Navigate to="/dashboard/shipper" replace />
   const tabs: [Tab, string, typeof Bot][] = [['switches', 'Automations', Bot], ['activity', 'What it did', Check], ['rules', 'My rules', Workflow], ['assistant', 'WhatsApp helper', MessageCircle]]

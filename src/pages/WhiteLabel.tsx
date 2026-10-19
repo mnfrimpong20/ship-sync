@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -22,7 +23,7 @@ export default function BrandedPage() {
   useEffect(() => { whitelabelApi.page(slug).then((r) => { setD(r); setQ((x) => ({ ...x, origin: r.brand.origins[0] ?? r.shipper.origins[0] ?? '', destination: r.shipper.destinations[0] ?? 'GH' })) }).catch((e) => setError(e instanceof Error ? e.message : 'Not found.')) }, [slug])
   useEffect(() => { if (user) setQ((x) => ({ ...x, name: x.name || user.name, email: x.email || user.email })) }, [user])
   if (error) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center"><p className="text-danger">{error}</p><Link to="/" className="btn-ghost mt-4">Ntemtem home</Link></div></div>
-  if (!d) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading…</div></div>
+  if (!d) return <div className="min-h-dvh bg-bg text-text"><BrandLoader /></div>
   const { brand: b, shipper: s } = d; const fg = onAccent(b.accent)
   const doTrack = async (e: React.FormEvent) => { e.preventDefault(); setTracking(true); try { setTracked(await track(ref.trim())) } finally { setTracking(false) } }
   const submit = async (e: React.FormEvent) => {
@@ -95,7 +96,7 @@ export function BrandEditor() {
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [toast, setToast] = useState('')
   useEffect(() => { if (ready && user?.role === 'shipper') whitelabelApi.mine().then((r) => { setD(r); setB(r.brand) }).catch((e) => setError(e instanceof Error ? e.message : 'Could not load.')) }, [ready, user])
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) }, [toast])
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/brand" replace />
   if (user.role !== 'shipper' || (user.staffRole !== 'owner' && user.staffRole !== 'dispatcher')) return <Navigate to="/dashboard" replace />
   const save = async () => { if (!b) return; setBusy(true); setError(''); try { setB(await whitelabelApi.save(b)); setToast('Saved.') } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.') } finally { setBusy(false) } }

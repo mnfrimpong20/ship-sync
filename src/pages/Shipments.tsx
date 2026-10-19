@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -114,7 +115,7 @@ export default function Shipments() {
   const pages = Math.max(1, Math.ceil(list.length / PAGE)); const cur = Math.min(page, pages)
   const rows = list.slice((cur - 1) * PAGE, cur * PAGE)
 
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/shipments" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
 

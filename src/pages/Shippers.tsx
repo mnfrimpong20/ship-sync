@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -25,7 +26,7 @@ export function ShipperProfile() {
   const { ready, shipperById } = useStore()
   const s = shipperById(id ?? '')
   useEffect(() => { if (!s) return; try { const k = 'ss-recent-shippers'; const cur = (JSON.parse(localStorage.getItem(k) ?? '[]') as string[]).filter((x) => x !== s.id); localStorage.setItem(k, JSON.stringify([s.id, ...cur].slice(0, 6))) } catch { /* storage blocked */ } }, [s])
-  if (!s && !ready) return <div className="container-x py-20 text-center text-text-muted">Loading profile…</div>
+  if (!s && !ready) return <BrandLoader label="Loading profile…" />
   if (!s) return (
     <div className="container-x py-20 text-text"><Empty title="Shipper not found" body="This profile may have been removed or the link is wrong." action={<Link to="/shippers" className="btn-gold">Back to directory</Link>} /></div>
   )

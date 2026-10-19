@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { Calculator, Plus, Trash2 } from 'lucide-react'
@@ -19,7 +20,7 @@ export default function CostsPage() {
   const [f, setF] = useState({ scope: 'container', category: 'freight', amount: '', description: '', vendor: '', incurredOn: today(), containerId: '', shipmentId: '' })
   const load = () => { platformApi.costs(days).then(setD).catch((e) => setErr(e.message)); analyticsApi.get({ days }).then(setA).catch(() => {}) }
   useEffect(() => { if (user?.role === 'shipper') load() }, [user, days]) // eslint-disable-line react-hooks/exhaustive-deps
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?next=/dashboard/costs" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   const p = a?.profit

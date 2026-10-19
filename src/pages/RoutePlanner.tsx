@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -114,7 +115,7 @@ export default function RoutePlanner() {
     if (run) { try { setRun(await opsApi.updateRun(run.id, { start: s })) } catch (e) { setError(e instanceof Error ? e.message : 'Could not set the start.') } }
   }, [pickMode, start, run])
 
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to={`/login?role=shipper&next=/dashboard/routes/${id ?? 'new'}`} replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   if (isNew && !manage) return <Navigate to="/dashboard/routes" replace />

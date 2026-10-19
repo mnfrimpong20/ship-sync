@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -19,7 +20,7 @@ export default function MyRuns() {
     opsApi.myRuns().then((r) => live && setRuns(r)).catch((e) => live && setError(e instanceof Error ? e.message : 'Could not load your runs.'))
     return () => { live = false }
   }, [ready, user])
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/runs" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   const today = new Date().toISOString().slice(0, 10)

@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Barcode, Check, CreditCard, Gift, Minus, Package, PackageCheck, Pencil, Plus, Printer, RotateCcw, ShoppingCart, Tag, Trash2, Truck, X } from 'lucide-react'
@@ -19,7 +20,7 @@ export default function SuppliesPage() {
   const { ready, user } = useStore()
   const [sp, setSp] = useSearchParams()
   const tab = sp.get('tab') === 'packing' ? 'packing' : 'equipment'
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?next=/dashboard/supplies" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   return (

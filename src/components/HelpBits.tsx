@@ -28,9 +28,9 @@ export function HelpLine({ text = 'Questions?', topic, waText, className = '' }:
   return (
     <p className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted ${className}`} data-testid="help-line">
       <span>{text}</span>
-      {cfg?.whatsappUrl && <><a href={waWithText(cfg.whatsappUrl, waText ?? 'Hi Ntemtem, ')} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-gold-deep hover:underline"><MessageCircle size={14} aria-hidden="true" /> Chat on WhatsApp</a><span aria-hidden="true">·</span></>}
-      <Link to="/help" className="font-semibold text-gold-deep hover:underline">Help centre</Link><span aria-hidden="true">·</span>
-      <Link to={topic ? `/contact?topic=${topic}` : '/contact'} className="font-semibold text-gold-deep hover:underline">Contact us</Link>
+      {cfg?.whatsappUrl && <><a href={waWithText(cfg.whatsappUrl, waText ?? 'Hi Ntemtem, ')} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-gold-deep underline underline-offset-2 hover:decoration-2"><MessageCircle size={14} aria-hidden="true" /> Chat on WhatsApp</a><span aria-hidden="true">·</span></>}
+      <Link to="/help" className="font-semibold text-gold-deep underline underline-offset-2 hover:decoration-2">Help centre</Link><span aria-hidden="true">·</span>
+      <Link to={topic ? `/contact?topic=${topic}` : '/contact'} className="font-semibold text-gold-deep underline underline-offset-2 hover:decoration-2">Contact us</Link>
     </p>
   )
 }

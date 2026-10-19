@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -62,7 +63,7 @@ export default function Payments() {
   const pg = usePaged(list, 12, `${filter}|${q}`)
   const count = (s: Payment['status']) => all.filter((p) => p.status === s).length
 
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/payments" replace />
   if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
   const b = data?.balance

@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { LoadPlanner } from '../components/LoadPlanner'
@@ -82,7 +83,7 @@ export default function Containers() {
     return s ? byTab.filter((c) => [c.ref, c.number, c.line, c.bookingRef, c.vesselName, c.originPort, c.destinationPort, countryByCode(c.destination)?.name ?? ''].join(' ').toLowerCase().includes(s)) : byTab
   }, [list, tab, q])
 
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/containers" replace />
   if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
 

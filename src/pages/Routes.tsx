@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -116,7 +117,7 @@ export default function Routes() {
   const p = usePaged(list, PAGE, `${bucket}|${kind}|${driver}|${q}|${sort}`)
   const drivers = team.filter((s) => s.role === 'driver')
 
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/routes" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   if (user.staffRole === 'driver') return <Navigate to="/dashboard/runs" replace />

@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useRef, useState } from 'react'
 import { localPrice } from '../lib/sourcingOrigins'
 import { useParams } from 'react-router-dom'
@@ -32,7 +33,7 @@ export default function SupplierPortalPage() {
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 5000); return () => clearTimeout(t) }, [toast])
   useEffect(() => { if (d?.po?.readyBy && !f.readyBy) setF((x) => ({ ...x, readyBy: d.po!.readyBy })) }, [d]) // eslint-disable-line react-hooks/exhaustive-deps
   if (error && !d) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center text-danger">{error}</div></div>
-  if (!d) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading…</div></div>
+  if (!d) return <div className="min-h-dvh bg-bg text-text"><BrandLoader /></div>
   const closed = ['closed', 'cancelled', 'delivered'].includes(d.job.status)
   const needsDate = kind === 'ready' || kind === 'delay'
   const submit = async (e: React.FormEvent) => {

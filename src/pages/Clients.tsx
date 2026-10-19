@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -87,7 +88,7 @@ export default function Clients() {
   const pages = Math.max(1, Math.ceil(list.length / PAGE)); const cur = Math.min(page, pages)
   const rows = list.slice((cur - 1) * PAGE, cur * PAGE)
 
-  if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading…</div></div>
+  if (!ready) return <div className="bg-bg text-text"><BrandLoader /></div>
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/clients" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
 

@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -51,7 +52,7 @@ export default function Warehouse() {
   const bins = useMemo(() => (d?.bins ?? []).filter((b) => b.siteId === siteId), [d, siteId])
   const stock = useMemo(() => (d?.stock ?? []).filter((s) => s.siteId === siteId), [d, siteId])
   const zones = useMemo(() => [...new Set(bins.map((b) => b.zone))], [bins])
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/warehouse" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   const act = async (fn: () => Promise<unknown>, msg: string, key: string) => { setBusy(key); setError(''); try { await fn(); await load(); setToast(msg) } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong.') } finally { setBusy(''); setReleasing(null); setMoving(null) } }

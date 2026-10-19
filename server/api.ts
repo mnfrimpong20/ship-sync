@@ -68,8 +68,9 @@ import { mountReviews } from './reviews'
 import { mountBrand } from './brand'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
-export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: StaffPerms; staffId?: string; readOnly?: boolean; viewAsBy?: string; actingBy?: { id: string; name: string; email: string } }
+export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: StaffPerms; staffId?: string; display?: DisplayPrefs; readOnly?: boolean; viewAsBy?: string; actingBy?: { id: string; name: string; email: string } }
 export interface StaffPerms { allow?: Area[]; deny?: Area[] }
+export interface DisplayPrefs { lang?: 'en' | 'fr'; textSize?: 'normal' | 'large' | 'larger'; theme?: 'light' | 'dark' | 'system' }
 /** Areas a company can grant or withhold per person on top of their role. Mirrors ROLE_AREAS in src/lib/ops.ts. */
 export const AREAS = ['leads', 'rates', 'lanes', 'groupage', 'brand', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'payments', 'collections', 'reviews', 'fleet', 'team', 'verification', 'sourcing', 'analytics'] as const
 export type Area = (typeof AREAS)[number]
@@ -176,7 +177,7 @@ export async function resolvePosition(r: Row, events: Row[]) {
       : phase === 'pre' ? 'Not yet departed.' : 'Arrived at destination.',
   }
 }
-const userOut = (r: Row, company?: string): ApiUser => ({ id: r.id, name: r.name, email: r.email, role: r.role, shipperId: r.shipper_id ?? undefined, company, admin: !!r.is_admin, staffRole: r.shipper_id ? (r.staff_role ?? 'owner') : undefined, perms: r.shipper_id ? ((J(r.staff_perms) ?? {}) as StaffPerms) : undefined, staffId: r.staff_id ?? undefined })
+const userOut = (r: Row, company?: string): ApiUser => ({ id: r.id, name: r.name, email: r.email, role: r.role, shipperId: r.shipper_id ?? undefined, company, admin: !!r.is_admin, staffRole: r.shipper_id ? (r.staff_role ?? 'owner') : undefined, perms: r.shipper_id ? ((J(r.staff_perms) ?? {}) as StaffPerms) : undefined, staffId: r.staff_id ?? undefined, display: (J(r.display) ?? {}) as DisplayPrefs })
 
 class HttpError extends Error {
   status: number
@@ -519,6 +520,14 @@ export function apiRouter() {
     res.clearCookie(SESSION_COOKIE, { path: '/' }); res.json({ ok: true })
   }))
   r.get('/auth/me', wrap(async (req, res) => { const db = await getDb(); res.json({ user: await currentUser(db, req) }) }))
+  /** Text size, theme and language follow the person to every device. */
+  r.put('/me/display', wrap(async (req, res) => {
+    const db = await getDb(); const u = await requireUser(db, req)
+    const b = z.object({ lang: z.enum(['en', 'fr']).optional(), textSize: z.enum(['normal', 'large', 'larger']).optional(), theme: z.enum(['light', 'dark', 'system']).optional() }).parse(req.body)
+    const { rows } = await db.query<Row>('select display from users where id = $1', [u.id])
+    const next = { ...((J(rows[0]?.display) ?? {}) as DisplayPrefs), ...b }
+    await db.query('update users set display = $2 where id = $1', [u.id, JSON.stringify(next)]); res.json({ display: next })
+  }))
 
   // shippers (public)
   mountDirectory(r, { getDb, shipperOut, wrap })

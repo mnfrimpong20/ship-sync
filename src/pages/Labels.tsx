@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import QRCode from 'qrcode'
@@ -106,7 +107,7 @@ export default function Labels() {
     return () => { live = false }
   }, [data])
 
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to={`/login?role=shipper&next=${encodeURIComponent(`/dashboard/labels?${sp.toString()}`)}`} replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
 

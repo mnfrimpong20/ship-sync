@@ -17,9 +17,9 @@
   --color-gold-deep: #8A5A00;
   --color-gold-soft: #FBE7B2;
   --color-on-accent: #14213D;
-  --color-teal: #0E7A4E;
+  --color-teal: #0A6842;
   --color-sea: #1B5E78;
-  --color-sky: #2B6CB0;
+  --color-sky: #255F9C;
   --color-partner: #24211C;
   --color-border: #E3D8C3;
   --color-border-light: #E3D8C3;
@@ -144,3 +144,15 @@ table, dl, .tabular-nums, [data-testid$="card"] { font-variant-numeric: tabular-
    Used only for data marks; text stays in text tokens. */
 :root { --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100; --viz-5: #e87ba4; --viz-grid: rgba(20, 33, 61, 0.08); }
 .theme-dark { --viz-1: #3987e5; --viz-2: #d95926; --viz-3: #199e70; --viz-4: #c98500; --viz-5: #d55181; --viz-grid: rgba(255, 255, 255, 0.08); }
+
+/* Brand loader: chevrons move forward in turn, the parcel settles, a gold line sweeps. */
+@keyframes ntm-chev { 0%, 100% { transform: translateX(0); opacity: 1 } 40% { transform: translateX(6px); opacity: .55 } }
+@keyframes ntm-box { 0%, 60%, 100% { transform: translateX(0) } 75% { transform: translateX(3px) } }
+@keyframes ntm-bar { 0% { transform: translateX(-110%) } 100% { transform: translateX(330%) } }
+.ntm-chev { animation: ntm-chev 1.2s ease-in-out infinite; transform-box: fill-box }
+.ntm-chev-2 { animation-delay: .18s }
+.ntm-box { animation: ntm-box 1.2s ease-in-out infinite; transform-box: fill-box }
+.ntm-bar { animation: ntm-bar 1.3s cubic-bezier(.4,0,.2,1) infinite }
+@media (prefers-reduced-motion: reduce) { .ntm-chev, .ntm-box, .ntm-bar { animation: none } .ntm-bar { width: 100% } }
+/* Links inside sentences are underlined, not told apart by colour alone. */
+.ss-app p a:not([class*="btn"]), .ss-app li > p a:not([class*="btn"]), p > a.text-gold-deep:not([class*="btn"]) { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px }

@@ -1,3 +1,6 @@
+import { BrandLoader } from './BrandLoader'
+import { useT } from '../lib/i18n'
+import { adoptAccountDisplay } from '../lib/prefs'
 import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -14,7 +17,7 @@ import { WifiOff, CloudUpload, CalendarDays, MessageSquare, FolderArchive, Repea
 import { hubApi } from '../lib/customerHub'
 import { refreshSummary, useSummary } from '../lib/account'
 
-interface Item { to: string; label: string; icon: typeof Inbox; end?: boolean; badge?: number | string; group?: string }
+interface Item { to: string; label: string; icon: typeof Inbox; end?: boolean; badge?: number | string; group?: string; more?: boolean }
 
 /**
  * The signed-in application: a fixed sidebar with role-specific navigation and a slim top bar, kept visually apart
@@ -28,6 +31,10 @@ export default function AppShell() {
   const [open, setOpen] = useState(false)
   const [menu, setMenu] = useState(false)
   const [dueReminders, setDueReminders] = useState(0)
+  const t = useT()
+  const [moreOpen, setMoreOpen] = useState(() => { try { return localStorage.getItem('ss-nav-more') === '1' } catch { return false } })
+  const toggleMore = () => setMoreOpen((v) => { try { localStorage.setItem('ss-nav-more', v ? '0' : '1') } catch { /* private mode */ } return !v })
+  useEffect(() => { if (user?.display) adoptAccountDisplay(user.display) }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setOpen(false); setMenu(false) }, [loc])
   const summary = useSummary(user?.role === 'customer')
   useEffect(() => { if (user?.role === 'customer') refreshSummary() }, [user, loc.pathname, loc.search])
@@ -36,7 +43,7 @@ export default function AppShell() {
     clientsApi.remindersDue().then((r) => setDueReminders(r.filter((x) => x.dueAt && new Date(x.dueAt).getTime() < Date.now() + 86400000).length)).catch(() => {})
   }, [user, loc.pathname])
 
-  if (!ready) return <div className="grid min-h-screen place-items-center bg-bg text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader label="Loading your account…" />
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
   // Staff see only their area: a warehouse clerk who lands on the owner's overview goes to the warehouse, a finance user asking for Fleet goes home.
   if (user.role === 'shipper' && user.staffRole && !user.admin && loc.pathname.startsWith('/dashboard') && !roleAllows(user.staffRole, loc.pathname, user.perms as never)) return <Navigate to={roleHome[user.staffRole]} replace />
@@ -91,15 +98,15 @@ export default function AppShell() {
         { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
         { to: '/quote', label: 'New request', icon: PlusCircle },
         { to: '/dashboard?tab=requests', label: 'Quote requests', icon: FileText, badge: summary?.quotesWaiting || openLeads, group: 'Shipping' },
-        { to: '/dashboard?tab=shipments', label: 'Shipments', icon: Package, badge: summary?.activeShipments ?? active, group: 'Shipping' },
-        { to: '/dashboard?tab=groupage', label: 'Shared barrels', icon: Boxes, group: 'Shipping' },
-        { to: '/dashboard?tab=sourcing', label: 'Sourcing', icon: Globe2, group: 'Shipping' },
+        { to: '/dashboard?tab=shipments', label: t('Shipments'), icon: Package, badge: summary?.activeShipments ?? active, group: 'Shipping' },
+        { to: '/dashboard?tab=groupage', label: 'Shared barrels', icon: Boxes, group: 'Shipping', more: true },
+        { to: '/dashboard?tab=sourcing', label: 'Sourcing', icon: Globe2, group: 'Shipping', more: true },
         { to: '/dashboard?tab=money', label: 'Money', icon: Wallet, badge: summary?.owe ? `$${Math.round(summary.owe).toLocaleString()}` : undefined, group: 'Money' },
         { to: '/dashboard?tab=invoices', label: 'Invoices', icon: Receipt, group: 'Money' },
         { to: '/dashboard?tab=week', label: 'This week', icon: CalendarDays, group: 'Organise' },
-        { to: '/dashboard?tab=inbox', label: 'Messages', icon: MessageSquare, badge: summary?.unread, group: 'Organise' },
+        { to: '/dashboard?tab=inbox', label: t('Messages'), icon: MessageSquare, badge: summary?.unread, group: 'Organise' },
         { to: '/dashboard?tab=documents', label: 'Documents', icon: FolderArchive, group: 'Organise' },
-        { to: '/dashboard?tab=plans', label: 'Saved & repeat', icon: Repeat, group: 'Organise' },
+        { to: '/dashboard?tab=plans', label: 'Saved & repeat', icon: Repeat, group: 'Organise', more: true },
         { to: '/dashboard?tab=recipients', label: 'Recipients', icon: Contact, group: 'Organise' },
         { to: '/dashboard?tab=issues', label: 'Problems', icon: AlertTriangle, group: 'Help & account' },
         { to: '/dashboard?tab=account', label: 'Account', icon: CircleUser, group: 'Help & account' },
@@ -108,9 +115,9 @@ export default function AppShell() {
   const tools: Item[] = [
     ...(isShipper ? [{ to: '/dashboard/notifications', label: 'Notifications', icon: BellRing } as Item] : []),
     ...(isShipper ? [{ to: '/dashboard/scan', label: 'Scan a sticker', icon: ScanLine } as Item] : []),
-    ...(isDriver ? [] : [{ to: '/live', label: 'Live map', icon: Radar } as Item]),
+    ...(isDriver ? [] : [{ to: '/live', label: 'Live map', icon: Radar, more: !isShipper } as Item]),
     { to: '/track', label: 'Track a shipment', icon: Search },
-    ...(isShipper ? [] : [{ to: '/', label: 'Ntemtem website', icon: Globe } as Item]),
+    ...(isShipper ? [] : [{ to: '/', label: 'Ntemtem website', icon: Globe, more: true } as Item]),
     ...(user.admin ? [{ to: '/admin', label: 'Business', icon: BarChart3, end: true } as Item, { to: '/admin?view=attention', label: 'Attention', icon: BellRing } as Item, { to: '/admin?view=shippers', label: 'Verification', icon: ShieldCheck } as Item, { to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2 } as Item] : []),
   ]
 
@@ -128,8 +135,8 @@ export default function AppShell() {
         const act = isActive(it)
         return (
           <li key={it.to}>
-            <NavLink to={it.to} className={`flex ${isShipper ? 'min-h-10' : 'min-h-9'} items-center gap-3 rounded-lg px-3 text-sm transition-colors focus-ring ${act ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} aria-current={act ? 'page' : undefined}>
-              <it.icon size={17} aria-hidden="true" /><span className="flex-1">{it.label}</span>
+            <NavLink to={it.to} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors focus-ring ${act ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} aria-current={act ? 'page' : undefined}>
+              <it.icon size={17} aria-hidden="true" /><span className="flex-1">{t(it.label)}</span>
               {it.badge ? <span className={`rounded-full px-1.5 text-[11px] font-bold ${act ? 'bg-gold text-on-accent' : 'bg-surface-2 text-text'}`}>{it.badge}</span> : null}
             </NavLink>
           </li>
@@ -142,12 +149,14 @@ export default function AppShell() {
       <div className="flex h-16 items-center justify-between px-5"><Logo partner={isShipper} /><button onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-lg text-text-muted lg:hidden focus-ring" aria-label="Close menu"><X size={18} /></button></div>
       <div className="flex items-center gap-2.5 px-4 pb-3">
         {isShipper && company && <Avatar initials={company.initials} hue={company.hue} logo={company.logo} size={32} />}
-        <div className="min-w-0"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : 'Customer'}</p>{isShipper && user.staffRole && <p className="text-[11px] text-text-muted/70">{user.staffRole.charAt(0).toUpperCase() + user.staffRole.slice(1)}</p>}</div>
+        <div className="min-w-0"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : t('Customer')}</p>{isShipper && user.staffRole && <p className="text-[11px] text-text-muted">{user.staffRole.charAt(0).toUpperCase() + user.staffRole.slice(1)}</p>}</div>
       </div>
       <nav className={`flex-1 overflow-y-auto px-3 ${isShipper ? 'space-y-5' : 'space-y-3.5'}`} aria-label="Application">
-        <NavItems list={visible.filter((i) => !i.group)} />
-        {Array.from(new Set(visible.map((i) => i.group).filter(Boolean))).map((g) => <div key={g}><p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted/70">{g}</p><NavItems list={visible.filter((i) => i.group === g)} /></div>)}
-        <div><p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted/70">Tools</p><NavItems list={tools} /></div>
+        <NavItems list={visible.filter((i) => !i.group && !i.more)} />
+        {Array.from(new Set(visible.filter((i) => !i.more).map((i) => i.group).filter(Boolean))).map((g) => <div key={g}><p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted">{t(g!)}</p><NavItems list={visible.filter((i) => i.group === g && !i.more)} /></div>)}
+        {tools.some((i) => !i.more) && <div><p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted">{t('Tools')}</p><NavItems list={tools.filter((i) => !i.more)} /></div>}
+        {[...visible, ...tools].some((i) => i.more) && (() => { const rest = [...visible, ...tools].filter((i) => i.more); const open2 = moreOpen || rest.some(isActive); return (
+          <div data-testid="nav-more"><button type="button" onClick={() => toggleMore()} aria-expanded={open2} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-text-muted hover:bg-surface-2 hover:text-text focus-ring"><ChevronDown size={17} className={`transition-transform ${open2 ? 'rotate-180' : ''}`} aria-hidden="true" /><span className="flex-1 text-left">{open2 ? t('Less') : t('More')}</span></button>{open2 && <NavItems list={rest} />}</div>) })()}
       </nav>
  {isShipper && <div className="border-t border-border p-3">
         <Link to="/" className="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm text-text-muted hover:bg-surface-2 hover:text-text focus-ring"><Globe size={17} aria-hidden="true" /> Ntemtem website <ExternalLink size={12} className="ml-auto" aria-hidden="true" /></Link>
@@ -157,6 +166,7 @@ export default function AppShell() {
 
   return (
     <div className={`min-h-screen bg-bg text-text lg:grid lg:grid-cols-[256px_minmax(0,1fr)] ${isShipper ? 'ss-partner' : ''}`}>
+      <a href="#main" onClick={(e) => { e.preventDefault(); const m = document.getElementById('main'); m?.focus(); m?.scrollIntoView() }} className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-gold focus:px-4 focus:py-2 focus:font-semibold focus:text-on-accent" data-testid="skip-link">{t('Skip to content')}</a>
       <aside className="ss-sidebar no-print sticky top-0 hidden h-screen border-r border-border bg-surface/60 lg:block">{sidebar}</aside>
       <AnimatePresence>
         {open && (
@@ -169,7 +179,7 @@ export default function AppShell() {
       <div className="flex min-h-screen min-w-0 flex-col">
         <header className="no-print sticky top-0 z-40 flex h-16 items-center justify-between gap-2 border-b border-border bg-bg/85 px-3 backdrop-blur-xl sm:gap-4 sm:px-4 md:px-8">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <button onClick={() => setOpen(true)} className="grid h-10 w-10 place-items-center rounded-lg text-text focus-ring lg:hidden" aria-label="Open menu"><Menu size={20} /></button>
+            <button onClick={() => setOpen(true)} className="grid h-10 w-10 place-items-center rounded-lg text-text focus-ring lg:hidden" aria-label={t('Open menu')}><Menu size={20} /></button>
             <span className="lg:hidden"><Logo tagline={false} partner={isShipper} /></span>
           </div>
           <div className="flex items-center gap-2">
@@ -185,7 +195,7 @@ export default function AppShell() {
                   <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} role="menu" className="card-dark absolute right-0 mt-2 w-56 overflow-hidden p-1.5">
                     <p className="px-3 py-2 text-xs text-text-muted">{user.email}</p>
                     {isShipper && staffRole === 'owner' && <Link role="menuitem" to="/dashboard/shipper?view=profile" className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><UserCog size={16} aria-hidden="true" /> Company profile</Link>}
-                    <Link role="menuitem" to="/support" className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><LifeBuoy size={16} aria-hidden="true" /> Help &amp; support</Link>
+                    <Link role="menuitem" to="/support" className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><LifeBuoy size={16} aria-hidden="true" /> {t('Help & support')}</Link>
                     {user.admin && <Link role="menuitem" to="/admin" className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><ShieldCheck size={16} aria-hidden="true" /> Admin</Link>}
                     <button role="menuitem" onClick={() => { logout().finally(() => nav('/')) }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-surface-2 focus-ring"><LogOut size={16} aria-hidden="true" /> Sign out</button>
                   </motion.div>
@@ -196,10 +206,10 @@ export default function AppShell() {
         </header>
         <PlatformBanners />
         {user?.actingBy && <div data-testid="acting-banner" role="status" className="flex flex-wrap items-center justify-center gap-3 border-b border-gold/40 bg-gold/10 px-4 py-2 text-sm"><span>You’re using <b>{user.name}</b>’s account as {user.actingBy.name}.</span><button data-testid="acting-exit" onClick={() => { hubApi.switchTo(null).finally(() => { window.location.hash = '#/dashboard'; window.location.reload() }) }} className="rounded-md border border-gold/50 px-2.5 py-1 text-xs font-semibold text-gold-deep hover:bg-gold/10 focus-ring">Switch back to my account</button></div>}
-        <main id="main" className={`ss-app flex-1 ${isShipper ? '' : 'pb-20 lg:pb-0'}`}>
+        <main id="main" tabIndex={-1} className={`ss-app flex-1 outline-none ${isShipper ? '' : 'pb-20 lg:pb-0'}`}>
           <AnimatePresence mode="wait">
             <motion.div key={loc.pathname} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-              <Suspense fallback={<div className="p-10 text-center text-sm text-text-muted" aria-busy="true">Loading…</div>}>{outlet}</Suspense>
+              <Suspense fallback={<BrandLoader partner={isShipper} />}>{outlet}</Suspense>
             </motion.div>
           </AnimatePresence>
         </main>
@@ -211,22 +221,23 @@ export default function AppShell() {
 
 /** Phone-only tab bar for customers: the four places people go most, plus the full menu. */
 function BottomBar({ unread, owe, onMenu }: { unread: number; owe: number; onMenu: () => void }) {
-  const loc = useLocation(); const tab = new URLSearchParams(loc.search).get('tab')
+  const loc = useLocation(); const tab = new URLSearchParams(loc.search).get('tab'); const t = useT()
+  const short = owe >= 1000 ? `$${(owe / 1000).toFixed(owe >= 10000 ? 0 : 1)}k` : `$${Math.round(owe)}`
   const items: { to: string; label: string; icon: typeof Home; on: boolean; badge?: string | number }[] = [
-    { to: '/dashboard', label: 'Home', icon: Home, on: loc.pathname === '/dashboard' && !tab },
-    { to: '/dashboard?tab=shipments', label: 'Shipments', icon: Package, on: tab === 'shipments' },
-    { to: '/dashboard?tab=inbox', label: 'Messages', icon: MessageSquare, on: tab === 'inbox', badge: unread || undefined },
-    { to: '/dashboard?tab=money', label: 'Money', icon: Wallet, on: tab === 'money' || tab === 'invoices', badge: owe > 0 ? '•' : undefined },
+    { to: '/dashboard', label: t('Home'), icon: Home, on: loc.pathname === '/dashboard' && !tab },
+    { to: '/dashboard?tab=shipments', label: t('Shipments'), icon: Package, on: tab === 'shipments' },
+    { to: '/dashboard?tab=inbox', label: t('Messages'), icon: MessageSquare, on: tab === 'inbox', badge: unread || undefined },
+    { to: '/dashboard?tab=money', label: t('Pay'), icon: Wallet, on: tab === 'money' || tab === 'invoices', badge: owe > 0 ? short : undefined },
   ]
   return (
     <nav className="no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden" aria-label="Quick menu" data-testid="bottom-bar">
       {items.map((it) => (
-        <Link key={it.to} to={it.to} aria-current={it.on ? 'page' : undefined} className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] focus-ring ${it.on ? 'font-semibold text-gold-deep' : 'text-text-muted'}`} data-testid={`bb-${it.label.toLowerCase()}`}>
+        <Link key={it.to} to={it.to} aria-current={it.on ? 'page' : undefined} className={`relative flex min-h-[3.75rem] flex-col items-center justify-center gap-0.5 text-xs focus-ring ${it.on ? 'font-semibold text-gold-deep' : 'text-text-muted'}`} data-testid={`bb-${it.label.toLowerCase()}`}>
           <it.icon size={20} aria-hidden="true" />{it.label}
-          {it.badge ? <span className="absolute right-[calc(50%-18px)] top-1.5 min-w-4 rounded-full bg-gold px-1 text-center text-[10px] font-bold leading-4 text-on-accent">{it.badge}</span> : null}
+          {it.badge ? <span className="absolute left-[calc(50%+4px)] top-1.5 min-w-4 rounded-full bg-gold px-1 text-center text-[10px] font-bold leading-4 text-on-accent">{it.badge}</span> : null}
         </Link>
       ))}
-      <button type="button" onClick={onMenu} className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] text-text-muted focus-ring" data-testid="bb-menu"><Menu size={20} aria-hidden="true" />More</button>
+      <button type="button" onClick={onMenu} className="flex min-h-[3.75rem] flex-col items-center justify-center gap-0.5 text-xs text-text-muted focus-ring" data-testid="bb-menu" aria-label={t('Open menu')}><Menu size={20} aria-hidden="true" />{t('More')}</button>
     </nav>
   )
 }

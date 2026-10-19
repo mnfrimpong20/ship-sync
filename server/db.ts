@@ -1404,6 +1404,7 @@ create table if not exists container_bookings (
   last_polled_at timestamptz, created_at timestamptz not null default now()
 );
 create index if not exists container_bookings_container on container_bookings (container_id);
+alter table users add column if not exists display jsonb;
 create table if not exists autopilot_settings (shipper_id text primary key references shippers(id) on delete cascade, value jsonb not null default '{}');
 create table if not exists autopilot_log (id text primary key, shipper_id text not null, kind text not null, title text not null, body text not null default '', link text not null default '', ref text not null default '', created_at timestamptz not null default now());
 create index if not exists autopilot_log_shipper on autopilot_log (shipper_id, created_at desc);

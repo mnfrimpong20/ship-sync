@@ -22,7 +22,7 @@ export function PushToggle({ className = '' }: { className?: string }) {
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gold/15 text-gold-deep">{st === 'ios-home-screen' ? <Smartphone size={18} aria-hidden="true" /> : <BellRing size={18} aria-hidden="true" />}</span>
         <div className="min-w-0"><p className="font-semibold">Notifications on this device</p><p className="text-sm text-text-muted">{msg || note[st]}</p></div>
       </div>
-      {(st === 'on' || st === 'off') && <button role="switch" aria-checked={st === 'on'} aria-label="Notifications on this device" onClick={toggle} disabled={busy} className={`relative h-7 w-12 shrink-0 rounded-full transition ${st === 'on' ? 'bg-teal' : 'bg-border'} disabled:opacity-60`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${st === 'on' ? 'left-6' : 'left-1'}`} /></button>}
+      {(st === 'on' || st === 'off') && <button role="switch" aria-checked={st === 'on'} aria-label="Notifications on this device" onClick={toggle} disabled={busy} className={`relative h-7 w-12 shrink-0 rounded-full transition after:absolute after:-inset-x-1 after:-inset-y-2.5 after:content-[''] ${st === 'on' ? 'bg-teal' : 'bg-border'} disabled:opacity-60`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${st === 'on' ? 'left-6' : 'left-1'}`} /></button>}
     </div>
   )
 }

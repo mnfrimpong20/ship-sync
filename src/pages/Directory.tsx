@@ -35,7 +35,7 @@ export function DirectoryCard({ s, quote }: { s: Shipper; quote?: string }) {
         <Rating value={s.rating} count={s.reviews} />
         <span className="ml-auto text-xs font-semibold text-text-muted" title="Price level">{priceLabel(s.priceIndex)}</span>
       </div>
-      <p className="mt-3 line-clamp-2 text-sm text-text-muted">Ships to {s.destinations.map((d) => countryByCode(d)?.name).filter(Boolean).join(', ')}<span className="text-text-muted/60"> · from {s.hq}</span></p>
+      <p className="mt-3 line-clamp-2 text-sm text-text-muted">Ships to {s.destinations.map((d) => countryByCode(d)?.name).filter(Boolean).join(', ')}<span className="text-text-muted"> · from {s.hq}</span></p>
       {doorish.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{doorish.map((x) => <li key={x} className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-text-muted">{x}</li>)}</ul>}
       <div className="flex-1" />
       <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3 text-center text-xs">

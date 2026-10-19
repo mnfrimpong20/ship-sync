@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -75,7 +76,7 @@ export default function Sailings() {
   useEffect(() => { if (ready && user?.role === 'shipper') void load() }, [ready, user, dest, kind]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 5000); return () => clearTimeout(t) }, [toast])
   useEffect(() => { if (preset.containerId && data && !booking) { const c = containers.find((x) => x.id === preset.containerId); if (c && !kind) setKind('container'); if (c && !dest) setDest(c.destination) } }, [preset, data]) // eslint-disable-line react-hooks/exhaustive-deps
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/sailings" replace />
   if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
   const vehicles = shipments.filter((s) => s.cargo === 'vehicle' && ['booked', 'picked_up', 'at_origin_port'].includes(s.status)).map((s) => ({ id: s.id, ref: s.ref, description: s.description }))

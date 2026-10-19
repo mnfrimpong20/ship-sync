@@ -109,10 +109,10 @@ export default function Notifications() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                       {n.link ? <Link to={n.link} onClick={() => readOne(n)} className={`text-sm hover:underline ${n.readAt ? 'text-text-muted' : 'font-semibold text-text'}`}>{n.title}</Link> : <span className={`text-sm ${n.readAt ? 'text-text-muted' : 'font-semibold text-text'}`}>{n.title}</span>}
-                      <span className="text-[11px] uppercase tracking-wider text-text-muted/80">{labelOf(n.kind)}</span>
+                      <span className="text-[11px] uppercase tracking-wider text-text-muted">{labelOf(n.kind)}</span>
                     </div>
                     {n.body && <p className="mt-0.5 text-sm text-text-muted">{n.body}</p>}
-                    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-text-muted/80">
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-text-muted">
                       <span title={fmtDateTime(n.at)}>{ago(n.at)}</span>
                       {n.emailStatus === 'sent' && <span className="inline-flex items-center gap-1"><Mail size={11} aria-hidden="true" /> emailed</span>}
                       {n.emailStatus === 'failed' && <span className="inline-flex items-center gap-1 text-danger"><MailX size={11} aria-hidden="true" /> email failed</span>}

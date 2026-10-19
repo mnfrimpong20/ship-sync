@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Printer } from 'lucide-react'
@@ -15,11 +16,11 @@ export default function InvoiceView() {
   const [d, setD] = useState<Data | null>(null)
   const [error, setError] = useState('')
   useEffect(() => { if (ready && user?.role === 'shipper') clientsApi.invoice(id).then(setD).catch((e) => setError(e instanceof Error ? e.message : 'Not found.')) }, [ready, user, id])
-  if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading…</div></div>
+  if (!ready) return <div className="bg-bg text-text"><BrandLoader /></div>
   if (!user) return <Navigate to={`/login?role=shipper&next=/dashboard/invoices/${id}`} replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   if (error) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-danger">{error}</div></div>
-  if (!d) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading invoice…</div></div>
+  if (!d) return <div className="bg-bg text-text"><BrandLoader label="Loading invoice…" /></div>
   const { invoice: inv, client: c, shipper, shipment } = d
   const dest = shipment ? countryByCode(shipment.destination) : null
   return (

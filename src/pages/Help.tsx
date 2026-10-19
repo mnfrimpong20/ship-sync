@@ -104,7 +104,7 @@ export function SupportPage() {
               <ol className="mt-4 space-y-3">{open.messages.map((m) => <li key={m.id} className={`rounded-xl p-3 text-sm ${m.fromStaff ? 'border border-gold/40 bg-gold/10' : 'bg-surface-2/60'}`}><p className="text-xs text-text-muted"><b className="text-text">{m.authorName}</b> · {m.at ? fmtDateTime(m.at) : ''}</p><p className="mt-1 whitespace-pre-wrap">{m.body}</p></li>)}</ol>
               <form onSubmit={send} className="mt-4 grid gap-2"><textarea rows={3} className="input-dark py-2" placeholder={open.ticket.status === 'solved' ? 'Reply to reopen this ticket' : 'Write a reply'} value={reply} onChange={(e) => setReply(e.target.value)} aria-label="Reply" data-testid="ticket-reply" /><div className="flex flex-wrap gap-2"><button disabled={busy || !reply.trim()} className="btn-gold !min-h-10 text-sm disabled:opacity-60"><Send size={14} aria-hidden="true" /> Send</button>{open.ticket.status !== 'solved' && <button type="button" onClick={async () => { await supportApi.solved(open.ticket.id); setOpen({ ...open, ticket: { ...open.ticket, status: 'solved' } }); void load() }} className="btn-ghost !min-h-10 text-sm">It’s sorted — close it</button>}</div></form>
             </div>
-          ) : <div className="card-dark p-8 text-center text-sm text-text-muted">Pick a ticket, or start a new one. Many answers are already in the <Link to="/help" className="text-gold-deep hover:underline">help centre</Link>.</div>}
+          ) : <div className="card-dark p-8 text-center text-sm text-text-muted">Pick a ticket, or start a new one. Many answers are already in the <Link to="/help" className="text-gold-deep underline underline-offset-2">help centre</Link>.</div>}
         </div>
       </div>
     </div></div>

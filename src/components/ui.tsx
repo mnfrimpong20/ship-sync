@@ -4,6 +4,8 @@ import { Plane, Ship, ShieldCheck, Star } from 'lucide-react'
 import type { ReactNode, SVGProps } from 'react'
 import { fadeUp, stagger, viewport } from '../lib/motion'
 import { countryByCode, type Mode, type Shipper } from '../lib/data'
+import { fmtDay } from '../lib/i18n'
+import { currentLang } from '../lib/prefs'
 
 /** Real flag images (flag-icons, MIT). Flag emoji show as letters ("GH") on Windows, so never use them on screen. */
 const FLAG_URLS = import.meta.glob('../../node_modules/flag-icons/flags/4x3/*.svg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
@@ -201,5 +203,6 @@ export function Empty({ title, body, action }: { title: string; body: string; ac
 }
 
 export const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
-export const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+/** "Sun 1 Nov" (year added when it isn't this year), in the person's language. */
+export const fmtDate = (iso: string) => fmtDay(iso, currentLang())
 export const fmtDateTime = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })

@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Printer } from 'lucide-react'
@@ -38,7 +39,7 @@ export default function ManifestPage() {
   const [m, setM] = useState<Manifest | null>(null); const [err, setErr] = useState('')
   useEffect(() => { shipmentOpsApi.manifest(id).then(setM).catch((e) => setErr(e instanceof Error ? e.message : 'Could not load the manifest.')) }, [id])
   if (err) return <div className="container-x py-24 text-center text-danger">{err}</div>
-  if (!m) return <div className="container-x py-24 text-center text-text-muted">Loading manifest…</div>
+  if (!m) return <BrandLoader label="Loading manifest…" />
   const c = m.container
   return (
     <div className="bg-bg text-text print:bg-white print:text-black">

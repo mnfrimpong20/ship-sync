@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -115,7 +116,7 @@ export default function Scan() {
     try { setLook(await scanApi.lookup(c)) } catch (e) { setError(e instanceof Error ? e.message : 'Unknown label.') } finally { setBusy(false) }
   }, [auto, kind, containerId, commit, busy])
 
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to={`/login?role=shipper&next=${encodeURIComponent('/dashboard/scan')}`} replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
 

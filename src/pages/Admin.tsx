@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { AdminPartners } from '../components/AdminPartners'
 import { AdminTickets } from '../components/AdminTickets'
 import { AdminReceiverPayments } from '../components/AdminReceiverPayments'
@@ -45,7 +46,7 @@ export default function Admin() {
     return () => { live = false }
   }, [ready, user, adminShippers])
 
-  if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading…</div></div>
+  if (!ready) return <div className="bg-bg text-text"><BrandLoader /></div>
   if (!user) return <Navigate to="/login?next=/admin" replace />
   if (!user.admin) return <Navigate to="/dashboard" replace />
 
@@ -205,7 +206,7 @@ function ShipperDocs({ shipper, onDecline, busy }: { shipper: AdminShipper; onDe
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Setup progress {d?.onboarding ? `· ${d.onboarding.progress}%` : ''}</p>
         {d?.onboarding?.requestedAt && <p className="mt-1 flex items-center gap-1 text-xs text-gold-deep"><Clock size={12} aria-hidden="true" /> Review requested {fmtDateTime(d.onboarding.requestedAt)}</p>}
-        <ul className="mt-2 space-y-1 text-xs">{d?.onboarding?.steps.map((st) => <li key={st.id} className={`flex items-center gap-2 ${st.done ? '' : 'text-text-muted'}`}>{st.done ? <Check size={12} className="text-teal" aria-hidden="true" /> : <span className="inline-block h-3 w-3 rounded-full border border-border" aria-hidden="true" />}{st.title}{st.optional ? <span className="text-[10px] uppercase tracking-wider text-text-muted/70">opt</span> : null}</li>)}</ul>
+        <ul className="mt-2 space-y-1 text-xs">{d?.onboarding?.steps.map((st) => <li key={st.id} className={`flex items-center gap-2 ${st.done ? '' : 'text-text-muted'}`}>{st.done ? <Check size={12} className="text-teal" aria-hidden="true" /> : <span className="inline-block h-3 w-3 rounded-full border border-border" aria-hidden="true" />}{st.title}{st.optional ? <span className="text-[10px] uppercase tracking-wider text-text-muted">opt</span> : null}</li>)}</ul>
       </div>
     </div>
   )

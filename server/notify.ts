@@ -222,7 +222,7 @@ export function mountNotifications(r: Router, d: Deps) {
     const db = await getDb(); const u = await requireUser(db, req)
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50))
     const { rows } = await db.query<Row>('select * from notifications where user_id = $1 order by at desc limit $2', [u.id, limit])
-    const { rows: c } = await db.query<{ n: number }>('select count(*)::int as n from notifications where user_id = $1 and read_at is null', [u.id])
+    const { rows: c } = await db.query<{ n: number }>(`select count(*)::int as n from notifications where user_id = $1 and read_at is null and at > now() - interval '30 days'`, [u.id])
     const prefs = await prefsOf(db, u.id)
     res.set('Cache-Control', 'no-store')
     res.json({ notifications: rows.map(notificationOut), unread: c[0].n, prefs, kinds: kindsFor(u.role).map((k) => ({ id: k, label: kindLabels[k] })), email: { provider: emailProvider().id, to: u.email } })
@@ -232,7 +232,7 @@ export function mountNotifications(r: Router, d: Deps) {
     const ids = z.object({ ids: z.array(z.string()).max(500).optional() }).parse(req.body ?? {}).ids
     if (ids?.length) await db.query('update notifications set read_at = coalesce(read_at, now()) where user_id = $1 and id = any($2::text[])', [u.id, ids])
     else await db.query('update notifications set read_at = coalesce(read_at, now()) where user_id = $1 and read_at is null', [u.id])
-    const { rows: c } = await db.query<{ n: number }>('select count(*)::int as n from notifications where user_id = $1 and read_at is null', [u.id])
+    const { rows: c } = await db.query<{ n: number }>(`select count(*)::int as n from notifications where user_id = $1 and read_at is null and at > now() - interval '30 days'`, [u.id])
     res.json({ ok: true, unread: c[0].n })
   }))
   r.delete('/notifications/:id', wrap(async (req, res) => {

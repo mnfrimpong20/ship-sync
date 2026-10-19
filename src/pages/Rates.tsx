@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -118,7 +119,7 @@ export default function Rates() {
   }, [all, filter, dest, cargo, q])
   const p = usePaged(list, PAGE, `${filter}|${dest}|${cargo}|${q}`)
 
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/rates" replace />
   if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
 

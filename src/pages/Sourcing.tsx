@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -97,7 +98,7 @@ export function SourcingNew() {
     try { const r = await sourcingApi.importLink(url); setRef(r.reference); setHint(r.hint); setF((x) => ({ ...x, origin: r.origin ?? x.origin, title: x.title || r.reference.title, description: x.description || r.description, targetPriceUsd: x.targetPriceUsd ?? r.reference.priceUsd, quantity: r.reference.moq && x.quantity < r.reference.moq ? r.reference.moq : x.quantity, links: x.links.includes(url) ? x.links : [...x.links, url] })); setLink('') } catch (er) { setError(err(er, 'Could not read that link.')) } finally { setImporting(false) }
   }
   useEffect(() => { if (user) setF((x) => ({ ...x, contactName: x.contactName || user.name, contactEmail: x.contactEmail || user.email })) }, [user])
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/sourcing/new${sp.toString() ? `?${sp}` : ''}`)}`} replace />
   if (user.role !== 'customer') return <div className="container-x py-24 text-center text-text-muted">Sourcing requests are filed from a customer account.</div>
   const submit = async (e: React.FormEvent) => { e.preventDefault(); setBusy(true); setError(''); try { const d = await sourcingApi.create({ ...f, links: link.trim() ? [...f.links, link.trim()] : f.links, reference: ref }); nav(`/sourcing/${d.job.id}`) } catch (er) { setError(err(er, 'Could not send the request.')) } finally { setBusy(false) } }
@@ -157,7 +158,7 @@ export function SourcingJob() {
   }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
   const act = async (fn: () => Promise<Detail | unknown>, msg: string, key: string) => { setBusy(key); setError(''); try { const r = await fn(); if (r && typeof r === 'object' && 'job' in (r as Detail)) setD(r as Detail); else await load(); if (msg) setToast(msg) } catch (e) { setError(err(e, 'Something went wrong.')) } finally { setBusy('') } }
   if (error && !d) return <div className="container-x py-16 text-center text-danger">{error}</div>
-  if (!d) return <div className="container-x py-16 text-center text-text-muted">Loading…</div>
+  if (!d) return <BrandLoader />
   const j = d.job; const steps = stepsFor(j.tier); const idx = steps.indexOf(j.status as typeof steps[number]); const closed = ['closed', 'cancelled'].includes(j.status)
   const back = team ? '/dashboard/sourcing' : '/dashboard?tab=sourcing'
   return (
@@ -414,7 +415,7 @@ export function QcReportPage() {
   const { id = '' } = useParams(); const nav = useNavigate(); const [r, setR] = useState<QcReport | null>(null); const [error, setError] = useState('')
   useEffect(() => { sourcingApi.qcReport(id).then(setR).catch((e) => setError(err(e, 'Not found.'))) }, [id])
   if (error) return <div className="container-x py-16 text-center text-danger">{error}</div>
-  if (!r) return <div className="container-x py-16 text-center text-text-muted">Loading…</div>
+  if (!r) return <BrandLoader />
   const j = r.job; const qc = r.qc
   return (
     <div className="container-x max-w-3xl py-6 print:max-w-none" data-testid="qc-report">

@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -329,7 +330,7 @@ export default function AnalyticsPage() {
   const tabs = useMemo(() => TABS.filter((t) => t.key === 'overview' || (t.key === 'team' ? !!a?.team.length : a ? a.access[t.key as keyof Analytics['access']] : true)), [a])
   const tab = tabs.some((t) => t.key === tab0) ? tab0 : 'overview'
 
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/analytics" replace />
   if (user.role !== 'shipper' || !roleAllows(user.staffRole as never, '/dashboard/analytics', user.perms as never)) return <Navigate to="/dashboard/shipper" replace />
   const period = a ? `${fmtDate(a.period.from)} – ${fmtDate(a.period.to)}` : ''

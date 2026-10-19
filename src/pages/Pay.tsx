@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -25,7 +26,7 @@ export default function Pay() {
   }, [sp, token]) // eslint-disable-line react-hooks/exhaustive-deps
   const checkout = async () => { setBusy('pay'); setError(''); try { const r = await collectionsApi.checkout(token); window.location.assign(r.url) } catch (e) { setError(e instanceof Error ? e.message : 'Could not start the payment.'); setBusy('') } }
   if (error && !d) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-danger">{error}</div></div>
-  if (!d) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading invoice…</div></div>
+  if (!d) return <div className="bg-bg text-text"><BrandLoader label="Loading invoice…" /></div>
   const inv = d.invoice; const paid = inv.status === 'paid'
   return (
     <div className="bg-bg text-text">

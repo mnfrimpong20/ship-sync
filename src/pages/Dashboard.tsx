@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+import { BrandLoader } from '../components/BrandLoader'
+import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, Check, ChevronRight, Clock, FileText, Pencil, PlusCircle, Send, X } from 'lucide-react'
-import { cargoLabel, countryByCode, statusLabels, type CargoType, type Shipper } from '../lib/data'
+import { ArrowLeft, ArrowRight, Check, ChevronRight, Clock, FileText, Pencil, PlusCircle, Search, Send, X } from 'lucide-react'
+import { cargoLabel, countryByCode, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
+import { useT, fmtDay, relDay } from '../lib/i18n'
+import { useLang } from '../lib/prefs'
 import { Empty, ModeBadge, Pill, fmtDate, money, VerifiedMark, Flag } from '../components/ui'
 import { ShipmentDetail } from './Track'
 import { DocumentsPanel } from '../components/DocumentsPanel'
@@ -69,6 +72,7 @@ const SECTIONS: Record<typeof TABS[number], { title: string; sub: string; group:
 export function CustomerDashboard() {
   const { ready, user, requests, shipments, acceptQuote, shipperById } = useStore()
   const [sp, setSp] = useSearchParams()
+  const t = useT(); const lang = useLang()
   // Each section is its own page (the sidebar is the menu); with no tab you get the overview.
   // Old links that open a request (?request= / ?open=) land on Quote requests.
   const asTab = (q: URLSearchParams): Tab => { const t = q.get('tab'); if (t && (TABS as readonly string[]).includes(t)) return t as Tab; return q.get('request') || q.get('open') ? 'requests' : 'overview' }
@@ -80,7 +84,7 @@ export function CustomerDashboard() {
   const [error, setError] = useState('')
   const [busyQuote, setBusyQuote] = useState<string | null>(null)
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
-  if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading your dashboard…</div></div>
+  if (!ready) return <div className="bg-bg text-text"><BrandLoader label="Loading your dashboard…" /></div>
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/dashboard${sp.toString() ? `?${sp}` : ''}`)}`} replace />
   if (user.role === 'shipper') return <Navigate to="/dashboard/shipper" replace />
 
@@ -97,7 +101,7 @@ export function CustomerDashboard() {
   }
 
   return (
-    <Layout eyebrow={tab === 'overview' ? 'Your account' : meta.group} title={tab === 'overview' ? `Akwaaba, ${user.name.split(' ')[0]}` : meta.title} sub={tab === 'overview' ? 'What needs you, what’s on the way, and what you owe.' : meta.sub} cta={tab === 'overview' || meta.cta ? <Link to="/quote" className="btn-gold"><PlusCircle size={18} aria-hidden="true" /> New shipment request</Link> : undefined}>
+    <Layout eyebrow={tab === 'overview' ? t('Your account') : t(meta.group)} title={tab === 'overview' ? `${lang === 'fr' ? 'Bonjour' : 'Akwaaba'}, ${user.name.split(' ')[0]}` : t(meta.title)} sub={tab === 'overview' ? t('What needs you, what’s on the way, and what you owe.') : t(meta.sub)} cta={tab === 'overview' || meta.cta ? <Link to="/quote" className="btn-gold"><PlusCircle size={18} aria-hidden="true" /> {t('New shipment request')}</Link> : undefined}>
       <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal"><Check size={16} aria-hidden="true" />{toast}</motion.p>}</AnimatePresence>
       {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
       {tab === 'overview' && <CustomerOverview />}
@@ -174,7 +178,7 @@ function InvoicesTab() {
       {d && d.invoices.length === 0 && <Empty title="No invoices" body="When a shipper invoices you it shows up here with a secure pay link." />}
       <ul className="grid gap-3 md:grid-cols-2">
         {d?.invoices.map((inv: InvoiceFull) => (
-          <li key={inv.id} className={`card-dark min-w-0 p-5 ${inv.status === 'paid' ? 'opacity-80' : ''}`} data-testid="my-invoice">
+          <li key={inv.id} className={`card-dark min-w-0 p-5 ${inv.status === 'paid' ? 'bg-surface-2/40' : ''}`} data-testid="my-invoice">
             <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="font-mono text-xs text-text-muted">{inv.number}</p><p className="truncate font-semibold">{inv.shipper.name}</p>{inv.shipmentRef && <p className="text-xs text-text-muted">Shipment {inv.shipmentRef}</p>}</div><Pill tone={inv.status === 'paid' ? 'green' : inv.overdue ? 'danger' : 'gold'}>{inv.status === 'paid' ? 'Paid' : inv.overdue ? 'Overdue' : 'Due'}</Pill></div>
             <p className="mt-3 text-2xl font-bold tabular-nums">{usd(inv.status === 'paid' ? inv.total : inv.balance)}</p>
             <p className="text-xs text-text-muted">{inv.status === 'paid' ? 'Paid in full' : inv.dueAt ? `Due ${fmtDate(inv.dueAt)}` : 'No due date'}{inv.paid > 0 && inv.status !== 'paid' ? ` · ${usd(inv.paid)} already paid` : ''}</p>
@@ -225,42 +229,57 @@ const SHIP_VIEWS = [
   { id: 'people', label: 'Recipient & pickup' }, { id: 'chat', label: 'Messages' }, { id: 'docs', label: 'Documents' }, { id: 'help', label: 'Help' },
 ] as const
 type ShipView = (typeof SHIP_VIEWS)[number]['id']
+type ShipFilter = 'active' | 'pay' | 'delivered' | 'all'
+const STAGES: [string, (st: string) => boolean][] = [['Booked', () => true], ['On the way', (st) => !['booked'].includes(st)], ['Arrived', (st) => ['arrived', 'customs', 'ready_for_collection', 'out_for_delivery', 'delivered'].includes(st)], ['Delivered', (st) => st === 'delivered']]
+/** Four-step progress line so a shipment's state reads at a glance. */
+export function ShipProgress({ status, eta }: { status: string; eta?: string | null }) {
+  const t = useT(); const lang = useLang()
+  const done = STAGES.filter(([, f]) => f(status)).length
+  return (
+    <div className="mt-2" data-testid="ship-progress">
+      <div className="grid grid-cols-4 gap-1" role="img" aria-label={`${t('Shipments')}: ${done}/4 — ${t(STAGES[done - 1][0])}`}>{STAGES.map(([l], i) => <span key={l} className={`h-1.5 rounded-full ${i < done ? (done === 4 ? 'bg-teal' : 'bg-gold') : 'bg-border'}`} />)}</div>
+      <p className="mt-1.5 flex flex-wrap justify-between gap-x-2 text-xs"><span className="font-semibold">{t(STAGES[done - 1][0])}</span>{status !== 'delivered' && eta ? <span className="text-text-muted">{t('Expected {d}', { d: `${fmtDay(eta, lang)} · ${relDay(eta, lang)}` })}</span> : null}</p>
+    </div>
+  )
+}
+
 function ShipmentsTab() {
   const { shipments, shipperById } = useStore()
   const [sp, setSp] = useSearchParams()
   const sum = useSummary()
+  const t = useT()
+  const asked = sp.get('s') ?? sp.get('open') ?? sp.get('recipient') ?? sp.get('review')
   // Old deep links: ?recipient= opens the recipient view, ?review= opens Help.
-  const initial = sp.get('s') ?? sp.get('open') ?? sp.get('recipient') ?? sp.get('review') ?? shipments.find((x) => x.status !== 'delivered')?.id ?? shipments[0]?.id ?? null
+  const initial = asked ?? shipments.find((x) => x.status !== 'delivered')?.id ?? shipments[0]?.id ?? null
   const [sel, setSel] = useState<string | null>(initial)
+  const [q, setQ] = useState(''); const [filter, setFilter] = useState<ShipFilter>('active'); const [limit, setLimit] = useState(10)
+  const [sheet, setSheet] = useState(() => !!asked && typeof window !== 'undefined' && window.innerWidth < 1024)
+  const backBtn = useRef<HTMLButtonElement>(null); const lastCard = useRef<HTMLElement | null>(null)
   const viewParam = sp.get('view') ?? (sp.get('recipient') ? 'people' : sp.get('review') ? 'help' : 'tracking')
   const view: ShipView = (SHIP_VIEWS.some((v) => v.id === viewParam) ? viewParam : 'tracking') as ShipView
   useEffect(() => { const id = sp.get('s') ?? sp.get('open') ?? sp.get('recipient') ?? sp.get('review'); if (id) setSel(id) }, [sp])
-  const pick = (id: string, v: ShipView = 'tracking') => { setSel(id); setSp({ tab: 'shipments', s: id, ...(v !== 'tracking' ? { view: v } : {}) }, { replace: true }); if (window.innerWidth < 1024) setTimeout(() => document.getElementById('ship-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50) }
+  // Phone: the shipment opens as a full-screen panel (scroll locked behind it, Escape closes, focus returns to the card).
+  useEffect(() => {
+    if (!sheet) return
+    const prev = document.body.style.overflow; document.body.style.overflow = 'hidden'; setTimeout(() => backBtn.current?.focus(), 30)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeSheet() }
+    window.addEventListener('keydown', onKey); return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey) }
+  }, [sheet]) // eslint-disable-line react-hooks/exhaustive-deps
+  const closeSheet = () => { setSheet(false); setTimeout(() => lastCard.current?.focus(), 30) }
+  const pick = (id: string, v: ShipView = 'tracking', fromCard = false) => { setSel(id); setSp({ tab: 'shipments', s: id, ...(v !== 'tracking' ? { view: v } : {}) }, { replace: true }); if (fromCard && window.innerWidth < 1024) { lastCard.current = document.activeElement as HTMLElement; setSheet(true) } }
   const s = shipments.find((x) => x.id === sel)
   if (shipments.length === 0) return <div className="mt-6"><Empty title="No shipments yet" body="Accept a quote on one of your requests and it will appear here with live tracking." action={<Link to="/quote" className="btn-gold">Get quotes</Link>} /></div>
+  const owing = (id: string) => (sum?.dueByShipment[id] ?? 0) > 0
+  const counts: Record<ShipFilter, number> = { active: shipments.filter((x) => x.status !== 'delivered').length, pay: shipments.filter((x) => owing(x.id)).length, delivered: shipments.filter((x) => x.status === 'delivered').length, all: shipments.length }
+  const ql = q.trim().toLowerCase()
+  const list = shipments
+    .filter((x) => filter === 'all' || (filter === 'active' ? x.status !== 'delivered' : filter === 'delivered' ? x.status === 'delivered' : owing(x.id)))
+    .filter((x) => !ql || [x.ref, x.origin, countryByCode(x.destination)?.name, x.description].join(' ').toLowerCase().includes(ql))
   const due = s ? sum?.dueByShipment[s.id] : undefined
-  return (
-    <div className="mt-6 grid gap-6 lg:grid-cols-12">
-      <ul className="space-y-2 lg:col-span-4" aria-label="Your shipments">
-        {shipments.map((x) => {
-          const d = countryByCode(x.destination)!
-          return (
-            <li key={x.id} className={`rounded-[var(--radius-md)] border transition-colors ${sel === x.id ? 'border-gold bg-surface' : 'border-border bg-surface/50 hover:bg-surface'}`} data-testid="ship-row">
-              <button onClick={() => pick(x.id)} aria-current={sel === x.id} className="w-full rounded-[var(--radius-md)] p-4 pb-2 text-left focus-ring">
-                <div className="flex items-center justify-between"><p className="font-mono text-xs text-gold-deep">{x.ref}</p><ModeBadge mode={x.mode} /></div>
-                <p className="mt-1.5 text-sm font-semibold text-text">{x.origin} → <Flag code={d.code} /> {d.name}</p>
-                <p className="truncate text-xs text-text-muted">{x.description}</p>
-                <p className="mt-2 text-xs"><Pill tone={x.status === 'delivered' ? 'green' : 'teal'}>{statusLabels[x.status]}</Pill></p>
-              </button>
-              <div className="px-4 pb-3"><ShipmentQuickActions s={x} due={sum?.dueByShipment[x.id]} /></div>
-            </li>
-          )
-        })}
-      </ul>
-      <div className="min-w-0 scroll-mt-20 lg:col-span-8" id="ship-detail">
-        {s && <>
+  const views = s && <>
+
           <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl border border-border bg-surface p-1 lg:flex-wrap" role="tablist" aria-label="Shipment sections" data-testid="ship-views">
-            {SHIP_VIEWS.map((v) => <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => pick(s.id, v.id)} className={`relative min-h-9 shrink-0 whitespace-nowrap rounded-lg px-3 text-sm font-medium focus-ring ${view === v.id ? 'bg-gold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid={`sv-${v.id}`}>{v.label}{v.id === 'pay' && due ? <span className={`ml-1.5 rounded-full px-1.5 text-[10px] font-bold ${view === v.id ? 'bg-on-accent/20' : 'bg-gold/20 text-gold-deep'}`}>{money(due)}</span> : null}</button>)}
+            {SHIP_VIEWS.map((v) => <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => pick(s.id, v.id)} className={`relative min-h-9 shrink-0 whitespace-nowrap rounded-lg px-3 text-sm font-medium focus-ring ${view === v.id ? 'bg-gold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid={`sv-${v.id}`}>{t(v.label)}{v.id === 'pay' && due ? <span className={`ml-1.5 rounded-full px-1.5 text-[10px] font-bold ${view === v.id ? 'bg-on-accent/20' : 'bg-gold/20 text-gold-deep'}`}>{money(due)}</span> : null}</button>)}
           </div>
           <div className="space-y-4" data-testid={`ship-view-${view}`}>
             {view === 'tracking' && <><ShipmentDetail s={s} compact /><Link to={`/track?ref=${s.ref}`} className="inline-flex items-center gap-1 text-sm text-gold-deep hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link><NextStep shipmentId={s.id} /><CollectionNotice s={s} /><OffersCard s={s} /></>}
@@ -272,8 +291,43 @@ function ShipmentsTab() {
             {view === 'docs' && <DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} />}
             {view === 'help' && <><ReviewCard shipmentId={s.id} shipperName={shipperById(s.shipperId)?.name} /><DisputeCard shipmentId={s.id} /><p className="text-sm text-text-muted">See every problem you’ve reported under <Link to="/dashboard?tab=issues" className="text-gold-deep hover:underline">Problems</Link>.</p></>}
           </div>
-        </>}
+
+  </>
+  return (
+    <div className="mt-6 grid gap-6 lg:grid-cols-12">
+      <div className="min-w-0 lg:col-span-4">
+        <div className="space-y-3" data-testid="ship-toolbar">
+          <label className="relative block"><span className="sr-only">{t('Search by reference, place or what’s inside')}</span><Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" /><input type="search" value={q} onChange={(e) => { setQ(e.target.value); setLimit(10) }} placeholder={t('Search by reference, place or what’s inside')} className="input-dark !pl-9" data-testid="ship-search" /></label>
+          <div className="flex gap-1.5 overflow-x-auto pb-1" role="radiogroup" aria-label={t('Shipments')}>{([['active', 'Active'], ['pay', 'To pay'], ['delivered', 'Delivered'], ['all', 'All']] as [ShipFilter, string][]).map(([k, l]) => <button key={k} role="radio" aria-checked={filter === k} onClick={() => { setFilter(k); setLimit(10) }} className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-sm ${filter === k ? 'border-gold bg-gold/15 font-semibold' : 'border-border text-text-muted hover:text-text'}`}>{t(l)}<span className="rounded-full bg-surface-2 px-1.5 text-xs tabular-nums">{counts[k]}</span></button>)}</div>
+        </div>
+        <ul className="mt-3 space-y-2" aria-label={t('Your shipments')}>
+          {list.length === 0 && <li className="rounded-[var(--radius-md)] border border-border p-6 text-center text-sm text-text-muted">{t('No shipments match.')}</li>}
+          {list.slice(0, limit).map((x) => {
+            const d = countryByCode(x.destination)!
+            return (
+              <li key={x.id} className={`rounded-[var(--radius-md)] border transition-colors ${sel === x.id ? 'border-gold bg-surface' : 'border-border bg-surface/50 hover:bg-surface'}`} data-testid="ship-row">
+                <button onClick={() => pick(x.id, 'tracking', true)} aria-current={sel === x.id} className="w-full rounded-[var(--radius-md)] p-4 pb-2 text-left focus-ring">
+                  <div className="flex items-center justify-between"><p className="font-mono text-xs text-gold-deep">{x.ref}</p><ModeBadge mode={x.mode} /></div>
+                  <p className="mt-1.5 text-sm font-semibold text-text">{x.origin} → <Flag code={d.code} /> {d.name}</p>
+                  <p className="truncate text-xs text-text-muted">{x.description}</p>
+                  <ShipProgress status={x.status} eta={x.eta} />
+                </button>
+                <div className="px-4 pb-3"><ShipmentQuickActions s={x} due={sum?.dueByShipment[x.id]} /></div>
+              </li>
+            )
+          })}
+        </ul>
+        {list.length > limit && <button onClick={() => setLimit((n) => n + 10)} className="btn-ghost mt-3 w-full !min-h-11 text-sm" data-testid="ship-more">{t('Show {n} more', { n: Math.min(10, list.length - limit) })}</button>}
       </div>
+      <div className="hidden min-w-0 scroll-mt-20 lg:col-span-8 lg:block" id="ship-detail">{views}</div>
+      {sheet && s && (
+        <div role="dialog" aria-modal="true" aria-labelledby="sheet-h" className="fixed inset-0 z-50 overflow-y-auto bg-bg lg:hidden" data-testid="ship-sheet">
+          <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-bg/95 px-3 py-2 backdrop-blur-xl">
+            <button ref={backBtn} onClick={closeSheet} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold focus-ring" data-testid="sheet-back"><ArrowLeft size={18} aria-hidden="true" /> {t('Back to shipments')}</button>
+          </div>
+          <div className="px-4 pb-24 pt-4"><h2 id="sheet-h" className="!text-lg"><span className="font-mono text-gold-deep">{s.ref}</span> · {s.origin} → {countryByCode(s.destination)?.name}</h2><ShipProgress status={s.status} eta={s.eta} /><div className="mt-4">{views}</div></div>
+        </div>
+      )}
     </div>
   )
 }
@@ -292,7 +346,7 @@ export function ShipperDashboard() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
-  if (!ready) return <div className="bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading your dashboard…</div></div>
+  if (!ready) return <div className="bg-bg text-text"><BrandLoader label="Loading your dashboard…" /></div>
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/shipper" replace />
   if (user.role !== 'shipper' || !user.shipperId) return <Navigate to="/dashboard" replace />
   const me = user.shipperId

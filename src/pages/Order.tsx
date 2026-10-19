@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../lib/store'
@@ -12,7 +13,7 @@ export default function OrderPage() {
   const [err, setErr] = useState('')
   useEffect(() => { api<OrderPayload>(`/order/${encodeURIComponent(code)}`).then(setD).catch((e) => setErr(e instanceof Error ? e.message : 'Not found.')) }, [code])
   if (err) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center"><p className="text-danger">{err}</p><p className="mt-3 text-sm text-text-muted"><Link to="/quote" className="text-gold-deep hover:underline">Request quotes from all shippers instead</Link></p></div></div>
-  if (!d) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading…</div></div>
+  if (!d) return <div className="min-h-dvh bg-bg text-text"><BrandLoader /></div>
   return (
     <div className="min-h-dvh bg-bg text-text" data-testid="order-page">
       <header className="border-b border-border bg-surface/60">

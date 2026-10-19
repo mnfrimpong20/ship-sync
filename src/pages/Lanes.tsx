@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { Fragment, useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -85,7 +86,7 @@ export function ShipperLanes() {
   const [error, setError] = useState('')
   const [open, setOpen] = useState<number | null>(0)
   useEffect(() => { if (ready && user?.role === 'shipper') lanesApi.mine().then(setD).catch((e) => setError(e instanceof Error ? e.message : 'Could not load.')) }, [ready, user])
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/lanes" replace />
   if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
   const tips = d?.lanes.filter((l) => l.tip) ?? []

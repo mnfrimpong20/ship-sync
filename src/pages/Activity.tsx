@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { Navigate } from 'react-router-dom'
 import { useStore } from '../lib/store'
 import { AuditTable } from '../components/AuditTable'
@@ -6,7 +7,7 @@ import { Panel } from '../components/Charts'
 /** The company's activity log: every change your team made, newest first. */
 export default function ActivityPage() {
   const { ready, user } = useStore()
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?next=/dashboard/activity" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   return (

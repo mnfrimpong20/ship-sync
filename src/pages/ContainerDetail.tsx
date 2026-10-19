@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -132,11 +133,11 @@ export default function ContainerDetail() {
 
   const used = useMemo(() => (d?.shipments ?? []).reduce((a, s) => a + (cargoCbm[s.cargo] ?? 2), 0), [d])
 
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to={`/login?role=shipper&next=/dashboard/containers/${id}`} replace />
   if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
   if (error && !d) return <div className="container-x py-16"><Empty title="Container not found" body={error} action={<Link to="/dashboard/containers" className="btn-ghost !min-h-10 !px-4 text-sm"><ArrowLeft size={15} aria-hidden="true" /> All containers</Link>} /></div>
-  if (!d) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!d) return <BrandLoader />
 
   const c = d.container
   const dest = countryByCode(c.destination)

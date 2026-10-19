@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { Check, Copy, Download, Plus, RefreshCw, Send, Trash2 } from 'lucide-react'
@@ -113,7 +114,7 @@ function Webhooks() {
 
 export default function IntegrationsPage() {
   const { ready, user } = useStore()
-  if (!ready) return <div className="container-x py-24 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?next=/dashboard/integrations" replace />
   if (user.role !== 'shipper' || !user.shipperId) return <Navigate to="/dashboard" replace />
   return (

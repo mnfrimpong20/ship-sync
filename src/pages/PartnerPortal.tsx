@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Check, KeyRound, MessageSquare, Phone, Ship } from 'lucide-react'
@@ -17,7 +18,7 @@ export default function PartnerPortal() {
   useEffect(() => { void load() }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 4000); return () => clearTimeout(t) } }, [toast])
   if (err && !d) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center text-danger">{err}</div></div>
-  if (!d) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center text-text-muted">Loading…</div></div>
+  if (!d) return <div className="min-h-dvh bg-bg text-text"><BrandLoader /></div>
   const c = d.container
   const order = ['sailed', 'arrived', 'customs', 'devanned']
   const nextStage = (['arrived', 'customs', 'devanned'] as const).find((st) => order.indexOf(st) > order.indexOf(c.status))

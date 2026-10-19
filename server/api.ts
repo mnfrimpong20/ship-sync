@@ -55,6 +55,9 @@ import { mountMomo } from './momo'
 import { mountMeasure } from './measure'
 import { mountSupport } from './support'
 import { mountPush } from './push'
+import { mountPartners } from './partners'
+import { mountLineBooking } from './lineBooking'
+import { mountQuickBooks } from './quickbooks'
 import { mountCompliance, evaluateExport, assertExportCleared, zDeclaration, DECLARATION_VERSION } from './compliance'
 import { mountSupplies, attachDefaultSupplies, defaultQuoteSupplies, resolveQuoteSupplies, suppliesFromQuote, suppliesTotal, type QuoteSupplyLine, type SupplyNeed } from './supplies'
 import { mountReviews } from './reviews'
@@ -813,6 +816,9 @@ export function apiRouter() {
   mountMeasure(r, { getDb, requireUser, HttpError, wrap })
   mountSupport(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountPush(r, { getDb, requireUser, HttpError, wrap })
+  mountPartners(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  mountLineBooking(r, { getDb, requireUser, HttpError, wrap })
+  mountQuickBooks(r, { getDb, requireUser, HttpError, wrap })
   mountSupplies(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountReviews(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountBrand(r, { getDb, requireUser, HttpError, wrap })

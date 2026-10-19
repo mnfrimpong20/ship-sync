@@ -5,6 +5,7 @@ import { useStore } from '../lib/store'
 import { accountingCsvUrl, platformApi, type Webhook } from '../lib/platform'
 import { fmtDateTime } from '../components/ui'
 import { NoData, Panel } from '../components/Charts'
+import { LineConnectionsPanel, QuickBooksPanel } from '../components/Connections'
 
 const cls = 'input-dark !min-h-10 text-sm'
 function CopyBox({ text, testid }: { text: string; testid?: string }) {
@@ -119,7 +120,7 @@ export default function IntegrationsPage() {
     <div className="bg-bg text-text"><div className="container-x py-10 md:py-14">
       <p className="eyebrow mb-1">Company</p><h1 className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">Integrations</h1>
       <p className="mt-1 max-w-2xl text-text-muted">Reports, accounting, your website and your own systems.</p>
-      <div className="mt-6 grid gap-6 lg:grid-cols-2"><WeeklyReport /><Currency /><Accounting /><Widget shipperId={user.shipperId} /></div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">{['owner', 'finance'].includes(user.staffRole ?? 'owner') && <QuickBooksPanel />}{['owner', 'dispatcher'].includes(user.staffRole ?? 'owner') && <LineConnectionsPanel />}<WeeklyReport /><Currency /><Accounting /><Widget shipperId={user.shipperId} /></div>
       <div className="mt-6"><Webhooks /></div>
     </div></div>
   )

@@ -1,3 +1,4 @@
+import { AdminPartners } from '../components/AdminPartners'
 import { AdminTickets } from '../components/AdminTickets'
 import { AdminReceiverPayments } from '../components/AdminReceiverPayments'
 import { useEffect, useState } from 'react'
@@ -21,7 +22,7 @@ import { AdminSystem } from '../components/AdminSystem'
 import { AdminDestinations } from '../components/AdminDestinations'
 import { AdminAnnouncements, AdminAudit, AdminBilling, AdminFeatures, AdminMarketplace, AdminMessaging, AdminPlatform, AdminRisk, AdminScorecards, AdminSupport } from '../components/AdminConsole'
 
-const VIEWS = [['overview', 'Business'], ['attention', 'Attention'], ['shippers', 'Shippers'], ['disputes', 'Disputes'], ['payments', 'Payments'], ['brokers', 'Brokers'], ['sourcing', 'Sourcing'], ['insurance', 'Insurance'], ['supplies', 'Supplies'], ['screening', 'Screening'], ['tickets', 'Support'], ['destinations', 'Destinations'], ['system', 'System'], ['analytics', 'Platform'], ['marketplace', 'Marketplace'], ['scorecards', 'Scorecards'], ['risk', 'Risk'], ['messaging', 'Messaging'], ['billing', 'Billing'], ['announcements', 'Announcements'], ['audit', 'Audit log'], ['support', 'View as'], ['features', 'Features']] as const
+const VIEWS = [['overview', 'Business'], ['attention', 'Attention'], ['shippers', 'Shippers'], ['disputes', 'Disputes'], ['payments', 'Payments'], ['brokers', 'Brokers'], ['sourcing', 'Sourcing'], ['insurance', 'Insurance'], ['supplies', 'Supplies'], ['screening', 'Screening'], ['tickets', 'Support'], ['partners', 'Partners'], ['destinations', 'Destinations'], ['system', 'System'], ['analytics', 'Platform'], ['marketplace', 'Marketplace'], ['scorecards', 'Scorecards'], ['risk', 'Risk'], ['messaging', 'Messaging'], ['billing', 'Billing'], ['announcements', 'Announcements'], ['audit', 'Audit log'], ['support', 'View as'], ['features', 'Features']] as const
 type View = (typeof VIEWS)[number][0]
 
 /** Ntemtem staff: the business overview, the attention board, and every admin work queue in tabs. */
@@ -118,6 +119,7 @@ export default function Admin() {
     announcements: ['Announcements', 'Banners and notifications to shippers, customers or everyone — by destination if needed.'],
     audit: ['Audit log', 'Who changed what and when, searchable and exportable.'],
     support: ['Support — view as', 'See exactly what a shipper or customer sees, read-only and logged.'],
+    partners: ['Destination partners', 'Vetted clearing agents, warehouses and delivery partners shippers can hand a container to — and the jobs to confirm with them.'],
     tickets: ['Support inbox', 'Tickets from customers, shippers and the contact form — oldest waiting first.'],
     features: ['Feature switches', 'Turn features on or off for everyone or for one shipper.']
   }
@@ -147,6 +149,7 @@ export default function Admin() {
           {view === 'supplies' && <AdminSupplies />}
           {view === 'screening' && <AdminScreening />}
           {view === 'tickets' && <AdminTickets />}
+          {view === 'partners' && <AdminPartners />}
           {view === 'destinations' && <AdminDestinations />}
           {view === 'system' && <AdminSystem />}
           {view === 'analytics' && <AdminPlatform />}

@@ -35,6 +35,8 @@ async function main() {
   startSourcingSweeps(getDb)
   startFlowSweeps(getDb)
   ;(await import('./screening')).startScreeningSweeps(getDb)
+  ;(await import('./lineBooking')).startBookingSweeps(getDb)
+  ;(await import('./quickbooks')).startQuickBooksSweeps(getDb)
   startExportSchedule(getDb)
   const app = express()
   app.disable('x-powered-by')

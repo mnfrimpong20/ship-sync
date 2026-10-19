@@ -50,6 +50,7 @@ export async function getDb(): Promise<Db> {
   await seedHistoryDemo(db)
   await seedOpenLeads(db)
   await seedContainerDemo(db)
+  await (await import('./partners')).seedPartners(db)
   await seedRunsDemo(db)
   await seedRatesDemo(db)
   await seedPickupsDemo(db)
@@ -1378,6 +1379,41 @@ create table if not exists push_subscriptions (
   ua text not null default '', failures int not null default 0, last_ok_at timestamptz, created_at timestamptz not null default now()
 );
 create index if not exists push_subscriptions_user on push_subscriptions (user_id);
+create table if not exists destination_partners (
+  id text primary key, name text not null, country text not null, cities jsonb not null default '[]', services jsonb not null default '[]',
+  contact_name text not null default '', phone text not null default '', whatsapp text not null default '', email text not null default '',
+  about text not null default '', rates_note text not null default '', verified boolean not null default false, active boolean not null default true, is_demo boolean not null default false,
+  rating_sum numeric not null default 0, rating_count int not null default 0, created_at timestamptz not null default now()
+);
+create table if not exists partner_assignments (
+  id text primary key, partner_id text not null references destination_partners(id) on delete cascade, shipper_id text not null, container_id text, link_id text,
+  services jsonb not null default '[]', note text not null default '', status text not null default 'requested', stars int, review text not null default '',
+  created_by text not null default '', created_at timestamptz not null default now(), responded_at timestamptz
+);
+create index if not exists partner_assignments_container on partner_assignments (container_id);
+alter table partner_links add column if not exists partner_id text;
+create table if not exists line_connections (
+  id text primary key, shipper_id text not null references shippers(id) on delete cascade, line text not null, label text not null default '', mode text not null default 'dcsa',
+  base_url text not null default '', api_key text not null default '', key_header text not null default 'Authorization', service_contract text not null default '', booking_email text not null default '',
+  active boolean not null default true, last_ok_at timestamptz, last_error text not null default '', created_at timestamptz not null default now()
+);
+create table if not exists container_bookings (
+  id text primary key, container_id text not null references containers(id) on delete cascade, shipper_id text not null, connection_id text, line text not null default '', mode text not null default 'dcsa',
+  request jsonb, carrier_request_ref text, carrier_booking_ref text, status text not null default 'SENDING', status_detail text not null default '', confirmed jsonb,
+  pol text not null default '', pod text not null default '', equipment text not null default '', error text not null default '', created_by text not null default '',
+  last_polled_at timestamptz, created_at timestamptz not null default now()
+);
+create index if not exists container_bookings_container on container_bookings (container_id);
+create table if not exists qb_connections (
+  shipper_id text primary key references shippers(id) on delete cascade, realm_id text, company_name text not null default '', home_currency text not null default 'USD',
+  access_token text not null default '', refresh_token text not null default '', access_expires_at timestamptz, refresh_expires_at timestamptz,
+  state text, state_user text not null default '', state_at timestamptz, connected_by text not null default '', connected_at timestamptz,
+  item_id text, last_sync_at timestamptz, last_error text not null default '', last_result jsonb
+);
+create table if not exists qb_sync (
+  shipper_id text not null, realm_id text not null, kind text not null, local_id text not null, qb_id text not null, synced_at timestamptz not null default now(),
+  primary key (shipper_id, realm_id, kind, local_id)
+);
 update client_consignees set gps = 'GA-183-8164', lat = 5.6275, lng = -0.1170 where id = 'cs_demo_1' and gps = '';
 update client_consignees set gps = 'AK-039-5028', lat = 6.6946, lng = -1.6244 where id = 'cs_demo_2' and gps = '';
 

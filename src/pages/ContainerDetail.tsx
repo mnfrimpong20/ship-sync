@@ -9,6 +9,7 @@ import { Empty, Pill, fmtDate, fmtDateTime } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { ContainerForm, StageStepper, stageTone } from './Containers'
 import { PartnerLinksCard } from '../components/PartnerLinks'
+import { LineBookingCard } from '../components/Connections'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -233,7 +234,9 @@ export default function ContainerDetail() {
                 )}
               </motion.section>
 
-              <motion.div variants={fadeUp}><PartnerLinksCard containerId={c.id} containerRef={c.ref} /></motion.div>
+              {['owner', 'dispatcher'].includes(user.staffRole ?? 'owner') && <motion.div variants={fadeUp}><LineBookingCard containerId={c.id} onChanged={() => { containersApi.get(id).then((r) => setD(r)).catch(() => {}) }} /></motion.div>}
+
+              <motion.div variants={fadeUp}><PartnerLinksCard containerId={c.id} containerRef={c.ref} destination={c.destination} /></motion.div>
 
               <motion.section variants={fadeUp} className="card-dark p-5" aria-labelledby="events-h">
                 <h2 id="events-h" className="!text-lg">Timeline</h2>

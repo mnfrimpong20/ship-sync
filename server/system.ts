@@ -2,6 +2,7 @@
  * Operations plumbing for launch: an error log every 500 lands in (plus browser-side crashes),
  * a nightly JSON export of the whole database the admin can download, and a small system summary.
  */
+import { SECRET_SETTINGS } from './secrets'
 import { mkdirSync, readdirSync, statSync, unlinkSync, createWriteStream, existsSync } from 'node:fs'
 import path from 'node:path'
 import type { Request, Response, NextFunction, Router } from 'express'
@@ -57,7 +58,7 @@ export async function exportDatabase(db: Db, file: string) {
   let first = true
   for (const t of tables) {
     const name = String(t.table_name)
-    const { rows } = await db.query<Row>(`select * from "${name.replace(/"/g, '')}"`)
+    const { rows } = name === 'settings' ? await db.query<Row>(`select * from settings where id <> all($1::text[])`, [SECRET_SETTINGS]) : name === 'push_subscriptions' ? { rows: [] as Row[] } : await db.query<Row>(`select * from "${name.replace(/"/g, '')}"`)
     await write(`${first ? '' : ','}${JSON.stringify(name)}:${JSON.stringify(rows)}`)
     first = false
   }
@@ -67,7 +68,7 @@ export async function exportDatabase(db: Db, file: string) {
 }
 
 const exportName = (d = new Date()) => `ntemtem-${d.toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`
-const SAFE_NAME = /^shipsync-[\d-]+\.json$/
+const SAFE_NAME = /^(shipsync|ntemtem)-[\d-]+\.json$/
 
 export function listExports() {
   if (!existsSync(EXPORT_DIR)) return []

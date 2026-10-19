@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { Check, Copy, Handshake, MessageCircle, Send, X } from 'lucide-react'
 import { shipmentOpsApi, type PartnerLink } from '../lib/shipmentOps'
 import { fmtDateTime } from './ui'
+import { NtemtemPartners } from './NtemtemPartners'
 
-const linkOf = (p: PartnerLink) => p.url.startsWith('http') ? p.url : `${location.origin}${location.pathname}#${p.path}`
+const linkOf = (p: PartnerLink) => p.url.startsWith('http') ? p.url : `${location.origin}${p.path}`
 
 /** Destination agent / partner access to one container: no login, just a link. They get a pre-alert when it sails. */
-export function PartnerLinksCard({ containerId, containerRef }: { containerId: string; containerRef: string }) {
+export function PartnerLinksCard({ containerId, containerRef, destination }: { containerId: string; containerRef: string; destination?: string }) {
   const [list, setList] = useState<PartnerLink[] | null>(null)
   const [f, setF] = useState<{ name: string; email: string; phone: string } | null>(null)
   const [busy, setBusy] = useState(''); const [err, setErr] = useState(''); const [copied, setCopied] = useState(''); const [note, setNote] = useState('')
@@ -45,6 +46,7 @@ export function PartnerLinksCard({ containerId, containerRef }: { containerId: s
         ))}
         {list && list.length === 0 && !f && <li className="py-3 text-sm text-text-muted">No agent yet.</li>}
       </ul>
+      {destination && <NtemtemPartners containerId={containerId} destination={destination} onAssigned={() => { shipmentOpsApi.partners(containerId).then(setList).catch(() => {}) }} />}
     </section>
   )
 }

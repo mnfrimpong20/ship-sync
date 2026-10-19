@@ -11,6 +11,7 @@
  */
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
+import { normaliseGps } from '../src/lib/address'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { countryByCode, statusOrder, type ShipmentStatus, flowFor, flowIndex } from '../src/lib/data'
@@ -30,9 +31,10 @@ const n = (v: unknown) => Number(v ?? 0)
 export const zConsignee = z.object({
   name: z.string().trim().min(2).max(80), phone: z.string().trim().max(30).default(''), address: z.string().trim().max(200).default(''), city: z.string().trim().max(80).default(''),
   country: z.string().trim().length(2).toUpperCase().default('GH'), relationship: z.string().trim().max(40).default(''), isDefault: z.boolean().optional(),
+  gps: z.string().trim().max(20).default('').transform((v, ctx) => { if (!v) return ''; const g = normaliseGps(v); if (!g) ctx.addIssue({ code: 'custom', message: 'A Ghana Post GPS address looks like GA-183-8164.' }); return g }), lat: z.number().min(-90).max(90).nullable().optional(), lng: z.number().min(-180).max(180).nullable().optional(),
 })
 export type ConsigneeInput = z.infer<typeof zConsignee>
-export const consigneeOut = (r: Row) => ({ id: r.id, name: r.name, phone: r.phone, address: r.address, city: r.city, country: r.country, relationship: r.relationship, isDefault: !!r.is_default, lastUsedAt: ISO(r.last_used_at), createdAt: ISO(r.created_at) })
+export const consigneeOut = (r: Row) => ({ id: r.id, name: r.name, phone: r.phone, address: r.address, city: r.city, country: r.country, relationship: r.relationship, gps: r.gps ?? '', lat: r.lat == null ? null : Number(r.lat), lng: r.lng == null ? null : Number(r.lng), isDefault: !!r.is_default, lastUsedAt: ISO(r.last_used_at), createdAt: ISO(r.created_at) })
 
 /** Save (or refresh) a recipient on the customer's list; returns its id. Matches on name + phone so the same brother isn't saved five times. */
 export async function rememberConsignee(db: Db, userId: string, c: ConsigneeInput) {
@@ -40,12 +42,12 @@ export async function rememberConsignee(db: Db, userId: string, c: ConsigneeInpu
   const { rows: all } = await db.query<Row>('select id, phone from customer_consignees where user_id = $1 and lower(name) = lower($2)', [userId, c.name])
   const hit = all.find((x) => digits(String(x.phone)) === digits(c.phone))
   if (hit) {
-    await db.query(`update customer_consignees set address = coalesce(nullif($2, ''), address), city = coalesce(nullif($3, ''), city), country = $4, relationship = coalesce(nullif($5, ''), relationship), phone = coalesce(nullif($6, ''), phone), last_used_at = now() where id = $1`, [hit.id, c.address, c.city, c.country, c.relationship, c.phone])
+    await db.query(`update customer_consignees set address = coalesce(nullif($2, ''), address), city = coalesce(nullif($3, ''), city), country = $4, relationship = coalesce(nullif($5, ''), relationship), phone = coalesce(nullif($6, ''), phone), gps = coalesce(nullif($7, ''), gps), lat = coalesce($8, lat), lng = coalesce($9, lng), last_used_at = now() where id = $1`, [hit.id, c.address, c.city, c.country, c.relationship, c.phone, c.gps ?? '', c.lat ?? null, c.lng ?? null])
     return String(hit.id)
   }
   const { rows: cnt } = await db.query<Row>('select count(*)::int as n from customer_consignees where user_id = $1', [userId])
   const id = 'cc_' + uid()
-  await db.query('insert into customer_consignees (id,user_id,name,phone,address,city,country,relationship,is_default,last_used_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,now())', [id, userId, c.name, c.phone, c.address, c.city, c.country, c.relationship, n(cnt[0].n) === 0])
+  await db.query('insert into customer_consignees (id,user_id,name,phone,address,city,country,relationship,is_default,gps,lat,lng,last_used_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now())', [id, userId, c.name, c.phone, c.address, c.city, c.country, c.relationship, n(cnt[0].n) === 0, c.gps ?? '', c.lat ?? null, c.lng ?? null])
   return id
 }
 
@@ -56,7 +58,7 @@ export async function consigneeToClient(db: Db, shipmentId: string, consignee: C
   if (!clientId) return
   const { rows: ex } = await db.query<Row>('select id from client_consignees where client_id = $1 and lower(name) = lower($2) limit 1', [clientId, consignee.name])
   let id = ex[0]?.id as string | undefined
-  if (!id) { id = 'cs_' + uid(); await db.query('insert into client_consignees (id,client_id,name,phone,address,city,country,relationship,is_default) values ($1,$2,$3,$4,$5,$6,$7,$8,false)', [id, clientId, consignee.name, consignee.phone, consignee.address, consignee.city, consignee.country, consignee.relationship]) }
+  if (!id) { id = 'cs_' + uid(); await db.query('insert into client_consignees (id,client_id,name,phone,address,city,country,relationship,gps,lat,lng,is_default) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,false)', [id, clientId, consignee.name, consignee.phone, consignee.address, consignee.city, consignee.country, consignee.relationship, consignee.gps ?? '', consignee.lat ?? null, consignee.lng ?? null]) }
   await db.query('update shipments set consignee_id = $2 where id = $1', [shipmentId, id])
 }
 
@@ -132,7 +134,7 @@ export function mountCustomer(r: Router, d: Deps) {
     const db = await getDb(); const u = await customer(db, req); const b = zConsignee.partial().parse(req.body)
     const { rows: ex } = await db.query<Row>('select id from customer_consignees where id = $1 and user_id = $2', [req.params.id, u.id]); if (!ex[0]) throw new HttpError(404, 'Recipient not found.')
     const sets: string[] = []; const params: unknown[] = [req.params.id]
-    for (const [k, col] of [['name', 'name'], ['phone', 'phone'], ['address', 'address'], ['city', 'city'], ['country', 'country'], ['relationship', 'relationship']] as const) if (b[k] !== undefined) { params.push(b[k]); sets.push(`${col} = $${params.length}`) }
+    for (const [k, col] of [['name', 'name'], ['phone', 'phone'], ['address', 'address'], ['city', 'city'], ['country', 'country'], ['relationship', 'relationship'], ['gps', 'gps'], ['lat', 'lat'], ['lng', 'lng']] as const) if (b[k] !== undefined) { params.push(b[k]); sets.push(`${col} = $${params.length}`) }
     if (sets.length) await db.query(`update customer_consignees set ${sets.join(', ')} where id = $1`, params)
     if (b.isDefault) await db.query('update customer_consignees set is_default = (id = $2) where user_id = $1', [u.id, req.params.id])
     const { rows } = await db.query<Row>('select * from customer_consignees where id = $1', [req.params.id]); res.json({ consignee: consigneeOut(rows[0]) })

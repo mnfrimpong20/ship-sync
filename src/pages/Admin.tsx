@@ -1,3 +1,4 @@
+import { AdminReceiverPayments } from '../components/AdminReceiverPayments'
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -137,7 +138,7 @@ export default function Admin() {
           {view === 'attention' && <AdminAttention />}
           {view === 'shippers' && shippersView}
           {view === 'disputes' && <AdminDisputes />}
-          {view === 'payments' && <AdminPayments />}
+          {view === 'payments' && <><AdminPayments /><AdminReceiverPayments /></>}
           {view === 'brokers' && <AdminBrokers />}
           {view === 'sourcing' && <AdminSourcing />}
           {view === 'insurance' && <AdminInsurance />}

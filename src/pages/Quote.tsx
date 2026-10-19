@@ -57,11 +57,11 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
     customerApi.consignees().then((list) => {
       setSaved(list)
       const pick = sp.get('consignee'); const chosen = pick ? list.find((c) => c.id === pick) : undefined
-      if (chosen) { setForm((f) => ({ ...f, destination: chosen.country as Form['destination'], delivery: true, consignee: { name: chosen.name, phone: chosen.phone, address: chosen.address, city: chosen.city, country: chosen.country, relationship: chosen.relationship } })); setRecipientMode('pick') }
+      if (chosen) { setForm((f) => ({ ...f, destination: chosen.country as Form['destination'], delivery: true, consignee: { name: chosen.name, phone: chosen.phone, address: chosen.address, city: chosen.city, country: chosen.country, gps: chosen.gps, lat: chosen.lat, lng: chosen.lng, relationship: chosen.relationship } })); setRecipientMode('pick') }
       else if (list.length && !sp.get('again')) setRecipientMode('pick')
     }).catch(() => {})
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
-  const pickSaved = (c: Consignee) => { setForm((f) => ({ ...f, consignee: { name: c.name, phone: c.phone, address: c.address, city: c.city, country: c.country, relationship: c.relationship } })); setRecipientMode('pick') }
+  const pickSaved = (c: Consignee) => { setForm((f) => ({ ...f, consignee: { name: c.name, phone: c.phone, address: c.address, city: c.city, country: c.country, gps: c.gps, lat: c.lat, lng: c.lng, relationship: c.relationship } })); setRecipientMode('pick') }
   useEffect(() => {
     let live = true
     setMatching(true)

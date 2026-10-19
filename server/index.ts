@@ -41,6 +41,7 @@ async function main() {
   app.set('trust proxy', 1)
   app.use(compression()) // /api/live/region carries thousands of vessels; gzip cuts it ~8x
   app.post('/api/payments/webhook', express.raw({ type: '*/*', limit: '1mb' }), (req, res) => { stripeWebhook(getDb)(req, res).catch((e) => { console.error('[stripe webhook]', e); res.status(500).json({ error: 'Webhook failed.' }) }) }) // raw body: Stripe signatures are computed over the exact bytes
+  app.post('/api/paystack/webhook', express.raw({ type: '*/*', limit: '1mb' }), (req, res) => { void import('./momo').then((m) => m.paystackWebhook(getDb)(req, res)).catch((e) => { console.error('[paystack webhook]', e); res.status(500).json({ error: 'Webhook failed.' }) }) })
   app.use(express.json({ limit: '10mb' })) // document uploads and POD photos travel as base64 in JSON
   app.use(cookieParser())
   app.use('/api', apiRouter())

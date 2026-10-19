@@ -1337,6 +1337,24 @@ alter table supply_products add column if not exists packing_kind text;
 alter table supply_orders add column if not exists kind text not null default 'shipper';
 alter table supply_orders add column if not exists shipment_id text;
 alter table supply_orders add column if not exists customer_name text not null default '';
+alter table client_consignees add column if not exists gps text not null default '';
+alter table client_consignees add column if not exists lat double precision;
+alter table client_consignees add column if not exists lng double precision;
+alter table customer_consignees add column if not exists gps text not null default '';
+alter table customer_consignees add column if not exists lat double precision;
+alter table customer_consignees add column if not exists lng double precision;
+alter table shipments add column if not exists receiver_lang text;
+create table if not exists receiver_charges (
+  id text primary key, shipment_id text not null, shipper_id text not null, amount numeric not null, currency text not null, reason text not null default '',
+  status text not null default 'due', method text not null default '', provider_ref text, paid_at timestamptz, paid_phone text not null default '', recorded_by text not null default '',
+  created_by text not null default '', created_at timestamptz not null default now()
+);
+create index if not exists receiver_charges_shipment on receiver_charges (shipment_id);
+alter table receiver_charges add column if not exists settled_to text not null default '';
+alter table receiver_charges add column if not exists payout_done boolean not null default false;
+alter table shippers add column if not exists paystack_subaccount text not null default '';
+update client_consignees set gps = 'GA-183-8164', lat = 5.6275, lng = -0.1170 where id = 'cs_demo_1' and gps = '';
+update client_consignees set gps = 'AK-039-5028', lat = 6.6946, lng = -1.6244 where id = 'cs_demo_2' and gps = '';
 
 `
 

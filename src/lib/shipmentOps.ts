@@ -58,7 +58,7 @@ export const shipmentOpsApi = {
   offers: (id: string) => api<{ offers: Offer[] }>(`/me/shipments/${id}/offers`).then((r) => r.offers),
   acceptOffer: (id: string, kind: Offer['kind']) => api<{ invoice: string | null; shipment: Shipment }>(`/me/shipments/${id}/offers/${kind}`, { json: {} }),
   recipientForm: (token: string) => api<RecipientForm>(`/add-recipient/${token}`),
-  submitRecipient: (token: string, b: { name: string; phone: string; address: string; city: string; country: string; relationship: string }) => api<{ ok: true }>(`/add-recipient/${token}`, { json: b }),
+  submitRecipient: (token: string, b: { name: string; phone: string; address: string; city: string; country: string; relationship: string; gps?: string; lat?: number | null; lng?: number | null }) => api<{ ok: true }>(`/add-recipient/${token}`, { json: b }),
   partnerView: (token: string) => api<PartnerView>(`/p/${token}`),
   partnerStage: (token: string, stage: 'arrived' | 'customs' | 'devanned', note = '') => api<Manifest>(`/p/${token}/container`, { json: { stage, note } }),
   partnerHandover: (token: string, sid: string, b: { code?: string; receivedBy: string }) => api<{ ok: true }>(`/p/${token}/shipments/${sid}/handover`, { json: b }),

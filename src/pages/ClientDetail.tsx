@@ -1,3 +1,4 @@
+import { AddressLookup } from '../components/AddressLookup'
 import { Fragment, useEffect, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -130,9 +131,8 @@ function Overview({ d, busy, run, reload }: Common) {
               <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} onSubmit={(e) => { e.preventDefault(); save() }} className="mt-4 grid gap-3 overflow-hidden border-t border-border pt-4 sm:grid-cols-2">
                 <div><label className="label-dark" htmlFor="cs-name">Name</label><input id="cs-name" className="input-dark !min-h-10" required minLength={2} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
                 <div><label className="label-dark" htmlFor="cs-phone">Phone</label><input id="cs-phone" className="input-dark !min-h-10" placeholder="+233 …" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-                <div className="sm:col-span-2"><label className="label-dark" htmlFor="cs-addr">Address</label><input id="cs-addr" className="input-dark !min-h-10" placeholder="Street, landmark, area" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
-                <div><label className="label-dark" htmlFor="cs-city">City</label><input id="cs-city" className="input-dark !min-h-10" placeholder="Accra" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
                 <div><label className="label-dark" htmlFor="cs-country">Country</label><select id="cs-country" className="input-dark !min-h-10" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })}>{countries.map((k) => <option key={k.code} value={k.code}>{k.name}</option>)}</select></div>
+                <div className="sm:col-span-2"><AddressLookup compact country={form.country} value={{ address: form.address, city: form.city, gps: form.gps ?? '', lat: form.lat ?? null, lng: form.lng ?? null }} onChange={(p) => setForm((x) => (x ? { ...x, ...p } : x))} /></div>
                 <div><label className="label-dark" htmlFor="cs-rel">Relationship</label><input id="cs-rel" className="input-dark !min-h-10" placeholder="Brother, business partner…" value={form.relationship} onChange={(e) => setForm({ ...form, relationship: e.target.value })} /></div>
                 <label className="flex items-center gap-2 self-end text-sm text-text-muted"><input type="checkbox" className="accent-gold" checked={form.isDefault} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} /> Default consignee</label>
                 <div className="sm:col-span-2 flex justify-end gap-2"><button type="button" onClick={() => { setForm(null); setEditId(null) }} className="btn-ghost !min-h-9 !px-3 text-xs">Cancel</button><button disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60">{editId ? 'Save' : 'Add consignee'}</button></div>
@@ -150,7 +150,7 @@ function Overview({ d, busy, run, reload }: Common) {
                 </div>
                 <div className="flex gap-1">
                   {!k.isDefault && <button onClick={() => run(async () => { await clientsApi.updateConsignee(k.id, { isDefault: true }); await reload() })} className="btn-ghost !min-h-8 !px-2 text-xs" title="Make default"><Star size={13} aria-hidden="true" /></button>}
-                  <button onClick={() => { setForm({ name: k.name, phone: k.phone, address: k.address, city: k.city, country: k.country, relationship: k.relationship, isDefault: k.isDefault }); setEditId(k.id) }} className="btn-ghost !min-h-8 !px-2 text-xs" aria-label={`Edit ${k.name}`}><Pencil size={13} aria-hidden="true" /></button>
+                  <button onClick={() => { setForm({ name: k.name, phone: k.phone, address: k.address, city: k.city, country: k.country, relationship: k.relationship, isDefault: k.isDefault, gps: k.gps ?? '', lat: k.lat ?? null, lng: k.lng ?? null }); setEditId(k.id) }} className="btn-ghost !min-h-8 !px-2 text-xs" aria-label={`Edit ${k.name}`}><Pencil size={13} aria-hidden="true" /></button>
                   <button onClick={() => run(async () => { await clientsApi.deleteConsignee(k.id); await reload() }, 'Consignee removed.')} className="btn-ghost !min-h-8 !px-2 text-xs text-danger" aria-label={`Remove ${k.name}`}><Trash2 size={13} aria-hidden="true" /></button>
                 </div>
               </li>

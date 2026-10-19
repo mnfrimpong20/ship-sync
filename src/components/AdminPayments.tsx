@@ -98,7 +98,7 @@ export function AdminPayments() {
           <label className="mt-3 block text-sm">Release funds when the shipment is<select className="input-dark mt-1 !min-h-9 w-full text-sm" value={st.releaseOn} onChange={(e) => setSt({ ...st, releaseOn: e.target.value as PaymentSettings['releaseOn'] })}><option value="in_transit">In transit (sailed / flown)</option><option value="delivered">Delivered</option></select></label>
           <label className="mt-3 block text-xs text-text-muted">Note shown to customers<textarea rows={3} className="input-dark mt-1 w-full py-2 text-sm" value={st.customerNote} onChange={(e) => setSt({ ...st, customerNote: e.target.value })} /></label>
           <label className="mt-3 block text-xs text-text-muted">Note shown to shippers<textarea rows={3} className="input-dark mt-1 w-full py-2 text-sm" value={st.payoutNote} onChange={(e) => setSt({ ...st, payoutNote: e.target.value })} /></label>
-          <p className="mt-4 text-[11px] text-text-muted">Mobile money collection (MTN MoMo, Telecel Cash, AT Money via Paystack/Flutterwave) plugs in behind the same escrow ledger when a partner is signed. <Link to="/dashboard/payments" className="text-gold-deep hover:underline">Shipper view →</Link></p>
+          <p className="mt-4 text-[11px] text-text-muted">Receivers pay destination charges by mobile money through Paystack — see Receiver mobile money below. <Link to="/dashboard/payments" className="text-gold-deep hover:underline">Shipper view →</Link></p>
         </div>
       </div>
     </section>

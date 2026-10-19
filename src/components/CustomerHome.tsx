@@ -1,3 +1,4 @@
+import { AddressLookup } from './AddressLookup'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -77,9 +78,8 @@ export function ConsigneeForm({ initial = empty, onSave, onCancel, busy }: { ini
     <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2" aria-label="Recipient" data-testid="consignee-form">
       <label className="grid gap-1 text-xs"><span className="text-text-muted">Full name</span><input className="input-dark !min-h-10" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoComplete="name" data-testid="cs-name" /></label>
       <label className="grid gap-1 text-xs"><span className="text-text-muted">Phone / WhatsApp</span><input className="input-dark !min-h-10" type="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} placeholder="+233 24 …" data-testid="cs-phone" /></label>
-      <label className="grid gap-1 text-xs sm:col-span-2"><span className="text-text-muted">Address / landmark</span><input className="input-dark !min-h-10" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} placeholder="House 12, near the Methodist church" /></label>
-      <label className="grid gap-1 text-xs"><span className="text-text-muted">City / town</span><input className="input-dark !min-h-10" value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} data-testid="cs-city" /></label>
       <label className="grid gap-1 text-xs"><span className="text-text-muted">Country</span><select className="input-dark !min-h-10" value={f.country} onChange={(e) => setF({ ...f, country: e.target.value })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
+      <div className="sm:col-span-2"><AddressLookup compact country={f.country ?? 'GH'} value={{ address: f.address ?? '', city: f.city ?? '', gps: f.gps ?? '', lat: f.lat ?? null, lng: f.lng ?? null }} onChange={(p) => setF((x) => ({ ...x, ...p }))} labels={{ address: 'Address / landmark' }} /></div>
       <label className="grid gap-1 text-xs"><span className="text-text-muted">Relationship (optional)</span><input className="input-dark !min-h-10" value={f.relationship} onChange={(e) => setF({ ...f, relationship: e.target.value })} placeholder="Brother, business partner…" /></label>
       {err && <p role="alert" className="text-xs text-danger sm:col-span-2">{err}</p>}
       <div className="flex gap-2 sm:col-span-2">{onCancel && <button type="button" onClick={onCancel} className="btn-ghost !min-h-10 text-sm">Cancel</button>}<button className="btn-gold !min-h-10 text-sm" disabled={busy} data-testid="cs-save"><Check size={16} aria-hidden="true" /> Save recipient</button></div>

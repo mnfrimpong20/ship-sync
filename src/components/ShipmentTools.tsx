@@ -1,3 +1,4 @@
+import { AddressLookup } from './AddressLookup'
 import { useEffect, useState } from 'react'
 import { AlertTriangle, Ban, Bot, Check, ChevronRight, CircleDashed, KeyRound, PackageCheck, Pencil, Plus, RotateCcw, Store, Trash2, Truck, UserPlus, Wallet, Zap } from 'lucide-react'
 import { countries, nextStatus, prevStatus, statusLabels, type Handover, type Shipment } from '../lib/data'
@@ -41,9 +42,8 @@ export function RecipientEditor({ s, consignees: given, onSaved }: { s: Shipment
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="grid gap-1 text-xs"><span className="text-text-muted">Full name</span><input className="input-dark !min-h-9 text-sm" required minLength={2} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="rcp-name" /></label>
           <label className="grid gap-1 text-xs"><span className="text-text-muted">Phone (for arrival texts)</span><input className="input-dark !min-h-9 text-sm" placeholder="+233 24 …" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} data-testid="rcp-phone" /></label>
-          <label className="grid gap-1 text-xs sm:col-span-2"><span className="text-text-muted">Delivery address</span><input className="input-dark !min-h-9 text-sm" placeholder="House no., street, landmark" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></label>
-          <label className="grid gap-1 text-xs"><span className="text-text-muted">City</span><input className="input-dark !min-h-9 text-sm" placeholder="Kumasi" value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} data-testid="rcp-city" /></label>
           <label className="grid gap-1 text-xs"><span className="text-text-muted">Country</span><select className="input-dark !min-h-9 text-sm" value={f.country} onChange={(e) => setF({ ...f, country: e.target.value })}>{countries.map((k) => <option key={k.code} value={k.code}>{k.name}</option>)}</select></label>
+          <div className="sm:col-span-2"><AddressLookup compact country={f.country} value={{ address: f.address, city: f.city, gps: f.gps ?? '', lat: f.lat ?? null, lng: f.lng ?? null }} onChange={(p) => setF((x) => ({ ...x, ...p }))} labels={{ address: 'Delivery address' }} /></div>
           <label className="grid gap-1 text-xs sm:col-span-2"><span className="text-text-muted">Relationship to the sender (optional)</span><input className="input-dark !min-h-9 text-sm" placeholder="Brother, business partner…" value={f.relationship} onChange={(e) => setF({ ...f, relationship: e.target.value })} /></label>
         </div>
       )}

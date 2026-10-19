@@ -23,6 +23,8 @@
     "src/lib/data.ts",
     "src/lib/geo.ts",
     "src/lib/sourcingOrigins.ts",
-    "src/lib/pageMeta.ts"
+    "src/lib/pageMeta.ts",
+    "src/lib/address.ts",
+    "src/lib/receiverText.ts"
   ]
 }

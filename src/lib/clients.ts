@@ -7,7 +7,7 @@ export interface Client {
   shipmentCount?: number; activeShipments?: number; invoiced?: number; paid?: number; lastActivityAt?: string; nextReminderAt?: string
 }
 export type ClientInput = Pick<Client, 'name' | 'company' | 'email' | 'phone' | 'whatsapp' | 'city' | 'tags' | 'notes'>
-export interface Consignee { id: string; clientId: string; name: string; phone: string; address: string; city: string; country: string; relationship: string; isDefault: boolean }
+export interface Consignee { id: string; clientId: string; name: string; phone: string; address: string; city: string; country: string; relationship: string; isDefault: boolean; gps?: string; lat?: number | null; lng?: number | null }
 export type ConsigneeInput = Omit<Consignee, 'id' | 'clientId'>
 export type ActivityType = 'note' | 'call' | 'email' | 'whatsapp' | 'meeting' | 'reminder' | 'system'
 export interface Activity { id: string; clientId: string; type: ActivityType; body: string; at: string; dueAt?: string; done: boolean; createdBy?: string; clientName?: string }

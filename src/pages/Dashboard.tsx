@@ -16,6 +16,7 @@ import { Recipients } from '../components/CustomerHome'
 import { PaymentCard } from '../components/PaymentCard'
 import { PackingSuppliesCard } from '../components/PackingSupplies'
 import { ExportCard } from '../components/Compliance'
+import { ReceiverChargesCard } from '../components/ReceiverCharges'
 import { QuoteList, RequestManage } from '../components/RequestPanel'
 import { CollectionNotice, OffersCard } from '../components/FlowCards'
 import { VehicleCard } from '../components/VehicleCard'
@@ -263,7 +264,7 @@ function ShipmentsTab() {
           <div className="space-y-4" data-testid={`ship-view-${view}`}>
             {view === 'tracking' && <><ShipmentDetail s={s} compact /><Link to={`/track?ref=${s.ref}`} className="inline-flex items-center gap-1 text-sm text-gold-deep hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link><NextStep shipmentId={s.id} /><CollectionNotice s={s} /><OffersCard s={s} /></>}
             {view === 'inside' && <><PackingList shipmentId={s.id} destination={s.destination} /><DutyEarly shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}</>}
-            {view === 'pay' && <><ExportCard shipmentId={s.id} /><PackingSuppliesCard shipmentId={s.id} /><PaymentCard shipmentId={s.id} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><p className="text-sm text-text-muted">Paying several shipments? <Link to="/dashboard?tab=money" className="text-gold-deep hover:underline">Pay everything you owe in one checkout</Link>.</p></>}
+            {view === 'pay' && <><ExportCard shipmentId={s.id} /><ReceiverChargesCard shipmentId={s.id} /><PackingSuppliesCard shipmentId={s.id} /><PaymentCard shipmentId={s.id} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><p className="text-sm text-text-muted">Paying several shipments? <Link to="/dashboard?tab=money" className="text-gold-deep hover:underline">Pay everything you owe in one checkout</Link>.</p></>}
             {view === 'customs' && <><CustomsCard shipmentId={s.id} destination={s.destination} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /></>}
             {view === 'people' && <><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><FamilyShare shipmentId={s.id} /><PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /></>}
             {view === 'chat' && <ShipmentChat shipmentId={s.id} />}

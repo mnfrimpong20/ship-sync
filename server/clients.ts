@@ -4,6 +4,7 @@
  */
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
+import { normaliseGps } from '../src/lib/address'
 import { makeRef, uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { countryByCode } from '../src/lib/data'
@@ -29,7 +30,7 @@ export const clientOut = (r: Row) => ({
   invoiced: r.invoiced != null ? Number(r.invoiced) : undefined, paid: r.paid != null ? Number(r.paid) : undefined, lastActivityAt: r.last_activity_at ? ISO(r.last_activity_at) : undefined,
   nextReminderAt: r.next_reminder_at ? ISO(r.next_reminder_at) : undefined,
 })
-const consigneeOut = (r: Row) => ({ id: r.id, clientId: r.client_id, name: r.name, phone: r.phone, address: r.address, city: r.city, country: r.country, relationship: r.relationship, isDefault: r.is_default })
+const consigneeOut = (r: Row) => ({ id: r.id, clientId: r.client_id, name: r.name, phone: r.phone, address: r.address, city: r.city, country: r.country, relationship: r.relationship, gps: r.gps ?? '', lat: r.lat == null ? null : Number(r.lat), lng: r.lng == null ? null : Number(r.lng), isDefault: r.is_default })
 const activityOut = (r: Row) => ({ id: r.id, clientId: r.client_id, type: r.type, body: r.body, at: ISO(r.at), dueAt: r.due_at ? ISO(r.due_at) : undefined, done: r.done, createdBy: r.created_by ?? undefined })
 const invoiceOut = (r: Row, payments: Row[]) => {
   const paid = payments.reduce((n, p) => n + Number(p.amount), 0)
@@ -59,6 +60,7 @@ const zClientPatch = zClient.partial().extend({ status: z.enum(['active', 'archi
 const zConsignee = z.object({
   name: z.string().trim().min(2).max(80), phone: z.string().trim().max(30).default(''), address: z.string().trim().max(200).default(''), city: z.string().trim().max(60).default(''),
   country: COUNTRY.default('GH'), relationship: z.string().trim().max(40).default(''), isDefault: z.boolean().default(false),
+  gps: z.string().trim().max(20).default('').transform((v, ctx) => { if (!v) return ''; const g = normaliseGps(v); if (!g) ctx.addIssue({ code: 'custom', message: 'A Ghana Post GPS address looks like GA-183-8164.' }); return g }), lat: z.number().min(-90).max(90).nullable().optional(), lng: z.number().min(-180).max(180).nullable().optional(),
 })
 const zActivity = z.object({ type: z.enum(['note', 'call', 'email', 'whatsapp', 'meeting', 'reminder']), body: z.string().trim().min(1, 'Write something.').max(2000), dueAt: z.string().datetime().optional() })
 const zActivityPatch = z.object({ body: z.string().trim().min(1).max(2000).optional(), done: z.boolean().optional(), dueAt: z.string().datetime().nullable().optional() })
@@ -181,7 +183,7 @@ export function mountClients(r: Router, d: Deps) {
     const b = zConsignee.parse(req.body)
     const id = 'cs_' + uid()
     if (b.isDefault) await db.query('update client_consignees set is_default = false where client_id = $1', [c.id])
-    await db.query('insert into client_consignees (id,client_id,name,phone,address,city,country,relationship,is_default) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [id, c.id, b.name, b.phone, b.address, b.city, b.country, b.relationship, b.isDefault])
+    await db.query('insert into client_consignees (id,client_id,name,phone,address,city,country,relationship,gps,lat,lng,is_default) values ($1,$2,$3,$4,$5,$6,$7,$8,$10,$11,$12,$9)', [id, c.id, b.name, b.phone, b.address, b.city, b.country, b.relationship, b.isDefault, b.gps ?? '', b.lat ?? null, b.lng ?? null])
     const { rows } = await db.query<Row>('select * from client_consignees where client_id = $1 order by is_default desc, name asc', [c.id])
     res.status(201).json({ consignees: rows.map(consigneeOut) })
   }))

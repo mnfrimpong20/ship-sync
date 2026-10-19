@@ -12,7 +12,7 @@ export type ShipperProfileInput = Pick<Shipper, 'name' | 'tagline' | 'hq' | 'fou
 }
 export type AdminShipper = Shipper & { owner: { email: string; name: string } | null; quoteCount: number; shipmentCount: number; docCount: number; docsPending: number; verificationRequestedAt: string | null }
 
-export interface RequestConsignee { name: string; phone?: string; address?: string; city?: string; country?: string; relationship?: string }
+export interface RequestConsignee { name: string; phone?: string; address?: string; city?: string; country?: string; relationship?: string; gps?: string; lat?: number | null; lng?: number | null }
 export type PackingKind = 'barrel' | 'box' | 'lock' | 'tape' | 'other'
 export interface SupplyNeed { kind: PackingKind; qty: number }
 export interface SupplyAddress { name: string; line1: string; line2?: string; city: string; state?: string; zip?: string; country?: string; phone?: string }

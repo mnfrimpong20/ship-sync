@@ -51,6 +51,7 @@ import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
 import { mountOperations } from './operations'
 import { mountScreening, screenSubject, screeningHold } from './screening'
+import { mountMomo } from './momo'
 import { mountCompliance, evaluateExport, assertExportCleared, zDeclaration, DECLARATION_VERSION } from './compliance'
 import { mountSupplies, attachDefaultSupplies, defaultQuoteSupplies, resolveQuoteSupplies, suppliesFromQuote, suppliesTotal, type QuoteSupplyLine, type SupplyNeed } from './supplies'
 import { mountReviews } from './reviews'
@@ -545,7 +546,7 @@ export function apiRouter() {
         (select count(*) from company_documents cd where cd.shipper_id = s.id)::int as doc_count,
         (select count(*) from company_documents cd where cd.shipper_id = s.id and cd.status = 'submitted')::int as docs_pending
       from shippers s left join users u on u.id = (select id from users x where x.shipper_id = s.id order by x.created_at limit 1) order by s.verified asc, (s.verification_requested_at is null) asc, s.verification_requested_at desc, s.created_at desc`)
-    res.json({ shippers: rows.map((r) => ({ ...shipperOut(r), owner: r.owner_email ? { email: r.owner_email, name: r.owner_name } : null, quoteCount: r.quote_count, shipmentCount: r.shipment_count, docCount: r.doc_count, docsPending: r.docs_pending, verificationRequestedAt: r.verification_requested_at ? ISO(r.verification_requested_at) : null })) })
+    res.json({ shippers: rows.map((r) => ({ ...shipperOut(r), paystackSubaccount: r.paystack_subaccount ?? '', owner: r.owner_email ? { email: r.owner_email, name: r.owner_name } : null, quoteCount: r.quote_count, shipmentCount: r.shipment_count, docCount: r.doc_count, docsPending: r.docs_pending, verificationRequestedAt: r.verification_requested_at ? ISO(r.verification_requested_at) : null })) })
   }))
   r.post('/admin/shippers/:id/verify', wrap(async (req, res) => {
     const db = await getDb(); const admin = await requireAdmin(db, req)
@@ -805,6 +806,7 @@ export function apiRouter() {
   mountOperations(r, { getDb, requireUser, HttpError, wrap })
   mountCompliance(r, { getDb, requireUser, HttpError, wrap })
   mountScreening(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  mountMomo(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountSupplies(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountReviews(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountBrand(r, { getDb, requireUser, HttpError, wrap })

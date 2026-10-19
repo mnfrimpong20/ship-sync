@@ -4,13 +4,14 @@ import { Check, UserRound } from 'lucide-react'
 import { countries } from '../lib/data'
 import { shipmentOpsApi, type RecipientForm } from '../lib/shipmentOps'
 import { Logo } from '../components/ui'
+import { AddressLookup } from '../components/AddressLookup'
 
 /** `/add-recipient/:token` — the sender tells us who collects the shipment. Phone first, no login. */
 export default function AddRecipient() {
   const { token = '' } = useParams()
   const [d, setD] = useState<RecipientForm | null>(null)
   const [err, setErr] = useState(''); const [done, setDone] = useState(false); const [busy, setBusy] = useState(false)
-  const [f, setF] = useState({ name: '', phone: '', address: '', city: '', country: 'GH', relationship: '' })
+  const [f, setF] = useState<{ name: string; phone: string; address: string; city: string; country: string; relationship: string; gps: string; lat: number | null; lng: number | null }>({ name: '', phone: '', address: '', city: '', country: 'GH', relationship: '', gps: '', lat: null, lng: null })
   useEffect(() => { shipmentOpsApi.recipientForm(token).then((r) => { setD(r); setF((x) => ({ ...x, country: r.destination })) }).catch((e) => setErr(e instanceof Error ? e.message : 'Not found.')) }, [token])
   const submit = async (e: React.FormEvent) => { e.preventDefault(); setBusy(true); setErr(''); try { await shipmentOpsApi.submitRecipient(token, f); setDone(true) } catch (er) { setErr(er instanceof Error ? er.message : 'Could not save.') } finally { setBusy(false) } }
   return (
@@ -27,8 +28,8 @@ export default function AddRecipient() {
             {err && <p role="alert" className="text-sm text-danger">{err}</p>}
             <label className="grid gap-1 text-sm"><span className="text-text-muted">Full name</span><input required minLength={2} className="input-dark" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoComplete="off" data-testid="ar-name" /></label>
             <label className="grid gap-1 text-sm"><span className="text-text-muted">Phone number (WhatsApp if possible)</span><input required inputMode="tel" className="input-dark" placeholder="+233 24 …" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} data-testid="ar-phone" /></label>
-            <div className="grid grid-cols-2 gap-3"><label className="grid gap-1 text-sm"><span className="text-text-muted">Town / city</span><input className="input-dark" value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} data-testid="ar-city" /></label><label className="grid gap-1 text-sm"><span className="text-text-muted">Country</span><select className="input-dark" value={f.country} onChange={(e) => setF({ ...f, country: e.target.value })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label></div>
-            <label className="grid gap-1 text-sm"><span className="text-text-muted">Address or landmark (for delivery)</span><input className="input-dark" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></label>
+            <label className="grid gap-1 text-sm"><span className="text-text-muted">Country</span><select className="input-dark" value={f.country} onChange={(e) => setF({ ...f, country: e.target.value })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
+            <AddressLookup country={f.country} value={f} onChange={(p) => setF((x) => ({ ...x, ...p }))} labels={{ address: 'Address or landmark (for delivery)' }} />
             <label className="grid gap-1 text-sm"><span className="text-text-muted">Relationship to you (optional)</span><input className="input-dark" value={f.relationship} onChange={(e) => setF({ ...f, relationship: e.target.value })} placeholder="Mother, brother, business partner…" /></label>
             <button disabled={busy} className="btn-gold mt-1" data-testid="ar-submit">{busy ? 'Saving…' : 'Save recipient'}</button>
           </form>

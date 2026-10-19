@@ -15,6 +15,8 @@ import type { ApiUser } from './api'
 import { notify, notifyShipperStaff } from './notify'
 import { messagingReady, normalisePhone, sendText, smsProvider, whatsappProvider } from './sms'
 import { countryByCode, statusLabels, type ShipmentStatus } from '../src/lib/data'
+import { receiverLang, mapLink, type Lang } from '../src/lib/address'
+import { greeting, receiverText, type TextKind } from '../src/lib/receiverText'
 
 type Row = Record<string, any>
 interface Deps {
@@ -28,7 +30,7 @@ const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? n
 const appUrl = () => (process.env.APP_URL || '').replace(/\/$/, '')
 export const receiverUrl = (token: string) => `${appUrl()}/r/${token}`
 
-export type RecipientKind = 'notice' | 'sailed' | 'arrived' | 'ready' | 'out_for_delivery' | 'delivered' | 'reminder'
+export type RecipientKind = TextKind
 export const messageOut = (m: Row) => ({ id: m.id, shipmentId: m.shipment_id, to: m.to_phone, channel: m.channel as 'sms' | 'whatsapp', kind: m.kind as RecipientKind, text: m.text, status: m.status as 'pending' | 'sent' | 'skipped' | 'failed', error: m.error ?? '', attempts: Number(m.attempts ?? 0), createdAt: ISO(m.created_at), sentAt: ISO(m.sent_at) })
 
 /** Make sure a shipment has a receiver token; returns it. */
@@ -48,30 +50,22 @@ export async function consigneeOf(db: Db, s: Row) {
   return null
 }
 
-const firstName = (n: string) => String(n ?? '').trim().split(' ')[0] || 'there'
-/** Short, plain texts — SMS segments cost money and signal is patchy. */
-function compose(kind: RecipientKind, s: Row, shipperName: string, link: string, receiver: Row | null, extra?: { note?: string }) {
-  const name = firstName(receiver?.name ?? '')
-  const hi = s.destination === 'GH' ? `Akwaaba, ${name}!` : `Hi ${name},`
+const firstName = (n: string) => String(n ?? '').trim().split(' ')[0] || ''
+export const langOf = (s: Row): Lang => (s.receiver_lang === 'fr' || s.receiver_lang === 'en' ? s.receiver_lang : receiverLang(s.destination))
+/** Short, plain texts — SMS segments cost money and signal is patchy. English or French by destination. */
+function compose(kind: RecipientKind, s: Row, shipperName: string, link: string, receiver: Row | null, extra?: { note?: string; amount?: string }) {
+  const lang = langOf(s)
+  const name = firstName(receiver?.name ?? '') || (lang === 'fr' ? '' : 'there')
   const dest = countryByCode(s.destination)
-  const port = dest?.ports?.[0] ?? dest?.name ?? s.destination
-  const ref = s.ref
+  const eta = s.eta ? new Date(s.eta).toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'short' }) : undefined
   // Ntemtem voice: greeting, the news, the next step, the link. No emoji — it doubles SMS cost.
-  switch (kind) {
-    case 'notice': return `${hi} ${s.customer} is sending you a package with ${shipperName} on Ntemtem. Ref ${ref}. Track it here: ${link}`
-    case 'sailed': return `${hi} your package from ${s.customer} is on its way${s.vessel_name ? ` on ${s.vessel_name}` : ''}${s.eta ? `, arriving around ${new Date(s.eta).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}. Ref ${ref}. Follow it: ${link}`
-    case 'arrived': return `${hi} your package ${ref} has landed at ${port} and is going through customs. We'll message you the moment it's ready. ${link}`
-    case 'ready': return `Good news, ${name} — your package ${ref} is ready for collection at ${shipperName}${extra?.note ? ` (${extra.note})` : ''}. Bring your ID and this ref. ${link}`
-    case 'out_for_delivery': return `${hi} your package ${ref} is out for delivery today. Please keep ${receiver?.phone || 'this number'} on. ${link}`
-    case 'delivered': return `${hi} your package ${ref} has been delivered. Tap to confirm you have it: ${link} — or reply if anything is missing.`
-    case 'reminder': return `${hi} a reminder: your package ${ref} is waiting for you at ${shipperName}. ${link}`
-  }
+  return receiverText(lang, kind, { hi: greeting(lang, s.destination, name).replace(' ,', ','), name, sender: s.customer, shipper: shipperName, ref: s.ref, link, port: dest?.ports?.[0] ?? dest?.name ?? s.destination, vessel: s.vessel_name || undefined, eta, note: extra?.note, phone: receiver?.phone, amount: extra?.amount })
 }
 
 async function shipperOf(db: Db, id: string) { const { rows } = await db.query<Row>('select name, recipient_sms from shippers where id = $1', [id]); return rows[0] }
 
 /** Queue (and try to send) one text to the shipment's consignee. Returns the message row or null when there's nobody to text / messages are off. */
-export async function messageRecipient(db: Db, s: Row, kind: RecipientKind, o: { force?: boolean; note?: string; by?: string } = {}) {
+export async function messageRecipient(db: Db, s: Row, kind: RecipientKind, o: { force?: boolean; note?: string; by?: string; amount?: string } = {}) {
   const sh = await shipperOf(db, s.shipper_id); if (!sh) return null
   if (!o.force && !sh.recipient_sms) return null
   const receiver = await consigneeOf(db, s)
@@ -79,7 +73,7 @@ export async function messageRecipient(db: Db, s: Row, kind: RecipientKind, o: {
   if (!to) return null
   if (!o.force) { const { rows } = await db.query<Row>(`select 1 from recipient_messages where shipment_id = $1 and kind = $2 and status <> 'failed' limit 1`, [s.id, kind]); if (rows[0]) return null }
   const token = await ensureReceiverToken(db, s)
-  const text = compose(kind, s, sh.name, receiverUrl(token), receiver, { note: o.note })
+  const text = compose(kind, s, sh.name, receiverUrl(token), receiver, { note: o.note, amount: o.amount })
   const ready = messagingReady()
   const waOn = await (await import('./features')).featureOn(db, 'whatsapp', s.shipper_id)
   const channel = waOn && whatsappProvider().id !== 'off' ? 'whatsapp' : 'sms'
@@ -151,7 +145,7 @@ export function mountRecipient(r: Router, d: Deps) {
     res.set('Cache-Control', 'no-store')
     res.json({
       token, url: receiverUrl(token), path: `/r/${token}`,
-      receiver: receiver ? { name: receiver.name, phone: receiver.phone, phoneE164: normalisePhone(receiver.phone, receiver.country || s.destination), city: receiver.city, country: receiver.country } : null,
+      receiver: receiver ? { name: receiver.name, phone: receiver.phone, phoneE164: normalisePhone(receiver.phone, receiver.country || s.destination), address: receiver.address ?? '', city: receiver.city, country: receiver.country, gps: receiver.gps ?? '', mapUrl: mapLink({ lat: receiver.lat == null ? null : Number(receiver.lat), lng: receiver.lng == null ? null : Number(receiver.lng), address: receiver.address, city: receiver.city, country: receiver.country }) } : null, lang: langOf(s),
       messages: msgs.map(messageOut), receipt: rc[0] ? { name: rc[0].name, note: rc[0].note, allGood: Boolean(rc[0].all_good), at: ISO(rc[0].created_at) } : null,
       settings: office ? await settingsOut(db, s.shipper_id) : null, canManage: office,
     })
@@ -197,14 +191,23 @@ export function mountRecipient(r: Router, d: Deps) {
     const { rows: rc } = await db.query<Row>('select * from recipient_receipts where shipment_id = $1 order by created_at desc limit 1', [s.id])
     const { rows: ready } = await db.query<Row>(`select 1 from recipient_messages where shipment_id = $1 and kind = 'ready' limit 1`, [s.id])
     const dest = countryByCode(s.destination)
+    const lang = langOf(s)
+    const money = await (await import('./momo')).receiverCharges(db, s, lang)
     res.set('Cache-Control', 'no-store')
     res.json({
+      lang, ...money,
+      deliverTo: receiver && s.handover !== 'collection' ? { city: receiver.city ?? '', address: receiver.address ?? '', gps: receiver.gps ?? '', mapUrl: mapLink({ lat: receiver.lat == null ? null : Number(receiver.lat), lng: receiver.lng == null ? null : Number(receiver.lng), address: receiver.address, city: receiver.city, country: receiver.country }) } : null,
       shipment: { ref: s.ref, status: s.status, statusLabel: statusLabels[s.status as ShipmentStatus] ?? s.status, mode: s.mode, origin: s.origin, destination: s.destination, destinationName: dest?.name ?? s.destination, port: dest?.ports?.[0] ?? '', description: s.description, eta: ISO(s.eta)?.slice(0, 10) ?? null, sender: s.customer, vesselName: s.vessel_name ?? '' },
       shipper: { name: sh?.name ?? '' }, receiver: receiver ? { name: receiver.name } : null, readyForCollection: ready.length > 0,
       events: events.map((e) => ({ status: e.status, label: statusLabels[e.status as ShipmentStatus] ?? e.status, at: ISO(e.at), place: e.place, note: e.note ?? '' })),
       pieces: pieces.map((p) => ({ seq: Number(p.seq), status: p.status })), trackUrl: `${appUrl()}/track?ref=${s.ref}`,
       receipt: rc[0] ? { name: rc[0].name, note: rc[0].note, allGood: Boolean(rc[0].all_good), at: ISO(rc[0].created_at) } : null,
     })
+  }))
+  r.post('/r/:token/lang', wrap(async (req, res) => {
+    const db = await getDb(); const s = await byToken(db, String(req.params.token))
+    const b = z.object({ lang: z.enum(['en', 'fr']) }).parse(req.body)
+    await db.query('update shipments set receiver_lang = $2 where id = $1', [s.id, b.lang]); res.json({ ok: true, lang: b.lang })
   }))
   r.post('/r/:token/received', wrap(async (req, res) => {
     const db = await getDb(); const s = await byToken(db, String(req.params.token))

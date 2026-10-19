@@ -31,6 +31,7 @@ export function RecipientPanel({ shipmentId, shipmentRef, status }: { shipmentId
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
       <p className="mt-2 text-sm">{d.receiver ? <><strong>{d.receiver.name}</strong>{d.receiver.city ? ` · ${d.receiver.city}` : ''}{d.receiver.phone ? <span className="text-text-muted"> · {d.receiver.phone}</span> : <span className="text-danger"> · no phone number</span>}</> : <span className="text-text-muted">{d.canManage ? 'No consignee on this shipment yet — add one on the client to text them.' : 'Share the link below with whoever is receiving the goods.'}</span>}</p>
+      {d.receiver && (d.receiver.gps || d.receiver.address) && <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-text-muted" data-testid="receiver-address">{d.receiver.address && <span>{d.receiver.address}</span>}{d.receiver.gps && <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-text" title="GhanaPost GPS digital address">{d.receiver.gps}</span>}{d.receiver.mapUrl && <a href={d.receiver.mapUrl} target="_blank" rel="noopener" className="text-gold-deep hover:underline">Map</a>}</p>}
       {d.receipt && <p className="mt-1.5 text-xs text-text-muted">{d.receipt.allGood ? `${d.receipt.name} confirmed receipt` : `${d.receipt.name} reported a problem`}{d.receipt.at ? ` · ${fmtDateTime(d.receipt.at)}` : ''}{d.receipt.note ? ` — “${d.receipt.note}”` : ''}</p>}
       <div className="mt-3 flex items-center gap-1.5 rounded-lg border border-border bg-surface-2/40 px-2.5 py-1.5">
         <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-muted" title={link}>{link}</span>
@@ -42,7 +43,7 @@ export function RecipientPanel({ shipmentId, shipmentRef, status }: { shipmentId
       {d.canManage && (
         <>
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <select aria-label="Message" className="input-dark !min-h-8 !w-auto !px-2 text-xs" value={kind} onChange={(e) => setKind(e.target.value as RecipientKind)}>{(Object.keys(recipientKindLabels) as RecipientKind[]).map((k) => <option key={k} value={k}>{recipientKindLabels[k]}</option>)}</select>
+            <select aria-label="Message" className="input-dark !min-h-8 !w-auto !px-2 text-xs" value={kind} onChange={(e) => setKind(e.target.value as RecipientKind)}>{(Object.keys(recipientKindLabels) as RecipientKind[]).filter((k) => k !== 'charge').map((k) => <option key={k} value={k}>{recipientKindLabels[k]}</option>)}</select>
             {(kind === 'ready' || kind === 'reminder') && <input aria-label="Note" className="input-dark !min-h-8 min-w-[140px] flex-1 !px-2 text-xs" placeholder={kind === 'ready' ? 'e.g. Tema warehouse, Mon–Fri 9–5' : 'e.g. closes Friday'} value={note} onChange={(e) => setNote(e.target.value)} />}
             <button onClick={send} disabled={busy === 'send' || !d.receiver?.phoneE164 || status === 'booked' && kind !== 'notice'} className="btn-ghost !min-h-8 !px-2.5 text-xs disabled:opacity-50" title={!d.receiver?.phoneE164 ? 'Add a consignee phone number first' : ''}><Send size={12} aria-hidden="true" /> {busy === 'send' ? 'Sending…' : d.settings?.channel === 'whatsapp' ? 'Send WhatsApp' : 'Send SMS'}</button>
           </div>

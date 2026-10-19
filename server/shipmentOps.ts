@@ -145,14 +145,14 @@ export function mountShipmentOps(r: Router, d: Deps) {
     if (cid) { const { rows } = await db.query<Row>('select id from client_consignees where id = $1 and client_id = $2', [cid, clientId]); if (!rows[0]) throw new HttpError(400, 'That recipient belongs to another client.') }
     else {
       if (!b.name || b.name.trim().length < 2) throw new HttpError(400, 'Enter the recipient’s name.')
-      if (s.consignee_id) { await db.query('update client_consignees set name=$2, phone=$3, address=$4, city=$5, country=$6, relationship=$7 where id = $1 and client_id = $8', [s.consignee_id, b.name, b.phone ?? '', b.address ?? '', b.city ?? '', b.country ?? s.destination, b.relationship ?? '', clientId]); cid = s.consignee_id }
-      else { cid = 'cs_' + uid(); await db.query('insert into client_consignees (id,client_id,name,phone,address,city,country,relationship,is_default) values ($1,$2,$3,$4,$5,$6,$7,$8,false)', [cid, clientId, b.name, b.phone ?? '', b.address ?? '', b.city ?? '', b.country ?? s.destination, b.relationship ?? '']) }
+      if (s.consignee_id) { await db.query('update client_consignees set name=$2, phone=$3, address=$4, city=$5, country=$6, relationship=$7, gps=$9, lat=$10, lng=$11 where id = $1 and client_id = $8', [s.consignee_id, b.name, b.phone ?? '', b.address ?? '', b.city ?? '', b.country ?? s.destination, b.relationship ?? '', clientId, b.gps ?? '', b.lat ?? null, b.lng ?? null]); cid = s.consignee_id }
+      else { cid = 'cs_' + uid(); await db.query('insert into client_consignees (id,client_id,name,phone,address,city,country,relationship,gps,lat,lng,is_default) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,false)', [cid, clientId, b.name, b.phone ?? '', b.address ?? '', b.city ?? '', b.country ?? s.destination, b.relationship ?? '', b.gps ?? '', b.lat ?? null, b.lng ?? null]) }
     }
     await db.query('update shipments set consignee_id = $2 where id = $1', [s.id, cid])
     const { rows: c } = await db.query<Row>('select * from client_consignees where id = $1', [cid])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, countryByCode(s.destination)?.name ?? s.destination, `Recipient set: ${c[0].name}${c[0].city ? `, ${c[0].city}` : ''} (by ${u.name}).`])
     if (s.user_id) await notify(db, { userId: s.user_id, kind: 'shipment_status', title: `${s.ref}: recipient set to ${c[0].name}`, body: `${u.company ?? 'Your shipper'} added who receives this shipment${c[0].city ? ` in ${c[0].city}` : ''}. They'll get the arrival text.`, link: `/dashboard?tab=shipments&open=${s.id}`, dedupe: `cons:${s.id}:${cid}` })
-    res.json({ consignee: { id: c[0].id, name: c[0].name, phone: c[0].phone, address: c[0].address, city: c[0].city, country: c[0].country, relationship: c[0].relationship } })
+    res.json({ consignee: { id: c[0].id, name: c[0].name, phone: c[0].phone, address: c[0].address, city: c[0].city, country: c[0].country, relationship: c[0].relationship, gps: c[0].gps ?? '', lat: c[0].lat == null ? null : Number(c[0].lat), lng: c[0].lng == null ? null : Number(c[0].lng) } })
   }))
 
   /** One step back. Managers only; the reason goes on the timeline and to the customer. */
@@ -253,7 +253,7 @@ export function mountShipmentOps(r: Router, d: Deps) {
     // consignee
     let consigneeId: string | null = null
     if (b.consigneeId) { const { rows } = await db.query<Row>('select id from client_consignees where id = $1 and client_id = $2', [b.consigneeId, c.id]); if (!rows[0]) throw new HttpError(400, 'That recipient belongs to another client.'); consigneeId = rows[0].id }
-    else if (b.consignee?.name) { consigneeId = 'cs_' + uid(); await db.query('insert into client_consignees (id,client_id,name,phone,address,city,country,relationship,is_default) values ($1,$2,$3,$4,$5,$6,$7,$8,false)', [consigneeId, c.id, b.consignee.name, b.consignee.phone ?? '', b.consignee.address ?? '', b.consignee.city ?? '', b.consignee.country ?? b.destination, b.consignee.relationship ?? '']) }
+    else if (b.consignee?.name) { consigneeId = 'cs_' + uid(); await db.query('insert into client_consignees (id,client_id,name,phone,address,city,country,relationship,gps,lat,lng,is_default) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,false)', [consigneeId, c.id, b.consignee.name, b.consignee.phone ?? '', b.consignee.address ?? '', b.consignee.city ?? '', b.consignee.country ?? b.destination, b.consignee.relationship ?? '', b.consignee.gps ?? '', b.consignee.lat ?? null, b.consignee.lng ?? null]) }
     // shipment
     const id = uid(); const ref = makeRef()
     const descr = b.description || `${b.quantity} × ${b.cargo}${b.vehicle?.make ? ` — ${[b.vehicle.year, b.vehicle.make, b.vehicle.model].filter(Boolean).join(' ')}` : ''} for ${c.name}`

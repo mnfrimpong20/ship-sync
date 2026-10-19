@@ -1,6 +1,6 @@
 import { StuckCard } from './FlowCards'
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { AlertTriangle, ArrowRight, Bell, CalendarDays, Clock, FileText, Inbox, Info, MapPinned, Package, Send, Ship, TrendingDown, TrendingUp, Truck, UserPlus, Users, Wallet } from 'lucide-react'
 import { insightsApi, type AttentionItem, type Benchmarks as BenchmarksT, type Kpi, type Overview, type TodayBlock, type WeekPoint } from '../lib/insights'
@@ -8,6 +8,7 @@ import { fmtDateTime, money } from './ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { OnboardingChecklist } from './Onboarding'
 import { OrderLinkCard } from './OrderLink'
+import { OpsOverview } from './OpsOverview'
 import { useStore } from '../lib/store'
 
 /* ---------- small pieces ---------- */
@@ -114,7 +115,23 @@ function Attention({ items }: { items: AttentionItem[] }) {
 }
 
 /* ---------- page section ---------- */
+/** Overview tabs (kept in the URL as ?ov= so links and refreshes land on the same tab). */
+export function OverviewTabs({ tabs, active, onPick }: { tabs: [string, string][]; active: string; onPick: (k: string) => void }) {
+  return (
+    <div role="tablist" aria-label="Overview" className="mt-6 inline-flex rounded-full border border-border bg-surface p-1" data-testid="overview-tabs">
+      {tabs.map(([k, l]) => <button key={k} role="tab" aria-selected={active === k} onClick={() => onPick(k)} className={`min-h-9 rounded-full px-4 text-sm font-semibold focus-ring ${active === k ? 'bg-gold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid={`overview-tab-${k}`}>{l}</button>)}
+    </div>
+  )
+}
+
 export default function ShipperOverview({ firstName }: { firstName: string }) {
+  const [sp, setSp] = useSearchParams()
+  const tab = sp.get('ov') === 'operations' ? 'operations' : 'quotes'
+  const pick = (k: string) => { const n = new URLSearchParams(sp); if (k === 'quotes') n.delete('ov'); else n.set('ov', k); setSp(n, { replace: true }) }
+  return <><OverviewTabs tabs={[['quotes', 'Quotes & wins'], ['operations', 'Operations']]} active={tab} onPick={pick} />{tab === 'operations' ? <OpsOverview scope="shipper" /> : <QuotesOverview firstName={firstName} />}</>
+}
+
+function QuotesOverview({ firstName }: { firstName: string }) {
   const { user } = useStore()
   const [o, setO] = useState<Overview | null>(null)
   const [error, setError] = useState('')

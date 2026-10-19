@@ -49,6 +49,7 @@ import { mountRequestFlow, startRequestSweeps, sweepRequests } from './requestFl
 import { mountBooking } from './booking'
 import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
+import { mountOperations } from './operations'
 import { mountSupplies, attachDefaultSupplies, defaultQuoteSupplies, resolveQuoteSupplies, suppliesFromQuote, suppliesTotal, type QuoteSupplyLine, type SupplyNeed } from './supplies'
 import { mountReviews } from './reviews'
 import { mountBrand } from './brand'
@@ -790,6 +791,7 @@ export function apiRouter() {
   mountBooking(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountWarehouse(r, { getDb, requireUser, HttpError, wrap })
   mountLanes(r, { getDb, requireUser, HttpError, wrap })
+  mountOperations(r, { getDb, requireUser, HttpError, wrap })
   mountSupplies(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountReviews(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountBrand(r, { getDb, requireUser, HttpError, wrap })

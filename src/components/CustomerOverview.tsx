@@ -1,6 +1,8 @@
 /** Customer home: what needs you, money and messages at a glance, recent shipments with quick actions, and a getting-started checklist. */
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { OpsOverview } from './OpsOverview'
+import { OverviewTabs } from './ShipperOverview'
 import { motion } from 'motion/react'
 import { ArrowRight, CalendarDays, Check, CheckCircle2, CreditCard, FileText, MessageSquare, Package, Share2, Ship, Truck, Wallet, X } from 'lucide-react'
 import { useStore } from '../lib/store'
@@ -71,6 +73,13 @@ function Tile({ to, icon: Icon, label, value, hint, tone, testid }: { to: string
 }
 
 export function CustomerOverview() {
+  const [sp, setSp] = useSearchParams()
+  const tab = sp.get('ov') === 'activity' ? 'activity' : 'glance'
+  const pick = (k: string) => { const n = new URLSearchParams(sp); if (k === 'glance') n.delete('ov'); else n.set('ov', k); setSp(n, { replace: true }) }
+  return <><OverviewTabs tabs={[['glance', 'At a glance'], ['activity', 'Activity & spending']]} active={tab} onPick={pick} />{tab === 'activity' ? <OpsOverview scope="customer" /> : <GlanceOverview />}</>
+}
+
+function GlanceOverview() {
   const { user, shipments, requests } = useStore()
   const sum = useSummary()
   const [home, setHome] = useState<{ items: AttentionItem[]; nextArrival: NextArrival | null } | null>(null)

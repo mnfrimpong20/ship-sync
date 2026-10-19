@@ -2,7 +2,7 @@ import { roleHome } from '../lib/ops'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Building2, Check, KeyRound, Loader2, MailCheck, MessageSquare, User } from 'lucide-react'
+import { ArrowRight, Building2, Check, KeyRound, Loader2, MailCheck, MessageSquare, User } from 'lucide-react'
 import { devicePin, saveDevicePin } from '../lib/driver'
 import type { User as ApiUserLite } from '../lib/store'
 import { api, useStore, type Role } from '../lib/store'
@@ -129,6 +129,7 @@ export function Login() {
         {role === 'shipper' && devicePin() && <button type="button" onClick={() => setMode('pin')} className="min-h-11 text-sm text-text-muted underline">Use my PIN</button>}
         <DemoNote role={role} />
       </form>}
+      <Link to="/broker-portal/login" className="mt-6 flex min-h-12 items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-sm hover:border-gold focus-ring" data-testid="broker-signin-link"><span><b>Customs broker?</b> <span className="text-text-muted">Sign in to your broker dashboard</span></span><ArrowRight size={16} className="shrink-0 text-gold-deep" aria-hidden="true" /></Link>
     </Shell>
   )
 }

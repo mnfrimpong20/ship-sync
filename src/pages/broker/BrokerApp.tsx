@@ -72,6 +72,8 @@ function Login({ onIn }: { onIn: () => void }) {
           <button disabled={busy} className="btn-gold w-full" data-testid="bp-login-go">{busy ? 'One moment…' : mode === 'pw' ? 'Sign in' : 'Email me a sign-in link'}</button>
           <button type="button" onClick={() => setMode(mode === 'pw' ? 'link' : 'pw')} className="text-sm font-semibold text-gold-deep underline">{mode === 'pw' ? 'Forgot your password? Email me a link' : 'Use my password instead'}</button>
         </form>)}
+      <p className="mt-6 border-t border-border pt-4 text-center text-sm text-text-muted">Not on Ntemtem yet? <Link to="/brokers/join" className="font-semibold text-gold-deep underline">Apply to join the broker network</Link></p>
+      <p className="mt-2 text-center text-xs text-text-muted">Shipping company or customer? <Link to="/login" className="underline">Sign in here</Link></p>
     </AuthFrame>
   )
 }

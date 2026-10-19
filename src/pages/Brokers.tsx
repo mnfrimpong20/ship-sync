@@ -2,13 +2,14 @@ import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Anchor, ArrowLeft, BadgeCheck, Calculator, Check, ClipboardCheck, Clock, FileText, Filter, Landmark, PackageCheck, Phone, Search, ShieldCheck, X } from 'lucide-react'
+import { Anchor, ArrowLeft, LogIn, BadgeCheck, Calculator, Check, ClipboardCheck, Clock, FileText, Filter, Landmark, PackageCheck, Phone, Search, ShieldCheck, X } from 'lucide-react'
 import { brokersApi, jobStepLabels, JOB_STEPS, type Broker, type BrokerInput, type JobStep, type StepInput } from '../lib/brokers'
 import { countries, countryByCode, cargoLabel, cargoTypes, type CargoType } from '../lib/data'
 import { useStore } from '../lib/store'
 import { Avatar, Empty, Logo, Pill, Rating, fmtDateTime, money, Flag } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { StatCard } from '../components/board'
+import { BrokerApplications, DashboardAccess, useBrokerAccess } from '../components/AdminBrokerNetwork'
 
 /* ================= public directory ================= */
 export function BrokerCard({ b, cargo }: { b: Broker; cargo?: CargoType }) {
@@ -137,6 +138,13 @@ export default function BrokersPage() {
         </div>
       </section>
 
+      <section className="border-b border-border" aria-label="For customs brokers" data-testid="broker-cta-band">
+        <div className="container-fluid flex flex-wrap items-center justify-between gap-3 py-4">
+          <p className="text-sm"><b>Are you a licensed customs broker?</b> <span className="text-text-muted">Get clearance jobs on Ntemtem, with your own dashboard for jobs, papers, invoices and messages.</span></p>
+          <div className="flex flex-wrap gap-2"><Link to="/brokers/join" className="btn-gold !min-h-10 !px-4 text-sm">Join the network</Link><Link to="/broker-portal/login" className="btn-ghost !min-h-10 !px-4 text-sm"><LogIn size={15} aria-hidden="true" /> Broker sign in</Link></div>
+        </div>
+      </section>
+
       <div className="container-fluid py-10">
         <div className="grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside>
@@ -146,7 +154,7 @@ export default function BrokersPage() {
               <div className="mt-4 hidden rounded-2xl border border-dashed border-border p-4 text-xs text-text-muted lg:block">
                 <p className="font-semibold text-text">Are you a licensed clearing agent?</p>
                 <p className="mt-1">Get jobs from shippers and customers on Ntemtem. Listing is free — we check your licence first.</p>
-                <a href="mailto:hello@ntemtem.com?subject=Broker listing" className="btn-ghost mt-3 !min-h-9 w-full text-xs">Get listed</a>
+                <Link to="/brokers/join" className="btn-gold mt-3 !min-h-9 w-full text-xs">Apply to join</Link><Link to="/broker-portal/login" className="btn-ghost mt-2 !min-h-9 w-full text-xs">Broker sign in</Link>
               </div>
             </div>
           </aside>
@@ -313,6 +321,7 @@ export function AdminBrokers() {
   const [list, setList] = useState<Broker[] | null>(null)
   const [form, setForm] = useState<(BrokerInput & { id?: string }) | null>(null)
   const [busy, setBusy] = useState(''); const [msg, setMsg] = useState(''); const [error, setError] = useState('')
+  const { access, reload: reloadAccess } = useBrokerAccess()
   const load = () => brokersApi.admin().then(setList).catch((e) => setError(e instanceof Error ? e.message : 'Could not load.'))
   useEffect(() => { void load() }, [])
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(''), 3500); return () => clearTimeout(t) }, [msg])
@@ -326,7 +335,8 @@ export function AdminBrokers() {
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4"><StatCard label="Listed" value={list?.length ?? 0} hint="All ports" icon={Landmark} /><StatCard label="Verified" value={list?.filter((b) => b.verified).length ?? 0} hint="Licence checked" icon={BadgeCheck} /><StatCard label="Jobs" value={list?.reduce((n, b) => n + b.jobs, 0) ?? 0} hint="Booked through the platform" icon={FileText} /></div>
-      <div className="mt-4 flex justify-end">{!form && <button onClick={() => setForm(blank())} className="btn-gold !min-h-9 !px-4 text-sm" data-testid="new-broker">Add a broker</button>}</div>
+      <BrokerApplications onApproved={() => { void load(); void reloadAccess() }} />
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-2"><h3 className="text-lg font-semibold">Listings</h3>{!form && <button onClick={() => setForm(blank())} className="btn-gold !min-h-9 !px-4 text-sm" data-testid="new-broker">Add a broker</button>}</div>
       {form && (
         <form onSubmit={(e) => { e.preventDefault(); void act(async () => { if (form.id) await brokersApi.update(form.id, form); else await brokersApi.create(form); setForm(null) }, form.id ? 'Broker updated.' : 'Broker listed.', 'save') }} className="card-dark mt-4 grid gap-3 p-5 sm:grid-cols-2" aria-label="Broker form" data-testid="broker-form">
           <label className="text-xs text-text-muted">Name<input required className="input-dark mt-1 !min-h-9 text-sm" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
@@ -349,6 +359,7 @@ export function AdminBrokers() {
         {list?.map((b) => (
           <li key={b.id} className={`card-dark p-4 ${b.active ? '' : 'dimmed'}`} data-testid="admin-broker-row">
             <div className="flex items-start justify-between gap-2"><div className="flex min-w-0 items-center gap-2"><Avatar initials={b.initials} hue={b.hue} size={32} /><div className="min-w-0"><p className="truncate text-sm font-semibold">{b.name}{b.verified && <BadgeCheck size={13} className="ml-1 inline text-teal" />}</p><p className="truncate text-xs text-text-muted">{b.company || 'Independent'} · {b.countryName} · {b.ports.join(', ')} · {b.jobs} job{b.jobs === 1 ? '' : 's'}</p></div></div><div className="flex gap-1.5"><button onClick={() => act(() => brokersApi.update(b.id, { verified: !b.verified }), b.verified ? 'Verification removed.' : 'Broker verified.', b.id)} disabled={busy === b.id} className="btn-ghost !min-h-8 !px-2.5 text-xs">{b.verified ? 'Unverify' : 'Verify'}</button><button onClick={() => setForm({ id: b.id, name: b.name, company: b.company, country: b.country, ports: b.ports, licenceNo: b.licenceNo, licenceAuthority: b.licenceAuthority, phone: b.phone, whatsapp: b.whatsapp, email: b.email, about: b.about, specialties: b.specialties, fees: b.fees, dutyAdvance: b.dutyAdvance, responseHours: b.responseHours, verified: b.verified, active: b.active })} className="btn-ghost !min-h-8 !px-2.5 text-xs">Edit</button></div></div>
+            <DashboardAccess brokerId={b.id} defaultEmail={b.email} defaultName={b.name} members={access[b.id] ?? []} onChange={() => void reloadAccess()} />
           </li>
         ))}
       </ul>

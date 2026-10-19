@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useScroll, useSpring } from 'motion/react'
-import { Mail, LifeBuoy, Anchor, ArrowRight, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X, Printer } from 'lucide-react'
+import { LogIn, Mail, LifeBuoy, Anchor, ArrowRight, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X, Printer } from 'lucide-react'
 import { Logo, VerifiedMark } from './ui'
 import { useStore } from '../lib/store'
 
@@ -25,6 +25,7 @@ const services: { title: string; items: Service[] }[] = [
     { to: '/lanes', label: 'Lane prices', blurb: 'What it really costs on your lane', icon: BarChart3 },
     { to: '/duty', label: 'Duty estimator', blurb: 'Landed cost at Tema, Lagos and more', icon: Calculator },
     { to: '/brokers', label: 'Customs brokers', blurb: 'Licensed clearing agents at the port', icon: Landmark },
+    { to: '/broker-portal/login', label: 'Broker sign in', blurb: 'For clearing agents on Ntemtem — or apply to join', icon: LogIn },
   ] },
   { title: 'Follow along', items: [
     { to: '/live', label: 'Live map', blurb: 'Ships and flights on the Gulf of Guinea', icon: Radar },

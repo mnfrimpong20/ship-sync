@@ -29,6 +29,7 @@ const Drivers = lazy(() => import('./pages/Drivers'))
 const RunsList = lazy(() => import('./pages/Routes'))
 const RoutePlanner = lazy(() => import('./pages/RoutePlanner'))
 const MyRuns = lazy(() => import('./pages/MyRuns'))
+const BrokerJoin = lazy(() => import('./pages/BrokerJoin'))
 const BrokerApp = lazy(() => import('./pages/broker/BrokerApp'))
 const OfficeBrokerInvoice = lazy(() => import('./pages/broker/BrokerMoney').then((m) => ({ default: m.OfficeInvoicePage })))
 const DriverHr = lazy(() => import('./pages/DriverHr'))
@@ -164,6 +165,8 @@ export default function App() {
               <Route path="/duty" element={<Duty />} />
               <Route path="/groupage" element={<GroupagePage />} />
               <Route path="/brokers" element={<BrokersPage />} />
+              <Route path="/brokers/join" element={<BrokerJoin />} />
+              <Route path="/brokers/login" element={<Navigate to="/broker-portal/login" replace />} />
               <Route path="/brokers/:id" element={<BrokerProfile />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/for-shippers" element={<ForShippersPage />} />
@@ -250,6 +253,7 @@ export default function App() {
             <Route path="/r/:token" element={<Receive />} />
             <Route path="/broker/:token" element={<BrokerPortal />} />
             <Route path="/broker-portal/*" element={<BrokerApp />} />
+            <Route path="/broker-login" element={<Navigate to="/broker-portal/login" replace />} />
             <Route path="/s/:token" element={<SupplierPortalPage />} />
             <Route path="/p/:token" element={<PartnerPortal />} />
             <Route path="/add-recipient/:token" element={<AddRecipient />} />

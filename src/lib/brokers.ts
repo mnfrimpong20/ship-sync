@@ -32,3 +32,17 @@ export const brokersApi = {
   create: (b: BrokerInput) => api<{ broker: Broker }>('/admin/brokers', { json: b }).then((r) => r.broker),
   update: (id: string, b: Partial<BrokerInput>) => api<{ broker: Broker }>(`/admin/brokers/${id}`, { method: 'PATCH', json: b }).then((r) => r.broker),
 }
+
+/* ---- joining the broker network ---- */
+export interface BrokerApplicationInput { company: string; name: string; email: string; phone: string; whatsapp: string; country: string; ports: string[]; licenceNo: string; licenceAuthority: string; licenceExpires: string | null; specialties: string[]; about: string; fees: Record<string, number>; dutyAdvance: boolean; licenceFile: string | null; website?: string }
+export interface BrokerApplication extends Omit<BrokerApplicationInput, 'licenceFile' | 'website'> { id: string; hasLicenceFile: boolean; status: 'pending' | 'approved' | 'rejected'; reason: string; brokerId: string | null; decidedBy: string | null; decidedAt: string | null; createdAt: string }
+export interface BrokerAccess { name: string; email: string; role: string; status: string; lastSeenAt: string | null }
+export const networkApi = {
+  apply: (b: BrokerApplicationInput) => api('/broker-applications', { json: b }),
+  applications: () => api<{ applications: BrokerApplication[] }>('/admin/broker-applications').then((r) => r.applications),
+  licence: (id: string) => api<{ dataUrl: string }>(`/admin/broker-applications/${id}/licence`).then((r) => r.dataUrl),
+  approve: (id: string, verified: boolean) => api<{ ok: true; brokerId: string; link: string }>(`/admin/broker-applications/${id}/approve`, { json: { verified } }),
+  reject: (id: string, reason: string) => api(`/admin/broker-applications/${id}/reject`, { json: { reason } }),
+  access: () => api<{ access: Record<string, BrokerAccess[]> }>('/admin/broker-access').then((r) => r.access),
+  invite: (brokerId: string, b: { name: string; email: string; phone?: string }) => api<{ ok: true; link: string }>(`/admin/brokers/${brokerId}/invite`, { json: b }),
+}

@@ -767,6 +767,14 @@ alter table broker_jobs add column if not exists port text not null default '';
 alter table brokers add column if not exists accepting boolean not null default true;
 alter table brokers add column if not exists settings jsonb not null default '{}';
 alter table brokers add column if not exists licence_expires date;
+create table if not exists broker_applications (
+  id text primary key, company text not null, name text not null, email text not null, phone text not null default '', whatsapp text not null default '',
+  country text not null, ports jsonb not null default '[]', licence_no text not null, licence_authority text not null default '', licence_expires date,
+  specialties jsonb not null default '[]', about text not null default '', fees jsonb not null default '{}', duty_advance boolean not null default false,
+  licence_file text, status text not null default 'pending', reason text not null default '', broker_id text, decided_by text, decided_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_bapp_status on broker_applications(status, created_at);
 
 create table if not exists sailings (
   id text primary key,

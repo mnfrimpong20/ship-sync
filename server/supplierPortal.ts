@@ -10,6 +10,7 @@
  *   GET  /s/:token/files/:fid                    supplier: their own photos back
  */
 import { randomBytes } from 'node:crypto'
+import { isDriverRole } from '../src/lib/roles'
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
 import { uid, type Db } from './db'
@@ -46,7 +47,7 @@ async function tellAgents(db: Db, job: Row, title: string, body: string, dedupe:
 export function mountSupplierPortal(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
 
-  const isAgent = (u: ApiUser) => !!u.admin || (u.role === 'shipper' && u.shipperId === SOURCING_SHIPPER && u.staffRole !== 'driver')
+  const isAgent = (u: ApiUser) => !!u.admin || (u.role === 'shipper' && u.shipperId === SOURCING_SHIPPER && !isDriverRole(u.staffRole))
   const jobFor = async (db: Db, id: string) => { const { rows } = await db.query<Row>('select * from sourcing_requests where id = $1 or ref = $1', [id]); if (!rows[0]) throw new HttpError(404, 'Sourcing request not found.'); return rows[0] }
   const byToken = async (db: Db, token: string) => {
     const { rows } = await db.query<Row>(`select l.*, j.ref, j.title, j.description, j.quantity, j.unit, j.status as job_status, j.po, j.agent_user_id, j.destination, j.id as job_id, sp.name as sup_name, sp.contact as sup_contact, q.unit_price_cny, q.currency, j.origin_country, q.lead_days, q.qty as q_qty, q.title as q_title, q.notes as q_notes, q.tiers, q.moq

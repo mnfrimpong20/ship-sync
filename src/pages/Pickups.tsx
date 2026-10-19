@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -76,7 +77,7 @@ export default function Pickups() {
 
   if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/pickups" replace />
-  if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
+  if (user.role !== 'shipper' || isDriverRole(user.staffRole)) return <Navigate to="/dashboard" replace />
 
   const act = async (id: string, fn: () => Promise<unknown>, msg: string) => { setBusy(id); setError(''); try { await fn(); await load(); setToast(msg) } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong.') } finally { setBusy(''); setConfirming(null); setMoving(null); setCancelling(null) } }
   const openMove = async (p: Pickup) => { try { const d = await pickupsApi.forShipment(p.shipmentId); setMoving({ p, slots: d.slots, slot: null, note: '' }) } catch (e) { setError(e instanceof Error ? e.message : 'Could not load slots.') } }

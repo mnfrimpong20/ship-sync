@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -88,7 +89,7 @@ export default function Scan() {
   const [sound, setSound] = useState(() => { try { return localStorage.getItem('ss-scan-sound') !== '0' } catch { return true } })
   const signal = (k: 'ok' | 'warn' | 'bad') => { scanFeedback(k, sound); setFlash(k); setTimeout(() => setFlash(null), 650) }
   const pos = useRef<{ lat: number; lon: number } | null>(null)
-  const isDriver = user?.staffRole === 'driver'
+  const isDriver = isDriverRole(user?.staffRole)
 
   useEffect(() => {
     if (!ready || user?.role !== 'shipper') return
@@ -97,7 +98,9 @@ export default function Scan() {
     scanApi.recent().then(setRecent).catch(() => {})
     navigator.geolocation?.getCurrentPosition((p) => { pos.current = { lat: p.coords.latitude, lon: p.coords.longitude } }, () => {}, { maximumAge: 60000, timeout: 5000 })
   }, [ready, user, isDriver, runId])
-  useEffect(() => { if (isDriver && kind === 'loading' && !sp.get('kind')) setKind('delivery') }, [isDriver]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Pickup drivers check pieces; delivery drivers deliver (and check); the old single role keeps everything but loading.
+  const driverKinds: ScanKind[] = user?.staffRole === 'pickup_driver' ? ['check'] : user?.staffRole === 'delivery_driver' ? ['delivery', 'check'] : ['devanning', 'delivery', 'check']
+  useEffect(() => { if (isDriver && !driverKinds.includes(kind)) setKind(driverKinds[0]) }, [isDriver]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { startQueueSync(); const onQ = () => setQueued(scanQueue.list().length); const on = () => setOnline(true), off = () => setOnline(false); window.addEventListener(SCAN_QUEUE_EVENT, onQ); window.addEventListener('online', on); window.addEventListener('offline', off); return () => { window.removeEventListener(SCAN_QUEUE_EVENT, onQ); window.removeEventListener('online', on); window.removeEventListener('offline', off) } }, [])
 
   const commit = useCallback(async (c: string, k: ScanKind, extra?: { note?: string; receivedBy?: string; photo?: string; signature?: string }) => {
@@ -142,7 +145,7 @@ export default function Scan() {
 
         {/* what this scan means */}
         <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Scan type">
-          {KINDS.filter((k) => !(isDriver && k === 'loading')).map((k) => { const I = kindIcon[k]; return <button key={k} role="radio" aria-checked={kind === k} onClick={() => { setKind(k); setLook(null); setResult(null); setError(''); const n = new URLSearchParams(sp); n.set('kind', k); setSp(n, { replace: true }) }} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm focus-ring ${kind === k ? 'border-gold bg-gold/10 font-semibold' : 'border-border text-text-muted hover:text-text'}`}><I size={16} className={kind === k ? 'text-gold-deep' : ''} aria-hidden="true" /> {scanKindShort[k]}</button> })}
+          {KINDS.filter((k) => !isDriver || driverKinds.includes(k)).map((k) => { const I = kindIcon[k]; return <button key={k} role="radio" aria-checked={kind === k} onClick={() => { setKind(k); setLook(null); setResult(null); setError(''); const n = new URLSearchParams(sp); n.set('kind', k); setSp(n, { replace: true }) }} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm focus-ring ${kind === k ? 'border-gold bg-gold/10 font-semibold' : 'border-border text-text-muted hover:text-text'}`}><I size={16} className={kind === k ? 'text-gold-deep' : ''} aria-hidden="true" /> {scanKindShort[k]}</button> })}
         </div>
         {kind === 'loading' && !isDriver && (
           <div className="mt-3 flex flex-wrap items-center gap-2">

@@ -8,6 +8,7 @@
  *   shipper   open a slot (lane, kind, capacity, price per unit, closing date) → watch it fill → close → book everyone
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
 import { uid, makeRef, type Db } from './db'
 import type { ApiUser } from './api'
@@ -67,7 +68,7 @@ const zJoin = z.object({ units: z.number().int().min(1).max(2000), description: 
 
 export function mountGroupage(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
-  const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.'); return u }
+  const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.'); return u }
   const byId = async (db: Db, id: string) => { const { rows } = await db.query<Row>(`${SELECT} where g.id = $1`, [id]); if (!rows[0]) throw new HttpError(404, 'Shared slot not found.'); return rows[0] }
   const spots = async (db: Db, gid: string) => (await db.query<Row>(`${SPOT_SELECT} where s.groupage_id = $1 order by s.created_at asc`, [gid])).rows
   const refreshFull = async (db: Db, gid: string) => {
@@ -124,7 +125,7 @@ export function mountGroupage(r: Router, d: Deps) {
     const db = await getDb(); const u = await requireUser(db, req)
     const { rows } = await db.query<Row>(`${SPOT_SELECT} where s.id = $1`, [req.params.id]); const s = rows[0]; if (!s) throw new HttpError(404, 'Reservation not found.')
     const g = await byId(db, s.groupage_id)
-    const isOffice = u.role === 'shipper' && u.shipperId === g.shipper_id && u.staffRole !== 'driver'
+    const isOffice = u.role === 'shipper' && u.shipperId === g.shipper_id && !isDriverRole(u.staffRole)
     if (s.user_id !== u.id && !isOffice) throw new HttpError(403, 'Not your reservation.')
     if (s.status !== 'reserved') throw new HttpError(409, s.status === 'booked' ? 'Already booked — contact the shipper to cancel the shipment.' : 'Already cancelled.')
     await db.query(`update groupage_spots set status = 'cancelled' where id = $1`, [s.id])

@@ -5,6 +5,7 @@
  * on that host are sent to the branded page.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
 import type { Db } from './db'
 import type { ApiUser } from './api'
@@ -82,7 +83,7 @@ export function mountBrand(r: Router, d: Deps) {
   /** Office: the company's order link, ready to share (every shipper has one — no setup needed). */
   r.get('/shipper/order-link', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireUser(db, req)
-    if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.')
+    if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.')
     const { rows } = await db.query<Row>('select * from shippers where id = $1', [u.shipperId]); const sh = rows[0]; const b = brandOf(sh)
     const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')
     const { rows: c } = await db.query<Row>(`select count(*)::int as n, count(*) filter (where created_at > now() - interval '30 days')::int as n30 from requests where preferred_shipper_id = $1 and source in ('link','branded')`, [u.shipperId])

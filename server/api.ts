@@ -68,7 +68,7 @@ import { mountReviews } from './reviews'
 import { mountBrand } from './brand'
 
 /* ---------------- types (API shapes match the old client store) ---------------- */
-export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: StaffPerms; staffId?: string; display?: DisplayPrefs; readOnly?: boolean; viewAsBy?: string; actingBy?: { id: string; name: string; email: string } }
+export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'pickup_driver' | 'delivery_driver' | 'driver'; perms?: StaffPerms; staffId?: string; display?: DisplayPrefs; readOnly?: boolean; viewAsBy?: string; actingBy?: { id: string; name: string; email: string } }
 export interface StaffPerms { allow?: Area[]; deny?: Area[] }
 export interface DisplayPrefs { lang?: 'en' | 'fr'; textSize?: 'normal' | 'large' | 'larger'; theme?: 'light' | 'dark' | 'system'; road?: boolean }
 /** Areas a company can grant or withhold per person on top of their role. Mirrors ROLE_AREAS in src/lib/ops.ts. */
@@ -79,7 +79,7 @@ const ROLE_BASE: Record<string, Area[] | 'all'> = {
   agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing', 'analytics'],
   finance: ['clients', 'payments', 'collections', 'reviews', 'shipments', 'team', 'analytics'],
   warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team', 'analytics'],
-  driver: ['routes', 'team'],
+  pickup_driver: ['routes'], delivery_driver: ['routes'], driver: ['routes'],
 }
 /** Role + per-person overrides → may this staff member use this area? Admins and customers are handled by callers. */
 export function can(u: ApiUser, area: Area): boolean {

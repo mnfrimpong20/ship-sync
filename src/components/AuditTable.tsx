@@ -4,7 +4,7 @@ import { adminConsoleApi, auditCsvUrl, platformApi, type AuditEntry } from '../l
 import { fmtDateTime } from './ui'
 import { NoData } from './Charts'
 
-const ROLES = ['', 'admin', 'owner', 'dispatcher', 'agent', 'finance', 'warehouse', 'driver', 'customer', 'system']
+const ROLES = ['', 'admin', 'owner', 'dispatcher', 'agent', 'finance', 'warehouse', 'pickup_driver', 'delivery_driver', 'driver', 'customer', 'system']
 /** Searchable audit log. `admin` shows every company; otherwise the caller's company only. */
 export function AuditTable({ admin }: { admin: boolean }) {
   const [q, setQ] = useState({ q: '', role: '', from: '', to: '', viewAs: '' }); const [typed, setTyped] = useState('')

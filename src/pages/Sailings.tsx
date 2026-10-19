@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -79,7 +80,7 @@ export default function Sailings() {
   useEffect(() => { if (preset.containerId && data && !booking) { const c = containers.find((x) => x.id === preset.containerId); if (c && !kind) setKind('container'); if (c && !dest) setDest(c.destination) } }, [preset, data]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/sailings" replace />
-  if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
+  if (user.role !== 'shipper' || isDriverRole(user.staffRole)) return <Navigate to="/dashboard" replace />
   const vehicles = shipments.filter((s) => s.cargo === 'vehicle' && ['booked', 'picked_up', 'at_origin_port'].includes(s.status)).map((s) => ({ id: s.id, ref: s.ref, description: s.description }))
   const all = data?.sailings ?? []
   const ports = Array.from(new Set(all.map((x) => x.originPort))).sort()

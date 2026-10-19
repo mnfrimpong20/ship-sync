@@ -18,6 +18,7 @@
  *   people     agents are staff of the platform-owned shipper `ship-sync-sourcing`; admins assign jobs
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { uid, makeRef, type Db } from './db'
@@ -264,7 +265,7 @@ export async function sourcingOnShipmentStatus(db: Db, s: Row, status: ShipmentS
 /* ------------------------------------------------------------------ routes */
 export function mountSourcing(r: Router, d: Deps) {
   const { getDb, requireUser, requireAdmin, HttpError, wrap } = d
-  const isAgent = (u: ApiUser) => u.admin || (u.role === 'shipper' && u.shipperId === SOURCING_SHIPPER && u.staffRole !== 'driver')
+  const isAgent = (u: ApiUser) => u.admin || (u.role === 'shipper' && u.shipperId === SOURCING_SHIPPER && !isDriverRole(u.staffRole))
   const agentOnly = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (!isAgent(u)) throw new HttpError(403, 'Ntemtem Sourcing team only.'); return u }
   const access = async (db: Db, req: Request, id: string) => {
     const u = await requireUser(db, req); const job = await jobById(db, id); if (!job) throw new HttpError(404, 'Sourcing request not found.')

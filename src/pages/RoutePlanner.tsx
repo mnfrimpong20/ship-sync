@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { canDriveKind, isDriverRole } from '../lib/roles'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -74,7 +75,7 @@ export default function RoutePlanner() {
   useEffect(() => {
     if (!ready || user?.role !== 'shipper') return
     let live = true
-    Promise.all([opsApi.team(), opsApi.vehicles(), isNew ? Promise.resolve(null) : (user.staffRole === 'driver' ? opsApi.myRuns() : opsApi.runs()).then((rs) => rs.find((r) => r.id === id) ?? null)])
+    Promise.all([opsApi.team(), opsApi.vehicles(), isNew ? Promise.resolve(null) : (isDriverRole(user.staffRole) ? opsApi.myRuns() : opsApi.runs()).then((rs) => rs.find((r) => r.id === id) ?? null)])
       .then(([t, v, r]) => { if (!live) return; setTeam(t); setVehicles(v); if (!isNew) { if (!r) setError('Run not found.'); setRun(r) } })
       .catch((e) => live && setError(e instanceof Error ? e.message : 'Could not load.'))
     return () => { live = false }
@@ -97,7 +98,7 @@ export default function RoutePlanner() {
     return () => { live = false }
   }, [drafts])
 
-  const drivers = useMemo(() => team.filter((s) => s.role === 'driver' && s.status === 'active'), [team])
+  const drivers = useMemo(() => team.filter((s) => isDriverRole(s.role) && s.status === 'active'), [team])
   const fleet = useMemo(() => vehicles.filter((v) => v.status !== 'retired'), [vehicles])
 
   const addCandidate = (c: Candidate) => { if (drafts.some((d) => d.shipmentId === c.shipmentId)) return; setDrafts((ds) => [...ds, { id: uid(), shipmentId: c.shipmentId, label: c.label, address: c.address, contact: c.contact, phone: c.phone, geoState: c.address ? 'pending' : 'miss' }]) }
@@ -120,7 +121,7 @@ export default function RoutePlanner() {
   if (!user) return <Navigate to={`/login?role=shipper&next=/dashboard/routes/${id ?? 'new'}`} replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   if (isNew && !manage) return <Navigate to="/dashboard/routes" replace />
-  if (user.staffRole === 'driver' && !isNew && id) return <DriverRun id={id} />
+  if (isDriverRole(user.staffRole) && !isNew && id) return <DriverRun id={id} />
 
   const create = async () => {
     setBusy(true); setError('')
@@ -135,13 +136,13 @@ export default function RoutePlanner() {
   const mapStops: MapStop[] = isNew ? drafts.map((d, i) => ({ id: d.id, seq: i, label: d.label, lat: d.lat, lon: d.lon })) : (run?.stops ?? []).map((s) => ({ id: s.id, seq: s.seq, label: s.label, lat: s.lat, lon: s.lon, status: s.status }))
   const mapStart = isNew ? start : run?.start ?? null
   const editable = isNew || (manage && run?.status === 'planned')
-  const canWorkStops = !isNew && run && (manage || (user.staffRole === 'driver' && run.driverId === team.find((s) => s.userId === user.id)?.id)) && run.status === 'in_progress'
+  const canWorkStops = !isNew && run && (manage || (isDriverRole(user.staffRole) && run.driverId === team.find((s) => s.userId === user.id)?.id)) && run.status === 'in_progress'
   const noGeo = mapStops.filter((s) => s.lat == null).length
 
   const header = (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <Link to={user.staffRole === 'driver' ? '/dashboard/runs' : '/dashboard/routes'} className="mb-2 inline-flex items-center gap-1 text-sm text-text-muted hover:text-text focus-ring"><ArrowLeft size={14} aria-hidden="true" /> {user.staffRole === 'driver' ? 'My runs' : 'All runs'}</Link>
+        <Link to={isDriverRole(user.staffRole) ? '/dashboard/runs' : '/dashboard/routes'} className="mb-2 inline-flex items-center gap-1 text-sm text-text-muted hover:text-text focus-ring"><ArrowLeft size={14} aria-hidden="true" /> {isDriverRole(user.staffRole) ? 'My runs' : 'All runs'}</Link>
         <h1 className="flex flex-wrap items-center gap-3 !text-[clamp(1.5rem,3vw,2.2rem)]">{isNew ? 'Plan a run' : run?.name ?? '…'}{run && <Pill tone={runTone[run.status]}>{runStatusLabels[run.status]}</Pill>}</h1>
         {run && <p className="mt-1 text-sm text-text-muted">{run.kind === 'pickup' ? 'Pickup run' : 'Delivery run'} · {fmtDate(run.date + 'T12:00:00Z')} · {run.driverName ?? 'No driver yet'}{run.vehicleName ? ` · ${run.vehicleName}` : ''}{run.distanceKm ? ` · ~${run.distanceKm} km` : ''}</p>}
       </div>
@@ -153,7 +154,7 @@ export default function RoutePlanner() {
           {(run.status === 'planned' || run.status === 'in_progress') && <button disabled={busy} onClick={() => act(() => opsApi.updateRun(run.id, { status: 'cancelled' }))} className="btn-ghost !min-h-10 !px-4 text-sm text-danger"><X size={15} aria-hidden="true" /> Cancel</button>}
         </div>
       )}
-      {run && !manage && user.staffRole === 'driver' && (
+      {run && !manage && isDriverRole(user.staffRole) && (
         <div className="flex flex-wrap gap-2">
           {run.status === 'in_progress' && <button disabled={busy} onClick={() => setLate({ minutes: 30, note: '' })} className="btn-ghost !min-h-10 !px-4 text-sm" data-testid="running-late"><Clock size={15} aria-hidden="true" /> Running late</button>}
           {queued > 0 && <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/50 bg-gold/10 px-3 text-xs text-gold-deep" data-testid="queued-badge"><WifiOff size={12} aria-hidden="true" /> {queued} update{queued === 1 ? '' : 's'} waiting for signal</span>}
@@ -188,9 +189,9 @@ export default function RoutePlanner() {
                   <h2 className="!text-base">1 · Details</h2>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className="sm:col-span-2"><label htmlFor="r-name" className="label-dark">Run name</label><input id="r-name" className="input-dark" placeholder="Tuesday Houston pickups" value={name} onChange={(e) => setName(e.target.value)} /></div>
-                    <div><span className="label-dark">Type</span><div className="flex gap-2" role="radiogroup" aria-label="Run type">{(['pickup', 'delivery'] as const).map((k) => <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => { setKind(k); setDrafts([]) }} className={`flex-1 rounded-lg border px-3 py-2.5 text-sm focus-ring ${kind === k ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted'}`}>{k === 'pickup' ? 'Pickups' : 'Deliveries'}</button>)}</div></div>
+                    <div><span className="label-dark">Type</span><div className="flex gap-2" role="radiogroup" aria-label="Run type">{(['pickup', 'delivery'] as const).map((k) => <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => { setKind(k); setDrafts([]); const cur = drivers.find((d) => d.id === driverId); if (cur && !canDriveKind(cur.role, k)) setDriverId('') }} className={`flex-1 rounded-lg border px-3 py-2.5 text-sm focus-ring ${kind === k ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted'}`}>{k === 'pickup' ? 'Pickups' : 'Deliveries'}</button>)}</div></div>
                     <div><label htmlFor="r-date" className="label-dark">Date</label><input id="r-date" type="date" className="input-dark" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-                    <div><label htmlFor="r-driver" className="label-dark">Driver</label><select id="r-driver" className="input-dark" value={driverId} onChange={(e) => { setDriverId(e.target.value); const v = vehicles.find((x) => x.driverId === e.target.value && x.status === 'available'); if (v && !vehicleId) setVehicleId(v.id) }}><option value="">— Assign later —</option>{drivers.map((d) => <option key={d.id} value={d.id}>{d.name}{d.city ? ` (${d.city})` : ''}</option>)}</select></div>
+                    <div><label htmlFor="r-driver" className="label-dark">Driver</label><select id="r-driver" className="input-dark" value={driverId} onChange={(e) => { setDriverId(e.target.value); const v = vehicles.find((x) => x.driverId === e.target.value && x.status === 'available'); if (v && !vehicleId) setVehicleId(v.id) }}><option value="">— Assign later —</option>{drivers.filter((d) => canDriveKind(d.role, kind)).map((d) => <option key={d.id} value={d.id}>{d.name}{d.city ? ` (${d.city})` : ''}</option>)}</select></div>
                     <div><label htmlFor="r-vehicle" className="label-dark">Vehicle</label><select id="r-vehicle" className="input-dark" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}><option value="">— None —</option>{fleet.map((v) => <option key={v.id} value={v.id} disabled={v.status !== 'available'}>{v.name}{v.plate ? ` · ${v.plate}` : ''}{v.status !== 'available' ? ` (${v.status.replace('_', ' ')})` : ''}</option>)}</select></div>
                     <div className="sm:col-span-2">
                       <GeoSearch id="r-start" label="Start point (yard, warehouse, port)" placeholder="e.g. 4501 Navigation Blvd, Houston" onHit={(h, q) => setStart({ label: q, lat: h.lat, lon: h.lon })} />
@@ -210,7 +211,7 @@ export default function RoutePlanner() {
                   <h2 className="!text-base">Assignment</h2>
                   <div className="mt-3 grid gap-3 sm:grid-cols-3">
                     <div><label htmlFor="e-date" className="label-dark">Date</label><input id="e-date" type="date" className="input-dark" value={run.date} onChange={(e) => act(() => opsApi.updateRun(run.id, { date: e.target.value }))} /></div>
-                    <div><label htmlFor="e-driver" className="label-dark">Driver</label><select id="e-driver" className="input-dark" value={run.driverId ?? ''} onChange={(e) => act(() => opsApi.updateRun(run.id, { driverId: e.target.value || null }))}><option value="">— Assign later —</option>{drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+                    <div><label htmlFor="e-driver" className="label-dark">Driver</label><select id="e-driver" className="input-dark" value={run.driverId ?? ''} onChange={(e) => act(() => opsApi.updateRun(run.id, { driverId: e.target.value || null }))}><option value="">— Assign later —</option>{drivers.filter((d) => canDriveKind(d.role, run.kind)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
                     <div><label htmlFor="e-vehicle" className="label-dark">Vehicle</label><select id="e-vehicle" className="input-dark" value={run.vehicleId ?? ''} onChange={(e) => act(() => opsApi.updateRun(run.id, { vehicleId: e.target.value || null }))}><option value="">— None —</option>{fleet.map((v) => <option key={v.id} value={v.id} disabled={v.status !== 'available' && v.id !== run.vehicleId}>{v.name}{v.plate ? ` · ${v.plate}` : ''}</option>)}</select></div>
                     <div className="sm:col-span-3">
                       <GeoSearch id="e-start" label="Start point" placeholder="Search an address…" onHit={(h, q) => act(() => opsApi.updateRun(run.id, { start: { label: q, lat: h.lat, lon: h.lon } }))} />

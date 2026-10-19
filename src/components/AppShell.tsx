@@ -1,4 +1,5 @@
 import { BrandLoader } from './BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { useT } from '../lib/i18n'
 import { adoptAccountDisplay } from '../lib/prefs'
 import { Suspense, useEffect, useState } from 'react'
@@ -14,7 +15,7 @@ import { DisplaySettings } from './DisplaySettings'
 import { useStore } from '../lib/store'
 import { clientsApi } from '../lib/clients'
 import { SOURCING_SHIPPER } from '../lib/sourcing'
-import { roleAllows, roleHome } from '../lib/ops'
+import { roleAllows, roleHome, roleLabels } from '../lib/ops'
 import { scanQueue, startQueueSync, SCAN_QUEUE_EVENT } from '../lib/scan'
 import { Navigation, Phone, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Type, WifiOff, CloudUpload, CalendarDays, MessageSquare, FolderArchive, Repeat, AlertTriangle, CircleUser, Contact, Home } from 'lucide-react'
 import { hubApi } from '../lib/customerHub'
@@ -68,7 +69,7 @@ export default function AppShell() {
   const active = shipments.filter((s) => s.status !== 'delivered').length
 
   const staffRole = user.staffRole ?? 'owner'
-  const isDriver = isShipper && staffRole === 'driver'
+  const isDriver = isShipper && isDriverRole(staffRole)
   const canManage = isShipper && (staffRole === 'owner' || staffRole === 'dispatcher')
   const allowed = (it: Item) => !isShipper || user.admin || roleAllows(staffRole, it.to.split('?')[0], user.perms as never) || !it.to.startsWith('/dashboard')
   const sourcingTeam = !!user.admin || (isShipper && user.shipperId === SOURCING_SHIPPER && !isDriver)
@@ -94,7 +95,7 @@ export default function AppShell() {
         { to: '/dashboard/pickups', label: 'Pickups', icon: CalendarCheck, group: 'Operate' },
         { to: '/dashboard/routes', label: 'Routes', icon: MapPinned, group: 'Operate' },
         { to: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, group: 'Operate' },
-        ...(staffRole !== 'driver' ? [{ to: '/dashboard/supplies', label: 'Equipment & supplies', icon: Printer, group: 'Operate' } as Item] : []),
+        ...(!isDriverRole(staffRole) ? [{ to: '/dashboard/supplies', label: 'Equipment & supplies', icon: Printer, group: 'Operate' } as Item] : []),
         { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders, group: 'Money' },
         { to: '/dashboard/payments', label: 'Payments', icon: Wallet, group: 'Money' },
         { to: '/dashboard/collections', label: 'Collections', icon: Receipt, group: 'Money' },
@@ -192,7 +193,7 @@ export default function AppShell() {
           ? (isShipper && company ? <div className="flex justify-center pb-3" title={user.company ?? ''}><Avatar initials={company.initials} hue={company.hue} logo={company.logo} size={32} /></div> : null)
           : <div className="flex items-center gap-2.5 px-4 pb-3">
               {isShipper && company && <Avatar initials={company.initials} hue={company.hue} logo={company.logo} size={32} />}
-              <div className="min-w-0"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : t('Customer')}</p>{isShipper && user.staffRole && <p className="text-xs text-text-muted">{user.staffRole.charAt(0).toUpperCase() + user.staffRole.slice(1)}</p>}</div>
+              <div className="min-w-0"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : t('Customer')}</p>{isShipper && user.staffRole && <p className="text-xs text-text-muted">{t(roleLabels[user.staffRole as keyof typeof roleLabels] ?? user.staffRole)}</p>}</div>
             </div>}
         <nav className={`flex-1 overflow-y-auto overflow-x-hidden ${compact ? 'px-2 space-y-1' : `px-3 ${isShipper ? 'space-y-3' : 'space-y-2.5'}`}`} aria-label="Application" onScroll={() => setTip(null)}>
           <NavItems list={visible.filter((i) => !i.group && !i.more)} compact={compact} />
@@ -317,13 +318,13 @@ function BottomBar({ unread, owe, onMenu }: { unread: number; owe: number; onMen
 
 /** Thumb-reach bar for drivers: my runs, the next stop, scan, call dispatch. */
 function DriverBar() {
-  const loc = useLocation(); const t = useT()
+  const loc = useLocation(); const t = useT(); const { user } = useStore()
   const { runs } = useMyRuns(); const { phone } = useDispatch(); const queued = useQueued()
   const cur = (runs ?? []).find((r) => r.status === 'in_progress') ?? (runs ?? []).find((r) => r.status === 'planned')
   const items: { to: string; label: string; icon: typeof Home; on: boolean; badge?: number }[] = [
     { to: '/dashboard/runs', label: t('My runs'), icon: MapPinned, on: loc.pathname === '/dashboard/runs' },
     { to: cur ? `/dashboard/routes/${cur.id}` : '/dashboard/runs', label: t('Next stop'), icon: Navigation, on: loc.pathname.startsWith('/dashboard/routes/') },
-    { to: `/dashboard/scan?kind=delivery${cur ? `&run=${cur.id}` : ''}`, label: t('Scan'), icon: ScanLine, on: loc.pathname === '/dashboard/scan', badge: queued || undefined },
+    { to: `/dashboard/scan?kind=${user?.staffRole === 'pickup_driver' ? 'check' : 'delivery'}${cur ? `&run=${cur.id}` : ''}`, label: t('Scan'), icon: ScanLine, on: loc.pathname === '/dashboard/scan', badge: queued || undefined },
   ]
   return (
     <nav className="no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden" aria-label={t('Driver menu')} data-testid="driver-bar">

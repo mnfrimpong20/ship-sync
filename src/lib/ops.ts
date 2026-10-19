@@ -1,7 +1,8 @@
 import { api } from './store'
+import { isDriverRole } from './roles'
 import type { Mode, ShipmentStatus } from './data'
 
-export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'
+export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'pickup_driver' | 'delivery_driver' | 'driver'
 export type StaffBase = 'origin' | 'destination'
 export type Area = 'leads' | 'rates' | 'lanes' | 'groupage' | 'brand' | 'shipments' | 'containers' | 'sailings' | 'pickups' | 'routes' | 'warehouse' | 'clients' | 'payments' | 'collections' | 'reviews' | 'fleet' | 'team' | 'verification' | 'sourcing' | 'analytics'
 export interface StaffPerms { allow?: Area[]; deny?: Area[] }
@@ -23,14 +24,16 @@ export interface Candidate { shipmentId: string; ref: string; mode: Mode; status
 export interface GeoHit { lat: number; lon: number; label: string; cached?: boolean }
 export interface JoinInvite { name: string; email: string; role: StaffRole; company: string }
 
-export const roleLabels: Record<StaffRole, string> = { owner: 'Owner', dispatcher: 'Dispatcher', agent: 'Agent', finance: 'Finance', warehouse: 'Warehouse', driver: 'Driver' }
+export const roleLabels: Record<StaffRole, string> = { owner: 'Owner', dispatcher: 'Dispatcher', agent: 'Agent', finance: 'Finance', warehouse: 'Warehouse', pickup_driver: 'Pickup driver', delivery_driver: 'Delivery driver', driver: 'Driver (pickups & deliveries)' }
 export const roleBlurb: Record<StaffRole, string> = {
   owner: 'Full access, including billing, team and company profile.',
   dispatcher: 'Plans routes, manages the fleet and team, works clients and shipments.',
   agent: 'Works leads, clients, shipments and bookings. No payments, fleet or company settings.',
   finance: 'Payments, invoices, collections and client accounts. Sees shipments read-only.',
   warehouse: 'Receiving, scanning, containers and pickups at the warehouse. Nothing commercial.',
-  driver: 'Sees only their own runs and marks stops done from the road.',
+  pickup_driver: 'Collects from senders at origin: only their own pickup runs, proof of collection, piece checks.',
+  delivery_driver: 'Delivers to receivers at destination: only their own delivery runs, proof of delivery, money at the door.',
+  driver: 'Older single driver role — can be given pickup and delivery runs. Switch to Pickup or Delivery driver.',
 }
 export const vehicleTypeLabels: Record<VehicleType, string> = { van: 'Van', truck: 'Truck', box_truck: 'Box truck', pickup: 'Pickup', trailer: 'Trailer', car: 'Car', motorbike: 'Motorbike' }
 export const vehicleStatusLabels: Record<VehicleStatus, string> = { available: 'Available', on_run: 'On a run', maintenance: 'In maintenance', retired: 'Retired' }
@@ -45,6 +48,8 @@ export const ROLE_BASE: Record<StaffRole, Area[] | 'all'> = {
   agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing', 'analytics'],
   finance: ['clients', 'payments', 'collections', 'reviews', 'shipments', 'team', 'analytics'],
   warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team', 'analytics'],
+  pickup_driver: ['routes'],
+  delivery_driver: ['routes'],
   driver: ['routes'],
 }
 const ALWAYS = ['/dashboard/costs', '/dashboard/campaigns', '/dashboard/integrations', '/dashboard/activity', '/dashboard/billing', '/dashboard/shipper', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/documents', '/dashboard/invoices', '/dashboard/runs', '/dashboard/suppliers']
@@ -55,10 +60,10 @@ export function areasFor(role: StaffRole | undefined, perms?: StaffPerms): Area[
   const set = new Set<Area>([...base, ...(perms?.allow ?? [])]); for (const d of perms?.deny ?? []) set.delete(d)
   return [...set]
 }
-export const roleHome: Record<StaffRole, string> = { owner: '/dashboard/shipper', dispatcher: '/dashboard/shipper', agent: '/dashboard/shipper', finance: '/dashboard/shipper', warehouse: '/dashboard/warehouse', driver: '/dashboard/runs' }
+export const roleHome: Record<StaffRole, string> = { owner: '/dashboard/shipper', dispatcher: '/dashboard/shipper', agent: '/dashboard/shipper', finance: '/dashboard/shipper', warehouse: '/dashboard/warehouse', pickup_driver: '/dashboard/runs', delivery_driver: '/dashboard/runs', driver: '/dashboard/runs' }
 export const roleAllows = (role: StaffRole | undefined, pathname: string, perms?: StaffPerms) => {
   const hit = (p: string) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p + '?')
-  if (role === 'driver' && hit('/dashboard/shipper')) return false
+  if (isDriverRole(role) && hit('/dashboard/shipper')) return false
   if (ALWAYS.some(hit)) return true
   const a = areasFor(role, perms); if (a === 'all') return true
   return a.some((x) => hit(AREA_PATHS[x]))

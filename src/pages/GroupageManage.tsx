@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -60,7 +61,7 @@ export default function GroupageManage() {
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 4000); return () => clearTimeout(t) }, [toast])
   if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/groupage" replace />
-  if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
+  if (user.role !== 'shipper' || isDriverRole(user.staffRole)) return <Navigate to="/dashboard" replace />
   const all = data?.groupages ?? []; const live = all.filter((g) => g.status === 'open' || g.status === 'full')
   const act = async (fn: () => Promise<unknown>, msg: string, key: string) => { setBusy(key); setError(''); try { await fn(); await load(); setToast(msg) } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong.') } finally { setBusy(''); setClosing(null); setCancelling(null) } }
   const reservedValue = live.reduce((n, g) => n + g.reserved * g.pricePerUnitUsd, 0)

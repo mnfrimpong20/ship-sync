@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -65,7 +66,7 @@ export default function Payments() {
 
   if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/payments" replace />
-  if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
+  if (user.role !== 'shipper' || isDriverRole(user.staffRole)) return <Navigate to="/dashboard" replace />
   const b = data?.balance
   const requestPayout = async () => { setBusy(true); setError(''); try { await paymentsApi.requestPayout(); await load(); setToast('Payout requested — Ntemtem will send it within 2 business days.') } catch (e) { setError(e instanceof Error ? e.message : 'Could not request a payout.') } finally { setBusy(false); setRequesting(false) } }
 

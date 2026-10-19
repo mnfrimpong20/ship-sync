@@ -20,6 +20,7 @@
  *      GET|PUT /me/business
  */
 import { randomBytes } from 'node:crypto'
+import { isDriverRole } from '../src/lib/roles'
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
 import { uid, type Db } from './db'
@@ -56,7 +57,7 @@ export async function myInvoices(db: Db, userId: string) {
 }
 async function ownShipment(db: Db, u: ApiUser, id: string, Err: Deps['HttpError']) {
   const { rows } = await db.query<Row>('select * from shipments where id = $1', [id]); const s = rows[0]; if (!s) throw new Err(404, 'Shipment not found.')
-  const office = u.role === 'shipper' && s.shipper_id === u.shipperId && u.staffRole !== 'driver'
+  const office = u.role === 'shipper' && s.shipper_id === u.shipperId && !isDriverRole(u.staffRole)
   if (!office && !(u.role === 'customer' && s.user_id === u.id)) throw new Err(403, 'You do not have access to this shipment.')
   return { s, office }
 }

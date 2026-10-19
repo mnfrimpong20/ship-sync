@@ -32,7 +32,7 @@ export const OPS = ['is', 'is_not', 'contains', 'at_least', 'at_most'] as const
 export const ACTIONS = ['notify_team', 'message_customer', 'assign_partner', 'receiver_charge', 'set_handover', 'add_note', 'make_document'] as const
 const zCond = z.object({ field: z.enum(FIELDS), op: z.enum(OPS), value: z.string().trim().max(80) })
 const zAction = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('notify_team'), roles: z.array(z.enum(['owner', 'dispatcher', 'finance', 'agent', 'driver'])).min(1), message: z.string().trim().min(3).max(300) }),
+  z.object({ type: z.literal('notify_team'), roles: z.array(z.enum(['owner', 'dispatcher', 'finance', 'agent', 'pickup_driver', 'delivery_driver', 'driver'])).min(1), message: z.string().trim().min(3).max(300) }),
   z.object({ type: z.literal('message_customer'), message: z.string().trim().min(3).max(500) }),
   z.object({ type: z.literal('assign_partner'), partnerId: z.string().min(3), services: z.array(z.string()).min(1) }),
   z.object({ type: z.literal('receiver_charge'), amount: z.number().positive().max(1_000_000), currency: z.string().length(3).toUpperCase(), reason: z.string().trim().min(2).max(120), send: z.boolean().default(false) }),

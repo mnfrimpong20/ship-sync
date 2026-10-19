@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -24,7 +25,7 @@ export default function ReviewsPage() {
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) }, [toast])
   if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/reviews" replace />
-  if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
+  if (user.role !== 'shipper' || isDriverRole(user.staffRole)) return <Navigate to="/dashboard" replace />
   const send = async () => { if (!reply) return; setBusy(reply.id); setError(''); try { await reviewsApi.reply(reply.id, reply.text); await load(); setToast('Reply posted.'); setReply(null) } catch (e) { setError(e instanceof Error ? e.message : 'Could not reply.') } finally { setBusy('') } }
   const open = (disputes ?? []).filter((x) => x.status === 'open')
   return (

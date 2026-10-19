@@ -7,6 +7,7 @@
  * Brokers are platform listings (admin-verified); they do not need a Ntemtem account.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { uid, type Db } from './db'
@@ -61,7 +62,7 @@ export function mountBrokers(r: Router, d: Deps) {
   const access = async (db: Db, req: Request, shipmentId: string) => {
     const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select * from shipments where id = $1', [shipmentId]); const s = rows[0]; if (!s) throw new HttpError(404, 'Shipment not found.')
-    const office = u.role === 'shipper' && s.shipper_id === u.shipperId && u.staffRole !== 'driver'
+    const office = u.role === 'shipper' && s.shipper_id === u.shipperId && !isDriverRole(u.staffRole)
     const owner = u.role === 'customer' && s.user_id === u.id
     if (!office && !owner && !u.admin) throw new HttpError(403, 'You do not have access to this shipment.')
     return { u, s, office, owner }
@@ -173,7 +174,7 @@ export function mountBrokers(r: Router, d: Deps) {
 
   /* ---- office: my jobs ---- */
   r.get('/customs/jobs', wrap(async (req, res) => {
-    const db = await getDb(); const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.')
+    const db = await getDb(); const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.')
     const { rows } = await db.query<Row>(`${JOB_SELECT} where j.shipper_id = $1 order by (j.status in ('cancelled','declined','done')) asc, j.updated_at desc limit 200`, [u.shipperId])
     res.set('Cache-Control', 'no-store'); res.json({ jobs: rows.map(jobOut) })
   }))

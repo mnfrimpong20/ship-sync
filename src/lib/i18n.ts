@@ -60,6 +60,7 @@ const FR: Record<string, string> = {
   'Workspace': 'Espace de travail', 'Edit profile': 'Modifier le profil', 'View public profile': 'Voir le profil public',
   'This section has the page you’re on': 'Cette section contient la page ouverte', 'Collapse menu': 'Réduire le menu', 'Expand menu': 'Agrandir le menu',
   // driver
+  'Pickup driver': 'Chauffeur enlèvement', 'Delivery driver': 'Chauffeur livraison', 'Driver (pickups & deliveries)': 'Chauffeur (enlèvements et livraisons)', 'Driver': 'Chauffeur',
   'Mark delivered': 'Marquer livré', 'Mark collected': 'Marquer collecté',
   'About 1 hour': 'Environ 1 heure',
   'About how late?': 'Combien de retard environ ?',

@@ -1426,6 +1426,8 @@ alter table run_stops add column if not exists tries int not null default 0;
 alter table run_stops add column if not exists on_way_at timestamptz;
 alter table run_stops add column if not exists collected jsonb;
 alter table runs add column if not exists summary_sent_at timestamptz;
+-- One driver role became two (2026-10-19): origin-side drivers collect, destination-side drivers deliver.
+update staff set role = case when base = 'destination' then 'delivery_driver' else 'pickup_driver' end where role = 'driver';
 create table if not exists login_links (
   token text primary key,
   user_id text not null references users(id) on delete cascade,
@@ -1572,8 +1574,8 @@ async function seedOpsDemo(d: Db) {
   const hash = await bcrypt.hash(DEMO_PASSWORD, 10)
   await d.query(`insert into users (id,email,name,password_hash,role,shipper_id) values ('u_demo_kwesi','kwesi@goldcoast.demo','Kwesi Appiah',$1,'shipper','gold-coast-freight'), ('u_demo_efua','efua@goldcoast.demo','Efua Danso',$1,'shipper','gold-coast-freight') on conflict (email) do nothing`, [hash])
   await d.query(`insert into staff (id,shipper_id,user_id,name,email,phone,role,status,base,city) values
-    ('st_demo_kwesi','gold-coast-freight','u_demo_kwesi','Kwesi Appiah','kwesi@goldcoast.demo','+1 713 555 0142','driver','active','origin','Houston, TX'),
-    ('st_demo_efua','gold-coast-freight','u_demo_efua','Efua Danso','efua@goldcoast.demo','+233 24 555 0133','driver','active','destination','Accra'),
+    ('st_demo_kwesi','gold-coast-freight','u_demo_kwesi','Kwesi Appiah','kwesi@goldcoast.demo','+1 713 555 0142','pickup_driver','active','origin','Houston, TX'),
+    ('st_demo_efua','gold-coast-freight','u_demo_efua','Efua Danso','efua@goldcoast.demo','+233 24 555 0133','delivery_driver','active','destination','Accra'),
     ('st_demo_yaa','gold-coast-freight',null,'Yaa Boakye','yaa@goldcoast.demo','+1 713 555 0161','dispatcher','invited','origin','Houston, TX')
     on conflict (shipper_id, email) do nothing`)
   // Two Gold Coast shipments that are ready for a pickup run and a delivery run.

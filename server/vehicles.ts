@@ -8,6 +8,7 @@
  * override for tests) and falls back to a built-in WMI / model-year decode.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
@@ -126,7 +127,7 @@ export function mountVehicles(r: Router, d: Deps) {
   const access = async (db: Db, req: Request, shipmentId: string) => {
     const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select * from shipments where id = $1', [shipmentId]); const s = rows[0]; if (!s) throw new HttpError(404, 'Shipment not found.')
-    const office = u.role === 'shipper' && s.shipper_id === u.shipperId && u.staffRole !== 'driver'
+    const office = u.role === 'shipper' && s.shipper_id === u.shipperId && !isDriverRole(u.staffRole)
     const owner = u.role === 'customer' && s.user_id === u.id
     if (!office && !owner && !u.admin) throw new HttpError(403, 'You do not have access to this shipment.')
     return { u, s, office, owner }

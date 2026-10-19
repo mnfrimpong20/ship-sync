@@ -6,6 +6,7 @@
  * Storage beyond the free days is priced per piece-day and can be dropped onto an invoice.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
@@ -58,7 +59,7 @@ export async function warehouseOnScan(db: Db, piece: Row, kind: string, shipperI
 export function mountWarehouse(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
   const staff = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId) throw new HttpError(403, 'Staff only.'); return u }
-  const office = async (db: Db, req: Request) => { const u = await staff(db, req); if (u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.'); return u }
+  const office = async (db: Db, req: Request) => { const u = await staff(db, req); if (isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.'); return u }
   const ownSite = async (db: Db, sid: string, id: string) => { const { rows } = await db.query<Row>(`${SITE_SELECT} where s.id = $1 and s.shipper_id = $2`, [id, sid]); if (!rows[0]) throw new HttpError(404, 'Site not found.'); return rows[0] }
   const onHand = async (db: Db, sid: string, siteId?: string) => {
     const { rows } = await db.query<Row>(`select p.*, s.ref, s.customer, s.cargo, s.status as s_status, s.client_id, s.destination, s.origin, b.code as bin_code, b.zone as bin_zone, st.free_days, st.rate_usd, st.vehicle_rate_usd, st.name as site_name

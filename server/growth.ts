@@ -9,6 +9,7 @@
  *   Quote templates   GET|POST /quote-templates, DELETE /quote-templates/:id
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
 import { uid, type Db } from './db'
 import { can, type ApiUser } from './api'
@@ -145,7 +146,7 @@ const tplOut = (t: Row) => ({ id: t.id, name: t.name, mode: t.mode, cargo: t.car
 
 export function mountGrowth(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
-  const shipper = async (db: Db, req: Request, roles?: string[]) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Shippers only.'); if (roles && !roles.includes(u.staffRole ?? 'owner')) throw new HttpError(403, `Only ${roles.join(', ')} can do this.`); return u }
+  const shipper = async (db: Db, req: Request, roles?: string[]) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Shippers only.'); if (roles && !roles.includes(u.staffRole ?? 'owner')) throw new HttpError(403, `Only ${roles.join(', ')} can do this.`); return u }
 
   // Monday report
   r.get('/shipper/weekly-report', wrap(async (req, res) => { const db = await getDb(); const u = await shipper(db, req); res.json({ prefs: await weeklyPrefs(db, u.shipperId!), on: await featureOn(db, 'weeklyReport', u.shipperId) }) }))

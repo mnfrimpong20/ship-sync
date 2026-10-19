@@ -10,6 +10,7 @@ import { daySummary, devicePin, saveDevicePin, stopLink, telLink, useDispatch, u
 import { setDisplay, useDisplay } from '../lib/prefs'
 import { useT } from '../lib/i18n'
 import { niceDay } from '../lib/dates'
+import { roleLabels, type StaffRole } from '../lib/ops'
 
 /** A PIN for this phone, so the driver doesn't type a password every morning. */
 function PinCard() {
@@ -48,6 +49,7 @@ export default function MyRuns() {
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   if (!runs && !offline) return <BrandLoader partner label={t('Loading your runs…')} />
   const today = new Date().toISOString().slice(0, 10)
+  const pickupOnly = user.staffRole === 'pickup_driver'
   const list = runs ?? []
   const active = list.filter((r) => r.status === 'in_progress')
   const upcoming = list.filter((r) => r.status === 'planned').sort((a, b) => a.date.localeCompare(b.date))
@@ -59,6 +61,7 @@ export default function MyRuns() {
     <div className="bg-bg text-text">
       <div className="container-x max-w-2xl py-6 pb-28 md:py-10">
         <motion.div initial="hidden" animate="show" variants={stagger}>
+          <motion.p variants={fadeUp} className="eyebrow mb-1" data-testid="driver-role">{t(roleLabels[(user.staffRole ?? 'driver') as StaffRole])}</motion.p>
           <motion.h1 variants={fadeUp} className="!text-[2rem]">{t('Hi {name}', { name: user.name.split(' ')[0] })}</motion.h1>
           <motion.p variants={fadeUp} className="mt-1 text-lg text-text-muted">{cur ? t('You have a run in progress.') : upcoming.some((r) => r.date === today) ? t('You have a run planned for today.') : t('Nothing on the road right now.')}</motion.p>
           {(offline || queued > 0) && <p role="status" className="mt-3 flex items-center gap-2 rounded-2xl border border-gold/50 bg-gold/10 px-4 py-3 text-base"><WifiOff size={18} aria-hidden="true" /> {offline ? t('Offline — showing your saved runs') : ''}{queued ? `${offline ? ' · ' : ''}${t('{n} updates waiting', { n: queued })}` : ''}</p>}
@@ -76,8 +79,8 @@ export default function MyRuns() {
             </motion.section>
           )}
 
-          <motion.div variants={fadeUp} className="mt-5 grid grid-cols-2 gap-2">
-            <Link to={`/dashboard/scan?kind=delivery${cur ? `&run=${cur.id}` : ''}`} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring"><ScanLine size={22} aria-hidden="true" /> {t('Scan a delivery')}</Link>
+          <motion.div variants={fadeUp} className={`mt-5 grid gap-2 ${pickupOnly ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {!pickupOnly && <Link to={`/dashboard/scan?kind=delivery${cur ? `&run=${cur.id}` : ''}`} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring"><ScanLine size={22} aria-hidden="true" /> {t('Scan a delivery')}</Link>}
             <Link to="/dashboard/scan?kind=check" className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring"><ScanLine size={22} aria-hidden="true" /> {t('Check a piece')}</Link>
           </motion.div>
 

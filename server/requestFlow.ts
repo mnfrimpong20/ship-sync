@@ -11,6 +11,7 @@
  *              (one-shipper requests are offered the open marketplace) · leads unanswered past a shipper's usual reply time → one reminder
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
@@ -109,7 +110,7 @@ export function mountRequestFlow(r: Router, d: RequestFlowDeps) {
   r.post('/quotes/:id/withdraw', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select q.*, r.user_id as owner, r.ref from quotes q join requests r on r.id = q.request_id where q.id = $1', [req.params.id]); const q = rows[0]
-    if (!q || u.role !== 'shipper' || q.shipper_id !== u.shipperId || u.staffRole === 'driver') throw new HttpError(404, 'Quote not found.')
+    if (!q || u.role !== 'shipper' || q.shipper_id !== u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(404, 'Quote not found.')
     if (q.status !== 'sent') throw new HttpError(409, q.status === 'accepted' ? 'It’s already accepted — cancel the shipment instead.' : 'This quote is no longer live.')
     const b = z.object({ reason: z.string().trim().max(200).default('') }).parse(req.body ?? {})
     await db.query(`update quotes set status = 'withdrawn', updated_at = now() where id = $1`, [q.id])
@@ -123,7 +124,7 @@ export function mountRequestFlow(r: Router, d: RequestFlowDeps) {
     const { rows } = await db.query<Row>('select * from requests where id = $1', [req.params.id]); const r0 = rows[0]; if (!r0) throw new HttpError(404, 'Request not found.')
     let shipperId: string
     if (u.role === 'customer') { if (r0.user_id !== u.id) throw new HttpError(404, 'Request not found.'); shipperId = String(req.query.shipperId ?? req.body?.shipperId ?? ''); if (!shipperId) throw new HttpError(400, 'Which shipper?') }
-    else { if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.'); shipperId = u.shipperId; if (r0.preferred_shipper_id && r0.preferred_shipper_id !== shipperId) throw new HttpError(403, 'This client asked another shipper.') }
+    else { if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.'); shipperId = u.shipperId; if (r0.preferred_shipper_id && r0.preferred_shipper_id !== shipperId) throw new HttpError(403, 'This client asked another shipper.') }
     const { rows: q } = await db.query<Row>('select status from quotes where request_id = $1 and shipper_id = $2', [r0.id, shipperId])
     if (u.role === 'customer' && !q[0] && r0.preferred_shipper_id !== shipperId) throw new HttpError(403, 'You can message shippers who quoted your request.')
     const booked = q[0]?.status === 'accepted'

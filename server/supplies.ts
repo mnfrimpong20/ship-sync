@@ -15,6 +15,7 @@
  * Without a Stripe key, equipment orders wait as "awaiting payment" and Ntemtem marks them paid by hand.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
 import { uid, type Db } from './db'
 import { can, type ApiUser } from './api'
@@ -340,7 +341,7 @@ const zPacking = z.object({ name: z.string().trim().min(2).max(80), kind: z.enum
 
 export function mountSupplies(r: Router, d: Deps) {
   const { getDb, requireUser, requireAdmin, HttpError, wrap } = d
-  const staff = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId) throw new HttpError(403, 'For shipping companies only.'); if (u.staffRole === 'driver') throw new HttpError(403, 'Ask your office to order equipment.'); return u }
+  const staff = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId) throw new HttpError(403, 'For shipping companies only.'); if (isDriverRole(u.staffRole)) throw new HttpError(403, 'Ask your office to order equipment.'); return u }
   const canOrder = (u: ApiUser) => can(u, 'payments')
   const fail = (e: unknown, code = 409) => new HttpError(code, e instanceof Error ? e.message : 'Something went wrong.')
 
@@ -570,7 +571,7 @@ export function mountSupplies(r: Router, d: Deps) {
   const access = async (db: Db, req: Request) => {
     const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select * from shipments where id = $1', [String(req.params.id)]); const s = rows[0]; if (!s) throw new HttpError(404, 'Shipment not found.')
-    const isOffice = u.role === 'shipper' && s.shipper_id === u.shipperId && u.staffRole !== 'driver'
+    const isOffice = u.role === 'shipper' && s.shipper_id === u.shipperId && !isDriverRole(u.staffRole)
     const owner = u.role === 'customer' && s.user_id === u.id
     if (!isOffice && !owner && !u.admin) throw new HttpError(403, 'You do not have access to this shipment.')
     const { rows: pay } = await db.query<Row>(`select 1 from escrow_payments where shipment_id = $1 and status in ('held','released','paid_out','direct') limit 1`, [s.id])

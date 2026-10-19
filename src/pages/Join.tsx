@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isDriverRole } from '../lib/roles'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Check, Loader2, ShieldCheck } from 'lucide-react'
@@ -28,7 +29,7 @@ export default function Join() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError('')
-    try { await opsApi.join(token, { name, password }); await refresh(); nav(invite?.role === 'driver' ? '/dashboard/runs' : '/dashboard/shipper', { replace: true }) }
+    try { await opsApi.join(token, { name, password }); await refresh(); nav(isDriverRole(invite?.role) ? '/dashboard/runs' : '/dashboard/shipper', { replace: true }) }
     catch (err) { setError(err instanceof Error ? err.message : 'Could not join.') } finally { setBusy(false) }
   }
 

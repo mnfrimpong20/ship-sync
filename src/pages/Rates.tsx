@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -121,7 +122,7 @@ export default function Rates() {
 
   if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/rates" replace />
-  if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
+  if (user.role !== 'shipper' || isDriverRole(user.staffRole)) return <Navigate to="/dashboard" replace />
 
   const me = user.shipperId ? shipperById(user.shipperId) : undefined
   const origins = me?.origins ?? []

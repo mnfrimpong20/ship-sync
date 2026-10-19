@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -45,7 +46,7 @@ export default function Collections() {
   const pg = usePaged(list, 12, `${filter}|${q}`)
   if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/collections" replace />
-  if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
+  if (user.role !== 'shipper' || isDriverRole(user.staffRole)) return <Navigate to="/dashboard" replace />
   const send = async (inv: InvoiceFull, kind: 'invoice' | 'reminder' | 'overdue') => { setBusy(inv.id + kind); setError(''); try { const r = await collectionsApi.send(inv.id, kind); await load(); setToast(r.channels.length ? `${kind === 'invoice' ? 'Invoice' : 'Reminder'} sent by ${r.channels.join(' + ')}.` : 'Logged — no channel could deliver (add the client’s email).') } catch (e) { setError(e instanceof Error ? e.message : 'Could not send.') } finally { setBusy('') } }
   const copy = async (inv: InvoiceFull) => { if (!inv.payToken) return; try { await navigator.clipboard.writeText(payLink(inv.payToken)); setToast('Pay link copied.') } catch { setToast(payLink(inv.payToken)) } }
   const t = data?.totals

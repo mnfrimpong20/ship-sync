@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
@@ -151,7 +152,7 @@ export default function Shipments() {
   const togglePick = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const [toast, setToast] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
   const [containers, setContainers] = useState<ContainerRec[]>([])
-  useEffect(() => { if (ready && user?.role === 'shipper' && user.staffRole !== 'driver') containersApi.list().then(setContainers).catch(() => {}) }, [ready, user])
+  useEffect(() => { if (ready && user?.role === 'shipper' && !isDriverRole(user.staffRole)) containersApi.list().then(setContainers).catch(() => {}) }, [ready, user])
   const containerOf = (s: Shipment) => (s.containerId ? containers.find((c) => c.id === s.containerId) : undefined)
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
 
@@ -184,7 +185,7 @@ export default function Shipments() {
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><motion.p variants={fadeUp} className="eyebrow mb-1">{t('Client shipments')}</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{t(counts.active === 1 ? '{n} active shipment' : '{n} active shipments', { n: counts.active })}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">{t('One row per client booking — from accepted quotes or booked by you. A container holds many shipments. Status changes go straight to the client’s tracking page.')}</motion.p></div>
-            <motion.div variants={fadeUp} className="flex flex-wrap gap-2"><Link to={`/dashboard/labels?shipments=${rows.filter((s) => s.status !== 'delivered').map((s) => s.id).join(',')}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Labels for every active shipment on this page"><Tag size={15} aria-hidden="true" /> {t('Print labels')}</Link><button onClick={exportCsv} className="btn-ghost !min-h-10 !px-4 text-sm"><Download size={15} aria-hidden="true" /> {t('Export CSV')}</button>{user.staffRole !== 'driver' && <button onClick={() => setPrefsOpen((v) => !v)} aria-expanded={prefsOpen} className="btn-ghost !min-h-10 !px-4 text-sm" data-testid="prefs-toggle"><Bot size={15} aria-hidden="true" /> {t('Automation')}</button>}<button onClick={() => setModal(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> {t('New shipment')}</button></motion.div>
+            <motion.div variants={fadeUp} className="flex flex-wrap gap-2"><Link to={`/dashboard/labels?shipments=${rows.filter((s) => s.status !== 'delivered').map((s) => s.id).join(',')}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Labels for every active shipment on this page"><Tag size={15} aria-hidden="true" /> {t('Print labels')}</Link><button onClick={exportCsv} className="btn-ghost !min-h-10 !px-4 text-sm"><Download size={15} aria-hidden="true" /> {t('Export CSV')}</button>{!isDriverRole(user.staffRole) && <button onClick={() => setPrefsOpen((v) => !v)} aria-expanded={prefsOpen} className="btn-ghost !min-h-10 !px-4 text-sm" data-testid="prefs-toggle"><Bot size={15} aria-hidden="true" /> {t('Automation')}</button>}<button onClick={() => setModal(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> {t('New shipment')}</button></motion.div>
           </div>
 
           {prefsOpen && <div className="mt-6 max-w-2xl"><AutomationPrefs onClose={() => setPrefsOpen(false)} /></div>}

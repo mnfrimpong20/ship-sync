@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -124,7 +125,7 @@ export default function ContainerDetail() {
   useEffect(() => { if (ready && user?.role === 'shipper') containersApi.provider().then(setProvider).catch(() => setProvider({ enabled: false, id: null, label: null, simulated: false })) }, [ready, user])
 
   useEffect(() => {
-    if (!ready || user?.role !== 'shipper' || user.staffRole === 'driver') return
+    if (!ready || user?.role !== 'shipper' || isDriverRole(user.staffRole)) return
     let live = true
     containersApi.get(id).then((r) => live && setD(r)).catch((e) => live && setError(e instanceof Error ? e.message : 'Container not found.'))
     return () => { live = false }
@@ -135,7 +136,7 @@ export default function ContainerDetail() {
 
   if (!ready) return <BrandLoader />
   if (!user) return <Navigate to={`/login?role=shipper&next=/dashboard/containers/${id}`} replace />
-  if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
+  if (user.role !== 'shipper' || isDriverRole(user.staffRole)) return <Navigate to="/dashboard" replace />
   if (error && !d) return <div className="container-x py-16"><Empty title="Container not found" body={error} action={<Link to="/dashboard/containers" className="btn-ghost !min-h-10 !px-4 text-sm"><ArrowLeft size={15} aria-hidden="true" /> All containers</Link>} /></div>
   if (!d) return <BrandLoader />
 

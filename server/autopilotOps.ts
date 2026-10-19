@@ -3,6 +3,7 @@
  * Settings and the log live in autopilot.ts.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
@@ -68,7 +69,7 @@ export async function planPickups(db: Db, sid: string, date: string, opts: { not
   if (!runs.length) return { runs: 0, stops: 0, texted: 0 }
   const { rows: stops } = await db.query<Row>(`select st.*, pr.window_start, pr.window_end, pr.city, sh.user_id from run_stops st left join pickup_requests pr on pr.stop_id = st.id left join shipments sh on sh.id = st.shipment_id where st.run_id = any($1::text[]) and st.status = 'pending'`, [runs.map((r) => r.id)])
   if (!stops.length) return { runs: runs.length, stops: 0, texted: 0 }
-  const { rows: drivers } = await db.query<Row>(`select id, name, user_id from staff where shipper_id = $1 and role = 'driver' and status = 'active' order by name`, [sid])
+  const { rows: drivers } = await db.query<Row>(`select id, name, user_id from staff where shipper_id = $1 and role in ('pickup_driver','driver') and status = 'active' order by name`, [sid])
   const need = Math.max(1, Math.ceil(stops.length / cfg.maxStopsPerRun))
   // Sweep clustering: order stops by bearing around their centre, then cut into equal slices (no coords → by town).
   const geo = stops.filter((s) => s.lat != null && s.lon != null)
@@ -171,7 +172,7 @@ export function mountAutopilotOps(r: Router, d: Deps) {
     res.json(out)
   }))
   r.post('/containers/:id/load-suggested', wrap(async (req, res) => {
-    const db = await getDb(); const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.')
+    const db = await getDb(); const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.')
     const { planner } = await import('./growth'); const p = await planner(db, u.shipperId); const c = p.containers.find((x) => x.id === String(req.params.id)); if (!c) throw new HttpError(404, 'Container not open.')
     if (!c.suggest.length) throw new HttpError(409, 'Nothing waiting fits this container.')
     const { rows } = await db.query<Row>('select * from containers where id = $1', [c.id]); const { loadIntoContainer } = await import('./containers')

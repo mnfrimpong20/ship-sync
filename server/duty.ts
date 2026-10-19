@@ -11,6 +11,7 @@
  * Rates live in RATES below with the date they were checked, so updating them is a one-line change.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
 import { vehicleDutyDefaults } from './vehicles'
 import type { Db } from './db'
@@ -133,7 +134,7 @@ export function mountDuty(r: Router, d: Deps) {
   const access = async (db: Db, req: Request, id: string) => {
     const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select * from shipments where id = $1', [id]); const s = rows[0]; if (!s) throw new HttpError(404, 'Shipment not found.')
-    const office = u.role === 'shipper' && s.shipper_id === u.shipperId && u.staffRole !== 'driver'
+    const office = u.role === 'shipper' && s.shipper_id === u.shipperId && !isDriverRole(u.staffRole)
     if (!office && !(u.role === 'customer' && s.user_id === u.id)) throw new HttpError(403, 'You do not have access to this shipment.')
     return { u, s, office }
   }

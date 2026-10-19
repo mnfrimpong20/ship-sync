@@ -11,6 +11,7 @@
  * slots in behind the same `requestBooking()` seam later. Admins can also add sailings by hand.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { uid, type Db } from './db'
@@ -94,7 +95,7 @@ const zSailing = z.object({
 
 export function mountBooking(r: Router, d: Deps) {
   const { getDb, requireUser, requireAdmin, HttpError, wrap } = d
-  const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.'); return u }
+  const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.'); return u }
   const byId = async (db: Db, id: string) => { const { rows } = await db.query<Row>(`${BOOKING_SELECT} where b.id = $1`, [id]); if (!rows[0]) throw new HttpError(404, 'Booking not found.'); return rows[0] }
 
   r.get('/sailings', wrap(async (req, res) => {

@@ -8,6 +8,7 @@
  *   in the thread; an admin resolves with a full / partial refund, a release, or no action.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
@@ -62,7 +63,7 @@ export function mountReviews(r: Router, d: Deps) {
   const access = async (db: Db, req: Request, shipmentId: string) => {
     const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select * from shipments where id = $1', [shipmentId]); const s = rows[0]; if (!s) throw new HttpError(404, 'Shipment not found.')
-    const office = u.role === 'shipper' && s.shipper_id === u.shipperId && u.staffRole !== 'driver'
+    const office = u.role === 'shipper' && s.shipper_id === u.shipperId && !isDriverRole(u.staffRole)
     const owner = u.role === 'customer' && s.user_id === u.id
     if (!office && !owner && !u.admin) throw new HttpError(403, 'You do not have access to this shipment.')
     return { u, s, office, owner }
@@ -106,7 +107,7 @@ export function mountReviews(r: Router, d: Deps) {
     res.json({ review: reviewOut((await reviewFor(db, rv.shipment_id))!, true) })
   }))
   r.get('/reviews', wrap(async (req, res) => {
-    const db = await getDb(); const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.')
+    const db = await getDb(); const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.')
     const { rows } = await db.query<Row>(`${REVIEW_SELECT} where r.shipper_id = $1 order by r.created_at desc limit 200`, [u.shipperId])
     const { rows: sh } = await db.query<Row>('select rating, reviews from shippers where id = $1', [u.shipperId])
     const { rows: pending } = await db.query<Row>(`select count(*)::int as n from shipments s where s.shipper_id = $1 and s.status = 'delivered' and s.user_id is not null and not exists (select 1 from reviews r where r.shipment_id = s.id)`, [u.shipperId])
@@ -181,7 +182,7 @@ export function mountReviews(r: Router, d: Deps) {
     res.json({ dispute: disputeOut(await disputeById(db, dp.id)) })
   }))
   r.get('/disputes', wrap(async (req, res) => {
-    const db = await getDb(); const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.')
+    const db = await getDb(); const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.')
     const { rows } = await db.query<Row>(`${DISPUTE_SELECT} where d.shipper_id = $1 order by (d.status = 'open') desc, d.updated_at desc limit 100`, [u.shipperId]); res.json({ disputes: rows.map(disputeOut) })
   }))
   r.get('/admin/disputes', wrap(async (req, res) => {

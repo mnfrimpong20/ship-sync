@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { humanizeDates } from '../src/lib/dates'
 import type { Db } from './db'
 import type { ApiUser } from './api'
@@ -154,7 +155,7 @@ export function mountInsights(r: Router, d: Deps) {
       },
       series, lanes: lanes.map((l) => ({ ...l, share: laneTotal ? Math.round((l.n / laneTotal) * 100) : 0 })), byStatus,
       pipeline: { leads: leads.length, quoted: q30.length, won: q30.filter((q) => q.status === 'accepted').length },
-      ops: { runsToday: runsToday.map((x) => ({ id: x.id, name: x.name, kind: x.kind, status: x.status, driver: x.driver_name ?? null, stops: x.stops, pending: x.pending })), vehicles: { total: vehicles.length, available: vehicles.filter((v) => v.status === 'available').length, onRun: vehicles.filter((v) => v.status === 'on_run').length, maintenance: vehicles.filter((v) => v.status === 'maintenance').length }, team: { active: team.filter((t) => t.status === 'active').length, drivers: team.filter((t) => t.role === 'driver' && t.status === 'active').length, invited: team.filter((t) => t.status === 'invited').length }, followupsDue: followups.length },
+      ops: { runsToday: runsToday.map((x) => ({ id: x.id, name: x.name, kind: x.kind, status: x.status, driver: x.driver_name ?? null, stops: x.stops, pending: x.pending })), vehicles: { total: vehicles.length, available: vehicles.filter((v) => v.status === 'available').length, onRun: vehicles.filter((v) => v.status === 'on_run').length, maintenance: vehicles.filter((v) => v.status === 'maintenance').length }, team: { active: team.filter((t) => t.status === 'active').length, drivers: team.filter((t) => isDriverRole(t.role) && t.status === 'active').length, invited: team.filter((t) => t.status === 'invited').length }, followupsDue: followups.length },
       attention: attention.slice(0, 8).map((a) => ({ ...a, title: humanizeDates(a.title, { rel: true }), body: humanizeDates(a.body, { rel: true }) })),
       leads: leads.slice(0, 4).map((l) => ({ id: l.id, ref: l.ref, origin: l.origin, destination: l.destination, mode: l.mode, cargo: l.cargo, contact: l.contact_name, createdAt: iso(l.created_at), competing: l.quote_count })),
       activity: activity.map((a) => ({ id: a.id, type: a.type, body: a.body, at: iso(a.at), clientName: a.client_name, clientId: a.client_id })),

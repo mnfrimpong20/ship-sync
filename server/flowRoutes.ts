@@ -9,6 +9,7 @@
  *             GET /p/:token · POST /p/:token/container · POST /p/:token/shipments/:sid/handover · POST /p/:token/shipments/:sid/note
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { uid, type Db } from './db'
@@ -41,7 +42,7 @@ export function mountFlow(r: Router, d: Deps) {
     const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select * from shipments where id = $1', [id]); const s = rows[0]; if (!s) throw new HttpError(404, 'Shipment not found.')
     if (u.role !== 'shipper' || s.shipper_id !== u.shipperId) throw new HttpError(403, 'Only the handling shipper can do this.')
-    if (!o.drivers && u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.')
+    if (!o.drivers && isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.')
     if (o.managers && !['owner', 'dispatcher'].includes(u.staffRole ?? 'owner')) throw new HttpError(403, 'Only owners and dispatchers can do this.')
     return { u, s }
   }
@@ -134,7 +135,7 @@ export function mountFlow(r: Router, d: Deps) {
 
   /* ---- manifest + destination partners ---- */
   const ownContainer = async (db: Db, req: Request, id: string) => {
-    const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.')
+    const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.')
     const { rows } = await db.query<Row>('select * from containers where id = $1 and shipper_id = $2', [id, u.shipperId]); if (!rows[0]) throw new HttpError(404, 'Container not found.')
     return { u, c: rows[0] }
   }
@@ -152,12 +153,12 @@ export function mountFlow(r: Router, d: Deps) {
   }))
   r.delete('/partners/:id', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireUser(db, req)
-    const { rows } = await db.query<Row>('select * from partner_links where id = $1 and shipper_id = $2', [req.params.id, u.shipperId ?? '']); if (!rows[0] || u.staffRole === 'driver') throw new HttpError(404, 'Link not found.')
+    const { rows } = await db.query<Row>('select * from partner_links where id = $1 and shipper_id = $2', [req.params.id, u.shipperId ?? '']); if (!rows[0] || isDriverRole(u.staffRole)) throw new HttpError(404, 'Link not found.')
     await db.query('update partner_links set revoked_at = now() where id = $1', [rows[0].id]); res.json({ ok: true })
   }))
   r.post('/partners/:id/pre-alert', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireUser(db, req)
-    const { rows } = await db.query<Row>('select l.*, c.id as cid from partner_links l join containers c on c.id = l.container_id where l.id = $1 and l.shipper_id = $2 and l.revoked_at is null', [req.params.id, u.shipperId ?? '']); if (!rows[0] || u.staffRole === 'driver') throw new HttpError(404, 'Link not found.')
+    const { rows } = await db.query<Row>('select l.*, c.id as cid from partner_links l join containers c on c.id = l.container_id where l.id = $1 and l.shipper_id = $2 and l.revoked_at is null', [req.params.id, u.shipperId ?? '']); if (!rows[0] || isDriverRole(u.staffRole)) throw new HttpError(404, 'Link not found.')
     if (!rows[0].email) throw new HttpError(400, 'Add an email for this agent first.')
     const { rows: c } = await db.query<Row>('select * from containers where id = $1', [rows[0].cid]); await db.query('update partner_links set pre_alert_sent_at = null where id = $1', [rows[0].id])
     res.json({ sent: await sendPreAlerts(db, c[0]) })

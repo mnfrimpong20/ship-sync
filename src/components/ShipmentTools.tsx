@@ -1,4 +1,5 @@
 import { AddressLookup } from './AddressLookup'
+import { isDriverRole } from '../lib/roles'
 import { useEffect, useState } from 'react'
 import { AlertTriangle, Ban, Bot, Check, ChevronRight, CircleDashed, KeyRound, PackageCheck, Pencil, Plus, RotateCcw, Store, Trash2, Truck, UserPlus, Wallet, Zap } from 'lucide-react'
 import { countries, nextStatus, prevStatus, statusLabels, type Handover, type Shipment } from '../lib/data'
@@ -67,7 +68,7 @@ export function AutoTag({ s, onOverride }: { s: Shipment; onOverride?: () => voi
 /** Everything the office may need to fix on a shipment: who receives it, how it's handed over, money owed, what moves it on its own, and corrections. */
 export function ShipmentManage({ s, consignees, onChanged, onDeleted }: { s: Shipment; consignees?: Consignee[]; onChanged: (toast: string) => void | Promise<void>; onDeleted: (toast: string) => void | Promise<void> }) {
   const { user } = useStore()
-  const office = user?.role === 'shipper' && user.staffRole !== 'driver'
+  const office = user?.role === 'shipper' && !isDriverRole(user.staffRole)
   const manager = user?.role === 'shipper' && ['owner', 'dispatcher', undefined].includes(user.staffRole)
   const moneyRole = manager || user?.staffRole === 'finance'
   const [auto, setAuto] = useState<Automation | null>(null)

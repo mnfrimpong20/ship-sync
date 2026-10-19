@@ -16,6 +16,7 @@
  *                    X-Hub-Signature-256 with WHATSAPP_APP_SECRET, reply through sendText).
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import { uid, type Db } from './db'
@@ -239,7 +240,7 @@ export function metaInbound(getDb: () => Promise<Db>) {
 const convOut = (c: Row) => ({ id: c.id, phone: c.phone, name: c.name, lastAt: ISO(c.last_at), lastIntent: c.last_intent ?? '', handedOff: !!c.handed_off_at && Date.now() - new Date(c.handed_off_at).getTime() < 12 * 3600_000, unread: Number(c.unread ?? 0), preview: c.preview ?? '' })
 export function mountAssistant(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
-  const staff = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (!(u.role === 'shipper' && u.shipperId && u.staffRole !== 'driver') && !u.admin) throw new HttpError(403, 'Office staff only.'); return u }
+  const staff = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (!(u.role === 'shipper' && u.shipperId && !isDriverRole(u.staffRole)) && !u.admin) throw new HttpError(403, 'Office staff only.'); return u }
   const scope = (u: ApiUser) => (u.role === 'shipper' && u.shipperId ? { sql: 'where c.shipper_id = $1', args: [u.shipperId] } : { sql: '', args: [] as string[] })
   r.get('/assistant/conversations', wrap(async (req, res) => {
     const db = await getDb(); const u = await staff(db, req); const s = scope(u)

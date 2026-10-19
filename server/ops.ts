@@ -3,6 +3,7 @@
  * consignees in West Africa). Staff sign in as normal users linked to the company; what they may do depends on their role.
  */
 import { assertRelease, owedFor } from './flow'
+import { canDriveKind, isDriverRole } from '../src/lib/roles'
 import { humanizeDates } from '../src/lib/dates'
 import { prefsOf } from './shipmentOps'
 import type { Request, Response, NextFunction, Router } from 'express'
@@ -17,7 +18,7 @@ import { notify, notifyShipmentStatus, notifyShipperStaff } from './notify'
 import { normalisePhone, sendText, smsProvider } from './sms'
 
 type Row = Record<string, any>
-export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'
+export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'pickup_driver' | 'delivery_driver' | 'driver'
 interface Deps {
   getDb: () => Promise<Db>
   requireUser: (db: Db, req: Request) => Promise<ApiUser>
@@ -45,7 +46,7 @@ const runOut = (r: Row, stops: Row[]) => ({
 })
 
 /* ---------------- schemas ---------------- */
-const zRole = z.enum(['owner', 'dispatcher', 'agent', 'finance', 'warehouse', 'driver'])
+const zRole = z.enum(['owner', 'dispatcher', 'agent', 'finance', 'warehouse', 'pickup_driver', 'delivery_driver', 'driver'])
 const zBase = z.enum(['origin', 'destination'])
 const zInvite = z.object({ name: z.string().trim().min(2).max(80), email: z.string().trim().email('Enter a valid email.'), phone: z.string().trim().max(30).default(''), role: zRole.default('agent'), base: zBase.default('origin'), city: z.string().trim().max(60).default('') })
 const zArea = z.enum(['leads', 'rates', 'lanes', 'groupage', 'brand', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'payments', 'collections', 'reviews', 'fleet', 'team', 'verification', 'sourcing'])
@@ -133,6 +134,13 @@ export function mountOps(r: Router, d: Deps) {
     return { user: u, shipperId: u.shipperId, me, role: me.role as StaffRole }
   }
   const MANAGE: StaffRole[] = ['owner', 'dispatcher']
+  /** A pickup driver only gets pickup runs; a delivery driver only delivery runs. */
+  const assertDriverFits = async (db: Db, shipperId: string, driverId: string | null | undefined, kind: string) => {
+    if (!driverId) return
+    const { rows } = await db.query<Row>('select name, role from staff where id = $1 and shipper_id = $2', [driverId, shipperId]); const d = rows[0]
+    if (!d) throw new HttpError(400, 'That driver isn’t on your team.')
+    if (isDriverRole(d.role) && !canDriveKind(d.role, kind as 'pickup' | 'delivery')) throw new HttpError(400, `${d.name} is a ${d.role === 'pickup_driver' ? 'pickup' : 'delivery'} driver — choose a ${kind === 'pickup' ? 'pickup' : 'delivery'} driver for this run.`)
+  }
   const loadRuns = async (db: Db, where: string, params: unknown[]) => {
     const { rows } = await db.query<Row>(`select r.*, s.name as driver_name, v.name as vehicle_name from runs r left join staff s on s.id = r.driver_id left join vehicles v on v.id = r.vehicle_id where ${where} order by r.run_date desc, r.created_at desc`, params)
     if (!rows.length) return []
@@ -155,7 +163,7 @@ export function mountOps(r: Router, d: Deps) {
   r.get('/team', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, role, me } = await staffOf(db, req)
     // Drivers don't need the office list (emails, phones); they get their own record, and dispatch via /runs/dispatch.
-    if (role === 'driver') { res.json({ team: [staffOut(me)] }); return }
+    if (isDriverRole(role)) { res.json({ team: [staffOut(me)] }); return }
     const { rows } = await db.query<Row>(`select s.*, (select count(*) from runs r where r.driver_id = s.id)::int as run_count,
         (select count(*) from runs r where r.driver_id = s.id and r.run_date >= current_date - 6)::int as runs_week,
         (select count(*) from run_stops rs join runs r on r.id = rs.run_id where r.driver_id = s.id and rs.status = 'done' and rs.done_at >= now() - interval '7 days')::int as stops_week,
@@ -294,7 +302,7 @@ export function mountOps(r: Router, d: Deps) {
   r.post('/runs/:id/stops/:sid/on-way', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, me, role } = await staffOf(db, req)
     const run = await ownRun(db, shipperId, String(req.params.id)); const st = run.stops.find((s) => s.id === req.params.sid); if (!st) throw new HttpError(404, 'Stop not found.')
-    if (role === 'driver' && run.driverId !== me.id) throw new HttpError(403, 'Not your run.')
+    if (isDriverRole(role) && run.driverId !== me.id) throw new HttpError(403, 'Not your run.')
     const { minutes } = z.object({ minutes: z.number().int().min(1).max(600) }).parse(req.body)
     const { rows: co } = await db.query<Row>('select name from shippers where id = $1', [shipperId])
     const first = me.name.split(' ')[0]; const company = co[0]?.name ?? 'your shipper'
@@ -317,7 +325,7 @@ export function mountOps(r: Router, d: Deps) {
   r.post('/runs/:id/summary', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, me, role } = await staffOf(db, req)
     const run = await ownRun(db, shipperId, String(req.params.id))
-    if (role === 'driver' && run.driverId !== me.id) throw new HttpError(403, 'Not your run.')
+    if (isDriverRole(role) && run.driverId !== me.id) throw new HttpError(403, 'Not your run.')
     const { note } = z.object({ note: z.string().trim().max(500).default('') }).parse(req.body ?? {})
     const done = run.stops.filter((s) => s.status === 'done'); const skipped = run.stops.filter((s) => s.status === 'skipped'); const pending = run.stops.filter((s) => s.status === 'pending')
     const pieces = done.reduce((n, s) => n + (s.pod?.pieces ?? 0), 0)
@@ -330,6 +338,7 @@ export function mountOps(r: Router, d: Deps) {
   r.post('/runs', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, me } = await staffOf(db, req, ...MANAGE)
     const b = zRun.parse(req.body); const id = 'run_' + uid()
+    await assertDriverFits(db, shipperId, b.driverId, b.kind)
     for (const st of b.stops) if (st.shipmentId) { const { rows } = await db.query('select 1 from shipments where id = $1 and shipper_id = $2', [st.shipmentId, shipperId]); if (!rows.length) throw new HttpError(400, 'A stop refers to a shipment that is not yours.') }
     const order = optimiseOrder(b.start ?? null, b.stops)
     await db.query('insert into runs (id,shipper_id,name,kind,run_date,driver_id,vehicle_id,start_label,start_lat,start_lon,notes,distance_km) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
@@ -342,9 +351,10 @@ export function mountOps(r: Router, d: Deps) {
     const db = await getDb(); const { shipperId, me, role } = await staffOf(db, req)
     const run = await ownRun(db, shipperId, String(req.params.id))
     const b = zRunPatch.parse(req.body)
-    const isDriver = role === 'driver'
+    const isDriver = isDriverRole(role)
     if (isDriver && (run.driverId !== me.id || Object.keys(b).some((k) => k !== 'status') || (b.status && !['in_progress', 'done'].includes(b.status)))) throw new HttpError(403, 'Drivers can only start or finish their own runs.')
     if (!isDriver && !MANAGE.includes(role)) throw new HttpError(403, 'This needs the owner or dispatcher role.')
+    if (b.driverId) await assertDriverFits(db, shipperId, b.driverId, run.kind)
     await db.query('update runs set name=$2, run_date=$3, driver_id=$4, vehicle_id=$5, status=$6, notes=$7, start_label=$8, start_lat=$9, start_lon=$10 where id = $1',
       [run.id, b.name ?? run.name, b.date ?? run.date, b.driverId === undefined ? run.driverId ?? null : b.driverId, b.vehicleId === undefined ? run.vehicleId ?? null : b.vehicleId, b.status ?? run.status, b.notes ?? run.notes, b.start === undefined ? run.start?.label ?? '' : b.start?.label ?? '', b.start === undefined ? run.start?.lat ?? null : b.start?.lat ?? null, b.start === undefined ? run.start?.lon ?? null : b.start?.lon ?? null])
     if (b.status === 'in_progress') {
@@ -378,7 +388,7 @@ export function mountOps(r: Router, d: Deps) {
     const db = await getDb(); const { shipperId, me, role } = await staffOf(db, req)
     const run = await ownRun(db, shipperId, String(req.params.id)); const st = run.stops.find((s) => s.id === req.params.sid); if (!st) throw new HttpError(404, 'Stop not found.')
     const b = zStopPatch.parse(req.body)
-    if (role === 'driver' && (run.driverId !== me.id || Object.keys(b).some((k) => !DRIVER_STOP_KEYS.includes(k)))) throw new HttpError(403, 'Drivers can only mark their own stops.')
+    if (isDriverRole(role) && (run.driverId !== me.id || Object.keys(b).some((k) => !DRIVER_STOP_KEYS.includes(k)))) throw new HttpError(403, 'Drivers can only mark their own stops.')
     if (role === 'agent') throw new HttpError(403, 'Agents cannot edit runs.')
     // Money taken at the door goes onto the shipment's open invoices (oldest first) before any release check.
     if (b.collected && st.shipmentId) {
@@ -406,7 +416,7 @@ export function mountOps(r: Router, d: Deps) {
       const why = b.skipReason ? SKIP_REASONS[b.skipReason] : 'Skipped'
       await db.query('update run_stops set skip_reason = $2 where id = $1', [st.id, b.skipReason ?? 'other'])
       b.note = `${why}${b.note ? ` — ${b.note}` : ''}`
-      if (role === 'driver') await notifyShipperStaff(db, shipperId, { kind: 'shipment_status', title: `${me.name} skipped ${st.label}`, body: `${b.note}. On “${run.name}”.`, link: `/dashboard/routes/${run.id}` }, ['owner', 'dispatcher']).catch(() => {})
+      if (isDriverRole(role)) await notifyShipperStaff(db, shipperId, { kind: 'shipment_status', title: `${me.name} skipped ${st.label}`, body: `${b.note}. On “${run.name}”.`, link: `/dashboard/routes/${run.id}` }, ['owner', 'dispatcher']).catch(() => {})
     }
     if (b.status === 'done' && (b.receivedBy || b.photo || b.signature || b.pieces != null)) await db.query('update run_stops set pod = $2 where id = $1', [st.id, JSON.stringify({ receivedBy: b.receivedBy ?? '', photo: b.photo, signature: b.signature, pieces: b.pieces, by: me.name, at: new Date().toISOString() })])
     await db.query('update run_stops set status=$2, note=$3, seq=$4, lat=$5, lon=$6, label=$7, address=$8, contact=$9, phone=$10, done_at = case when $2 = \'done\' then coalesce(done_at, now()) else null end where id = $1',
@@ -415,7 +425,7 @@ export function mountOps(r: Router, d: Deps) {
     if (b.status === 'done' && st.shipmentId && st.status !== 'done' && run.kind !== 'pickup') {
       // Money first: with "block unpaid" on, the stop can't close until it's settled (office can override with a reason).
       const { rows: sh } = await db.query<Row>('select * from shipments where id = $1', [st.shipmentId])
-      if (sh[0]) await assertRelease(db, sh[0], { by: me.name, byRole: role, override: role !== 'driver' && req.body?.override?.reason ? { reason: String(req.body.override.reason).slice(0, 200) } : null })
+      if (sh[0]) await assertRelease(db, sh[0], { by: me.name, byRole: role, override: !isDriverRole(role) && req.body?.override?.reason ? { reason: String(req.body.override.reason).slice(0, 200) } : null })
     }
     if (b.status === 'done' && st.shipmentId && st.status !== 'done') {
       const proof = [b.pieces != null ? `${b.pieces} piece${b.pieces === 1 ? '' : 's'}` : '', b.photo ? 'photo on file' : '', b.signature ? 'signed' : ''].filter(Boolean).join(', ')
@@ -431,7 +441,7 @@ export function mountOps(r: Router, d: Deps) {
   r.post('/runs/:id/late', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, me, role } = await staffOf(db, req)
     const run = await ownRun(db, shipperId, String(req.params.id))
-    if (role === 'driver' && run.driverId !== me.id) throw new HttpError(403, 'Not your run.')
+    if (isDriverRole(role) && run.driverId !== me.id) throw new HttpError(403, 'Not your run.')
     const b = z.object({ minutes: z.number().int().min(5).max(480), note: z.string().trim().max(200).default('') }).parse(req.body)
     const pending = run.stops.filter((st) => st.status === 'pending' && st.shipmentId)
     let told = 0

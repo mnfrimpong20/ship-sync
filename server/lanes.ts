@@ -5,6 +5,7 @@
  * adds "you vs the market" on every lane you quote, and the busiest lanes you don't serve yet.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import type { Db } from './db'
 import type { ApiUser } from './api'
 import { cargoLabel, countryByCode, type CargoType } from '../src/lib/data'
@@ -92,7 +93,7 @@ export function mountLanes(r: Router, d: Deps) {
   r.get('/lanes/top', wrap(async (_req, res) => { const db = await getDb(); res.set('Cache-Control', 'no-store'); res.json({ lanes: await topLanes(db) }) }))
   /** The shipper's lanes vs the market, plus demand they don't serve. */
   r.get('/shipper/lanes', wrap(async (req, res) => {
-    const db = await getDb(); const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.')
+    const db = await getDb(); const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.')
     const { rows: mine } = await db.query<Row>(`select split_part(r.origin, ',', 1) as origin, r.destination, r.cargo, count(*)::int as quotes, sum(case when q.status = 'accepted' then 1 else 0 end)::int as won, sum(case when q.status in ('accepted','declined') then 1 else 0 end)::int as decided, avg(q.price)::float as avg_price, avg(q.transit_days)::float as avg_transit,
         avg(extract(epoch from (q.sent_at - r.created_at)) / 3600)::float as response_h
       from quotes q join requests r on r.id = q.request_id where q.shipper_id = $1 and q.sent_at > now() - interval '180 days' group by 1, 2, 3 order by quotes desc limit 20`, [u.shipperId])

@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -16,7 +17,7 @@ const err = (e: unknown, fb: string) => (e instanceof Error ? e.message : fb)
 const stageLabel: Record<Stage, string> = { fee: 'Sourcing fee', deposit: 'Deposit', balance: 'Balance', sample: 'Sample' }
 const tone = (s: Job['status']) => (s === 'closed' || s === 'delivered' ? 'green' : s === 'cancelled' ? 'danger' : ['quoted', 'inspected'].includes(s) ? 'gold' : 'sky') as 'green' | 'danger' | 'gold' | 'sky'
 const stepsFor = (tier: Tier) => (tier === 'find' ? FIND_STEPS : STEPS)
-export const isSourcingTeam = (u: { admin?: boolean; role: string; shipperId?: string; staffRole?: string } | null) => !!u && (!!u.admin || (u.role === 'shipper' && u.shipperId === SOURCING_SHIPPER && u.staffRole !== 'driver'))
+export const isSourcingTeam = (u: { admin?: boolean; role: string; shipperId?: string; staffRole?: string } | null) => !!u && (!!u.admin || (u.role === 'shipper' && u.shipperId === SOURCING_SHIPPER && !isDriverRole(u.staffRole)))
 
 /* ================= public landing ================= */
 export default function SourcingPage() {

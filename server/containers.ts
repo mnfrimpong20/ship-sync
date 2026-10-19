@@ -1,4 +1,5 @@
 import { cascadeEta, devanShipments, sendPreAlerts } from './flow'
+import { isDriverRole } from '../src/lib/roles'
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
 import { uid, type Db } from './db'
@@ -175,7 +176,7 @@ export function mountContainers(r: Router, d: Deps) {
   const access = async (db: Db, req: Request) => {
     const u = await requireUser(db, req)
     if (u.role !== 'shipper' || !u.shipperId) throw new HttpError(403, 'Shippers only.')
-    if (u.staffRole === 'driver') throw new HttpError(403, 'Drivers can’t manage containers.')
+    if (isDriverRole(u.staffRole)) throw new HttpError(403, 'Drivers can’t manage containers.')
     return { u, sid: u.shipperId }
   }
   const nextRef = async (db: Db, sid: string) => {

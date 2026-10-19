@@ -9,6 +9,7 @@
  * moves to Picked up and the booking shows as done.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
@@ -94,7 +95,7 @@ export function mountPickups(r: Router, d: Deps) {
 
   const office = async (db: Db, req: Request, manage = false) => {
     const u = await requireUser(db, req)
-    if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Shipper office staff only.')
+    if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Shipper office staff only.')
     if (manage && u.staffRole === 'agent') throw new HttpError(403, 'Only owners and dispatchers can change pickup availability.')
     return u
   }
@@ -103,7 +104,7 @@ export function mountPickups(r: Router, d: Deps) {
     const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select * from shipments where id = $1', [shipmentId])
     const s = rows[0]; if (!s) throw new HttpError(404, 'Shipment not found.')
-    const isOffice = u.role === 'shipper' && s.shipper_id === u.shipperId && u.staffRole !== 'driver'
+    const isOffice = u.role === 'shipper' && s.shipper_id === u.shipperId && !isDriverRole(u.staffRole)
     const owner = u.role === 'customer' && s.user_id === u.id
     if (!isOffice && !owner) throw new HttpError(403, 'You do not have access to this shipment.')
     return { u, s, office: isOffice }

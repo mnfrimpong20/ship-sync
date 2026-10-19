@@ -8,6 +8,7 @@
  *   Demo partners are flagged and hidden with HIDE_DEMO_SHIPPERS like the demo shippers.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { hideDemoShippers, uid, type Db } from './db'
@@ -52,7 +53,7 @@ const zPartner = z.object({
 
 export function mountPartners(r: Router, d: Deps) {
   const { getDb, requireUser, requireAdmin, HttpError, wrap } = d
-  const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.'); return u }
+  const office = async (db: Db, req: Request) => { const u = await requireUser(db, req); if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.'); return u }
   const demoSql = () => (hideDemoShippers() ? 'and not p.is_demo' : '')
 
   /** Directory for shippers (and admins): active partners, optionally for one country. */

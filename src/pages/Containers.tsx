@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { LoadPlanner } from '../components/LoadPlanner'
@@ -70,7 +71,7 @@ export default function Containers() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!ready || user?.role !== 'shipper' || user.staffRole === 'driver') return
+    if (!ready || user?.role !== 'shipper' || isDriverRole(user.staffRole)) return
     let live = true
     containersApi.list().then((c) => live && setList(c)).catch((e) => live && setError(e instanceof Error ? e.message : 'Could not load containers.'))
     return () => { live = false }
@@ -85,7 +86,7 @@ export default function Containers() {
 
   if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/containers" replace />
-  if (user.role !== 'shipper' || user.staffRole === 'driver') return <Navigate to="/dashboard" replace />
+  if (user.role !== 'shipper' || isDriverRole(user.staffRole)) return <Navigate to="/dashboard" replace />
 
   if (view === 'planner') return (
     <div className="bg-bg text-text"><div className="container-x py-10 md:py-14">

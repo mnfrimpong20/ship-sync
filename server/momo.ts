@@ -10,6 +10,7 @@
  *   PAYSTACK_API_URL overrides the host for a local mock.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { isDriverRole } from '../src/lib/roles'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import { uid, type Db } from './db'
@@ -88,7 +89,7 @@ export function mountMomo(r: Router, d: Deps) {
   const office = async (db: Db, req: Request) => {
     const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select * from shipments where id = $1', [String(req.params.id)]); const s = rows[0]; if (!s) throw new HttpError(404, 'Shipment not found.')
-    const isOffice = u.role === 'shipper' && s.shipper_id === u.shipperId && u.staffRole !== 'driver'
+    const isOffice = u.role === 'shipper' && s.shipper_id === u.shipperId && !isDriverRole(u.staffRole)
     if (!isOffice && !(u.role === 'customer' && s.user_id === u.id) && !u.admin) throw new HttpError(403, 'You do not have access to this shipment.')
     return { u, s, isOffice }
   }

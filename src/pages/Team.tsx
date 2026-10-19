@@ -1,4 +1,5 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { isDriverRole } from '../lib/roles'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -10,7 +11,7 @@ import { fadeUp, stagger } from '../lib/motion'
 import { Chip, Confirm, Expander, Pager, SearchBox, StatCard, Th, thead, trow, usePaged } from '../components/board'
 
 const initialsOf = (n: string) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
-const roleTone: Record<StaffRole, 'gold' | 'teal' | 'sky' | 'muted' | 'green'> = { owner: 'gold', dispatcher: 'teal', agent: 'sky', finance: 'green', warehouse: 'muted', driver: 'muted' }
+const roleTone: Record<StaffRole, 'gold' | 'teal' | 'sky' | 'muted' | 'green'> = { owner: 'gold', dispatcher: 'teal', agent: 'sky', finance: 'green', warehouse: 'muted', pickup_driver: 'muted', delivery_driver: 'muted', driver: 'muted' }
 
 function CopyLink({ token }: { token: string }) {
   const [copied, setCopied] = useState(false)
@@ -61,11 +62,11 @@ export default function Team() {
   }, [ready, user])
 
   const all = team ?? []
-  const counts = { active: all.filter((s) => s.status === 'active').length, invited: all.filter((s) => s.status === 'invited').length, inactive: all.filter((s) => s.status === 'inactive').length, drivers: all.filter((s) => s.status === 'active' && s.role === 'driver').length }
+  const counts = { active: all.filter((s) => s.status === 'active').length, invited: all.filter((s) => s.status === 'invited').length, inactive: all.filter((s) => s.status === 'inactive').length, drivers: all.filter((s) => s.status === 'active' && isDriverRole(s.role)).length }
   const list = useMemo(() => {
     const ql = q.trim().toLowerCase()
-    const order: Record<StaffRole, number> = { owner: 0, dispatcher: 1, agent: 2, finance: 3, warehouse: 4, driver: 5 }
-    return all.filter((s) => (filter === 'all' ? s.status !== 'inactive' : s.status === filter) && (!role || s.role === role) && (!base || s.base === base) && (!ql || [s.name, s.email, s.phone, s.city, roleLabels[s.role]].join(' ').toLowerCase().includes(ql)))
+    const order: Record<StaffRole, number> = { owner: 0, dispatcher: 1, agent: 2, finance: 3, warehouse: 4, pickup_driver: 5, delivery_driver: 6, driver: 7 }
+    return all.filter((s) => (filter === 'all' ? s.status !== 'inactive' : s.status === filter) && (!role || s.role === role || (role === 'driver' && isDriverRole(s.role))) && (!base || s.base === base) && (!ql || [s.name, s.email, s.phone, s.city, roleLabels[s.role]].join(' ').toLowerCase().includes(ql)))
       .sort((a, b) => (a.status === 'invited' ? 1 : 0) - (b.status === 'invited' ? 1 : 0) || order[a.role] - order[b.role] || a.name.localeCompare(b.name))
   }, [all, filter, role, base, q])
   const p = usePaged(list, PAGE, `${filter}|${role}|${base}|${q}`)
@@ -103,7 +104,7 @@ export default function Team() {
 
           <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="Active members" value={counts.active} hint="Can sign in right now" icon={Users} active={filter === 'active'} onClick={() => setFilter(filter === 'active' ? 'all' : 'active')} />
-            <StatCard label="Drivers" value={counts.drivers} hint="See only their own runs" icon={Truck} active={role === 'driver'} onClick={() => setRole(role === 'driver' ? '' : 'driver')} />
+            <StatCard label="Drivers" value={counts.drivers} hint="See only their own runs" icon={Truck} active={isDriverRole(role)} onClick={() => setRole(isDriverRole(role) ? '' : 'driver')} />
             <StatCard label="Invitations pending" value={counts.invited} hint={counts.invited ? 'Haven’t opened their link yet' : 'Everyone invited has joined'} icon={Mail} warn={counts.invited > 0} active={filter === 'invited'} onClick={() => setFilter(filter === 'invited' ? 'all' : 'invited')} />
             <StatCard label="Deactivated" value={counts.inactive} hint="Access switched off" icon={UserX} active={filter === 'inactive'} onClick={() => setFilter(filter === 'inactive' ? 'all' : 'inactive')} />
           </motion.div>
@@ -125,8 +126,8 @@ export default function Team() {
                 <div><label htmlFor="t-phone" className="label-dark">Phone / WhatsApp</label><input id="t-phone" className="input-dark" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></div>
                 <div><label htmlFor="t-city" className="label-dark">Based in</label><input id="t-city" className="input-dark" placeholder="Houston, TX or Accra" value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} /></div>
                 <div><label htmlFor="t-role" className="label-dark">Role</label>
-                  <select id="t-role" className="input-dark" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as StaffRole })}>
-                    {(Object.keys(roleLabels) as StaffRole[]).filter((r) => r !== 'owner' || isOwner).map((r) => <option key={r} value={r}>{roleLabels[r]}</option>)}
+                  <select id="t-role" className="input-dark" value={f.role} onChange={(e) => { const r = e.target.value as StaffRole; setF({ ...f, role: r, base: r === 'pickup_driver' ? 'origin' : r === 'delivery_driver' ? 'destination' : f.base }) }}>
+                    {(Object.keys(roleLabels) as StaffRole[]).filter((r) => (r !== 'owner' || isOwner) && (r !== 'driver' || f.role === 'driver')).map((r) => <option key={r} value={r}>{roleLabels[r]}</option>)}
                   </select>
                   <p className="mt-1 text-xs text-text-muted">{roleBlurb[f.role]}</p>
                 </div>
@@ -186,7 +187,7 @@ export default function Team() {
                                     {menu === s.id && (
                                       <div role="menu" onClick={(e) => e.stopPropagation()} className="absolute right-0 top-9 z-20 w-56 overflow-hidden rounded-xl border border-border bg-surface py-1 text-left text-sm shadow-xl">
                                         {s.status === 'invited' && <button role="menuitem" onClick={() => { setMenu(null); reinvite(s) }} className="flex w-full items-center gap-2 px-3 py-2 hover:bg-surface-2"><RefreshCw size={14} aria-hidden="true" /> New invite link</button>}
-                                        {s.role === 'driver' && <Link role="menuitem" to={`/dashboard/routes?driver=${s.id}&b=all`} className="flex items-center gap-2 px-3 py-2 hover:bg-surface-2"><Truck size={14} aria-hidden="true" /> See their runs</Link>}
+                                        {isDriverRole(s.role) && <Link role="menuitem" to={`/dashboard/routes?driver=${s.id}&b=all`} className="flex items-center gap-2 px-3 py-2 hover:bg-surface-2"><Truck size={14} aria-hidden="true" /> See their runs</Link>}
                                         <a role="menuitem" href={`mailto:${s.email}`} className="flex items-center gap-2 px-3 py-2 hover:bg-surface-2"><Mail size={14} aria-hidden="true" /> Email</a>
                                         <div className="my-1 border-t border-border" />
                                         {s.status === 'inactive'
@@ -232,7 +233,7 @@ function Activity({ s }: { s: Staff }) {
   const a = s.activity
   if (!a) return <span className="text-text-muted">—</span>
   const bits: string[] = []
-  if (s.role === 'driver' || a.runsWeek) bits.push(`${a.runsWeek} run${a.runsWeek === 1 ? '' : 's'} · ${a.stopsWeek} stop${a.stopsWeek === 1 ? '' : 's'}`)
+  if (isDriverRole(s.role) || a.runsWeek) bits.push(`${a.runsWeek} run${a.runsWeek === 1 ? '' : 's'} · ${a.stopsWeek} stop${a.stopsWeek === 1 ? '' : 's'}`)
   if (a.scansWeek) bits.push(`${a.scansWeek} scan${a.scansWeek === 1 ? '' : 's'}`)
   if (a.quotesWeek || ['owner', 'dispatcher', 'agent'].includes(s.role)) bits.push(`${a.quotesWeek} quote${a.quotesWeek === 1 ? '' : 's'}${a.quotesWonWeek ? ` · ${a.quotesWonWeek} won` : ''}`)
   return <span className={bits.length && (a.runsWeek || a.scansWeek || a.quotesWeek) ? '' : 'text-text-muted'} data-testid="activity">{bits.length ? bits.join(' · ') : 'Nothing yet'}</span>

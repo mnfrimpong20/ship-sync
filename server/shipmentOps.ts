@@ -8,6 +8,7 @@
  * plus `invoiceForBooking()` — the invoice a marketplace booking creates automatically when the shipper has it on.
  */
 import { ensurePieces } from './labels'
+import { isDriverRole } from '../src/lib/roles'
 import { pickupRow, placePickupOnRun } from './pickups'
 import { generateDocument } from './documents'
 import type { Request, Response, NextFunction, Router } from 'express'
@@ -124,7 +125,7 @@ export function mountShipmentOps(r: Router, d: Deps) {
   const office = async (db: Db, req: Request, shipmentId: string) => {
     const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select * from shipments where id = $1', [shipmentId]); const s = rows[0]; if (!s) throw new HttpError(404, 'Shipment not found.')
-    if (u.role !== 'shipper' || s.shipper_id !== u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Only the handling shipper’s office can do this.')
+    if (u.role !== 'shipper' || s.shipper_id !== u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Only the handling shipper’s office can do this.')
     return { u, s }
   }
 
@@ -246,7 +247,7 @@ export function mountShipmentOps(r: Router, d: Deps) {
   })
   r.post('/clients/:id/shipments/full', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireUser(db, req)
-    if (u.role !== 'shipper' || !u.shipperId || u.staffRole === 'driver') throw new HttpError(403, 'Office staff only.')
+    if (u.role !== 'shipper' || !u.shipperId || isDriverRole(u.staffRole)) throw new HttpError(403, 'Office staff only.')
     const { rows: cs } = await db.query<Row>('select * from clients where id = $1 and shipper_id = $2', [req.params.id, u.shipperId]); const c = cs[0]; if (!c) throw new HttpError(404, 'Client not found.')
     const b = zFull.parse(req.body)
     const { rows: dest } = await db.query<Row>('select 1 from destinations where code = $1 and active', [b.destination]); if (!dest[0]) throw new HttpError(400, 'That destination is not served yet.')

@@ -5,7 +5,7 @@ import type { PositionPayload } from '../components/LiveMap'
 import { hydrateCountries, hydrateOrigins, type Country } from './data'
 
 export type Role = 'customer' | 'shipper'
-export interface User { id: string; name: string; email: string; role: Role; display?: { lang?: 'en' | 'fr'; textSize?: 'normal' | 'large' | 'larger'; theme?: 'light' | 'dark' | 'system'; road?: boolean }; company?: string; shipperId?: string; admin?: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: { allow?: string[]; deny?: string[] }; staffId?: string; readOnly?: boolean; viewAsBy?: string; actingBy?: { id: string; name: string; email: string } }
+export interface User { id: string; name: string; email: string; role: Role; display?: { lang?: 'en' | 'fr'; textSize?: 'normal' | 'large' | 'larger'; theme?: 'light' | 'dark' | 'system'; road?: boolean }; company?: string; shipperId?: string; admin?: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'pickup_driver' | 'delivery_driver' | 'driver'; perms?: { allow?: string[]; deny?: string[] }; staffId?: string; readOnly?: boolean; viewAsBy?: string; actingBy?: { id: string; name: string; email: string } }
 export type ShipperProfileInput = Pick<Shipper, 'name' | 'tagline' | 'hq' | 'founded' | 'modes' | 'destinations' | 'origins' | 'cargo' | 'services' | 'about' | 'priceIndex' | 'responseHours'> & {
   /** New logo as a data URL, '' to remove it; leave out to keep the current one. */
   logo?: string

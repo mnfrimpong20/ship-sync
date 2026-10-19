@@ -165,13 +165,13 @@ export function MessagesSheet({ run, stopId, onClose }: { run: Run; stopId?: str
 const EXP_KINDS = [['fuel', 'Fuel'], ['toll', 'Toll'], ['parking', 'Parking'], ['repair', 'Repair'], ['meal', 'Meal'], ['other', 'Other']] as const
 export function ExpenseSheet({ run, onClose, onDone, defaultCurrency = 'USD' }: { run?: Run; onClose: () => void; onDone: (usd: number) => void; defaultCurrency?: string }) {
   const t = useT()
-  const [kind, setKind] = useState('fuel'); const [amount, setAmount] = useState(''); const [cur, setCur] = useState(defaultCurrency); const [photo, setPhoto] = useState(''); const [note, setNote] = useState('')
+  const [kind, setKind] = useState('fuel'); const [paidBy, setPaidBy] = useState<'driver' | 'company'>('driver'); const [amount, setAmount] = useState(''); const [cur, setCur] = useState(defaultCurrency); const [photo, setPhoto] = useState(''); const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   const submit = async () => {
     const n = Number(amount); if (!n) { setErr(t('Enter the amount.')); return }
     if (!photo) { setErr(t('Take a photo of the receipt.')); return }
     setBusy(true); setErr('')
-    try { const r = await driverApi.expense({ runId: run?.id, kind, amount: n, currency: cur, photo, note: note.trim() }); onDone(r.amountUsd) } catch (e) { setErr(errText(e, t('Could not save.'))); setBusy(false) }
+    try { const r = await driverApi.expense({ paidBy, runId: run?.id, kind, amount: n, currency: cur, photo, note: note.trim() }); onDone(r.amountUsd) } catch (e) { setErr(errText(e, t('Could not save.'))); setBusy(false) }
   }
   return (
     <Sheet title={t('Fuel & expenses')} onClose={onClose} testid="expense-sheet" footer={<Big tone="gold" onClick={submit} disabled={busy} testid="exp-save"><Fuel size={20} aria-hidden="true" /> {busy ? t('Saving…') : t('Save expense')}</Big>}>
@@ -180,10 +180,12 @@ export function ExpenseSheet({ run, onClose, onDone, defaultCurrency = 'USD' }: 
         <div><label htmlFor="exp-amt" className="label-dark">{t('Amount')}</label><input id="exp-amt" inputMode="decimal" className="input-dark !min-h-14 text-2xl font-bold tabular-nums" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} data-testid="exp-amount" /></div>
         <div><label htmlFor="exp-cur" className="label-dark">{t('Currency')}</label><select id="exp-cur" className="input-dark !min-h-14 text-base" value={cur} onChange={(e) => setCur(e.target.value)}>{['USD', 'GHS', 'NGN', 'XOF', 'GBP', 'EUR'].map((c) => <option key={c}>{c}</option>)}</select></div>
       </div>
+      <p className="label-dark mt-4" id="exp-paid">{t('Who paid?')}</p>
+      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby="exp-paid"><Choice on={paidBy === 'driver'} onClick={() => setPaidBy('driver')} testid="exp-me">{t('I paid — pay me back')}</Choice><Choice on={paidBy === 'company'} onClick={() => setPaidBy('company')} testid="exp-company">{t('Company / fuel card')}</Choice></div>
       <div className="mt-4"><PhotoField value={photo} onChange={setPhoto} label={t('Photo of the receipt')} testid="exp-photo" /></div>
       <label htmlFor="exp-note" className="label-dark mt-4">{t('Note')} <span className="font-normal text-text-muted">({t('optional')})</span></label>
       <input id="exp-note" className="input-dark !min-h-12" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('e.g. Shell, Spintex Road')} />
-      <p className="mt-3 text-sm text-text-muted">{t('It goes into Costs & profit for the office.')}</p>
+      <p className="mt-3 text-sm text-text-muted">{paidBy === 'driver' ? t('Once the office approves it, it’s on your next payslip.') : t('It goes into Costs & profit for the office.')}</p>
       <Msg err={err} />
     </Sheet>
   )

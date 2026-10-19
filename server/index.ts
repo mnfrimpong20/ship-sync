@@ -38,6 +38,7 @@ async function main() {
   ;(await import('./lineBooking')).startBookingSweeps(getDb)
   ;(await import('./quickbooks')).startQuickBooksSweeps(getDb)
   ;(await import('./autopilot')).startAutopilotSweeps(getDb)
+  ;(await import('./driverHr')).startDriverHrSweeps(getDb)
   startExportSchedule(getDb)
   const app = express()
   app.disable('x-powered-by')

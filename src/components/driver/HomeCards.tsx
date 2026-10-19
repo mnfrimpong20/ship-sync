@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { hrApi, type Person } from '../../lib/driverHrApi'
 import { Banknote, Coffee, LogIn, LogOut, Play, TrendingUp } from 'lucide-react'
 import { driverApi, type DriverStat, type ShiftView } from '../../lib/driverApi'
 import { useT } from '../../lib/i18n'
@@ -62,5 +64,20 @@ export function WeekCard() {
       {hasPay && <p className="mt-3 text-base" data-testid="week-pay">{t('Earned so far')}: <b>{money(s.earned, cur)}</b> <span className="text-sm text-text-muted">({[s.pay.perStop ? t('{amount}/stop', { amount: money(s.pay.perStop, cur) }) : '', s.pay.perRun ? t('{amount}/run', { amount: money(s.pay.perRun, cur) }) : '', s.pay.perHour ? t('{amount}/hour', { amount: money(s.pay.perHour, cur) }) : ''].filter(Boolean).join(' · ')})</span></p>}
       {s.skipped > 0 && <p className="mt-2 text-sm text-text-muted">{t('{n} skipped', { n: s.skipped })}</p>}
     </section>
+  )
+}
+
+/** "3 things to finish" or "your licence expires" — shown on the driver home until done. */
+export function OnboardingNudge() {
+  const t = useT(); const [p, setP] = useState<Person | null>(null)
+  useEffect(() => { hrApi.me().then((r) => setP(r.person)).catch(() => {}) }, [])
+  if (!p) return null
+  const left = p.checklist.filter((c) => !c.done).length; const exp = p.expiringSoon
+  if (!left && !exp.length) return null
+  return (
+    <Link to="/dashboard/runs/me" className={`mt-5 block rounded-3xl border-2 p-5 focus-ring ${exp.some((e) => e.expired) ? 'border-danger bg-danger/10' : 'border-gold bg-gold/10'}`} data-testid="onboarding-nudge">
+      <p className="text-lg font-bold">{exp.some((e) => e.expired) ? t('Papers expired — you can’t be put on runs') : left ? t('{n} things to finish in My file', { n: left }) : t('Papers expiring soon')}</p>
+      <p className="mt-1 text-base">{exp.length ? exp.map((e) => `${t(e.label)}: ${e.date}`).join(' · ') : p.checklist.filter((c) => !c.done).map((c) => t(c.label)).join(' · ')}</p>
+    </Link>
   )
 }

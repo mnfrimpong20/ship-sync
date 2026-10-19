@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { AlertTriangle, Banknote, Check, Clock, Download, Fuel, MessageSquare, Pencil, ShieldAlert, TrendingUp, Truck } from 'lucide-react'
+import { AlertTriangle, Banknote, Check, Clock, Fuel, MessageSquare, ShieldAlert, Truck } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { isDriverRole } from '../lib/roles'
 import { driverApi, type DriverPos, type DriverStat, type Expense, type Incident, type Shift } from '../lib/driverApi'
@@ -10,13 +10,13 @@ import { BrandLoader } from '../components/BrandLoader'
 import { StatCard, Th, thead, trow } from '../components/board'
 import { fmtDateTime } from '../components/ui'
 import RunMap from '../components/RunMap'
+import { AnalyticsTab, HoursTab, PayrollTab, PeopleTab, RotaTab } from '../components/driver/OfficeHr'
 
 const money = (n: number, cur = 'USD') => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n) } catch { return `${cur} ${n}` } }
 const ago = (iso: string) => { const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago` }
 const Empty = ({ children }: { children: React.ReactNode }) => <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-text-muted">{children}</p>
-const SKIP: Record<string, string> = { not_home: 'Nobody home', wrong_address: 'Wrong address', refused: 'Refused', no_access: 'Couldn’t get in', other: 'Other' }
-type Tab = 'road' | 'cash' | 'time' | 'pay'
-const TABS: [Tab, string][] = [['road', 'On the road'], ['cash', 'Cash'], ['time', 'Hours & expenses'], ['pay', 'Performance & pay']]
+type Tab = 'road' | 'cash' | 'payroll' | 'time' | 'rota' | 'analytics' | 'people'
+const TABS: [Tab, string][] = [['road', 'On the road'], ['cash', 'Cash'], ['payroll', 'Payroll'], ['time', 'Hours'], ['rota', 'Rota & time off'], ['analytics', 'Analytics'], ['people', 'People']]
 
 /** Office view of the drivers: where they are, what they've said, cash to hand in, hours, expenses, performance and pay. */
 export default function Drivers() {
@@ -68,8 +68,11 @@ export default function Drivers() {
           <div className="mt-6" role="tabpanel">
             {tab === 'road' && <Road pos={pos} msgs={msgs} inc={inc} onInc={async (i) => { await driverApi.closeIncident(i.id, i.status === 'open' ? 'closed' : 'open'); setInc((x) => x.map((y) => (y.id === i.id ? { ...y, status: y.status === 'open' ? 'closed' : 'open' } : y))) }} />}
             {tab === 'cash' && cash && <Cash cash={cash} onDone={(m) => { setToast(m); driverApi.cash().then(setCash).catch(() => {}) }} />}
-            {tab === 'time' && <Time shifts={shifts} exp={exp} />}
-            {tab === 'pay' && <Pay stats={stats} onSaved={(m) => { setToast(m); driverApi.stats(30).then((r) => setStats(r.drivers)).catch(() => {}) }} />}
+            {tab === 'payroll' && <PayrollTab stats={stats} onStats={() => driverApi.stats(30).then((r) => setStats(r.drivers)).catch(() => {})} toast={setToast} />}
+            {tab === 'time' && <div className="grid gap-8"><HoursTab toast={setToast} /><Expenses exp={exp} /></div>}
+            {tab === 'rota' && <RotaTab toast={setToast} />}
+            {tab === 'analytics' && <AnalyticsTab />}
+            {tab === 'people' && <PeopleTab open={sp.get('p')} onOpen={(id) => setSp(id ? { tab: 'people', p: id } : { tab: 'people' })} toast={setToast} isOwner={user.staffRole === 'owner' || (!user.staffRole && !!user.shipperId)} canPay={['owner', 'finance', undefined].includes(user.staffRole)} />}
           </div>
         </motion.div>
       </div>
@@ -105,11 +108,11 @@ function Road({ pos, msgs, inc, onInc }: { pos: DriverPos[]; msgs: Awaited<Retur
 }
 
 function Cash({ cash, onDone }: { cash: Awaited<ReturnType<typeof driverApi.cash>>; onDone: (m: string) => void }) {
-  const [got, setGot] = useState<Record<string, string>>({}); const [note, setNote] = useState<Record<string, string>>({}); const [busy, setBusy] = useState(''); const [err, setErr] = useState('')
+  const [got, setGot] = useState<Record<string, string>>({}); const [note, setNote] = useState<Record<string, string>>({}); const [deduct, setDeduct] = useState<Record<string, boolean>>({}); const [busy, setBusy] = useState(''); const [err, setErr] = useState('')
   const confirm = async (staffId: string, due: number) => {
     const n = Number(got[staffId] ?? due); if (Number.isNaN(n)) return
     setBusy(staffId); setErr('')
-    try { const r = await driverApi.handover(staffId, n, note[staffId] ?? ''); onDone(r.diff === 0 ? `Handover confirmed: ${money(r.received)}.` : `Recorded — ${r.diff < 0 ? `${money(-r.diff)} short` : `${money(r.diff)} over`}. The owner and finance were told.`) } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save.') } finally { setBusy('') }
+    try { const r = await driverApi.handover(staffId, n, note[staffId] ?? '', !!deduct[staffId]); onDone(r.diff === 0 ? `Handover confirmed: ${money(r.received)}.` : `Recorded — ${r.diff < 0 ? `${money(-r.diff)} short` : `${money(r.diff)} over`}. The owner and finance were told.`) } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save.') } finally { setBusy('') }
   }
   return (
     <div className="grid gap-6">
@@ -124,6 +127,7 @@ function Cash({ cash, onDone }: { cash: Awaited<ReturnType<typeof driverApi.cash
               <div><label htmlFor={`got-${d.staffId}`} className="label-dark">Counted (USD)</label><input id={`got-${d.staffId}`} inputMode="decimal" className="input-dark tabular-nums" value={got[d.staffId] ?? String(d.due)} onChange={(e) => setGot((x) => ({ ...x, [d.staffId]: e.target.value.replace(/[^\d.]/g, '') }))} data-testid="cash-got" /></div>
               <button onClick={() => confirm(d.staffId, d.due)} disabled={busy === d.staffId} className="btn-gold self-end !min-h-11 text-sm" data-testid="cash-confirm"><Check size={15} aria-hidden="true" /> Confirm</button>
               <div className="col-span-2"><label htmlFor={`note-${d.staffId}`} className="label-dark">Note (if it doesn’t match)</label><input id={`note-${d.staffId}`} className="input-dark" value={note[d.staffId] ?? ''} onChange={(e) => setNote((x) => ({ ...x, [d.staffId]: e.target.value }))} /></div>
+              {Number(got[d.staffId] ?? d.due) < d.due && <label className="col-span-2 flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={!!deduct[d.staffId]} onChange={(e) => setDeduct((x) => ({ ...x, [d.staffId]: e.target.checked }))} data-testid="cash-deduct" /> Take the {money(d.due - Number(got[d.staffId] ?? d.due))} short from their next payslip</label>}
             </div>
           </div>))}</div> : <Empty>No cash waiting — every collection has been handed in.</Empty>}
       </section>
@@ -135,14 +139,9 @@ function Cash({ cash, onDone }: { cash: Awaited<ReturnType<typeof driverApi.cash
   )
 }
 
-function Time({ shifts, exp }: { shifts: (Shift & { name: string })[]; exp: Expense[] }) {
-  const t = (iso: string | null) => (iso ? fmtDateTime(iso) : 'on shift')
+function Expenses({ exp }: { exp: Expense[] }) {
   return (
     <div className="grid gap-6">
-      <section aria-labelledby="ts-h">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 id="ts-h" className="!text-lg">Timesheet (last 14 days)</h2><a href="/api/drivers/timesheet.csv?days=14" className="btn-ghost !min-h-10 text-sm" download data-testid="ts-csv"><Download size={15} aria-hidden="true" /> Download CSV</a></div>
-        {shifts.length ? <div className="overflow-x-auto rounded-xl border border-border bg-surface"><table className="w-full min-w-[560px] text-sm"><thead className={thead}><tr><Th>Driver</Th><Th>Clock in</Th><Th>Clock out</Th><Th>Breaks</Th><Th>Hours</Th></tr></thead><tbody>{shifts.map((s) => <tr key={s.id} className={trow()} data-testid="ts-row"><td className="px-3 py-3">{s.name}</td><td className="px-3 py-3">{t(s.start)}</td><td className="px-3 py-3">{s.end ? t(s.end) : <span className="text-teal">{s.onBreak ? 'On a break' : 'On shift'}</span>}</td><td className="px-3 py-3">{s.breaks.length}</td><td className="px-3 py-3 font-semibold tabular-nums">{s.hours}</td></tr>)}</tbody></table></div> : <Empty>No clock-ins yet. Drivers clock in from “My runs”.</Empty>}
-      </section>
       <section aria-labelledby="ex-h">
         <h2 id="ex-h" className="mb-2 flex items-center gap-2 !text-lg"><Fuel size={18} aria-hidden="true" /> Expenses (last 35 days)</h2>
         {exp.length ? <div className="overflow-x-auto rounded-xl border border-border bg-surface"><table className="w-full min-w-[560px] text-sm"><thead className={thead}><tr><Th>Driver</Th><Th>What</Th><Th>Amount</Th><Th>Receipt</Th><Th>When</Th></tr></thead><tbody>{exp.map((e) => <tr key={e.id} className={trow()} data-testid="exp-row"><td className="px-3 py-3">{e.name}</td><td className="px-3 py-3 capitalize">{e.kind}{e.note ? <span className="block text-xs normal-case text-text-muted">{e.note}</span> : null}</td><td className="px-3 py-3 tabular-nums">{money(e.amount, e.currency)}{e.currency !== 'USD' && <span className="block text-xs text-text-muted">≈ {money(e.amountUsd)}</span>}</td><td className="px-3 py-3">{e.photo ? <a href={e.photo} target="_blank" rel="noreferrer"><img src={e.photo} alt={`Receipt for ${e.kind}`} className="h-12 w-12 rounded object-cover" /></a> : '—'}</td><td className="px-3 py-3 text-text-muted">{fmtDateTime(e.at)}</td></tr>)}</tbody></table></div> : <Empty>No expenses logged. They also appear in Costs &amp; profit.</Empty>}
@@ -151,32 +150,4 @@ function Time({ shifts, exp }: { shifts: (Shift & { name: string })[]; exp: Expe
   )
 }
 
-function Pay({ stats, onSaved }: { stats: DriverStat[]; onSaved: (m: string) => void }) {
-  const [edit, setEdit] = useState<string | null>(null); const [f, setF] = useState({ perStop: '', perRun: '', perHour: '', currency: 'USD' }); const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
-  const open = (s: DriverStat) => { setEdit(s.staffId); setF({ perStop: String(s.pay.perStop ?? ''), perRun: String(s.pay.perRun ?? ''), perHour: String(s.pay.perHour ?? ''), currency: s.pay.currency ?? 'USD' }) }
-  const save = async () => { if (!edit) return; setBusy(true); setErr(''); try { await driverApi.setPay(edit, { perStop: Number(f.perStop) || 0, perRun: Number(f.perRun) || 0, perHour: Number(f.perHour) || 0, currency: f.currency }); setEdit(null); onSaved('Pay rates saved.') } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save.') } finally { setBusy(false) } }
-  if (!stats.length) return <Empty>No drivers yet. Invite a pickup or delivery driver from Team.</Empty>
-  return (
-    <section aria-labelledby="perf-h">
-      <h2 id="perf-h" className="mb-2 flex items-center gap-2 !text-lg"><TrendingUp size={18} aria-hidden="true" /> Last 30 days</h2>
-      {err && <p role="alert" className="mb-2 text-sm text-danger">{err}</p>}
-      <div className="overflow-x-auto rounded-xl border border-border bg-surface"><table className="w-full min-w-[760px] text-sm"><thead className={thead}><tr><Th>Driver</Th><Th>Stops done</Th><Th>On time</Th><Th>Per day</Th><Th>Skipped (why)</Th><Th>Hours</Th><Th>Pay</Th><Th /></tr></thead>
-        <tbody>{stats.map((s) => <tr key={s.staffId} className={trow(edit === s.staffId)} data-testid="perf-row">
-          <td className="px-3 py-3"><b>{s.name}</b><span className="block text-xs text-text-muted">{s.role === 'pickup_driver' ? 'Pickup driver' : s.role === 'delivery_driver' ? 'Delivery driver' : 'Driver'} · {s.runs} runs</span></td>
-          <td className="px-3 py-3 tabular-nums">{s.done}/{s.stops}{s.completionPct != null && <span className="block text-xs text-text-muted">{s.completionPct}%</span>}</td>
-          <td className="px-3 py-3 tabular-nums">{s.onTimePct == null ? '—' : `${s.onTimePct}%`}</td>
-          <td className="px-3 py-3 tabular-nums">{s.perDay}</td>
-          <td className="px-3 py-3">{s.skipped}{s.skipped > 0 && <span className="block text-xs text-text-muted">{Object.entries(s.reasons).map(([k, n]) => `${SKIP[k] ?? k} ${n}`).join(' · ')}</span>}</td>
-          <td className="px-3 py-3 tabular-nums">{s.hours}</td>
-          <td className="px-3 py-3">{edit === s.staffId ? (
-            <div className="grid min-w-[16rem] grid-cols-2 gap-2">
-              {(['perStop', 'perRun', 'perHour'] as const).map((k) => <label key={k} className="text-xs">{k === 'perStop' ? 'Per stop' : k === 'perRun' ? 'Per run' : 'Per hour'}<input inputMode="decimal" className="input-dark mt-1 !min-h-9 tabular-nums" value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value.replace(/[^\d.]/g, '') })} /></label>)}
-              <label className="text-xs">Currency<select className="input-dark mt-1 !min-h-9" value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value })}>{['USD', 'GHS', 'NGN', 'XOF', 'GBP', 'EUR'].map((c) => <option key={c}>{c}</option>)}</select></label>
-              <div className="col-span-2 flex gap-2"><button onClick={save} disabled={busy} className="btn-gold !min-h-9 text-xs" data-testid="pay-save">Save</button><button onClick={() => setEdit(null)} className="btn-ghost !min-h-9 text-xs">Cancel</button></div>
-            </div>) : <><b className="tabular-nums">{money(s.earned, s.pay.currency ?? 'USD')}</b><span className="block text-xs text-text-muted">{[s.pay.perStop ? `${money(s.pay.perStop, s.pay.currency)}/stop` : '', s.pay.perRun ? `${money(s.pay.perRun, s.pay.currency)}/run` : '', s.pay.perHour ? `${money(s.pay.perHour, s.pay.currency)}/h` : ''].filter(Boolean).join(' · ') || 'No rate set'}</span></>}</td>
-          <td className="px-3 py-3 text-right">{edit !== s.staffId && <button onClick={() => open(s)} className="btn-ghost !min-h-9 !px-3 text-xs" aria-label={`Set pay for ${s.name}`} data-testid="pay-edit"><Pencil size={13} aria-hidden="true" /> Pay</button>}</td>
-        </tr>)}</tbody></table></div>
-      <p className="mt-2 text-xs text-text-muted">On time = stops finished before the end of their time window. Weekly statements: drivers see “My week” on their phone; download the timesheet for payroll.</p>
-    </section>
-  )
-}
+

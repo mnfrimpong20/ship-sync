@@ -14,6 +14,7 @@ import { statusLabels } from '../lib/data'
 import { runTone } from './Routes'
 import DriverRun from './DriverRun'
 import { RunOffice, useRunTruck } from '../components/driver/RunOffice'
+import { hrApi } from '../lib/driverHrApi'
 
 type Draft = StopInput & { id: string; geoState?: 'pending' | 'ok' | 'miss' }
 const uid = () => Math.random().toString(36).slice(2, 10)
@@ -71,6 +72,10 @@ export default function RoutePlanner() {
   const [vehicleId, setVehicleId] = useState('')
   const [start, setStart] = useState<RunStart | null>(null)
   const [notes, setNotes] = useState('')
+  // Who is away (leave, day off, expired papers) on the run's day — shown next to their name.
+  const [away, setAway] = useState<Record<string, string>>({})
+  const awayDay = run?.date ?? date
+  useEffect(() => { if (!manage) return; hrApi.availability(awayDay).then(setAway).catch(() => setAway({})) }, [awayDay, manage])
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [custom, setCustom] = useState({ label: '', address: '', contact: '', phone: '' })
 
@@ -193,7 +198,7 @@ export default function RoutePlanner() {
                     <div className="sm:col-span-2"><label htmlFor="r-name" className="label-dark">Run name</label><input id="r-name" className="input-dark" placeholder="Tuesday Houston pickups" value={name} onChange={(e) => setName(e.target.value)} /></div>
                     <div><span className="label-dark">Type</span><div className="flex gap-2" role="radiogroup" aria-label="Run type">{(['pickup', 'delivery'] as const).map((k) => <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => { setKind(k); setDrafts([]); const cur = drivers.find((d) => d.id === driverId); if (cur && !canDriveKind(cur.role, k)) setDriverId('') }} className={`flex-1 rounded-lg border px-3 py-2.5 text-sm focus-ring ${kind === k ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted'}`}>{k === 'pickup' ? 'Pickups' : 'Deliveries'}</button>)}</div></div>
                     <div><label htmlFor="r-date" className="label-dark">Date</label><input id="r-date" type="date" className="input-dark" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-                    <div><label htmlFor="r-driver" className="label-dark">Driver</label><select id="r-driver" className="input-dark" value={driverId} onChange={(e) => { setDriverId(e.target.value); const v = vehicles.find((x) => x.driverId === e.target.value && x.status === 'available'); if (v && !vehicleId) setVehicleId(v.id) }}><option value="">— Assign later —</option>{drivers.filter((d) => canDriveKind(d.role, kind)).map((d) => <option key={d.id} value={d.id}>{d.name}{d.city ? ` (${d.city})` : ''}</option>)}</select></div>
+                    <div><label htmlFor="r-driver" className="label-dark">Driver</label><select id="r-driver" className="input-dark" value={driverId} onChange={(e) => { setDriverId(e.target.value); const v = vehicles.find((x) => x.driverId === e.target.value && x.status === 'available'); if (v && !vehicleId) setVehicleId(v.id) }}><option value="">— Assign later —</option>{drivers.filter((d) => canDriveKind(d.role, kind)).map((d) => <option key={d.id} value={d.id}>{d.name}{d.city ? ` (${d.city})` : ''}{away[d.id] ? ` — ${away[d.id]}` : ''}</option>)}</select>{driverId && away[driverId] && <p className="mt-1 text-xs font-semibold text-danger">{drivers.find((d) => d.id === driverId)?.name} is {away[driverId]} on this day.</p>}</div>
                     <div><label htmlFor="r-vehicle" className="label-dark">Vehicle</label><select id="r-vehicle" className="input-dark" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}><option value="">— None —</option>{fleet.map((v) => <option key={v.id} value={v.id} disabled={v.status !== 'available'}>{v.name}{v.plate ? ` · ${v.plate}` : ''}{v.status !== 'available' ? ` (${v.status.replace('_', ' ')})` : ''}</option>)}</select></div>
                     <div className="sm:col-span-2">
                       <GeoSearch id="r-start" label="Start point (yard, warehouse, port)" placeholder="e.g. 4501 Navigation Blvd, Houston" onHit={(h, q) => setStart({ label: q, lat: h.lat, lon: h.lon })} />
@@ -213,7 +218,7 @@ export default function RoutePlanner() {
                   <h2 className="!text-base">Assignment</h2>
                   <div className="mt-3 grid gap-3 sm:grid-cols-3">
                     <div><label htmlFor="e-date" className="label-dark">Date</label><input id="e-date" type="date" className="input-dark" value={run.date} onChange={(e) => act(() => opsApi.updateRun(run.id, { date: e.target.value }))} /></div>
-                    <div><label htmlFor="e-driver" className="label-dark">Driver</label><select id="e-driver" className="input-dark" value={run.driverId ?? ''} onChange={(e) => act(() => opsApi.updateRun(run.id, { driverId: e.target.value || null }))}><option value="">— Assign later —</option>{drivers.filter((d) => canDriveKind(d.role, run.kind)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div>
+                    <div><label htmlFor="e-driver" className="label-dark">Driver</label><select id="e-driver" className="input-dark" value={run.driverId ?? ''} onChange={(e) => act(() => opsApi.updateRun(run.id, { driverId: e.target.value || null }))}><option value="">— Assign later —</option>{drivers.filter((d) => canDriveKind(d.role, run.kind)).map((d) => <option key={d.id} value={d.id}>{d.name}{away[d.id] ? ` — ${away[d.id]}` : ''}</option>)}</select>{run.driverId && away[run.driverId] && <p className="mt-1 text-xs font-semibold text-danger">{run.driverName} is {away[run.driverId]} on this day — pick someone else.</p>}</div>
                     <div><label htmlFor="e-vehicle" className="label-dark">Vehicle</label><select id="e-vehicle" className="input-dark" value={run.vehicleId ?? ''} onChange={(e) => act(() => opsApi.updateRun(run.id, { vehicleId: e.target.value || null }))}><option value="">— None —</option>{fleet.map((v) => <option key={v.id} value={v.id} disabled={v.status !== 'available' && v.id !== run.vehicleId}>{v.name}{v.plate ? ` · ${v.plate}` : ''}</option>)}</select></div>
                     <div className="sm:col-span-3">
                       <GeoSearch id="e-start" label="Start point" placeholder="Search an address…" onHit={(h, q) => act(() => opsApi.updateRun(run.id, { start: { label: q, lat: h.lat, lon: h.lon } }))} />

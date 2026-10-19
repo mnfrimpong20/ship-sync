@@ -20,8 +20,8 @@ const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? n
 const J = (v: unknown) => (v == null ? null : typeof v === 'string' ? JSON.parse(v) : v)
 const money = (n: number) => `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
 /** Rough rates for driver expenses in local money (same env overrides as the duty flow). */
-const FX: Record<string, number> = { USD: 1, GHS: Number(process.env.GHS_PER_USD || 11), NGN: Number(process.env.NGN_PER_USD || 1550), XOF: Number(process.env.XOF_PER_USD || 600), GBP: 0.79, EUR: 0.92 }
-const toUsd = (amount: number, cur: string) => Math.round((amount / (FX[cur] ?? 1)) * 100) / 100
+export const FX: Record<string, number> = { USD: 1, GHS: Number(process.env.GHS_PER_USD || 11), NGN: Number(process.env.NGN_PER_USD || 1550), XOF: Number(process.env.XOF_PER_USD || 600), GBP: 0.79, EUR: 0.92 }
+export const toUsd = (amount: number, cur: string) => Math.round((amount / (FX[cur] ?? 1)) * 100) / 100
 const phoneOf = (raw: string) => (raw ? normalisePhone(raw, 'US') ?? normalisePhone(raw, 'GH') : null)
 async function text(to: string, body: string) { const n = phoneOf(to); if (!n || smsProvider().id === 'off') return false; try { await sendText(n, body); return true } catch (e) { console.error('[driver] text', e); return false } }
 
@@ -318,12 +318,13 @@ export function mountDriverOps(r: Router, d: Deps) {
   /* ---- expenses ---- */
   r.post('/drivers/expenses', wrap(async (req, res) => {
     const db = await getDb(); const { me, shipperId } = await staffOf(db, req)
-    const b = z.object({ runId: z.string().optional(), kind: z.enum(['fuel', 'toll', 'parking', 'repair', 'meal', 'other']), amount: z.number().positive().max(1_000_000), currency: z.enum(['USD', 'GHS', 'NGN', 'XOF', 'GBP', 'EUR']).default('USD'), photo: zPhoto.optional(), note: z.string().trim().max(300).default('') }).parse(req.body)
+    const b = z.object({ paidBy: z.enum(['driver', 'company']).default('driver'), runId: z.string().optional(), kind: z.enum(['fuel', 'toll', 'parking', 'repair', 'meal', 'other']), amount: z.number().positive().max(1_000_000), currency: z.enum(['USD', 'GHS', 'NGN', 'XOF', 'GBP', 'EUR']).default('USD'), photo: zPhoto.optional(), note: z.string().trim().max(300).default('') }).parse(req.body)
     if (b.runId) { const { rows } = await db.query<Row>('select id from runs where id = $1 and shipper_id = $2', [b.runId, shipperId]); if (!rows[0]) throw new HttpError(404, 'Run not found.') }
     const usd = toUsd(b.amount, b.currency); const id = 'dx_' + uid(); const costId = 'cost_' + uid()
     const cat = b.kind === 'fuel' || b.kind === 'repair' ? 'fuel' : b.kind === 'toll' || b.kind === 'parking' ? 'trucking' : 'other'
     await db.query('insert into costs (id,shipper_id,category,description,vendor,amount_usd,created_by) values ($1,$2,$3,$4,$5,$6,$7)', [costId, shipperId, cat, `${b.kind[0].toUpperCase() + b.kind.slice(1)} — ${me.name}${b.currency !== 'USD' ? ` (${b.currency} ${b.amount.toLocaleString()})` : ''}${b.note ? ` · ${b.note}` : ''}`, '', usd, me.name])
-    await db.query('insert into driver_expenses (id,shipper_id,staff_id,run_id,kind,amount,currency,amount_usd,photo,note,cost_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)', [id, shipperId, me.id, b.runId ?? null, b.kind, b.amount, b.currency, usd, b.photo ?? null, b.note, costId])
+    await db.query('insert into driver_expenses (id,shipper_id,staff_id,run_id,kind,amount,currency,amount_usd,photo,note,cost_id,paid_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [id, shipperId, me.id, b.runId ?? null, b.kind, b.amount, b.currency, usd, b.photo ?? null, b.note, costId, b.paidBy])
+    await notifyShipperStaff(db, shipperId, { kind: 'payment', title: `${me.name} logged ${b.kind}: ${b.currency} ${b.amount}`, body: b.paidBy === 'company' ? 'Paid with the company card.' : 'Approve it under Drivers → Pay to pay them back.', link: '/dashboard/drivers?tab=payroll', dedupe: `exp:${id}` }, ['owner', 'finance'])
     res.status(201).json({ ok: true, amountUsd: usd })
   }))
   r.get('/drivers/expenses', wrap(async (req, res) => {
@@ -373,12 +374,13 @@ export function mountDriverOps(r: Router, d: Deps) {
   }))
   r.post('/drivers/:staffId/cash', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, me } = await officeOnly(db, req)
-    const b = z.object({ received: z.number().min(0).max(10_000_000), note: z.string().trim().max(300).default('') }).parse(req.body)
+    const b = z.object({ received: z.number().min(0).max(10_000_000), note: z.string().trim().max(300).default(''), deduct: z.boolean().default(false) }).parse(req.body)
     const due = await cashDue(db, shipperId, String(req.params.staffId)); if (!due.length) throw new HttpError(409, 'Nothing to hand over for this driver.')
     const expected = Math.round(due.reduce((n, x) => n + x.amountUsd, 0) * 100) / 100; const id = 'ch_' + uid()
     await db.query('insert into cash_handovers (id,shipper_id,staff_id,expected,received,stops,by_name,note) values ($1,$2,$3,$4,$5,$6,$7,$8)', [id, shipperId, String(req.params.staffId), expected, b.received, JSON.stringify(due.map((x) => x.stopId)), me.name, b.note])
     await db.query('update run_stops set handed_over_id = $2 where id = any($1::text[])', [due.map((x) => x.stopId), id])
     const diff = Math.round((b.received - expected) * 100) / 100
+    if (diff < 0 && b.deduct) await db.query('insert into pay_adjustments (id,shipper_id,staff_id,kind,amount,currency,note,installments,remaining,created_by) values ($1,$2,$3,$4,$5,$6,$7,1,$5,$8)', ['pa_' + uid(), shipperId, String(req.params.staffId), 'shortfall', -diff, 'USD', `Cash handover ${new Date().toISOString().slice(0, 10)}${b.note ? ` — ${b.note}` : ''}`, me.name])
     const { rows: drv } = await db.query<Row>('select user_id, name from staff where id = $1', [String(req.params.staffId)])
     if (drv[0]?.user_id) await notify(db, { userId: drv[0].user_id, kind: 'payment', title: diff === 0 ? `Cash handover confirmed — ${money(b.received)}` : `Cash handover: ${money(b.received)} received, ${money(expected)} expected`, body: diff === 0 ? `${me.name} confirmed it. Thank you.` : `${diff < 0 ? `${money(-diff)} short` : `${money(diff)} over`}. ${b.note || 'Talk to the office.'}`, link: '/dashboard/runs' })
     if (diff !== 0) await notifyShipperStaff(db, shipperId, { kind: 'payment', title: `Cash mismatch: ${drv[0]?.name ?? 'driver'} ${diff < 0 ? `${money(-diff)} short` : `${money(diff)} over`}`, body: `Expected ${money(expected)}, received ${money(b.received)}. Recorded by ${me.name}.`, link: '/dashboard/drivers?tab=cash' }, ['owner', 'finance'])

@@ -47,7 +47,7 @@ export function WhatsAppBubble() {
   const close = () => { setClosed(true); try { sessionStorage.setItem('ss-wa-closed', '1') } catch { /* private mode */ } }
   return (
     <AnimatePresence>{ready && (
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} className="no-print group fixed bottom-24 right-4 z-40 flex items-center gap-2 md:bottom-6 md:right-6" data-testid="wa-bubble">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} className="no-print group fixed bottom-24 right-4 z-40 flex items-center gap-2 md:bottom-6 md:right-6" data-testid="wa-bubble" role="complementary" aria-label="WhatsApp chat">
         <a href={waWithText(cfg.whatsappUrl, text)} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#1f7a4d] px-4 text-sm font-semibold text-white shadow-lg hover:bg-[#186640] focus-ring" aria-label="Chat with Ntemtem on WhatsApp"><MessageCircle size={18} aria-hidden="true" /><span className="hidden sm:inline">Chat with us</span></a>
         <button onClick={close} className="grid h-7 w-7 place-items-center rounded-full border border-border bg-surface text-text-muted shadow hover:text-text" aria-label="Hide the chat button"><X size={13} /></button>
       </motion.div>)}</AnimatePresence>

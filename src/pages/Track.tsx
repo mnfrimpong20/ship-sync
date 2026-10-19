@@ -2,7 +2,8 @@ import { HelpLine } from '../components/HelpBits'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, Loader2, Plane, Radio, Search, Ship } from 'lucide-react'
+import { Check, Loader2, Plane, Radio, Search, Ship, Star } from 'lucide-react'
+import { hrApi } from '../lib/driverHrApi'
 import { cargoLabel, countryByCode, flowFor, flowIndex, statusLabels, type Shipment } from '../lib/data'
 import { useStore } from '../lib/store'
 import { Avatar, ModeBadge, Pill, fmtDate, fmtDateTime, Flag } from '../components/ui'
@@ -105,7 +106,23 @@ function LivePanel({ s }: { s: Shipment }) {
 
 
 /** One box per sticker on the customer's page — "3 of 4 loaded" answers the question before anyone rings the office. */
-function ProofOfDelivery({ pod }: { pod: NonNullable<Shipment['pod']> }) {
+/** One tap rating of the delivery (feeds the driver scorecard). */
+function RateDelivery({ refCode }: { refCode: string }) {
+  const [stars, setStars] = useState(0); const [note, setNote] = useState(''); const [state, setState] = useState<'' | 'sent' | 'done'>(''); const [err, setErr] = useState('')
+  useEffect(() => { try { if (localStorage.getItem(`ss-rated-${refCode}`)) setState('done') } catch { /* ignore */ } }, [refCode])
+  if (state) return <p className="mt-3 text-sm text-teal" role="status">{state === 'sent' ? 'Thanks for rating the delivery.' : 'You rated this delivery — thank you.'}</p>
+  const send = async () => { setErr(''); try { await hrApi.rate(refCode, stars, note); setState('sent'); try { localStorage.setItem(`ss-rated-${refCode}`, '1') } catch { /* ignore */ } } catch (e) { const m = e instanceof Error ? e.message : 'Could not send.'; if (/already/.test(m)) setState('done'); else setErr(m) } }
+  return (
+    <div className="mt-4 border-t border-teal/20 pt-3" data-testid="rate-delivery">
+      <p className="text-sm font-semibold" id="rate-l">How was the delivery?</p>
+      <div className="mt-1 flex gap-1" role="radiogroup" aria-labelledby="rate-l">{[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" role="radio" aria-checked={stars === n} aria-label={`${n} star${n === 1 ? '' : 's'}`} onClick={() => setStars(n)} className="grid h-11 w-11 place-items-center rounded-lg focus-ring"><Star size={24} className={n <= stars ? 'fill-gold text-gold-deep' : 'text-text-muted'} aria-hidden="true" /></button>)}</div>
+      {stars > 0 && <div className="mt-2 flex flex-wrap gap-2"><label htmlFor="rate-note" className="sr-only">Comment</label><input id="rate-note" className="input-dark !min-h-10 flex-1" value={note} onChange={(e) => setNote(e.target.value)} placeholder={stars <= 3 ? 'What went wrong? (optional)' : 'Anything to add? (optional)'} /><button onClick={send} className="btn-gold !min-h-10 text-sm" data-testid="rate-send">Send</button></div>}
+      {err && <p role="alert" className="mt-1 text-xs text-danger">{err}</p>}
+    </div>
+  )
+}
+
+function ProofOfDelivery({ pod, rateRef }: { pod: NonNullable<Shipment['pod']>; rateRef?: string }) {
   const [open, setOpen] = useState(false)
   return (
     <section className="mt-6 rounded-xl border border-teal/30 bg-teal/[0.06] p-4" aria-label="Proof of delivery" data-testid="pod">
@@ -119,6 +136,7 @@ function ProofOfDelivery({ pod }: { pod: NonNullable<Shipment['pod']> }) {
       </div>
       {pod.photo && open && <img src={pod.photo} alt="Proof of delivery" className="mt-3 max-h-96 w-auto rounded-lg border border-border" />}
       {pod.signature && <img src={pod.signature} alt="Receiver's signature" className="mt-3 h-16 rounded-lg border border-border bg-white" />}
+      {rateRef && <RateDelivery refCode={rateRef} />}
     </section>
   )
 }
@@ -178,7 +196,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
 
           {s.pieces && s.pieces.length > 0 && <PiecesStrip pieces={s.pieces} />}
           {s.driver && <p className={`mt-6 rounded-xl border p-4 text-sm ${s.driver.near ? 'border-gold/60 bg-gold/10' : 'border-border bg-surface'}`} role="status" data-testid="track-driver"><strong>{s.driver.near ? `${s.driver.driver || 'Your driver'} is a few minutes away.` : s.driver.stopsAway === 0 ? `${s.driver.driver || 'Your driver'} is heading to you next.` : `${s.driver.driver || 'Your driver'} is on the way — ${s.driver.stopsAway} stop${s.driver.stopsAway === 1 ? '' : 's'} before yours.`}</strong>{s.driver.km != null && !s.driver.near ? <span className="text-text-muted"> About {Math.max(1, Math.round(s.driver.km))} km away.</span> : null}</p>}
-          {s.pod && <ProofOfDelivery pod={s.pod} />}
+          {s.pod && <ProofOfDelivery pod={s.pod} rateRef={s.status === 'delivered' ? s.ref : undefined} />}
 
           <LivePanel s={s} />
 

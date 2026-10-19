@@ -9,6 +9,7 @@ import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion,
 import { attachShipmentToClient, logShipmentActivity, mountClients } from './clients'
 import { mountOps } from './ops'
 import { mountDriverOps, driverForShipment } from './driverOps'
+import { mountDriverHr } from './driverHr'
 import { mountDirectory } from './directory'
 import { mountInsights } from './insights'
 import { mountAnalytics } from './analytics'
@@ -848,6 +849,7 @@ export function apiRouter() {
   }))
   mountClients(r, { getDb, requireUser, HttpError, wrap, loadShipments })
   mountDriverOps(r, { getDb, requireUser, HttpError, wrap })
+  mountDriverHr(r, { getDb, requireUser, HttpError, wrap })
   mountOps(r, { getDb, requireUser, createSession, loadUserWithCompany, HttpError, wrap, loadShipments })
   mountInsights(r, { getDb, requireUser, HttpError, wrap })
   mountAnalytics(r, { getDb, requireUser, HttpError, wrap })

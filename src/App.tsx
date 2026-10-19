@@ -29,6 +29,8 @@ const Drivers = lazy(() => import('./pages/Drivers'))
 const RunsList = lazy(() => import('./pages/Routes'))
 const RoutePlanner = lazy(() => import('./pages/RoutePlanner'))
 const MyRuns = lazy(() => import('./pages/MyRuns'))
+const DriverHr = lazy(() => import('./pages/DriverHr'))
+const PayslipPage = lazy(() => import('./pages/DriverHr').then((m) => ({ default: m.PayslipPage })))
 const Shipments = lazy(() => import('./pages/Shipments'))
 const Leads = lazy(() => import('./pages/Leads'))
 const Labels = lazy(() => import('./pages/Labels'))
@@ -231,6 +233,10 @@ export default function App() {
               <Route path="/dashboard/routes" element={<RunsList />} />
               <Route path="/dashboard/routes/:id" element={<RoutePlanner />} />
               <Route path="/dashboard/runs" element={<MyRuns />} />
+              <Route path="/dashboard/runs/pay" element={<DriverHr section="pay" />} />
+              <Route path="/dashboard/runs/time" element={<DriverHr section="time" />} />
+              <Route path="/dashboard/runs/me" element={<DriverHr section="me" />} />
+              <Route path="/dashboard/payslip/:id" element={<PayslipPage />} />
               <Route path="/dashboard/scan" element={<Scan />} />
               <Route path="/dashboard/notifications" element={<Notifications />} />
               <Route path="/admin" element={<Admin />} />

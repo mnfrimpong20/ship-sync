@@ -23,7 +23,7 @@
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
     "flag-icons": "^7.2.3",
-    "jspdf": "^2.5.2",
+    "jspdf": "^4.2.1",
     "jsqr": "^1.4.0",
     "lucide-react": "^1.41.0",
     "maplibre-gl": "^6.7.0",

@@ -1,3 +1,4 @@
+import { PushToggle } from '../components/PushToggle'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -84,6 +85,8 @@ export default function Notifications() {
         <StatCard label="Last 30 days" value={items.filter((n) => Date.now() - new Date(n.at).getTime() < 30 * 86400000).length} hint="Alerts received" icon={Inbox} active={filter === 'all'} onClick={() => setFilter('all')} />
         <StatCard label="Email" value={emailOn ? (data?.prefs.email ? 'On' : 'Off') : 'Not set up'} hint={emailOn ? `${sent} sent to ${data?.email.to}` : 'Bell alerts only — see below'} icon={emailOn ? MailCheck : MailX} warn={!emailOn} />
       </motion.div>
+
+      <motion.div variants={fadeUp} className="mt-6"><PushToggle /></motion.div>
 
       <motion.div variants={fadeUp} className="mt-8 grid gap-6 lg:grid-cols-[1fr_340px]">
         <section className="card-dark overflow-hidden p-0">

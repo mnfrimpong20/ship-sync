@@ -9,7 +9,7 @@ const cols: { title: string; links: [string, string][] }[] = [
   { title: 'Send', links: [['Get a quote', '/quote'], ['Track a shipment', '/track'], ['Find a shipper', '/shippers'], ['Fill a barrel', '/groupage'], ['Sourcing service', '/sourcing'], ['How it works', '/?s=how']] },
   { title: 'Plan', links: [['Duty estimator', '/duty'], ['Lane prices', '/lanes'], ['Sailing schedule', '/sailings'], ['Customs brokers', '/brokers'], ['Live map', '/live']] },
   { title: 'For shipping companies', links: [['Why Ntemtem', '/for-shippers'], ['List your company', '/signup?role=shipper'], ['Plans & pricing', '/pricing?for=shippers'], ['Getting verified', '/for-shippers?s=verified'], ['Partner sign in', '/login']] },
-  { title: 'Company', links: [['About us', '/about'], ['Contact', '/contact'], ['FAQ', '/?s=faq']] },
+  { title: 'Company', links: [['About us', '/about'], ['Help centre', '/help'], ['Contact', '/contact'], ['FAQ', '/?s=faq']] },
 ]
 const SOCIAL_LABELS: Record<string, string> = { linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook', x: 'X', tiktok: 'TikTok', youtube: 'YouTube' }
 

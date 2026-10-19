@@ -59,6 +59,7 @@ export function mountSite(r: Router, d: Deps) {
     const now = Date.now(); const hits = (recent.get(ip) ?? []).filter((t) => now - t < 3600_000); if (hits.length >= 5) throw new HttpError(429, 'Too many messages from this connection — try again in an hour or email us directly.'); hits.push(now); recent.set(ip, hits)
     const db = await getDb(); const id = 'cm_' + uid()
     await db.query(`insert into contact_messages (id,name,email,phone,company,topic,message,ip) values ($1,$2,$3,$4,$5,$6,$7,$8)`, [id, b.name, b.email, b.phone, b.company, b.topic, b.message, ip])
+    await (await import('./support')).ticketFromContact(db, { name: b.name, email: b.email, topic: b.topic, message: b.message, contactId: id }).catch((e) => console.error('[support] contact ticket', e))
     const cfg = siteConfig()
     if (cfg.email && emailProvider().id !== 'off') {
       try { await sendEmail(cfg.email, `[Ntemtem contact] ${b.topic} — ${b.name}`, emailTemplate({ title: `New message from ${b.name}`, body: `${b.message}\n\nFrom: ${b.name} <${b.email}>${b.phone ? ` · ${b.phone}` : ''}${b.company ? ` · ${b.company}` : ''}\nTopic: ${b.topic}`, link: `${(process.env.APP_URL || '').replace(/\/$/, '')}/admin`, cta: 'Open admin' })) } catch (e) { console.error('[site] contact email', e) }

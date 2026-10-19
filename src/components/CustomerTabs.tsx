@@ -1,4 +1,5 @@
 /** Customer dashboard tabs: Money, This week, Inbox, Documents, Saved (favourites · repeats · alerts), Issues, Account. */
+import { PushToggle } from './PushToggle'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Bell, CalendarDays, CreditCard, Download, FileText, Gift, Heart, MessageCircle, PiggyBank, Plus, Repeat, Send, Ship, Trash2, Users, Wallet } from 'lucide-react'
@@ -322,7 +323,7 @@ export function AccountTab() {
   useEffect(() => { if (section) { const t = setTimeout(() => document.getElementById(`acct-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400); return () => clearTimeout(t) } }, [section])
   return (
     <div className="mt-6 grid gap-6 lg:grid-cols-2" data-testid="account-tab">
-      <div className="min-w-0 space-y-6"><div id="acct-profile" className="scroll-mt-24"><ProfileCard /></div><div id="acct-security" className="scroll-mt-24"><SecurityCard /></div><div id="acct-alerts" className="scroll-mt-24"><NotifyPrefs /></div></div>
+      <div className="min-w-0 space-y-6"><div id="acct-profile" className="scroll-mt-24"><ProfileCard /></div><div id="acct-push" className="scroll-mt-24"><PushToggle /></div><div id="acct-security" className="scroll-mt-24"><SecurityCard /></div><div id="acct-alerts" className="scroll-mt-24"><NotifyPrefs /></div></div>
       <div className="min-w-0 space-y-6"><div id="acct-family" className="scroll-mt-24"><Household /></div><Referral /><Business /><DataCard /></div>
     </div>
   )

@@ -19,6 +19,7 @@ import { PaymentCard } from '../components/PaymentCard'
 import { PackingSuppliesCard } from '../components/PackingSupplies'
 import { ExportCard } from '../components/Compliance'
 import { ReceiverChargesCard } from '../components/ReceiverCharges'
+import { MeasureCard } from '../components/MeasureCard'
 import { VehicleCard } from '../components/VehicleCard'
 import { CustomsCard } from '../components/CustomsCard'
 import { DisputeCard, ReviewCard } from '../components/ReviewCards'
@@ -191,6 +192,7 @@ export default function Shipments() {
                                 <ReviewCard shipmentId={s.id} /><DisputeCard shipmentId={s.id} />
                                 <ExportCard shipmentId={s.id} />
                                 <ReceiverChargesCard shipmentId={s.id} />
+                                <MeasureCard shipmentId={s.id} />
                                 <PackingSuppliesCard shipmentId={s.id} />
                                 <PaymentCard shipmentId={s.id} />
                                 {s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}

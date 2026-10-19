@@ -1,0 +1,21 @@
+{
+  "name": "Ntemtem — shipping home to West Africa",
+  "short_name": "Ntemtem",
+  "description": "Compare verified shippers, pay safely and track your shipment home to Ghana, Nigeria and West Africa.",
+  "id": "/",
+  "start_url": "/dashboard?source=app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FAF6EE",
+  "theme_color": "#14213D",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Track a shipment", "url": "/track" },
+    { "name": "Get a quote", "url": "/quote" }
+  ]
+}

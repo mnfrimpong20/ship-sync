@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Anchor, BarChart3, LineChart, Calculator, Megaphone, Plug, CreditCard, History, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X, Printer } from 'lucide-react'
+import { LifeBuoy, Anchor, BarChart3, LineChart, Calculator, Megaphone, Plug, CreditCard, History, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X, Printer } from 'lucide-react'
 import { Avatar, Logo } from './ui'
 import { PlatformBanners } from './PlatformBanners'
 import { NotificationBell } from './NotificationBell'
@@ -184,6 +184,7 @@ export default function AppShell() {
                   <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} role="menu" className="card-dark absolute right-0 mt-2 w-56 overflow-hidden p-1.5">
                     <p className="px-3 py-2 text-xs text-text-muted">{user.email}</p>
                     {isShipper && staffRole === 'owner' && <Link role="menuitem" to="/dashboard/shipper?view=profile" className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><UserCog size={16} aria-hidden="true" /> Company profile</Link>}
+                    <Link role="menuitem" to="/support" className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><LifeBuoy size={16} aria-hidden="true" /> Help &amp; support</Link>
                     {user.admin && <Link role="menuitem" to="/admin" className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><ShieldCheck size={16} aria-hidden="true" /> Admin</Link>}
                     <button role="menuitem" onClick={() => { logout().finally(() => nav('/')) }} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-surface-2 focus-ring"><LogOut size={16} aria-hidden="true" /> Sign out</button>
                   </motion.div>

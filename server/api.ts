@@ -52,6 +52,9 @@ import { mountLanes } from './lanes'
 import { mountOperations } from './operations'
 import { mountScreening, screenSubject, screeningHold } from './screening'
 import { mountMomo } from './momo'
+import { mountMeasure } from './measure'
+import { mountSupport } from './support'
+import { mountPush } from './push'
 import { mountCompliance, evaluateExport, assertExportCleared, zDeclaration, DECLARATION_VERSION } from './compliance'
 import { mountSupplies, attachDefaultSupplies, defaultQuoteSupplies, resolveQuoteSupplies, suppliesFromQuote, suppliesTotal, type QuoteSupplyLine, type SupplyNeed } from './supplies'
 import { mountReviews } from './reviews'
@@ -807,6 +810,9 @@ export function apiRouter() {
   mountCompliance(r, { getDb, requireUser, HttpError, wrap })
   mountScreening(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountMomo(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  mountMeasure(r, { getDb, requireUser, HttpError, wrap })
+  mountSupport(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
+  mountPush(r, { getDb, requireUser, HttpError, wrap })
   mountSupplies(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountReviews(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountBrand(r, { getDb, requireUser, HttpError, wrap })

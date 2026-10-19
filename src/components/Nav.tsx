@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useScroll, useSpring } from 'motion/react'
-import { Anchor, ArrowRight, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X, Printer } from 'lucide-react'
+import { LifeBuoy, Anchor, ArrowRight, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X, Printer } from 'lucide-react'
 import { Logo, VerifiedMark } from './ui'
 import { useStore } from '../lib/store'
 
@@ -147,6 +147,7 @@ export default function Nav() {
                   <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} role="menu" className="card-dark absolute right-0 mt-2 w-52 overflow-hidden p-1.5">
                     <Link role="menuitem" to={dash} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><LayoutDashboard size={16} aria-hidden="true" /> Open workspace</Link>
                     {user.role === 'shipper' && <Link role="menuitem" to="/dashboard/clients" className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><Users size={16} aria-hidden="true" /> Clients</Link>}
+                    <Link role="menuitem" to="/support" className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><LifeBuoy size={16} aria-hidden="true" /> Help &amp; support</Link>
                     {user.admin && <Link role="menuitem" to="/admin" className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm hover:bg-surface-2 focus-ring"><ShieldCheck size={16} aria-hidden="true" /> Admin</Link>}
                     <button role="menuitem" onClick={() => { logout().finally(() => nav('/')) }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-surface-2 focus-ring"><LogOut size={16} aria-hidden="true" /> Sign out</button>
                   </motion.div>

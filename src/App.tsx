@@ -57,6 +57,8 @@ const CampaignsPage = lazy(() => import('./pages/Campaigns'))
 const IntegrationsPage = lazy(() => import('./pages/Integrations'))
 const BillingPage = lazy(() => import('./pages/Billing'))
 const SuppliesPage = lazy(() => import('./pages/Supplies'))
+const HelpPage = L(() => import('./pages/Help'), 'HelpPage')
+const SupportPage = L(() => import('./pages/Help'), 'SupportPage')
 const ActivityPage = lazy(() => import('./pages/Activity'))
 const EmbedTrack = lazy(() => import('./pages/EmbedTrack'))
 const ReviewsPage = lazy(() => import('./pages/Reviews'))
@@ -170,6 +172,9 @@ export default function App() {
               <Route path="/pay/:token" element={<Pay />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/contact" element={<ContactPage />} />
+              <Route path="/help" element={<HelpPage />} />
+              <Route path="/help/:slug" element={<HelpPage />} />
+              <Route path="/support" element={<SupportPage />} />
               <Route path="/privacy" element={<LegalPage kind="privacy" />} />
               <Route path="/terms" element={<LegalPage kind="terms" />} />
               <Route path="/shipper-agreement" element={<LegalPage kind="shipper-agreement" />} />

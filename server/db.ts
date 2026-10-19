@@ -1353,6 +1353,31 @@ create index if not exists receiver_charges_shipment on receiver_charges (shipme
 alter table receiver_charges add column if not exists settled_to text not null default '';
 alter table receiver_charges add column if not exists payout_done boolean not null default false;
 alter table shippers add column if not exists paystack_subaccount text not null default '';
+alter table pieces add column if not exists weight_kg numeric;
+alter table pieces add column if not exists length_cm numeric;
+alter table pieces add column if not exists width_cm numeric;
+alter table pieces add column if not exists height_cm numeric;
+alter table pieces add column if not exists measured_at timestamptz;
+alter table pieces add column if not exists measured_by text not null default '';
+alter table pieces add column if not exists weight_source text not null default '';
+alter table shipments add column if not exists measured jsonb;
+create table if not exists support_tickets (
+  id text primary key, ref text unique not null, user_id text, name text not null default '', email text not null default '', role text not null default 'customer',
+  subject text not null, category text not null default 'other', shipment_ref text not null default '', priority text not null default 'normal', source text not null default 'app',
+  status text not null default 'open', last_from text not null default 'person', assigned_to text not null default '', first_response_at timestamptz,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create index if not exists support_tickets_user on support_tickets (user_id);
+create table if not exists support_messages (
+  id text primary key, ticket_id text not null references support_tickets(id) on delete cascade, author_id text, author_name text not null default '',
+  from_staff boolean not null default false, internal boolean not null default false, body text not null, created_at timestamptz not null default now()
+);
+create index if not exists support_messages_ticket on support_messages (ticket_id);
+create table if not exists push_subscriptions (
+  id text primary key, user_id text not null references users(id) on delete cascade, endpoint text unique not null, p256dh text not null, auth text not null,
+  ua text not null default '', failures int not null default 0, last_ok_at timestamptz, created_at timestamptz not null default now()
+);
+create index if not exists push_subscriptions_user on push_subscriptions (user_id);
 update client_consignees set gps = 'GA-183-8164', lat = 5.6275, lng = -0.1170 where id = 'cs_demo_1' and gps = '';
 update client_consignees set gps = 'AK-039-5028', lat = 6.6946, lng = -1.6244 where id = 'cs_demo_2' and gps = '';
 

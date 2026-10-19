@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, Award, Check, ChevronLeft, ChevronRight, Download, FileText, Lock, Plus, Printer, Settings2, Trash2, Upload, UserMinus, X } from 'lucide-react'
-import { ADJ_LABEL, LEAVE_LABEL, hrApi, money, type Analytics, type HrSettings, type Leave, type Person, type Rota } from '../../lib/driverHrApi'
+import { AlertTriangle, Award, Check, ChevronLeft, ChevronRight, Download, FileText, Lock, MessageSquareWarning, Plus, Printer, Settings2, Share2, Trash2, Upload, UserMinus, X } from 'lucide-react'
+import { ADJ_LABEL, LEAVE_LABEL, hrApi, money, type AdvanceReq, type Analytics, type HrSettings, type Leave, type PayDetail, type PayQuery, type Person, type Rota } from '../../lib/driverHrApi'
+import { payslipPdf, shareOrDownload } from '../../lib/payslipPdf'
+import { useStore } from '../../lib/store'
+import { isDriverRole } from '../../lib/roles'
 import { driverApi, type DriverStat } from '../../lib/driverApi'
 import { Th, thead, trow } from '../board'
 import { fmtDateTime } from '../ui'
@@ -22,9 +25,11 @@ const fileToDataUrl = (f: File) => new Promise<string>((res, rej) => { const r =
 export function PayrollTab({ stats, onStats, toast }: { stats: DriverStat[]; onStats: () => void; toast: (m: string) => void }) {
   const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.pay>> | null>(null); const [err, setErr] = useState(''); const [busy, setBusy] = useState('')
   const [paying, setPaying] = useState<string | null>(null); const [pm, setPm] = useState({ method: 'momo', ref: '' }); const [rules, setRules] = useState(false)
-  const load = () => hrApi.pay().then(setD).catch((e) => setErr(msg(e)))
+  const [qs, setQs] = useState<PayQuery[]>([]); const [ars, setArs] = useState<AdvanceReq[]>([]); const [ans, setAns] = useState<Record<string, string>>({})
+  const load = () => { hrApi.queries().then(setQs).catch(() => {}); hrApi.advances().then(setArs).catch(() => {}); return hrApi.pay().then(setD).catch((e) => setErr(msg(e))) }
   useEffect(() => { void load() }, [])
   if (!d) return err ? <Err e={err} /> : <p className="text-sm text-text-muted">Loading pay…</p>
+  const openQ = qs.filter((q) => q.status === 'open'); const pendAr = ars.filter((a) => a.status === 'pending')
   const act = async (key: string, fn: () => Promise<unknown>, ok: string) => { setBusy(key); setErr(''); try { await fn(); toast(ok); await load() } catch (e) { setErr(msg(e)) } finally { setBusy('') } }
   const prevStart = addDays(d.current.start, -d.settings.periodDays)
   const pendingEx = d.expenses.filter((e) => e.status === 'pending')
@@ -53,6 +58,17 @@ export function PayrollTab({ stats, onStats, toast }: { stats: DriverStat[]; onS
                 : <button onClick={() => { setPaying(s.id); setPm({ method: 'momo', ref: '' }) }} className="btn-gold !min-h-9 !px-2.5 text-xs" data-testid="slip-paid">Mark paid</button>)}
             </div></td></tr>)}</tbody></table></div> : <Empty>No payslips yet. Close a pay period to make them.</Empty>}
       </Panel>
+
+      {(qs.length > 0 || ars.length > 0) && <div className="grid gap-6 xl:grid-cols-2">
+        <Panel title="Pay questions" sub={openQ.length ? `${openQ.length} waiting for an answer` : 'All answered'} testid="pay-queries">
+          {qs.length ? <ul className="space-y-2 text-sm">{qs.map((q) => <li key={q.id} className={`rounded-xl border p-3 ${q.status === 'open' ? 'border-gold/60' : 'border-border'}`} data-testid="query-row"><p className="text-xs text-text-muted"><b className="text-text">{q.name}</b> · {fmtDateTime(q.at)}{q.line ? ` · ${q.line}` : ''}{q.payslipId ? <> · <Link to={`/dashboard/payslip/${q.payslipId}`} className="underline">payslip</Link></> : ' · this period'}</p><p className="mt-1">{q.note}</p>
+            {q.status === 'answered' ? <p className="mt-1 text-teal">↳ {q.answer} <span className="text-xs text-text-muted">— {q.answeredBy}</span></p> : <form onSubmit={(e) => { e.preventDefault(); void act(q.id, () => hrApi.answer(q.id, ans[q.id] ?? ''), 'Answer sent.') }} className="mt-2 flex gap-2"><label className="sr-only" htmlFor={`ans-${q.id}`}>Answer</label><input id={`ans-${q.id}`} className="input-dark !min-h-10 flex-1" value={ans[q.id] ?? ''} onChange={(e) => setAns({ ...ans, [q.id]: e.target.value })} placeholder="Your answer (they get a notification)" data-testid="query-answer" /><button disabled={(ans[q.id] ?? '').trim().length < 2 || !!busy} className="btn-gold !min-h-10 text-xs">Send</button></form>}</li>)}</ul> : <Empty>No questions.</Empty>}
+        </Panel>
+        <Panel title="Advance requests" sub={pendAr.length ? `${pendAr.length} waiting` : 'Nothing waiting'} testid="adv-requests">
+          {ars.length ? <ul className="space-y-2 text-sm">{ars.map((a) => <li key={a.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-3" data-testid="adv-row"><span className="min-w-0 flex-1"><b>{a.name}</b> · {money(a.amount, a.currency)} over {a.installments} payslip{a.installments === 1 ? '' : 's'}<span className="block text-xs text-text-muted">{a.reason} · {fmtDateTime(a.at)}</span></span>
+            {a.status === 'pending' ? <><button onClick={() => act(a.id, () => hrApi.decideAdvance(a.id, 'approved'), 'Advance approved — it’s on their payslip plan.')} disabled={!!busy} className="btn-gold !min-h-9 !px-3 text-xs" data-testid="adv-approve">Approve</button><button onClick={() => act(a.id, () => hrApi.decideAdvance(a.id, 'declined'), 'Declined.')} disabled={!!busy} className="btn-ghost !min-h-9 !px-3 text-xs">Decline</button></> : <span className={`text-xs font-semibold ${a.status === 'approved' ? 'text-teal' : 'text-text-muted'}`}>{a.status === 'approved' ? 'Approved' : 'Declined'} · {a.decidedBy}</span>}</li>)}</ul> : <Empty>No requests.</Empty>}
+        </Panel>
+      </div>}
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel title="Expenses to approve" sub="Approved expenses the driver paid for go on their next payslip. Rejected ones come out of Costs & profit.">
@@ -156,7 +172,8 @@ export function RotaTab({ toast }: { toast: (m: string) => void }) {
   const load = () => { hrApi.rota(from, 7).then(setR).catch((e) => setErr(msg(e))); hrApi.leave().then(setLeave).catch(() => {}) }
   useEffect(() => { void load() }, [from]) // eslint-disable-line react-hooks/exhaustive-deps
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(from, i)), [from])
-  const decide = async (l: Leave, status: 'approved' | 'declined') => { setErr(''); try { const x = await hrApi.decideLeave(l.id, status); toast(status === 'approved' ? (x.clashes.length ? `Approved. ${l.name} still has ${x.clashes.length} planned run${x.clashes.length === 1 ? '' : 's'} then — reassign ${x.clashes.map((c) => c.name).join(', ')}.` : 'Approved and added to the rota.') : 'Declined.'); load() } catch (e) { setErr(msg(e)) } }
+  const [why, setWhy] = useState<Record<string, string>>({}); const [declining, setDeclining] = useState<string | null>(null)
+  const decide = async (l: Leave, status: 'approved' | 'declined') => { setErr(''); try { const x = await hrApi.decideLeave(l.id, status, status === 'declined' ? why[l.id] ?? '' : ''); setDeclining(null); toast(status === 'approved' ? (x.clashes.length ? `Approved. ${l.name} still has ${x.clashes.length} planned run${x.clashes.length === 1 ? '' : 's'} then — reassign ${x.clashes.map((c) => c.name).join(', ')}.` : 'Approved and added to the rota.') : 'Declined.'); load() } catch (e) { setErr(msg(e)) } }
   const saveCell = async () => { if (!cell) return; try { await hrApi.setRota({ ...cell, kind: cf.kind, start: cf.kind === 'work' ? cf.start : '', end: cf.kind === 'work' ? cf.end : '' }); setCell(null); load() } catch (e) { setErr(msg(e)) } }
   const pending = leave.filter((l) => l.status === 'pending')
   return (
@@ -164,7 +181,7 @@ export function RotaTab({ toast }: { toast: (m: string) => void }) {
       <Err e={err} />
       <Panel title="Requests" sub={pending.length ? `${pending.length} waiting` : 'Nothing waiting'}>
         {leave.length ? <ul className="divide-y divide-border text-sm">{leave.map((l) => <li key={l.id} className="flex flex-wrap items-center gap-2 py-2.5" data-testid="leave-row"><span className="min-w-0 flex-1"><b>{l.name}</b> · {LEAVE_LABEL[l.kind]} · {day(l.start)}{l.end !== l.start ? ` – ${day(l.end)}` : ''}{l.kind === 'swap' && l.swapName ? ` with ${l.swapName}` : ''}{l.note ? <span className="block text-xs text-text-muted">{l.note}</span> : null}</span>
-          {l.status === 'pending' ? <><button onClick={() => decide(l, 'approved')} className="btn-gold !min-h-9 !px-3 text-xs" data-testid="leave-approve">Approve</button><button onClick={() => decide(l, 'declined')} className="btn-ghost !min-h-9 !px-3 text-xs">Decline</button></> : <span className={`text-xs font-semibold ${l.status === 'approved' ? 'text-teal' : 'text-text-muted'}`}>{l.status === 'approved' ? 'Approved' : 'Declined'}{l.decidedBy ? ` · ${l.decidedBy}` : ''}</span>}</li>)}</ul> : <Empty>No time-off or swap requests.</Empty>}
+          {l.status === 'pending' ? (declining === l.id ? <form onSubmit={(e) => { e.preventDefault(); void decide(l, 'declined') }} className="flex w-full gap-2 sm:w-auto"><label className="sr-only" htmlFor={`why-${l.id}`}>Reason</label><input id={`why-${l.id}`} className="input-dark !min-h-9 flex-1 text-xs" value={why[l.id] ?? ''} onChange={(e) => setWhy({ ...why, [l.id]: e.target.value })} placeholder="Why (they see this)" /><button className="btn-gold !min-h-9 !px-3 text-xs">Decline</button><button type="button" onClick={() => setDeclining(null)} className="btn-ghost !min-h-9 !px-3 text-xs">Cancel</button></form> : <><button onClick={() => decide(l, 'approved')} className="btn-gold !min-h-9 !px-3 text-xs" data-testid="leave-approve">Approve</button><button onClick={() => setDeclining(l.id)} className="btn-ghost !min-h-9 !px-3 text-xs" data-testid="leave-decline">Decline…</button></>) : <span className={`text-xs font-semibold ${l.status === 'approved' ? 'text-teal' : 'text-text-muted'}`}>{l.status === 'approved' ? 'Approved' : 'Declined'}{l.decidedBy ? ` · ${l.decidedBy}` : ''}</span>}</li>)}</ul> : <Empty>No time-off or swap requests.</Empty>}
       </Panel>
       <Panel title="Rota" sub="Tap a day to set work hours or a day off. Runs already planned show under each day." actions={<div className="flex items-center gap-1"><button onClick={() => setFrom(addDays(from, -7))} className="grid h-10 w-10 place-items-center rounded-lg border border-border" aria-label="Previous week"><ChevronLeft size={16} /></button><span className="px-2 text-sm font-semibold">{day(from)} – {day(addDays(from, 6))}</span><button onClick={() => setFrom(addDays(from, 7))} className="grid h-10 w-10 place-items-center rounded-lg border border-border" aria-label="Next week"><ChevronRight size={16} /></button></div>}>
         {!r ? <p className="text-sm text-text-muted">Loading…</p> : !r.staff.length ? <Empty>No drivers yet.</Empty> : <div className="overflow-x-auto"><table className="w-full min-w-[820px] table-fixed text-sm" data-testid="rota"><thead className={thead}><tr><Th className="w-40">Driver</Th>{days.map((d) => <Th key={d}>{day(d)}</Th>)}</tr></thead>
@@ -249,6 +266,7 @@ export function PeopleTab({ open, onOpen, toast, isOwner, canPay }: { open: stri
 function PersonFile({ id, onBack, toast, isOwner, canPay }: { id: string; onBack: () => void; toast: (m: string) => void; isOwner: boolean; canPay: boolean }) {
   const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.person>> | null>(null); const [f, setF] = useState<Person | null>(null); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false)
   const [doc, setDoc] = useState({ kind: 'licence', title: '', expiresOn: '' }); const [note, setNote] = useState({ kind: 'note', body: '' }); const [adj, setAdj] = useState({ kind: 'advance', amount: '', currency: 'USD', note: '', installments: '1' })
+  const [rejecting, setRejecting] = useState<string | null>(null); const [rejectWhy, setRejectWhy] = useState('')
   const [off, setOff] = useState<null | { lastDay: string; reason: string; returned: { equipment: boolean; fuelCard: boolean; keys: boolean; uniform: boolean }; finalPay: boolean }>(null)
   const load = () => hrApi.person(id).then((x) => { setD(x); setF(x.person) }).catch((e) => setErr(msg(e)))
   useEffect(() => { void load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -297,7 +315,9 @@ function PersonFile({ id, onBack, toast, isOwner, canPay }: { id: string; onBack
       </section>
 
       <section className="card-dark p-5" aria-labelledby="docs-h"><h3 id="docs-h" className="!text-base">Papers</h3>
-        {p.docs.length ? <ul className="mt-2 divide-y divide-border text-sm">{p.docs.map((x) => <li key={x.id} className="flex flex-wrap items-center gap-2 py-2"><FileText size={15} aria-hidden="true" /><span className="min-w-0 flex-1">{x.title || x.kind}<span className="block text-xs text-text-muted">{x.kind}{x.expiresOn ? ` · expires ${day(x.expiresOn)}` : ''} · {x.uploadedBy} · {fmtDateTime(x.at)}</span></span><button onClick={async () => { const r = await hrApi.doc(x.id); const w = window.open(); if (w) w.document.write(r.dataUrl.startsWith('data:application/pdf') ? `<iframe src="${r.dataUrl}" style="border:0;width:100%;height:100vh"></iframe>` : `<img src="${r.dataUrl}" style="max-width:100%">`) }} className="btn-ghost !min-h-9 !px-3 text-xs">View</button><button onClick={() => run(() => hrApi.delDoc(x.id), 'Removed.')} className="grid h-9 w-9 place-items-center rounded-md text-text-muted hover:text-danger" aria-label={`Delete ${x.title || x.kind}`}><Trash2 size={14} /></button></li>)}</ul> : <p className="mt-2 text-sm text-text-muted">Nothing uploaded.</p>}
+        {p.docs.length ? <ul className="mt-2 divide-y divide-border text-sm">{p.docs.map((x) => <li key={x.id} className="flex flex-wrap items-center gap-2 py-2"><FileText size={15} aria-hidden="true" /><span className="min-w-0 flex-1">{x.title || x.kind}<span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${x.status === 'checked' ? 'bg-teal/15 text-teal' : x.status === 'rejected' ? 'bg-danger/10 text-danger' : 'bg-gold/15 text-gold-deep'}`}>{x.status === 'checked' ? 'Checked' : x.status === 'rejected' ? 'Rejected' : 'To check'}</span><span className="block text-xs text-text-muted">{x.kind}{x.side ? ` (${x.side})` : ''}{x.expiresOn ? ` · expires ${day(x.expiresOn)}` : ''} · {x.uploadedBy} · {fmtDateTime(x.at)}{x.reviewNote ? ` · “${x.reviewNote}”` : ''}</span></span>
+                {x.status !== 'checked' && <button onClick={() => run(() => hrApi.reviewDoc(x.id, 'checked'), 'Marked as checked.')} className="btn-gold !min-h-9 !px-3 text-xs" data-testid="doc-check">Looks good</button>}
+                {x.status !== 'rejected' && (rejecting === x.id ? <form onSubmit={(e) => { e.preventDefault(); void run(() => hrApi.reviewDoc(x.id, 'rejected', rejectWhy), 'Sent back — they were asked to upload it again.').then(() => { setRejecting(null); setRejectWhy('') }) }} className="flex gap-1"><label className="sr-only" htmlFor={`rj-${x.id}`}>What’s wrong</label><input id={`rj-${x.id}`} className="input-dark !min-h-9 !w-48 text-xs" value={rejectWhy} onChange={(e) => setRejectWhy(e.target.value)} placeholder="What’s wrong (they see this)" data-testid="doc-reject-why" /><button className="btn-ghost !min-h-9 !px-2 text-xs" disabled={rejectWhy.trim().length < 3}>Send</button></form> : <button onClick={() => setRejecting(x.id)} className="btn-ghost !min-h-9 !px-3 text-xs" data-testid="doc-reject">Ask again</button>)}<button onClick={async () => { const r = await hrApi.doc(x.id); const w = window.open(); if (w) w.document.write(r.dataUrl.startsWith('data:application/pdf') ? `<iframe src="${r.dataUrl}" style="border:0;width:100%;height:100vh"></iframe>` : `<img src="${r.dataUrl}" style="max-width:100%">`) }} className="btn-ghost !min-h-9 !px-3 text-xs">View</button><button onClick={() => run(() => hrApi.delDoc(x.id), 'Removed.')} className="grid h-9 w-9 place-items-center rounded-md text-text-muted hover:text-danger" aria-label={`Delete ${x.title || x.kind}`}><Trash2 size={14} /></button></li>)}</ul> : <p className="mt-2 text-sm text-text-muted">Nothing uploaded.</p>}
         <div className="mt-3 flex flex-wrap items-end gap-2"><label className="text-xs">Type<select className="input-dark mt-1 !min-h-9" value={doc.kind} onChange={(e) => setDoc({ ...doc, kind: e.target.value })}>{[['licence', 'Driving licence'], ['id', 'ID'], ['medical', 'Medical card'], ['insurance', 'Insurance'], ['permit', 'Permit'], ['contract', 'Contract'], ['other', 'Other']].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label><label className="text-xs">Title<input className="input-dark mt-1 !min-h-9" value={doc.title} onChange={(e) => setDoc({ ...doc, title: e.target.value })} /></label><label className="text-xs">Expires<input type="date" className="input-dark mt-1 !min-h-9" value={doc.expiresOn} onChange={(e) => setDoc({ ...doc, expiresOn: e.target.value })} /></label>
           <label className="btn-ghost !min-h-9 cursor-pointer text-xs"><Upload size={13} aria-hidden="true" /> Upload photo or PDF<input type="file" accept="image/*,application/pdf" className="sr-only" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 2_900_000) { setErr('Keep files under 3 MB.'); return } const dataUrl = await fileToDataUrl(file); await run(() => hrApi.addDoc(id, { kind: doc.kind, title: doc.title || file.name, dataUrl, expiresOn: doc.expiresOn || null }), 'Uploaded.'); e.target.value = '' }} /></label></div>
       </section>
@@ -323,15 +343,21 @@ function PersonFile({ id, onBack, toast, isOwner, canPay }: { id: string; onBack
 
 /* ============================== Payslip page (print) ============================== */
 export function PayslipView({ id }: { id: string }) {
-  const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.slip>> | null>(null); const [err, setErr] = useState('')
-  useEffect(() => { hrApi.slip(id).then(setD).catch((e) => setErr(msg(e))) }, [id])
+  const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.slip>> | null>(null); const [err, setErr] = useState(''); const [info, setInfo] = useState('')
+  const [det, setDet] = useState<PayDetail | null>(null); const [q, setQ] = useState<{ line: string; note: string } | null>(null)
+  const { user } = useStore(); const driver = isDriverRole(user?.staffRole)
+  useEffect(() => { hrApi.slip(id).then(setD).catch((e) => setErr(msg(e))); hrApi.slipDetail(id).then(setDet).catch(() => {}) }, [id])
+  const share = async () => { if (!d) return; setInfo(''); try { const b = await payslipPdf(d.payslip, d.employment, d.payout); const r = await shareOrDownload(b, `payslip-${(d.payslip.name ?? 'driver').replace(/\s+/g, '-').toLowerCase()}-${d.payslip.start}.pdf`, 'Payslip'); if (r === 'downloaded') setInfo('PDF downloaded.') } catch (e) { setErr(msg(e, 'Could not make the PDF.')) } }
+  const sendQ = async () => { if (!q) return; setErr(''); try { await hrApi.askQuery(id, q.line, q.note); setQ(null); setInfo('Sent to the office — you’ll get a notification when they answer.') } catch (e) { setErr(msg(e)) } }
   if (!d) return <div className="container-x py-10">{err ? <Err e={err} /> : <p className="text-text-muted">Loading…</p>}</div>
   const s = d.payslip; const sec = (k: string[]) => s.lines.filter((l) => k.includes(l.kind))
   const Rows = ({ rows }: { rows: typeof s.lines }) => <>{rows.map((l, i) => <tr key={i} className="border-b border-border/60"><td className="py-2 pr-3">{l.label}</td><td className="py-2 pr-3 text-right tabular-nums">{l.qty != null ? l.qty : ''}</td><td className="py-2 pr-3 text-right tabular-nums">{l.rate != null ? money(l.rate, s.currency) : ''}</td><td className="py-2 text-right tabular-nums">{money(l.amount, s.currency)}</td></tr>)}</>
   return (
     <div className="bg-bg text-text print:bg-white print:text-black">
       <div className="container-x max-w-3xl py-8">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden"><button onClick={() => history.back()} className="inline-flex min-h-10 items-center gap-1 text-sm text-text-muted"><ChevronLeft size={16} aria-hidden="true" /> Back</button><button onClick={() => window.print()} className="btn-gold !min-h-10 text-sm" data-testid="print-slip"><Printer size={14} aria-hidden="true" /> Print or save as PDF</button></div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden"><button onClick={() => history.back()} className="inline-flex min-h-10 items-center gap-1 text-sm text-text-muted"><ChevronLeft size={16} aria-hidden="true" /> Back</button><div className="flex flex-wrap gap-2"><button onClick={share} className="btn-gold !min-h-10 text-sm" data-testid="share-slip"><Share2 size={14} aria-hidden="true" /> Share or download PDF</button><button onClick={() => window.print()} className="btn-ghost !min-h-10 text-sm" data-testid="print-slip"><Printer size={14} aria-hidden="true" /> Print</button></div></div>
+        {info && <p role="status" className="mb-3 rounded-lg border border-teal/40 bg-teal/10 px-3 py-2 text-sm print:hidden">{info}</p>}
+        <Err e={err} />
         <article className="rounded-2xl border border-border bg-surface p-6 print:border-0 print:p-0" data-testid="payslip">
           <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4"><div><p className="text-xs uppercase tracking-wider text-text-muted">Payslip{s.stats.final ? ' · final' : ''}</p><h1 className="!text-2xl">{s.company}</h1></div><div className="text-right text-sm"><p className="font-semibold">{s.name}</p><p className="text-text-muted">{d.employment === 'employee' ? 'Employee' : 'Contractor'}</p><p className="text-text-muted">{day(s.start)} – {day(s.end)}</p></div></header>
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4"><div><dt className="text-text-muted">Stops</dt><dd className="font-semibold">{s.stats.stops ?? 0}</dd></div><div><dt className="text-text-muted">Runs</dt><dd className="font-semibold">{s.stats.runs ?? 0}</dd></div><div><dt className="text-text-muted">Hours</dt><dd className="font-semibold">{s.stats.hours ?? 0}{s.stats.overtime ? ` (${s.stats.overtime} OT)` : ''}</dd></div><div><dt className="text-text-muted">On time</dt><dd className="font-semibold">{pct(s.stats.onTimePct ?? null)}</dd></div></dl>
@@ -340,10 +366,30 @@ export function PayslipView({ id }: { id: string }) {
               {sec(['reimbursement']).length > 0 && <><Rows rows={sec(['reimbursement'])} /><tr><td colSpan={3} className="py-2 font-semibold">Expenses paid back</td><td className="py-2 text-right font-semibold tabular-nums">{money(s.reimbursed, s.currency)}</td></tr></>}
               {sec(['deduction']).length > 0 && <><Rows rows={sec(['deduction'])} /><tr><td colSpan={3} className="py-2 font-semibold">Deductions</td><td className="py-2 text-right font-semibold tabular-nums">−{money(s.deducted, s.currency)}</td></tr></>}
               <tr className="border-t-2 border-text"><td colSpan={3} className="py-3 text-base font-bold">Net pay</td><td className="py-3 text-right text-base font-bold tabular-nums" data-testid="slip-net">{money(s.net, s.currency)}</td></tr></tbody></table>
+          {driver && <div className="mt-4 print:hidden">{q ? <div className="rounded-xl border border-border p-3" data-testid="query-form"><label htmlFor="q-line" className="label-dark">Which line?</label><select id="q-line" className="input-dark !min-h-11" value={q.line} onChange={(e) => setQ({ ...q, line: e.target.value })}><option value="">The whole payslip</option>{s.lines.map((l, i) => <option key={i} value={l.label}>{l.label}</option>)}</select><label htmlFor="q-note" className="label-dark mt-2">What looks wrong?</label><textarea id="q-note" rows={3} className="input-dark py-2" value={q.note} onChange={(e) => setQ({ ...q, note: e.target.value })} placeholder="e.g. I did 3 stops on Saturday that aren’t here" data-testid="query-note" /><div className="mt-2 flex gap-2"><button onClick={sendQ} disabled={q.note.trim().length < 5} className="btn-gold !min-h-11 text-sm" data-testid="query-send">Send to the office</button><button onClick={() => setQ(null)} className="btn-ghost !min-h-11 text-sm">Cancel</button></div></div> : <button onClick={() => setQ({ line: '', note: '' })} className="btn-ghost !min-h-11 text-sm" data-testid="query-open"><MessageSquareWarning size={15} aria-hidden="true" /> Something’s wrong?</button>}</div>}
           <footer className="mt-4 text-xs text-text-muted"><p>Status: {s.status === 'paid' ? `paid ${s.paidAt ? fmtDateTime(s.paidAt) : ''} by ${s.paidMethod}${s.paidRef ? ` (ref ${s.paidRef})` : ''}` : s.status === 'approved' ? `approved by ${s.approvedBy}, not paid yet` : 'draft'}</p>{d.payout.method && <p>Paid to: {d.payout.method === 'momo' ? `MoMo ${d.payout.momo}` : d.payout.method === 'zelle' ? `Zelle ${d.payout.zelle}` : d.payout.method === 'bank' ? `${d.payout.bankName} ••••${d.payout.bankLast4}` : 'cash'}</p>}<p className="mt-1">{d.employment === 'contractor' ? 'Contractor payment — no tax withheld.' : 'Tax and social security are handled separately by the company’s payroll.'}</p></footer>
         </article>
+        {det && (det.stops.length > 0 || det.shifts.length > 0) && <Breakdown det={det} />}
       </div>
     </div>
+  )
+}
+
+/** The stops and shifts behind a payslip, by day. */
+export function Breakdown({ det }: { det: PayDetail }) {
+  const byDay = new Map<string, { stops: PayDetail['stops']; shifts: PayDetail['shifts'] }>()
+  for (const x of det.stops) { const k = x.doneAt.slice(0, 10); const e = byDay.get(k) ?? { stops: [], shifts: [] }; e.stops.push(x); byDay.set(k, e) }
+  for (const x of det.shifts) { const k = x.start.slice(0, 10); const e = byDay.get(k) ?? { stops: [], shifts: [] }; e.shifts.push(x); byDay.set(k, e) }
+  const t2 = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return (
+    <section className="mt-6 rounded-2xl border border-border bg-surface p-5 print:hidden" aria-labelledby="bd-h" data-testid="breakdown">
+      <h2 id="bd-h" className="!text-lg">What’s behind it</h2>
+      <p className="text-sm text-text-muted">{det.stops.length} stops · {det.shifts.reduce((n, x) => n + x.hours, 0).toFixed(1)} hours on the clock</p>
+      <ul className="mt-3 space-y-3">{[...byDay.entries()].sort().map(([k, v]) => <li key={k} className="rounded-xl bg-surface-2/50 p-3"><p className="font-semibold">{day(k)}{v.stops.some((x) => x.holiday) ? ' · public holiday' : v.stops.some((x) => x.weekend) ? ' · weekend' : ''}</p>
+        {v.shifts.map((x, i) => <p key={i} className="text-sm text-text-muted">Shift {t2(x.start)}–{t2(x.end)} · {x.hours} h{x.breaks ? ` · ${x.breaks} break${x.breaks === 1 ? '' : 's'}` : ''}{x.edited ? ' · corrected by the office' : ''}</p>)}
+        {v.stops.length > 0 && <ul className="mt-1 text-sm">{v.stops.map((x, i) => <li key={i} className="flex justify-between gap-3 border-t border-border/50 py-1"><span className="min-w-0 truncate">{x.label}<span className="block truncate text-xs text-text-muted">{x.address || x.run}</span></span><span className="shrink-0 text-xs text-text-muted">{t2(x.doneAt)}</span></li>)}</ul>}
+      </li>)}</ul>
+    </section>
   )
 }
 

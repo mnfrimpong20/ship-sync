@@ -11,7 +11,7 @@ import { setDisplay, useDisplay } from '../lib/prefs'
 import { useT } from '../lib/i18n'
 import { niceDay } from '../lib/dates'
 import { roleLabels, type StaffRole } from '../lib/ops'
-import { CashCard, OnboardingNudge, ShiftCard, WeekCard } from '../components/driver/HomeCards'
+import { CashCard, OnboardingNudge, PayDayCard, ShiftCard, WeekCard } from '../components/driver/HomeCards'
 
 /** A PIN for this phone, so the driver doesn't type a password every morning. */
 function PinCard() {
@@ -68,7 +68,7 @@ export default function MyRuns() {
           {(offline || queued > 0) && <p role="status" className="mt-3 flex items-center gap-2 rounded-2xl border border-gold/50 bg-gold/10 px-4 py-3 text-base"><WifiOff size={18} aria-hidden="true" /> {offline ? t('Offline — showing your saved runs') : ''}{queued ? `${offline ? ' · ' : ''}${t('{n} updates waiting', { n: queued })}` : ''}</p>}
           {error && <p role="alert" className="mt-3 text-base text-danger">{error}</p>}
 
-          <motion.div variants={fadeUp}><OnboardingNudge /><ShiftCard /></motion.div>
+          <motion.div variants={fadeUp}><OnboardingNudge /><ShiftCard /><PayDayCard /></motion.div>
           <motion.nav variants={fadeUp} aria-label={t('My work')} className="mt-5 grid grid-cols-3 gap-2" data-testid="hr-links">
             {([['/dashboard/runs/pay', Wallet, 'My pay'], ['/dashboard/runs/time', CalendarDays, 'Time off'], ['/dashboard/runs/me', FolderOpen, 'My file']] as const).map(([to, I, l]) => <Link key={to} to={to} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring"><I size={22} aria-hidden="true" /> {t(l)}</Link>)}
           </motion.nav>

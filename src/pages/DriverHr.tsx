@@ -1,22 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Award, Check, ChevronRight, FileText, PlayCircle, Send, Upload, X } from 'lucide-react'
+import { ArrowLeft, Award, Camera, Check, ChevronRight, FileText, MessageSquareWarning, PlayCircle, Send, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { isDriverRole } from '../lib/roles'
 import { useT } from '../lib/i18n'
 import { useDisplay } from '../lib/prefs'
 import { niceDay } from '../lib/dates'
-import { ADJ_LABEL, LEAVE_LABEL, hrApi, money, type Leave, type Person, type Rota, type TrainingQ } from '../lib/driverHrApi'
+import { ADJ_LABEL, LEAVE_LABEL, hrApi, money, type AdvanceReq, type Badge, type Leave, type PayDetail, type PayQuery, type PaySummary, type Person, type Rota, type TrainingQ } from '../lib/driverHrApi'
 import { CONTRACT_VERSION, contractText } from '../lib/driverHr'
 import { BrandLoader } from '../components/BrandLoader'
 import { SignaturePad } from '../components/SignaturePad'
 import { Big, Choice } from '../components/driver/DriverUi'
-import { PayslipView } from '../components/driver/OfficeHr'
+import { Breakdown, PayslipView } from '../components/driver/OfficeHr'
+import { CardCamera } from '../components/driver/CardCamera'
+import QRCode from 'qrcode'
 
 const addDays = (d: string, n: number) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10) }
 const today = () => new Date().toISOString().slice(0, 10)
 const errOf = (e: unknown, f: string) => (e instanceof Error ? e.message : f)
-const fileToDataUrl = (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) })
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   const t = useT()
@@ -26,25 +27,67 @@ const Card = ({ title, children, id, testid }: { title: string; children: React.
 const Msg = ({ err, ok }: { err?: string; ok?: string }) => <>{err && <p role="alert" className="mt-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-base text-danger">{err}</p>}{ok && <p role="status" className="mt-3 rounded-xl border border-teal/40 bg-teal/10 px-3 py-2 text-base">{ok}</p>}</>
 
 /* ---------------- My pay ---------------- */
+function PayHistory({ rows, cur }: { rows: PaySummary['history']; cur: string }) {
+  const t = useT(); const disp = useDisplay(); const max = Math.max(1, ...rows.map((r) => r.net))
+  if (!rows.length) return null
+  return (
+    <figure className="mt-3" data-testid="pay-history">
+      <div className="flex h-32 items-end gap-1.5" aria-hidden="true">{rows.map((r, i) => <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1"><div className={`w-full rounded-t-md ${r.status === 'paid' ? 'bg-gold' : 'bg-gold/50'}`} style={{ height: `${Math.max(4, (r.net / max) * 100)}%` }} /></div>)}</div>
+      <div className="mt-1 flex gap-1.5 text-[0.7rem] text-text-muted" aria-hidden="true">{rows.map((r, i) => <span key={i} className="flex-1 truncate text-center">{new Date(r.end + 'T12:00:00Z').toLocaleDateString(disp.lang === 'fr' ? 'fr-FR' : undefined, { day: 'numeric', month: 'short' })}</span>)}</div>
+      <table className="sr-only"><caption>{t('Pay for each period')}</caption><tbody>{rows.map((r, i) => <tr key={i}><th>{r.start} – {r.end}</th><td>{money(r.net, r.currency || cur)}</td></tr>)}</tbody></table>
+    </figure>
+  )
+}
 function MyPay() {
   const t = useT(); const disp = useDisplay()
-  const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.myPay>> | null>(null); const [rank, setRank] = useState<Awaited<ReturnType<typeof hrApi.myRank>> | null>(null); const [err, setErr] = useState('')
-  useEffect(() => { hrApi.myPay().then(setD).catch((e) => setErr(errOf(e, t('Could not load.')))); hrApi.myRank().then(setRank).catch(() => {}) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.myPay>> | null>(null); const [sum, setSum] = useState<PaySummary | null>(null); const [rank, setRank] = useState<Awaited<ReturnType<typeof hrApi.myRank>> | null>(null)
+  const [qs, setQs] = useState<PayQuery[]>([]); const [ars, setArs] = useState<AdvanceReq[]>([]); const [err, setErr] = useState(''); const [ok, setOk] = useState('')
+  const [det, setDet] = useState<PayDetail | null>(null); const [open, setOpen] = useState(false); const [q, setQ] = useState<{ line: string; note: string } | null>(null)
+  const [adv, setAdv] = useState<{ amount: string; currency: string; reason: string; installments: number } | null>(null); const [busy, setBusy] = useState(false)
+  const load = () => { hrApi.myPay().then(setD).catch((e) => setErr(errOf(e, t('Could not load.')))); hrApi.paySummary().then(setSum).catch(() => {}); hrApi.myRank().then(setRank).catch(() => {}); hrApi.myQueries().then(setQs).catch(() => {}); hrApi.myAdvances().then(setArs).catch(() => {}) }
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   if (!d) return <Shell title={t('My pay')}>{err ? <Msg err={err} /> : <BrandLoader full={false} />}</Shell>
-  const c = d.current
+  const c = d.current; const curr = sum?.currency ?? c.currency
+  const showDetail = async () => { setOpen((v) => !v); if (!det) setDet(await hrApi.slipDetail('current').catch(() => null)) }
+  const sendQ = async () => { if (!q) return; setBusy(true); setErr(''); try { await hrApi.askQuery('current', q.line, q.note); setQ(null); setOk(t('Sent to the office — you’ll get a notification when they answer.')); load() } catch (e) { setErr(errOf(e, t('Could not send.'))) } finally { setBusy(false) } }
+  const sendAdv = async () => { if (!adv) return; setBusy(true); setErr(''); try { await hrApi.askAdvance({ amount: Number(adv.amount), currency: adv.currency, reason: adv.reason, installments: adv.installments }); setAdv(null); setOk(t('Advance request sent.')); load() } catch (e) { setErr(errOf(e, t('Could not send.'))) } finally { setBusy(false) } }
+  const pendingAdv = ars.find((a) => a.status === 'pending')
   return (
     <Shell title={t('My pay')}>
-      {d.owed > 0 && <p className="mt-4 rounded-2xl border-2 border-gold bg-gold/10 p-4 text-base font-semibold" data-testid="owed">{t('{amount} approved and on its way to you.', { amount: money(d.owed, d.payslips[0]?.currency) })}</p>}
+      {sum && <section className="mt-4 grid grid-cols-2 gap-2" aria-label={t('Pay day')} data-testid="pay-summary">
+        <div className="rounded-2xl border-2 border-gold bg-gold/10 p-4"><p className="text-sm text-text-muted">{t('Pay day')}</p><p className="text-xl font-bold">{niceDay(sum.payDay, { lang: disp.lang })}</p><p className="text-sm">{sum.closesIn === 0 ? t('Period closes today') : t('Period closes in {n} days', { n: sum.closesIn })}</p></div>
+        <div className="rounded-2xl border-2 border-border bg-surface p-4"><p className="text-sm text-text-muted">{t('Earned today')}</p><p className="text-xl font-bold tabular-nums" data-testid="earned-today">{money(sum.today.earned, curr)}</p><p className="text-sm">{t('{n} stops', { n: sum.today.stops })} · {sum.today.hours} h</p></div>
+      </section>}
+      {d.owed > 0 && <p className="mt-4 rounded-2xl border-2 border-teal/50 bg-teal/10 p-4 text-base font-semibold" data-testid="owed">{t('{amount} approved and on its way to you.', { amount: money(d.owed, d.payslips[0]?.currency) })}</p>}
       {rank?.show && rank.rank && <p className="mt-4 flex items-center gap-2 rounded-2xl bg-surface-2 p-4 text-base"><Award size={20} className="text-gold-deep" aria-hidden="true" /> {t('You’re number {n} of {of} drivers this month.', { n: rank.rank, of: rank.of ?? 0 })}</p>}
+      <Msg err={err} ok={ok} />
       <Card title={t('This pay period so far')} id="cur-h" testid="pay-current">
         <p className="text-sm text-text-muted">{niceDay(c.start, { lang: disp.lang })} – {niceDay(c.end, { lang: disp.lang })}</p>
         <p className="mt-2 text-3xl font-bold tabular-nums">{money(c.net, c.currency)}</p>
         <ul className="mt-3 divide-y divide-border text-base">{c.lines.map((l, i) => <li key={i} className="flex justify-between gap-3 py-2"><span>{t(l.label)}{l.qty != null ? ` × ${l.qty}` : ''}</span><span className={`tabular-nums ${l.amount < 0 ? 'text-danger' : ''}`}>{money(l.amount, c.currency)}</span></li>)}</ul>
         {!c.lines.length && <p className="mt-2 text-base text-text-muted">{t('Nothing yet this period.')}</p>}
-        <p className="mt-2 text-sm text-text-muted">{t('Not final until the office approves your payslip.')}</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button onClick={showDetail} aria-expanded={open} className="min-h-12 rounded-xl border-2 border-border text-base font-semibold focus-ring" data-testid="pay-detail">{open ? t('Hide details') : t('How was this worked out?')}</button>
+          <button onClick={() => setQ(q ? null : { line: '', note: '' })} className="min-h-12 rounded-xl border-2 border-border text-base font-semibold focus-ring" data-testid="pay-query"><MessageSquareWarning size={18} className="mr-1 inline" aria-hidden="true" />{t('Something’s wrong?')}</button>
+        </div>
+        {q && <div className="mt-3 grid gap-2" data-testid="query-form"><label htmlFor="pq-line" className="label-dark">{t('Which line?')}</label><select id="pq-line" className="input-dark !min-h-12" value={q.line} onChange={(e) => setQ({ ...q, line: e.target.value })}><option value="">{t('The whole period')}</option>{c.lines.map((l, i) => <option key={i} value={l.label}>{t(l.label)}</option>)}</select><label htmlFor="pq-note" className="label-dark">{t('What looks wrong?')}</label><textarea id="pq-note" rows={3} className="input-dark py-2 text-base" value={q.note} onChange={(e) => setQ({ ...q, note: e.target.value })} placeholder={t('e.g. I did 3 stops on Saturday that aren’t here')} data-testid="query-note" /><Big tone="gold" disabled={busy || q.note.trim().length < 5} onClick={sendQ} testid="query-send"><Send size={20} aria-hidden="true" /> {t('Send to the office')}</Big></div>}
+        {open && (det ? (det.stops.length || det.shifts.length ? <Breakdown det={det} /> : <p className="mt-3 text-base text-text-muted">{t('No stops or shifts yet this period.')}</p>) : <p className="mt-3 text-text-muted">{t('Loading…')}</p>)}
+        <p className="mt-3 text-sm text-text-muted">{t('Not final until the office approves your payslip.')}</p>
       </Card>
+      {qs.length > 0 && <Card title={t('My questions')} id="q-h"><ul className="mt-2 space-y-2 text-base">{qs.map((x) => <li key={x.id} className="rounded-xl bg-surface-2/60 p-3" data-testid="my-query"><p>{x.line ? <b>{t(x.line)}: </b> : null}{x.note}</p>{x.status === 'answered' ? <p className="mt-1 text-teal">↳ {x.answer} <span className="text-sm text-text-muted">— {x.answeredBy}</span></p> : <p className="mt-1 text-sm text-text-muted">{t('Waiting for the office')}</p>}</li>)}</ul></Card>}
+      {sum && sum.history.length > 0 && <Card title={t('Last {n} pay periods', { n: sum.history.length })} id="hist-h"><PayHistory rows={sum.history} cur={curr} />{sum.year.map((y) => <p key={y.currency} className="mt-3 text-base" data-testid="year-total">{t('This year: {amount} paid', { amount: money(y.net, y.currency) })} <span className="text-sm text-text-muted">({t('{amount} pay + {back} expenses back', { amount: money(y.gross, y.currency), back: money(y.reimbursed, y.currency) })})</span></p>)}</Card>}
       <Card title={t('Payslips')} id="slips-h">
         {d.payslips.length ? <ul className="mt-2 space-y-2">{d.payslips.map((s) => <li key={s.id}><Link to={`/dashboard/payslip/${s.id}`} className="flex min-h-14 items-center gap-3 rounded-2xl border-2 border-border px-4 py-2 text-base focus-ring" data-testid="my-slip"><FileText size={20} aria-hidden="true" /><span className="min-w-0 flex-1"><b>{money(s.net, s.currency)}</b><span className="block text-sm text-text-muted">{niceDay(s.start, { lang: disp.lang })} – {niceDay(s.end, { lang: disp.lang })}</span></span><span className={`rounded-full px-2 py-0.5 text-sm font-semibold ${s.status === 'paid' ? 'bg-teal/15 text-teal' : 'bg-gold/15 text-gold-deep'}`}>{s.status === 'paid' ? t('Paid') : t('Approved')}</span><ChevronRight size={18} aria-hidden="true" /></Link></li>)}</ul> : <p className="mt-2 text-base text-text-muted">{t('No payslips yet.')}</p>}
+        <p className="mt-2 text-sm text-text-muted">{t('Open a payslip to share it as a PDF — for a bank, landlord or visa letter.')}</p>
+      </Card>
+      <Card title={t('Need an advance?')} id="adv-h" testid="advance">
+        {pendingAdv ? <p className="mt-2 text-base">{t('Your request for {amount} is waiting for the office.', { amount: money(pendingAdv.amount, pendingAdv.currency) })}</p> : !adv ? <div className="mt-2"><Big onClick={() => setAdv({ amount: '', currency: curr, reason: '', installments: 2 })} testid="adv-open">{t('Ask for an advance')}</Big></div> : <div className="mt-2 grid gap-3">
+          <div className="grid grid-cols-[1fr_7rem] gap-2"><div><label htmlFor="adv-amt" className="label-dark">{t('Amount')}</label><input id="adv-amt" inputMode="decimal" className="input-dark !min-h-14 text-2xl font-bold tabular-nums" value={adv.amount} onChange={(e) => setAdv({ ...adv, amount: e.target.value.replace(/[^\d.]/g, '') })} data-testid="adv-amount" /></div><div><label htmlFor="adv-cur" className="label-dark">{t('Currency')}</label><select id="adv-cur" className="input-dark !min-h-14" value={adv.currency} onChange={(e) => setAdv({ ...adv, currency: e.target.value })}>{['USD', 'GHS', 'NGN', 'XOF', 'GBP', 'EUR'].map((x) => <option key={x}>{x}</option>)}</select></div></div>
+          <div><label htmlFor="adv-why" className="label-dark">{t('What is it for?')}</label><input id="adv-why" className="input-dark !min-h-12" value={adv.reason} onChange={(e) => setAdv({ ...adv, reason: e.target.value })} placeholder={t('e.g. car repair, school fees')} data-testid="adv-reason" /></div>
+          <div><p className="label-dark" id="adv-inst">{t('Pay it back over')}</p><div className="grid grid-cols-4 gap-2" role="radiogroup" aria-labelledby="adv-inst">{[1, 2, 3, 4].map((n) => <button key={n} type="button" role="radio" aria-checked={adv.installments === n} onClick={() => setAdv({ ...adv, installments: n })} className={`min-h-12 rounded-xl border-2 text-base font-semibold focus-ring ${adv.installments === n ? 'border-gold bg-gold/15' : 'border-border'}`}>{n}</button>)}</div><p className="mt-1 text-sm text-text-muted">{t('payslips')}{Number(adv.amount) ? ` · ${t('{amount} each', { amount: money(Number(adv.amount) / adv.installments, adv.currency) })}` : ''}</p></div>
+          <Big tone="gold" onClick={sendAdv} disabled={busy || !Number(adv.amount) || adv.reason.trim().length < 3} testid="adv-send"><Send size={20} aria-hidden="true" /> {t('Send request')}</Big>
+        </div>}
+        {ars.filter((a) => a.status !== 'pending').slice(0, 3).map((a) => <p key={a.id} className="mt-2 text-sm text-text-muted">{money(a.amount, a.currency)} · {a.status === 'approved' ? t('Approved') : t('Not approved')}{a.note ? ` — “${a.note}”` : ''}</p>)}
       </Card>
       {d.adjustments.length > 0 && <Card title={t('Advances & deductions')} id="adj-h"><ul className="mt-2 divide-y divide-border text-base">{d.adjustments.map((a) => <li key={a.id} className="flex justify-between gap-3 py-2"><span>{t(ADJ_LABEL[a.kind] ?? a.kind)}{a.note ? ` · ${a.note}` : ''}</span><span className="tabular-nums">{a.kind === 'bonus' ? '+' : ''}{money(a.remaining, a.currency)} {a.kind !== 'bonus' ? t('left') : ''}</span></li>)}</ul></Card>}
       {d.expenses.length > 0 && <Card title={t('My expenses')} id="exp-h"><ul className="mt-2 divide-y divide-border text-base">{d.expenses.map((e) => <li key={e.id} className="flex justify-between gap-3 py-2"><span className="capitalize">{t(e.kind[0].toUpperCase() + e.kind.slice(1))} · {money(e.amount, e.currency)}</span><span className={`text-sm font-semibold ${e.status === 'rejected' ? 'text-danger' : e.status === 'pending' ? 'text-text-muted' : 'text-teal'}`}>{e.status === 'pending' ? t('Waiting') : e.status === 'rejected' ? t('Not approved') : e.status === 'reimbursed' ? t('Paid back') : t('Approved')}</span></li>)}</ul></Card>}
@@ -79,7 +122,9 @@ function MyTime() {
         </form>
         <Msg err={err} ok={ok} />
       </Card>
-      {d && d.requests.length > 0 && <Card title={t('My requests')} id="req-h"><ul className="mt-2 divide-y divide-border text-base">{d.requests.map((l) => <li key={l.id} className="flex items-center justify-between gap-3 py-2"><span>{t(LEAVE_LABEL[l.kind])} · {niceDay(l.start, { lang: disp.lang })}{l.end !== l.start ? ` – ${niceDay(l.end, { lang: disp.lang })}` : ''}{l.swapName ? ` · ${l.swapName}` : ''}</span><span className={`text-sm font-semibold ${l.status === 'approved' ? 'text-teal' : l.status === 'declined' ? 'text-danger' : 'text-text-muted'}`}>{l.status === 'approved' ? t('Approved') : l.status === 'declined' ? t('Not approved') : t('Waiting')}</span></li>)}</ul></Card>}
+      {d && d.requests.length > 0 && <Card title={t('My requests')} id="req-h"><ul className="mt-2 divide-y divide-border text-base">{d.requests.map((l) => <li key={l.id} className="py-2.5" data-testid="my-leave"><div className="flex items-center justify-between gap-3"><span>{t(LEAVE_LABEL[l.kind])} · {niceDay(l.start, { lang: disp.lang })}{l.end !== l.start ? ` – ${niceDay(l.end, { lang: disp.lang })}` : ''}{l.swapName ? ` · ${l.swapName}` : ''}</span><span className={`text-sm font-semibold ${l.status === 'approved' ? 'text-teal' : l.status === 'declined' ? 'text-danger' : 'text-text-muted'}`}>{l.status === 'approved' ? t('Approved') : l.status === 'declined' ? t('Not approved') : t('Waiting')}</span></div>
+        {l.status !== 'pending' && l.decidedBy && <p className="text-sm text-text-muted">{t('By {name}', { name: l.decidedBy })}{l.decisionNote ? ` — “${l.decisionNote}”` : ''}</p>}
+        {l.status === 'pending' && <button onClick={async () => { setErr(''); try { await hrApi.cancelLeave(l.id); setOk(t('Request cancelled.')); load() } catch (e) { setErr(errOf(e, t('Could not cancel.'))) } }} className="mt-1 inline-flex min-h-11 items-center text-base font-semibold text-danger underline-offset-2 hover:underline" data-testid="leave-cancel">{t('Cancel request')}</button>}</li>)}</ul></Card>}
     </Shell>
   )
 }
@@ -101,6 +146,7 @@ function MyFile() {
       <Agreement company={d.company} person={p} onDone={() => { setOk(t('Agreement signed.')); void load() }} />
       <Training videos={d.settings.trainingVideos} passed={!!p.training?.passedAt} onDone={() => void load()} open={sp.get('quiz') === '1'} />
       <Papers person={p} onDone={(m) => { setOk(m); void load() }} />
+      <BadgeCard />
       <Details person={p} onDone={(m) => { setOk(m); void load() }} />
       <Msg err={err} ok={ok} />
     </Shell>
@@ -135,21 +181,64 @@ function Training({ videos, passed, onDone, open }: { videos: { title: string; u
     </Card>
   )
 }
+const PAPER_KINDS: [string, string, boolean][] = [['licence', 'Driving licence', true], ['id', 'ID', true], ['medical', 'Medical card', false], ['insurance', 'Insurance', false], ['permit', 'Work / DOT / DVLA permit', false]]
 function Papers({ person, onDone }: { person: Person; onDone: (m: string) => void }) {
-  const t = useT(); const [kind, setKind] = useState('licence'); const [exp, setExp] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
-  const KINDS: [string, string][] = [['licence', 'Driving licence'], ['id', 'ID'], ['medical', 'Medical card'], ['insurance', 'Insurance'], ['permit', 'Work / DOT / DVLA permit']]
+  const t = useT(); const [sp] = useSearchParams(); const renew = sp.get('renew')
+  const [kind, setKind] = useState(renew && PAPER_KINDS.some((k) => k[0] === renew) ? renew : 'licence'); const [exp, setExp] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
+  const [cam, setCam] = useState<null | 'front' | 'back' | 'single'>(null)
+  const box = useRef<HTMLElement>(null)
+  useEffect(() => { if (renew) setTimeout(() => box.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300) }, [renew])
+  const twoSided = PAPER_KINDS.find((k) => k[0] === kind)?.[2] ?? false
+  const label = t(PAPER_KINDS.find((k) => k[0] === kind)?.[1] ?? kind)
+  const save = async (dataUrl: string, side: '' | 'front' | 'back') => {
+    setBusy(true); setErr('')
+    try {
+      await hrApi.addDoc('me', { kind, title: `${PAPER_KINDS.find((k) => k[0] === kind)?.[1] ?? kind}${side ? ` — ${side}` : ''}`, dataUrl, expiresOn: kind === 'id' ? null : exp || null, side })
+      if (side === 'front' && twoSided) { setCam('back'); onDone(t('Front saved — now the back.')) } else { setCam(null); onDone(t('Uploaded — the office will check it.')); setExp('') }
+    } catch (e) { setErr(errOf(e, t('Could not upload.'))); setCam(null) } finally { setBusy(false) }
+  }
+  const status = (x: Person['docs'][number]) => x.status === 'checked' ? <span className="rounded-full bg-teal/15 px-2 py-0.5 text-sm font-semibold text-teal">{t('Checked')}</span> : x.status === 'rejected' ? <span className="rounded-full bg-danger/10 px-2 py-0.5 text-sm font-semibold text-danger">{t('Upload again')}</span> : <span className="rounded-full bg-gold/15 px-2 py-0.5 text-sm font-semibold text-gold-deep">{t('Waiting for the office')}</span>
   return (
-    <Card title={t('My papers')} id="pap-h" testid="papers">
-      {person.docs.length ? <ul className="mt-2 divide-y divide-border text-base">{person.docs.map((x) => <li key={x.id} className="flex items-center gap-2 py-2"><FileText size={18} aria-hidden="true" /><span className="flex-1">{x.title || x.kind}{x.expiresOn ? <span className="block text-sm text-text-muted">{t('Expires {date}', { date: x.expiresOn })}</span> : null}</span></li>)}</ul> : <p className="mt-2 text-base text-text-muted">{t('Nothing uploaded yet.')}</p>}
+    <section ref={box} className={`mt-5 rounded-3xl border bg-surface p-5 ${renew ? 'border-2 border-gold' : 'border-border'}`} aria-labelledby="pap-h" data-testid="papers">
+      <h2 id="pap-h" className="!text-lg">{t('My papers')}</h2>
+      {person.docs.length ? <ul className="mt-2 divide-y divide-border text-base">{person.docs.map((x) => <li key={x.id} className="py-2.5" data-testid="my-doc"><div className="flex items-center gap-2"><FileText size={18} aria-hidden="true" /><span className="min-w-0 flex-1">{x.title || x.kind}{x.expiresOn ? <span className="block text-sm text-text-muted">{t('Expires {date}', { date: x.expiresOn })}</span> : null}</span>{status(x)}</div>{x.status === 'rejected' && x.reviewNote && <p className="mt-1 rounded-xl bg-danger/10 p-2 text-sm">“{x.reviewNote}” — {x.reviewedBy}</p>}</li>)}</ul> : <p className="mt-2 text-base text-text-muted">{t('Nothing uploaded yet.')}</p>}
       <div className="mt-4 grid gap-3">
-        <div><label htmlFor="pap-kind" className="label-dark">{t('What is it?')}</label><select id="pap-kind" className="input-dark !min-h-12" value={kind} onChange={(e) => setKind(e.target.value)}>{KINDS.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}</select></div>
+        <div><label htmlFor="pap-kind" className="label-dark">{renew ? t('Upload the new one') : t('What is it?')}</label><select id="pap-kind" className="input-dark !min-h-12" value={kind} onChange={(e) => setKind(e.target.value)}>{PAPER_KINDS.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}</select></div>
         {kind !== 'id' && <div><label htmlFor="pap-exp" className="label-dark">{t('Expiry date')}</label><input id="pap-exp" type="date" className="input-dark !min-h-12" value={exp} onChange={(e) => setExp(e.target.value)} /></div>}
-        <label className={`flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface text-base font-semibold focus-within:ring-2 focus-within:ring-gold ${busy ? 'opacity-50' : ''}`}><Upload size={20} aria-hidden="true" /> {busy ? t('Uploading…') : t('Take a photo or choose a file')}<input type="file" accept="image/*,application/pdf" capture="environment" className="sr-only" disabled={busy} onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; if (f.size > 2_900_000) { setErr(t('Keep files under 3 MB.')); return } setBusy(true); setErr(''); try { await hrApi.addDoc('me', { kind, title: KINDS.find((x) => x[0] === kind)?.[1] ?? kind, dataUrl: await fileToDataUrl(f), expiresOn: kind === 'id' ? null : exp || null }); onDone(t('Uploaded — the office can see it.')); setExp('') } catch (er) { setErr(errOf(er, t('Could not upload.'))) } finally { setBusy(false); e.target.value = '' } }} data-testid="pap-file" /></label>
+        <Big tone="gold" disabled={busy} onClick={() => setCam(twoSided ? 'front' : 'single')} testid="pap-camera"><Camera size={20} aria-hidden="true" /> {busy ? t('Uploading…') : twoSided ? t('Photograph the front, then the back') : t('Take a photo')}</Big>
       </div>
+      {cam && <CardCamera title={cam === 'back' ? t('{doc} — back', { doc: label }) : cam === 'front' ? t('{doc} — front', { doc: label }) : label} hint={cam === 'back' ? t('Turn it over and photograph the back.') : t('Lay it flat on a dark surface, in good light, with no glare.')} shape={kind === 'insurance' || kind === 'permit' ? 'page' : 'card'} onClose={() => setCam(null)} onPhoto={(u) => void save(u, cam === 'single' ? '' : cam)} />}
       <Msg err={err} />
-    </Card>
+    </section>
   )
 }
+
+/** Digital driver badge with a QR code the warehouse gate or a checkpoint can scan. */
+function BadgeCard() {
+  const t = useT(); const [b, setB] = useState<{ badge: Badge; verifyUrl: string } | null>(null); const [qr, setQr] = useState(''); const [cam, setCam] = useState(false); const [err, setErr] = useState('')
+  const load = () => hrApi.badge().then((x) => { setB(x); void QRCode.toDataURL(x.verifyUrl, { margin: 1, width: 240 }).then(setQr) }).catch((e) => setErr(errOf(e, t('Could not load.'))))
+  useEffect(() => { void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!b) return err ? <Msg err={err} /> : null
+  const x = b.badge; const ok = x.active && x.papersOk
+  return (
+    <section className="mt-5" aria-labelledby="badge-h" data-testid="badge">
+      <h2 id="badge-h" className="!text-lg">{t('My driver badge')}</h2>
+      <div className="mt-2 overflow-hidden rounded-3xl border-2 border-border bg-white text-[#0D1424] shadow-sm">
+        <div className="flex items-center justify-between bg-[#0D1424] px-5 py-3 text-white"><span className="font-heading text-lg font-bold">{x.company}</span><span className={`rounded-full px-2.5 py-0.5 text-sm font-bold ${ok ? 'bg-[#3FB950] text-[#0D1424]' : 'bg-[#F5B82E] text-[#0D1424]'}`}>{ok ? t('Valid') : t('Not valid')}</span></div>
+        <div className="flex gap-4 p-5">
+          {x.photo ? <img src={x.photo} alt={t('Photo of {name}', { name: x.name })} className="h-32 w-24 shrink-0 rounded-xl object-cover" /> : <button onClick={() => setCam(true)} className="grid h-32 w-24 shrink-0 place-items-center rounded-xl border-2 border-dashed border-[#0D1424]/30 text-center text-sm font-semibold" data-testid="badge-photo"><Camera size={22} aria-hidden="true" />{t('Add photo')}</button>}
+          <div className="min-w-0 flex-1"><p className="text-xl font-bold leading-tight">{x.name}</p><p className="text-base">{t(x.role === 'pickup_driver' ? 'Pickup driver' : x.role === 'delivery_driver' ? 'Delivery driver' : 'Driver')}</p>{x.licenceClass && <p className="mt-1 text-sm">{t('Licence class {c}', { c: x.licenceClass })}{x.licenceExpires ? ` · ${t('expires {date}', { date: x.licenceExpires })}` : ''}</p>}{x.since && <p className="text-sm">{t('Since {date}', { date: x.since })}</p>}</div>
+        </div>
+        {qr && <div className="flex items-center gap-4 border-t border-[#0D1424]/10 px-5 py-4"><img src={qr} alt={t('QR code to check this badge')} className="h-28 w-28" /><p className="text-sm">{t('Scan to check this badge is valid right now. It shows only the name, photo and company.')}</p></div>}
+      </div>
+      {!ok && <p className="mt-2 text-base text-danger">{x.expired.length ? t('Not valid until you upload: {list}.', { list: x.expired.map((e) => t(e)).join(', ') }) : t('Ask the office to activate your account.')}</p>}
+      {x.photo && <button onClick={() => setCam(true)} className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-base font-semibold text-gold-deep"><Camera size={18} aria-hidden="true" /> {t('Change photo')}</button>}
+      {cam && <CardCamera title={t('Badge photo')} hint={t('Face the camera, plain background, no sunglasses or hat.')} shape="face" onClose={() => setCam(false)} onPhoto={async (u) => { try { await hrApi.setPhoto(u); setCam(false); await load() } catch (e) { setErr(errOf(e, t('Could not save.'))); setCam(false) } }} />}
+      <Msg err={err} />
+    </section>
+  )
+}
+
 function Details({ person, onDone }: { person: Person; onDone: (m: string) => void }) {
   const t = useT(); const [em, setEm] = useState({ name: person.emergency.name ?? '', phone: person.emergency.phone ?? '', relation: person.emergency.relation ?? '' }); const [po, setPo] = useState({ method: person.payout.method ?? '', momo: person.payout.momo ?? '', zelle: person.payout.zelle ?? '', bankName: person.payout.bankName ?? '', bankLast4: person.payout.bankLast4 ?? '' }); const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   return (
@@ -183,4 +272,22 @@ export function PayslipPage() {
   if (!ready) return <BrandLoader />
   if (!user) return <Navigate to="/login" replace />
   return <PayslipView id={id ?? ''} />
+}
+
+/** Public: /verify/driver/:token — what a gate or checkpoint sees when they scan a badge. */
+export function VerifyDriverPage() {
+  const { token } = useParams(); const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.verify>> | null>(null); const [err, setErr] = useState('')
+  useEffect(() => { hrApi.verify(token ?? '').then(setD).catch((e) => setErr(errOf(e, 'This badge isn’t valid.'))) }, [token])
+  return (
+    <div className="bg-bg text-text"><div className="container-x max-w-md py-12" data-testid="verify-page">
+      <h1 className="!text-2xl">Driver check</h1>
+      {err && <p role="alert" className="mt-4 rounded-2xl border-2 border-danger bg-danger/10 p-5 text-lg font-semibold text-danger">{err}</p>}
+      {d && <div className={`mt-4 rounded-3xl border-2 p-5 ${d.valid ? 'border-teal bg-teal/5' : 'border-danger bg-danger/5'}`}>
+        <p className={`text-2xl font-bold ${d.valid ? 'text-teal' : 'text-danger'}`}>{d.valid ? '✓ Valid driver' : '✕ Not valid'}</p>
+        <div className="mt-4 flex gap-4">{d.photo && <img src={d.photo} alt={`Photo of ${d.name}`} className="h-32 w-24 rounded-xl object-cover" />}<div><p className="text-xl font-bold">{d.name}</p><p>{d.role === 'pickup_driver' ? 'Pickup driver' : d.role === 'delivery_driver' ? 'Delivery driver' : 'Driver'}</p><p className="font-semibold">{d.company}</p></div></div>
+        {!d.valid && <p className="mt-3 text-base">{!d.active ? 'No longer works for this company.' : 'Their papers have expired.'}</p>}
+        <p className="mt-4 text-sm text-text-muted">Checked {new Date(d.checkedAt).toLocaleString()} · Ntemtem</p>
+      </div>}
+    </div></div>
+  )
 }

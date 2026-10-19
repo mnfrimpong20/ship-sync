@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { hrApi, type Person } from '../../lib/driverHrApi'
+import { hrApi, type PaySummary, type Person } from '../../lib/driverHrApi'
+import { useDisplay } from '../../lib/prefs'
+import { niceDay } from '../../lib/dates'
 import { Banknote, Coffee, LogIn, LogOut, Play, TrendingUp } from 'lucide-react'
 import { driverApi, type DriverStat, type ShiftView } from '../../lib/driverApi'
 import { useT } from '../../lib/i18n'
@@ -78,6 +80,19 @@ export function OnboardingNudge() {
     <Link to="/dashboard/runs/me" className={`mt-5 block rounded-3xl border-2 p-5 focus-ring ${exp.some((e) => e.expired) ? 'border-danger bg-danger/10' : 'border-gold bg-gold/10'}`} data-testid="onboarding-nudge">
       <p className="text-lg font-bold">{exp.some((e) => e.expired) ? t('Papers expired — you can’t be put on runs') : left ? t('{n} things to finish in My file', { n: left }) : t('Papers expiring soon')}</p>
       <p className="mt-1 text-base">{exp.length ? exp.map((e) => `${t(e.label)}: ${e.date}`).join(' · ') : p.checklist.filter((c) => !c.done).map((c) => t(c.label)).join(' · ')}</p>
+    </Link>
+  )
+}
+
+/** Earned today and when the money lands — the two questions drivers ask most. */
+export function PayDayCard() {
+  const t = useT(); const disp = useDisplay(); const [s, setS] = useState<PaySummary | null>(null)
+  useEffect(() => { hrApi.paySummary().then(setS).catch(() => {}) }, [])
+  if (!s) return null
+  return (
+    <Link to="/dashboard/runs/pay" className="mt-5 grid grid-cols-2 gap-3 rounded-3xl border border-border bg-surface p-5 focus-ring" data-testid="payday-card">
+      <span><span className="block text-sm text-text-muted">{t('Earned today')}</span><span className="block text-2xl font-bold tabular-nums">{money(s.today.earned, s.currency)}</span><span className="block text-sm">{t('{n} stops', { n: s.today.stops })}</span></span>
+      <span><span className="block text-sm text-text-muted">{t('Pay day')}</span><span className="block text-lg font-bold">{niceDay(s.payDay, { lang: disp.lang })}</span><span className="block text-sm">{s.closesIn === 0 ? t('Period closes today') : t('Period closes in {n} days', { n: s.closesIn })}</span></span>
     </Link>
   )
 }

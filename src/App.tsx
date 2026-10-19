@@ -31,6 +31,7 @@ const RoutePlanner = lazy(() => import('./pages/RoutePlanner'))
 const MyRuns = lazy(() => import('./pages/MyRuns'))
 const DriverHr = lazy(() => import('./pages/DriverHr'))
 const PayslipPage = lazy(() => import('./pages/DriverHr').then((m) => ({ default: m.PayslipPage })))
+const VerifyDriverPage = lazy(() => import('./pages/DriverHr').then((m) => ({ default: m.VerifyDriverPage })))
 const Shipments = lazy(() => import('./pages/Shipments'))
 const Leads = lazy(() => import('./pages/Leads'))
 const Labels = lazy(() => import('./pages/Labels'))
@@ -157,6 +158,7 @@ export default function App() {
               <Route path="/shippers" element={<Directory />} />
               <Route path="/shippers/:id" element={<ShipperProfile />} />
               <Route path="/track" element={<Track />} />
+              <Route path="/verify/driver/:token" element={<VerifyDriverPage />} />
               <Route path="/duty" element={<Duty />} />
               <Route path="/groupage" element={<GroupagePage />} />
               <Route path="/brokers" element={<BrokersPage />} />

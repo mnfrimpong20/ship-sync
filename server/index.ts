@@ -39,6 +39,7 @@ async function main() {
   ;(await import('./quickbooks')).startQuickBooksSweeps(getDb)
   ;(await import('./autopilot')).startAutopilotSweeps(getDb)
   ;(await import('./driverHr')).startDriverHrSweeps(getDb)
+  void getDb().then(async (db) => (await import('./driverHr2')).seedDriverHrDemo(db)).catch((e) => console.error('[driver-hr] demo seed', e))
   startExportSchedule(getDb)
   const app = express()
   app.disable('x-powered-by')

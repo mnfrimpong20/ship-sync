@@ -32,13 +32,14 @@ export interface HrSettings {
   periodDays: 7 | 14; periodAnchor: string; overtimeAfter: number; overtimeRate: number; weekendRate: number; holidayRate: number; holidays: string[]
   warnShiftHours: number; maxShiftHours: number; bonusOnTime: { pct: number; amount: number }; bonusNoDamage: number
   showLeaderboard: boolean; threshold1099: number; leaveDays: number; trainingVideos: { title: string; url: string }[]
+  payDayOffset: number; tzOrigin: string; tzDestination: string; clockInReminder: boolean
 }
-export const HR_DEFAULTS: HrSettings = { periodDays: 7, periodAnchor: '2026-01-05', overtimeAfter: 40, overtimeRate: 1.5, weekendRate: 1, holidayRate: 1.5, holidays: [], warnShiftHours: 10, maxShiftHours: 12, bonusOnTime: { pct: 95, amount: 0 }, bonusNoDamage: 0, showLeaderboard: false, threshold1099: 2000, leaveDays: 15, trainingVideos: [] }
+export const HR_DEFAULTS: HrSettings = { periodDays: 7, periodAnchor: '2026-01-05', overtimeAfter: 40, overtimeRate: 1.5, weekendRate: 1, holidayRate: 1.5, holidays: [], warnShiftHours: 10, maxShiftHours: 12, bonusOnTime: { pct: 95, amount: 0 }, bonusNoDamage: 0, showLeaderboard: false, threshold1099: 2000, leaveDays: 15, trainingVideos: [], payDayOffset: 3, tzOrigin: 'America/Chicago', tzDestination: 'Africa/Accra', clockInReminder: true }
 export async function hrSettings(db: Db, shipperId: string): Promise<HrSettings> {
   const { rows } = await db.query<Row>('select settings from driver_hr_settings where shipper_id = $1', [shipperId])
   return { ...HR_DEFAULTS, ...J<Partial<HrSettings>>(rows[0]?.settings, {}) }
 }
-const periodFor = (s: HrSettings, day: string) => { const n = Math.floor(daysBetween(s.periodAnchor, day) / s.periodDays); const start = addDays(s.periodAnchor, n * s.periodDays); return { start, end: addDays(start, s.periodDays - 1) } }
+export const periodFor = (s: HrSettings, day: string) => { const n = Math.floor(daysBetween(s.periodAnchor, day) / s.periodDays); const start = addDays(s.periodAnchor, n * s.periodDays); return { start, end: addDays(start, s.periodDays - 1) } }
 
 /** Why a driver can't be put on a run on `day` (expired papers, offboarded) — null when fine. Used by the run planner. */
 export async function driverBlock(db: Db, staffId: string, day = today()): Promise<string | null> {
@@ -63,7 +64,7 @@ export async function availability(db: Db, shipperId: string, day: string) {
 
 /* ---------------- payslip maths ---------------- */
 interface Line { label: string; kind: 'earning' | 'bonus' | 'reimbursement' | 'deduction'; qty?: number; rate?: number; amount: number; ref?: string }
-async function computeSlip(db: Db, staff: Row, start: string, end: string, s: HrSettings) {
+export async function computeSlip(db: Db, staff: Row, start: string, end: string, s: HrSettings) {
   const pay = J<{ perStop?: number; perRun?: number; perHour?: number; currency?: string }>(staff.pay, {}); const cur = pay.currency ?? 'USD'
   const holidays = new Set(s.holidays); const weekend = (d: string) => [0, 6].includes(new Date(d + 'T00:00:00Z').getUTCDay())
   // Everything done up to the end of the period that no approved payslip has covered yet (so closing a period early loses nothing).
@@ -135,6 +136,7 @@ async function leaderboard(db: Db, shipperId: string) {
 
 /* ---------------- sweeps: papers expiring, long shifts, missed clock-outs ---------------- */
 export async function sweepDriverHr(db: Db) {
+  await import('./driverHr2').then((m) => m.sweepClockIn(db)).catch((e) => console.error('[driver-hr] clock-in', e))
   const { rows: profs } = await db.query<Row>(`select p.*, s.name, s.user_id, s.shipper_id from driver_profiles p join staff s on s.id = p.staff_id where p.status <> 'offboarded'`)
   const t = today()
   for (const p of profs) {
@@ -144,7 +146,7 @@ export async function sweepDriverHr(db: Db) {
       const step = left < 0 ? 'expired' : left <= 7 ? '7' : left <= 30 ? '30' : null; if (!step) continue
       const title = step === 'expired' ? `${p.name}’s ${EXPIRY_LABEL[k].toLowerCase()} has expired` : `${p.name}’s ${EXPIRY_LABEL[k].toLowerCase()} expires ${d}`
       await notifyShipperStaff(db, p.shipper_id, { kind: 'system', title, body: step === 'expired' ? 'They can’t be put on runs until a new one is uploaded.' : `${left} days left. Ask for the renewed one.`, link: `/dashboard/drivers?tab=people&p=${p.staff_id}`, dedupe: `exp:${p.staff_id}:${k}:${d}:${step}` }, ['owner', 'dispatcher'])
-      if (p.user_id) await notify(db, { userId: p.user_id, kind: 'system', title: step === 'expired' ? `Your ${EXPIRY_LABEL[k].toLowerCase()} has expired` : `Your ${EXPIRY_LABEL[k].toLowerCase()} expires ${d}`, body: 'Upload the new one under My file so you can keep driving.', link: '/dashboard/runs/me', dedupe: `exp:${p.staff_id}:${k}:${d}:${step}:me` })
+      if (p.user_id) await notify(db, { userId: p.user_id, kind: 'system', title: step === 'expired' ? `Your ${EXPIRY_LABEL[k].toLowerCase()} has expired` : `Your ${EXPIRY_LABEL[k].toLowerCase()} expires ${d}`, body: 'Upload the new one under My file so you can keep driving.', link: `/dashboard/runs/me?renew=${k}`, dedupe: `exp:${p.staff_id}:${k}:${d}:${step}:me` })
     }
   }
   const { rows: open } = await db.query<Row>(`select sh.*, s.name, s.user_id from shifts sh join staff s on s.id = sh.staff_id where sh.end_at is null`)
@@ -190,7 +192,7 @@ export function mountDriverHr(r: Router, d: Deps) {
     return rows.reduce((n, x) => n + daysBetween(DATE(x.start_date)!, DATE(x.end_date)!) + 1, 0)
   }
   const checklist = async (db: Db, p: Row) => {
-    const { rows: docs } = await db.query<Row>('select kind from driver_docs where staff_id = $1', [p.staff_id])
+    const { rows: docs } = await db.query<Row>(`select kind from driver_docs where staff_id = $1 and status <> 'rejected'`, [p.staff_id])
     const has = (k: string) => docs.some((x) => x.kind === k)
     const em = J<Row>(p.emergency, {}); const po = J<Row>(p.payout, {}); const tr = J<Row | null>(p.training, null)
     return [
@@ -203,7 +205,7 @@ export function mountDriverHr(r: Router, d: Deps) {
     ]
   }
   const profileOut = async (db: Db, p: Row, staff: Row, full: boolean) => {
-    const { rows: docs } = await db.query<Row>('select id, kind, title, mime, expires_on, uploaded_by, created_at from driver_docs where staff_id = $1 order by created_at desc', [staff.id])
+    const { rows: docs } = await db.query<Row>(`select id, kind, title, mime, expires_on, uploaded_by, created_at, status, review_note, reviewed_by, side from driver_docs where staff_id = $1 and kind <> 'photo' order by created_at desc`, [staff.id])
     const used = await leaveUsed(db, staff.id)
     const exp = J<Record<string, string>>(p.expiries, {})
     return {
@@ -212,7 +214,7 @@ export function mountDriverHr(r: Router, d: Deps) {
       licence: J<Row>(p.licence, {}), emergency: J<Row>(p.emergency, {}), payout: J<Row>(p.payout, {}), expiries: exp,
       contractSignedAt: ISO(p.contract_signed_at), contractName: p.contract_name, training: J<Row | null>(p.training, null), offboarding: J<Row | null>(p.offboarding, null),
       leave: { allowance: Number(p.leave_days), used, left: Number(p.leave_days) - used },
-      checklist: await checklist(db, p), docs: docs.map((x) => ({ id: x.id, kind: x.kind, title: x.title, mime: x.mime, expiresOn: DATE(x.expires_on), uploadedBy: x.uploaded_by, at: ISO(x.created_at) })),
+      checklist: await checklist(db, p), docs: docs.map((x) => ({ id: x.id, kind: x.kind, title: x.title, mime: x.mime, expiresOn: DATE(x.expires_on), uploadedBy: x.uploaded_by, at: ISO(x.created_at), status: x.status as 'pending' | 'checked' | 'rejected', reviewNote: x.review_note, reviewedBy: x.reviewed_by, side: x.side })),
       expiringSoon: EXPIRY_KINDS.filter((k) => exp[k] && daysBetween(today(), exp[k]) <= 30).map((k) => ({ kind: k, label: EXPIRY_LABEL[k], date: exp[k], expired: exp[k] < today() })),
       pay: J<Row>(staff.pay, {}), ...(full ? {} : {}),
     }
@@ -222,7 +224,7 @@ export function mountDriverHr(r: Router, d: Deps) {
   r.get('/drivers/hr/settings', wrap(async (req, res) => { const db = await getDb(); const { shipperId } = await staffOf(db, req); res.json({ settings: await hrSettings(db, shipperId) }) }))
   r.put('/drivers/hr/settings', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId } = await office(db, req, ['owner', 'finance'])
-    const b = z.object({ periodDays: z.union([z.literal(7), z.literal(14)]), periodAnchor: zDate, overtimeAfter: z.number().min(0).max(80), overtimeRate: z.number().min(1).max(3), weekendRate: z.number().min(1).max(3), holidayRate: z.number().min(1).max(3), holidays: z.array(zDate).max(40), warnShiftHours: z.number().min(4).max(24), maxShiftHours: z.number().min(4).max(24), bonusOnTime: z.object({ pct: z.number().min(50).max(100), amount: z.number().min(0).max(10000) }), bonusNoDamage: z.number().min(0).max(10000), showLeaderboard: z.boolean(), threshold1099: z.number().min(0).max(100000), leaveDays: z.number().int().min(0).max(60), trainingVideos: z.array(z.object({ title: z.string().trim().min(1).max(80), url: z.string().url().max(400) })).max(10) }).partial().parse(req.body)
+    const b = z.object({ periodDays: z.union([z.literal(7), z.literal(14)]), periodAnchor: zDate, overtimeAfter: z.number().min(0).max(80), overtimeRate: z.number().min(1).max(3), weekendRate: z.number().min(1).max(3), holidayRate: z.number().min(1).max(3), holidays: z.array(zDate).max(40), warnShiftHours: z.number().min(4).max(24), maxShiftHours: z.number().min(4).max(24), bonusOnTime: z.object({ pct: z.number().min(50).max(100), amount: z.number().min(0).max(10000) }), bonusNoDamage: z.number().min(0).max(10000), showLeaderboard: z.boolean(), threshold1099: z.number().min(0).max(100000), leaveDays: z.number().int().min(0).max(60), trainingVideos: z.array(z.object({ title: z.string().trim().min(1).max(80), url: z.string().url().max(400) })).max(10), payDayOffset: z.number().int().min(0).max(30), tzOrigin: z.string().max(60), tzDestination: z.string().max(60), clockInReminder: z.boolean() }).partial().parse(req.body)
     const next = { ...(await hrSettings(db, shipperId)), ...b }
     await db.query(`insert into driver_hr_settings (shipper_id, settings) values ($1,$2) on conflict (shipper_id) do update set settings = excluded.settings`, [shipperId, JSON.stringify(next)])
     res.json({ settings: next })
@@ -274,13 +276,13 @@ export function mountDriverHr(r: Router, d: Deps) {
     const s = await driverOf(db, shipperId, me.id); const p = await saveProfile(db, s, b); res.json({ person: await profileOut(db, p, s, true) })
   }))
   // Papers: office or the driver themself. Expiry dates on licence/medical/insurance/permit feed the reminders and the run block.
-  const addDoc = async (db: Db, staff: Row, by: string, b: { kind: string; title: string; dataUrl: string; expiresOn?: string | null }) => {
+  const addDoc = async (db: Db, staff: Row, by: string, b: { kind: string; title: string; dataUrl: string; expiresOn?: string | null; side?: string }) => {
     const m = /^data:([^;]+);base64,(.*)$/.exec(b.dataUrl)!; const id = 'dd_' + uid()
-    await db.query('insert into driver_docs (id,staff_id,shipper_id,kind,title,data,mime,expires_on,uploaded_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [id, staff.id, staff.shipper_id, b.kind, b.title, m[2], m[1], b.expiresOn ?? null, by])
+    await db.query('insert into driver_docs (id,staff_id,shipper_id,kind,title,data,mime,expires_on,uploaded_by,side,status) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)', [id, staff.id, staff.shipper_id, b.kind, b.title, m[2], m[1], b.expiresOn ?? null, by, b.side ?? '', by === staff.name ? 'pending' : 'checked'])
     if (b.expiresOn && (EXPIRY_KINDS as readonly string[]).includes(b.kind)) { const p = await profileOf(db, staff); await db.query('update driver_profiles set expiries = $2 where staff_id = $1', [staff.id, JSON.stringify({ ...J<Row>(p.expiries, {}), [b.kind]: b.expiresOn })]) }
     return id
   }
-  const zDoc = z.object({ kind: z.enum(['licence', 'id', 'medical', 'insurance', 'permit', 'contract', 'other']), title: z.string().trim().max(80).default(''), dataUrl: zDataUrl, expiresOn: zDate.nullable().optional() })
+  const zDoc = z.object({ kind: z.enum(['licence', 'id', 'medical', 'insurance', 'permit', 'contract', 'other']), title: z.string().trim().max(80).default(''), dataUrl: zDataUrl, expiresOn: zDate.nullable().optional(), side: z.enum(['', 'front', 'back']).default('') })
   r.post('/drivers/people/:staffId/docs', wrap(async (req, res) => { const db = await getDb(); const { shipperId, me } = await office(db, req); const s = await driverOf(db, shipperId, String(req.params.staffId)); res.status(201).json({ id: await addDoc(db, s, me.name, zDoc.parse(req.body)) }) }))
   r.post('/drivers/me/docs', wrap(async (req, res) => { const db = await getDb(); const { shipperId, me, driver } = await staffOf(db, req); if (!driver) throw new HttpError(403, 'For drivers.'); const s = await driverOf(db, shipperId, me.id); const b = zDoc.parse(req.body); const id = await addDoc(db, s, me.name, b); await notifyShipperStaff(db, shipperId, { kind: 'system', title: `${me.name} uploaded a new ${b.kind === 'id' ? 'ID' : (EXPIRY_LABEL[b.kind] ?? b.kind).toLowerCase()}`, body: b.expiresOn ? `Expires ${b.expiresOn}.` : '', link: `/dashboard/drivers?tab=people&p=${me.id}` }, ['owner', 'dispatcher']); res.status(201).json({ id }) }))
   r.get('/drivers/docs/:id', wrap(async (req, res) => {
@@ -519,7 +521,7 @@ export function mountDriverHr(r: Router, d: Deps) {
     await notifyShipperStaff(db, shipperId, { kind: 'system', title: b.kind === 'swap' ? `${me.name} asks to swap ${b.start}` : b.kind === 'sick' ? `${me.name} is off sick ${b.start === b.end ? b.start : `${b.start} to ${b.end}`}` : `${me.name} asks for time off ${b.start === b.end ? b.start : `${b.start} to ${b.end}`}`, body: b.note, link: '/dashboard/drivers?tab=rota', dedupe: `leave:${id}` }, ['owner', 'dispatcher'])
     res.status(201).json({ ok: true, id })
   }))
-  const leaveOut = (l: Row) => ({ id: l.id, staffId: l.staff_id, name: l.name ?? undefined, swapName: l.swap_name ?? undefined, kind: l.kind, start: DATE(l.start_date), end: DATE(l.end_date), swapWith: l.swap_with, note: l.note, status: l.status, decidedBy: l.decided_by, at: ISO(l.at) })
+  const leaveOut = (l: Row) => ({ id: l.id, staffId: l.staff_id, name: l.name ?? undefined, swapName: l.swap_name ?? undefined, kind: l.kind, start: DATE(l.start_date), end: DATE(l.end_date), swapWith: l.swap_with, note: l.note, status: l.status, decidedBy: l.decided_by, decisionNote: l.decision_note ?? '', at: ISO(l.at) })
   r.get('/drivers/me/leave', wrap(async (req, res) => {
     const db = await getDb(); const { me, shipperId, driver } = await staffOf(db, req); if (!driver) throw new HttpError(403, 'For drivers.')
     const s = await driverOf(db, shipperId, me.id); const p = await profileOf(db, s); const used = await leaveUsed(db, me.id)
@@ -534,10 +536,10 @@ export function mountDriverHr(r: Router, d: Deps) {
   }))
   r.post('/drivers/leave/:id/decide', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, me } = await office(db, req, ['owner', 'dispatcher'])
-    const { status } = z.object({ status: z.enum(['approved', 'declined']) }).parse(req.body)
+    const { status, note } = z.object({ status: z.enum(['approved', 'declined']), note: z.string().trim().max(300).default('') }).parse(req.body)
     const { rows } = await db.query<Row>(`select l.*, s.user_id, s.name from leave_requests l join staff s on s.id = l.staff_id where l.id = $1 and l.shipper_id = $2`, [String(req.params.id), shipperId]); const l = rows[0]
     if (!l) throw new HttpError(404, 'Not found.'); if (l.status !== 'pending') throw new HttpError(409, 'Already decided.')
-    await db.query('update leave_requests set status = $2, decided_by = $3, decided_at = now() where id = $1', [l.id, status, me.name])
+    await db.query('update leave_requests set status = $2, decided_by = $3, decided_at = now(), decision_note = $4 where id = $1', [l.id, status, me.name, note])
     const start = DATE(l.start_date)!, end = DATE(l.end_date)!
     let clash: Row[] = []
     if (status === 'approved' && l.kind !== 'swap') {
@@ -551,7 +553,7 @@ export function mountDriverHr(r: Router, d: Deps) {
       await put(l.staff_id, b2); await put(l.swap_with, a)
       await db.query(`update runs set driver_id = case when driver_id = $1 then $2 else $1 end where driver_id in ($1, $2) and run_date = $3::date and status = 'planned'`, [l.staff_id, l.swap_with, start])
     }
-    if (l.user_id) await notify(db, { userId: l.user_id, kind: 'system', title: status === 'approved' ? `Approved: ${l.kind === 'swap' ? 'shift swap' : 'time off'} ${start}${end !== start ? ` to ${end}` : ''}` : `Not approved: ${l.kind === 'swap' ? 'shift swap' : 'time off'} ${start}`, body: `By ${me.name}.`, link: '/dashboard/runs/time' })
+    if (l.user_id) await notify(db, { userId: l.user_id, kind: 'system', title: status === 'approved' ? `Approved: ${l.kind === 'swap' ? 'shift swap' : 'time off'} ${start}${end !== start ? ` to ${end}` : ''}` : `Not approved: ${l.kind === 'swap' ? 'shift swap' : 'time off'} ${start}`, body: `By ${me.name}.${note ? ` “${note}”` : ''}`, link: '/dashboard/runs/time' })
     res.json({ ok: true, clashes: clash.map((c) => ({ id: c.id, name: c.name, day: DATE(c.run_date) })) })
   }))
   r.get('/drivers/availability', wrap(async (req, res) => { const db = await getDb(); const { shipperId } = await office(db, req, ['owner', 'dispatcher', 'finance', 'agent']); const day = typeof req.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : today(); res.json({ day, away: await availability(db, shipperId, day) }) }))

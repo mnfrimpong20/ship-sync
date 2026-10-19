@@ -11,10 +11,10 @@ export interface Person {
   staffId: string; name: string; role: string; phone: string; email: string; staffStatus: string; employment: 'employee' | 'contractor'; country: string; startDate: string | null; status: 'onboarding' | 'active' | 'offboarded'; trialUntil: string | null
   licence: { class?: string; last4?: string; state?: string }; emergency: { name?: string; phone?: string; relation?: string }; payout: { method?: string; momo?: string; zelle?: string; bankName?: string; bankLast4?: string }; expiries: Record<string, string>
   contractSignedAt: string | null; contractName: string; training: { score: number; tries: number; passedAt: string | null } | null; offboarding: Record<string, unknown> | null
-  leave: { allowance: number; used: number; left: number }; checklist: CheckItem[]; docs: { id: string; kind: string; title: string; mime: string; expiresOn: string | null; uploadedBy: string; at: string }[]
+  leave: { allowance: number; used: number; left: number }; checklist: CheckItem[]; docs: { id: string; kind: string; title: string; mime: string; expiresOn: string | null; uploadedBy: string; at: string; status: 'pending' | 'checked' | 'rejected'; reviewNote: string; reviewedBy: string; side: string }[]
   expiringSoon: { kind: string; label: string; date: string; expired: boolean }[]; pay: { perStop?: number; perRun?: number; perHour?: number; currency?: string }; owed?: number; docCount?: number
 }
-export interface Leave { id: string; staffId: string; name?: string; swapName?: string; kind: 'vacation' | 'sick' | 'personal' | 'swap'; start: string; end: string; swapWith: string | null; note: string; status: 'pending' | 'approved' | 'declined'; decidedBy: string; at: string }
+export interface Leave { id: string; staffId: string; name?: string; swapName?: string; kind: 'vacation' | 'sick' | 'personal' | 'swap'; start: string; end: string; swapWith: string | null; note: string; status: 'pending' | 'approved' | 'declined'; decidedBy: string; decisionNote?: string; at: string }
 export interface Rota { from: string; days: number; staff: { id: string; name: string; role: string }[]; entries: { staffId: string; day: string; kind: 'work' | 'off' | 'leave'; start: string; end: string; note: string }[]; leave: { staffId: string; start: string; end: string; kind: string }[]; runs: { id: string; name: string; day: string; staffId: string; kind: string }[] }
 export interface Week { week: string; stops: number; done: number; onTimePct: number | null; firstTryPct: number | null; incidents: number; rating: number | null; cashOkPct: number | null }
 export interface Analytics {
@@ -24,6 +24,11 @@ export interface Analytics {
   areas: { area: string; stops: number; cost: number; revenue: number; perStop: number | null }[]
   fleet: { id: string; name: string; plate: string; status: string; odometer: number | null; km30: number | null; fuelUsd30: number; fuelPerKm: number | null; checkIssues30: number; serviceEveryKm: number | null; lastServiceKm: number | null; lastServiceAt: string | null; nextServiceKm: number | null; serviceDue: boolean }[]
 }
+export interface PayDetail { stops: { label: string; address: string; doneAt: string; run: string; kind: string; holiday: boolean; weekend: boolean }[]; shifts: { start: string; end: string; breaks: number; hours: number; edited: boolean }[] }
+export interface PayQuery { id: string; payslipId: string | null; staffId: string; name?: string; line: string; note: string; status: 'open' | 'answered'; answer: string; answeredBy: string; answeredAt: string | null; at: string }
+export interface AdvanceReq { id: string; staffId: string; name?: string; amount: number; currency: string; reason: string; installments: number; status: 'pending' | 'approved' | 'declined'; decidedBy: string; note: string; at: string }
+export interface PaySummary { period: { start: string; end: string }; closesIn: number; payDay: string; currency: string; today: { stops: number; runs: number; hours: number; earned: number }; history: { start: string; end: string; net: number; currency: string; status: string }[]; year: { currency: string; gross: number; reimbursed: number; net: number }[] }
+export interface Badge { name: string; role: string; company: string; photo: string | null; licenceClass: string; licenceExpires: string | null; active: boolean; papersOk: boolean; expired: string[]; since: string | null }
 export interface TrainingQ { q: string; options: string[]; why: string }
 
 export const hrApi = {
@@ -32,7 +37,7 @@ export const hrApi = {
   people: () => api<{ people: Person[] }>('/drivers/people').then((r) => r.people),
   person: (id: string) => api<{ person: Person; notes: { id: string; kind: string; body: string; by: string; at: string }[] | null; adjustments: Adjustment[] }>(`/drivers/people/${id}`),
   savePerson: (id: string, b: Partial<Person> & { leaveDays?: number }) => api<{ person: Person }>(`/drivers/people/${id}`, { method: 'PUT', json: b }),
-  addDoc: (id: string | 'me', b: { kind: string; title: string; dataUrl: string; expiresOn?: string | null }) => api(id === 'me' ? '/drivers/me/docs' : `/drivers/people/${id}/docs`, { json: b }),
+  addDoc: (id: string | 'me', b: { kind: string; title: string; dataUrl: string; expiresOn?: string | null; side?: '' | 'front' | 'back' }) => api(id === 'me' ? '/drivers/me/docs' : `/drivers/people/${id}/docs`, { json: b }),
   doc: (id: string) => api<{ title: string; kind: string; dataUrl: string }>(`/drivers/docs/${id}`),
   delDoc: (id: string) => api(`/drivers/docs/${id}`, { method: 'DELETE' }),
   addNote: (id: string, kind: string, body: string) => api(`/drivers/people/${id}/notes`, { json: { kind, body } }),
@@ -52,7 +57,7 @@ export const hrApi = {
   rota: (from: string, days = 7) => api<Rota>(`/drivers/rota?from=${from}&days=${days}`),
   setRota: (b: { staffId: string; day: string; kind: 'work' | 'off' | 'leave' | 'clear'; start?: string; end?: string; note?: string }) => api('/drivers/rota', { method: 'PUT', json: b }),
   leave: () => api<{ requests: Leave[] }>('/drivers/leave').then((r) => r.requests),
-  decideLeave: (id: string, status: 'approved' | 'declined') => api<{ ok: true; clashes: { id: string; name: string; day: string }[] }>(`/drivers/leave/${id}/decide`, { json: { status } }),
+  decideLeave: (id: string, status: 'approved' | 'declined', note = '') => api<{ ok: true; clashes: { id: string; name: string; day: string }[] }>(`/drivers/leave/${id}/decide`, { json: { status, note } }),
   availability: (date: string) => api<{ day: string; away: Record<string, string> }>(`/drivers/availability?date=${date}`).then((r) => r.away),
   analytics: (weeks = 12) => api<Analytics>(`/drivers/analytics?weeks=${weeks}`),
   service: (vehicleId: string, b: { everyKm: number | null; lastKm: number | null; lastAt: string | null }) => api(`/drivers/fleet/${vehicleId}/service`, { method: 'PUT', json: b }),
@@ -66,6 +71,21 @@ export const hrApi = {
   myLeave: () => api<{ balance: { allowance: number; used: number; left: number }; requests: Leave[]; mates: { id: string; name: string }[] }>('/drivers/me/leave'),
   askLeave: (b: { kind: string; start: string; end: string; swapWith?: string; note: string }) => api('/drivers/me/leave', { json: b }),
   myRank: () => api<{ show: boolean; rank?: number | null; of?: number }>('/drivers/me/rank'),
+  slipDetail: (id: string) => api<PayDetail>(id === 'current' ? '/drivers/me/pay/detail' : `/drivers/payslips/${id}/detail`),
+  paySummary: () => api<PaySummary>('/drivers/me/pay/summary'),
+  askQuery: (payslipId: string, line: string, note: string) => api(`/drivers/payslips/${payslipId}/query`, { json: { line, note } }),
+  myQueries: () => api<{ queries: PayQuery[] }>('/drivers/me/queries').then((r) => r.queries),
+  queries: () => api<{ queries: PayQuery[] }>('/drivers/queries').then((r) => r.queries),
+  answer: (id: string, answer: string) => api(`/drivers/queries/${id}/answer`, { json: { answer } }),
+  askAdvance: (b: { amount: number; currency: string; reason: string; installments: number }) => api('/drivers/me/advance', { json: b }),
+  myAdvances: () => api<{ requests: AdvanceReq[] }>('/drivers/me/advances').then((r) => r.requests),
+  advances: () => api<{ requests: AdvanceReq[] }>('/drivers/advance-requests').then((r) => r.requests),
+  decideAdvance: (id: string, status: 'approved' | 'declined', note = '') => api(`/drivers/advance-requests/${id}/decide`, { json: { status, note } }),
+  cancelLeave: (id: string) => api(`/drivers/me/leave/${id}`, { method: 'DELETE' }),
+  reviewDoc: (id: string, status: 'checked' | 'rejected', note = '') => api(`/drivers/docs/${id}/review`, { json: { status, note } }),
+  setPhoto: (dataUrl: string) => api('/drivers/me/photo', { json: { dataUrl } }),
+  badge: () => api<{ badge: Badge; verifyUrl: string }>('/drivers/me/badge'),
+  verify: (token: string) => api<{ name: string; role: string; company: string; photo: string | null; valid: boolean; active: boolean; papersOk: boolean; checkedAt: string }>(`/verify-driver/${encodeURIComponent(token)}`),
   rate: (ref: string, stars: number, note: string) => api(`/track/${encodeURIComponent(ref)}/rate`, { json: { stars, note } }),
 }
 

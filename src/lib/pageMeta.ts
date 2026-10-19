@@ -23,6 +23,6 @@ export function pageMeta(pathname: string): { title: string; description: string
   return { title: hit && hit[1] ? `${hit[1]} · Ntemtem` : HOME_TITLE, description: hit?.[2] ?? DEFAULT_DESC }
 }
 /** Pages search engines should skip: private, one-off links and sign-in forms. */
-export const NOINDEX = /^\/(dashboard|admin|pay|doc|r|p|s|broker|reset|signin|join|embed|add-recipient|login|signup|forgot|order|scan|support)(\/|$|\?)/
+export const NOINDEX = /^\/(dashboard|admin|pay|doc|r|p|s|broker|reset|signin|join|embed|add-recipient|login|signup|forgot|order|scan|support|verify)(\/|$|\?)/
 /** Public pages listed in the sitemap. */
 export const SITEMAP_PATHS = ['/', '/for-shippers', '/pricing', '/shippers', '/quote', '/track', '/duty', '/groupage', '/sourcing', '/brokers', '/sailings', '/lanes', '/about', '/contact', '/help', ...HELP.map((a) => `/help/${a.slug}`), '/privacy', '/terms', '/shipper-agreement']

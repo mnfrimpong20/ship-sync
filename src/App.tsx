@@ -29,6 +29,8 @@ const Drivers = lazy(() => import('./pages/Drivers'))
 const RunsList = lazy(() => import('./pages/Routes'))
 const RoutePlanner = lazy(() => import('./pages/RoutePlanner'))
 const MyRuns = lazy(() => import('./pages/MyRuns'))
+const BrokerApp = lazy(() => import('./pages/broker/BrokerApp'))
+const OfficeBrokerInvoice = lazy(() => import('./pages/broker/BrokerMoney').then((m) => ({ default: m.OfficeInvoicePage })))
 const DriverHr = lazy(() => import('./pages/DriverHr'))
 const PayslipPage = lazy(() => import('./pages/DriverHr').then((m) => ({ default: m.PayslipPage })))
 const VerifyDriverPage = lazy(() => import('./pages/DriverHr').then((m) => ({ default: m.VerifyDriverPage })))
@@ -241,11 +243,13 @@ export default function App() {
               <Route path="/dashboard/payslip/:id" element={<PayslipPage />} />
               <Route path="/dashboard/scan" element={<Scan />} />
               <Route path="/dashboard/notifications" element={<Notifications />} />
+              <Route path="/dashboard/broker-invoices/:id" element={<OfficeBrokerInvoice />} />
               <Route path="/admin" element={<Admin />} />
             </Route>
             <Route path="/dashboard/labels" element={<Labels />} />
             <Route path="/r/:token" element={<Receive />} />
             <Route path="/broker/:token" element={<BrokerPortal />} />
+            <Route path="/broker-portal/*" element={<BrokerApp />} />
             <Route path="/s/:token" element={<SupplierPortalPage />} />
             <Route path="/p/:token" element={<PartnerPortal />} />
             <Route path="/add-recipient/:token" element={<AddRecipient />} />

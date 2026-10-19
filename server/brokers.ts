@@ -37,7 +37,7 @@ export const brokerOut = (b: Row, full = false) => ({
   phone: full ? b.phone : '', whatsapp: full ? b.whatsapp : '', email: full ? b.email : '', about: b.about, specialties: J(b.specialties) as string[], fees: J(b.fees) as Record<CargoType, number>, dutyAdvance: !!b.duty_advance,
   rating: Number(b.rating), reviews: Number(b.reviews), verified: !!b.verified, responseHours: Number(b.response_hours), initials: b.initials, hue: b.hue, active: !!b.active, jobs: Number(b.n_jobs ?? 0),
 })
-export const jobOut = (j: Row) => ({
+export const jobOut = (j: Row) => ({ assignedTo: j.assigned_to ?? null, port: j.port ?? '', checklist: (J(j.checklist) ?? {}) as Record<string, boolean>,
   id: j.id, shipmentId: j.shipment_id, shipmentRef: j.ref ?? undefined, customer: j.customer ?? undefined, destination: j.destination ?? undefined, cargo: j.cargo ?? undefined, shipperId: j.shipper_id, shipperName: j.shipper_name ?? undefined,
   broker: { id: j.broker_id, name: j.b_name, company: j.b_company, phone: j.b_phone, whatsapp: j.b_whatsapp, email: j.b_email, initials: j.b_initials, hue: j.b_hue, verified: !!j.b_verified },
   status: j.status as JobStep | 'cancelled' | 'declined', feeUsd: Number(j.fee_usd), dutyLocal: j.duty_local == null ? null : Number(j.duty_local), dutyCurrency: j.duty_currency ?? null, reference: j.reference ?? '', notes: j.notes ?? '', bookedBy: j.booked_by, bookedByRole: j.booked_by_role,
@@ -45,7 +45,7 @@ export const jobOut = (j: Row) => ({
 })
 
 const BROKER_SELECT = `select b.*, (select count(*) from broker_jobs j where j.broker_id = b.id and j.status not in ('cancelled','declined'))::int as n_jobs from brokers b`
-const JOB_SELECT = `select j.*, s.ref, s.customer, s.destination, s.cargo, s.user_id as s_user_id, s.status as s_status, sh.name as shipper_name, b.name as b_name, b.company as b_company, b.phone as b_phone, b.whatsapp as b_whatsapp, b.email as b_email, b.initials as b_initials, b.hue as b_hue, b.verified as b_verified
+export const JOB_SELECT = `select j.*, s.ref, s.customer, s.destination, s.cargo, s.user_id as s_user_id, s.status as s_status, sh.name as shipper_name, b.name as b_name, b.company as b_company, b.phone as b_phone, b.whatsapp as b_whatsapp, b.email as b_email, b.initials as b_initials, b.hue as b_hue, b.verified as b_verified
   from broker_jobs j join shipments s on s.id = j.shipment_id join shippers sh on sh.id = j.shipper_id join brokers b on b.id = j.broker_id`
 
 const zBroker = z.object({
@@ -55,7 +55,30 @@ const zBroker = z.object({
   dutyAdvance: z.boolean().default(false), responseHours: z.number().int().min(1).max(168).default(24), verified: z.boolean().default(false), active: z.boolean().default(true),
 })
 const zBook = z.object({ brokerId: z.string().min(1), note: z.string().trim().max(400).default('') })
-const zStep = z.object({ status: z.enum([...JOB_STEPS, 'declined', 'cancelled']), note: z.string().trim().max(400).default(''), dutyLocal: z.number().min(0).max(1_000_000_000).optional(), dutyCurrency: z.string().trim().max(3).optional(), reference: z.string().trim().max(60).optional(), feeUsd: z.number().min(0).max(100_000).optional() })
+export const zStep = z.object({ status: z.enum([...JOB_STEPS, 'declined', 'cancelled']), note: z.string().trim().max(400).default(''), dutyLocal: z.number().min(0).max(1_000_000_000).optional(), dutyCurrency: z.string().trim().max(3).optional(), reference: z.string().trim().max(60).optional(), feeUsd: z.number().min(0).max(100_000).optional() })
+
+/** Apply a step: timeline, duty confirmation on 'assessed', notifications to both sides. `by` is who did it. */
+export async function advanceJob(db: Db, job: Row, b: z.infer<typeof zStep>, by: string, byRole: 'broker' | 'office' | 'customer' | 'admin', HttpError: Deps['HttpError']) {
+  const order = [...JOB_STEPS] as string[]
+  if (['cancelled', 'declined', 'done'].includes(job.status)) throw new HttpError(409, `This job is already ${jobStepLabels[job.status as JobStep]?.toLowerCase() ?? job.status}.`)
+  if (b.status !== 'cancelled' && b.status !== 'declined' && order.indexOf(b.status) < order.indexOf(job.status)) throw new HttpError(409, 'Jobs only move forward.')
+  if (b.status === 'declined' && byRole !== 'broker') throw new HttpError(403, 'Only the broker can decline.')
+  if (b.status === 'assessed' && (b.dutyLocal == null || !(b.dutyLocal >= 0))) throw new HttpError(400, 'Enter the assessed duty amount.')
+  const timeline = (J(job.timeline) ?? []) as Row[]; timeline.push({ at: new Date().toISOString(), status: b.status, note: b.note, by })
+  await db.query(`update broker_jobs set status = $2, notes = case when $3 = '' then notes else $3 end, duty_local = coalesce($4, duty_local), duty_currency = coalesce($5, duty_currency), reference = coalesce($6, reference), fee_usd = coalesce($7, fee_usd), timeline = $8, updated_at = now() where id = $1`,
+    [job.id, b.status, b.note, b.dutyLocal ?? null, b.dutyCurrency?.toUpperCase() ?? null, b.reference ?? null, b.feeUsd ?? null, JSON.stringify(timeline.slice(-40))])
+  const label = jobStepLabels[b.status]
+  await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [job.shipment_id, job.s_status, job.destination, `Customs clearance (${job.b_name}): ${label}${b.status === 'assessed' && b.dutyLocal != null ? ` — ${(b.dutyCurrency ?? job.duty_currency ?? 'GHS').toUpperCase()} ${b.dutyLocal.toLocaleString()}${b.reference ? ` (${b.reference})` : ''}` : ''}${b.note ? ` — ${b.note}` : ''}`])
+  if (b.status === 'assessed' && b.dutyLocal != null) {
+    // Official assessment → the shipment's duty card shows it instead of the estimate.
+    const { rows: ss } = await db.query<Row>('select duty from shipments where id = $1', [job.shipment_id]); const saved = (J(ss[0]?.duty) as Row | null) ?? {}
+    const confirmed = { amountLocal: b.dutyLocal, currency: (b.dutyCurrency ?? job.duty_currency ?? (job.destination === 'NG' ? 'NGN' : 'GHS')).toUpperCase(), reference: b.reference ?? '', note: b.note || `Assessed via ${job.b_name}`, by: by, at: new Date().toISOString() }
+    await db.query('update shipments set duty = $2 where id = $1', [job.shipment_id, JSON.stringify({ ...saved, confirmed })])
+  }
+  if (byRole !== 'customer' && job.s_user_id) await notify(db, { userId: job.s_user_id, kind: 'customs', title: `${label} — ${job.ref}`, body: b.status === 'assessed' ? `Customs assessed ${(b.dutyCurrency ?? job.duty_currency ?? 'GHS').toUpperCase()} ${(b.dutyLocal ?? 0).toLocaleString()} on your shipment${b.reference ? ` (${b.reference})` : ''}. ${job.b_name} will arrange payment and release.` : b.status === 'declined' ? `${job.b_name} can't take this job${b.note ? `: ${b.note}` : ''}. Pick another broker from the shipment page.` : `${job.b_name}: ${b.note || label.toLowerCase()}.`, link: `/dashboard?tab=shipments&s=${job.shipment_id}`, dedupe: `cust:${job.id}:${b.status}`, emailSubject: `${label} — ${job.ref}` })
+  if (byRole !== 'office') await notifyShipperStaff(db, job.shipper_id, { kind: 'customs', title: `${job.ref}: ${label}`, body: `${job.b_name} · ${job.customer}${b.note ? ` — ${b.note}` : ''}${b.status === 'assessed' ? ` · duty ${(b.dutyCurrency ?? 'GHS').toUpperCase()} ${(b.dutyLocal ?? 0).toLocaleString()}` : ''}`, link: `/dashboard/shipments?q=${job.ref}&b=all`, dedupe: `cust:${job.id}:${b.status}:o` }, ['owner', 'dispatcher', 'agent'])
+  if (byRole !== 'broker') { const { notifyBroker } = await import('./brokerPortal'); await notifyBroker(db, job.broker_id, { title: `${job.ref}: ${jobStepLabels[b.status]}${byRole === 'customer' ? ' (by the customer)' : ' (by the shipper)'}`, body: b.note || `${job.shipper_name ?? ''}`, link: `/broker-portal/jobs/${job.id}` }).catch(() => {}) }
+}
 
 export function mountBrokers(r: Router, d: Deps) {
   const { getDb, requireUser, requireAdmin, HttpError, wrap } = d
@@ -70,28 +93,6 @@ export function mountBrokers(r: Router, d: Deps) {
   const jobFor = async (db: Db, sid: string) => (await db.query<Row>(`${JOB_SELECT} where j.shipment_id = $1 and j.status not in ('cancelled','declined') order by j.created_at desc limit 1`, [sid])).rows[0] ?? null
   const jobById = async (db: Db, id: string) => { const { rows } = await db.query<Row>(`${JOB_SELECT} where j.id = $1`, [id]); if (!rows[0]) throw new HttpError(404, 'Clearance job not found.'); return rows[0] }
   const jobByToken = async (db: Db, token: string) => { const { rows } = await db.query<Row>(`${JOB_SELECT} where j.token = $1`, [token]); if (!rows[0]) throw new HttpError(404, 'This link is not valid.'); return rows[0] }
-
-  /** Apply a step: timeline, duty confirmation on 'assessed', notifications to both sides. `by` is who did it. */
-  const advance = async (db: Db, job: Row, b: z.infer<typeof zStep>, by: string, byRole: 'broker' | 'office' | 'customer' | 'admin') => {
-    const order = [...JOB_STEPS] as string[]
-    if (['cancelled', 'declined', 'done'].includes(job.status)) throw new HttpError(409, `This job is already ${jobStepLabels[job.status as JobStep]?.toLowerCase() ?? job.status}.`)
-    if (b.status !== 'cancelled' && b.status !== 'declined' && order.indexOf(b.status) < order.indexOf(job.status)) throw new HttpError(409, 'Jobs only move forward.')
-    if (b.status === 'declined' && byRole !== 'broker') throw new HttpError(403, 'Only the broker can decline.')
-    if (b.status === 'assessed' && (b.dutyLocal == null || !(b.dutyLocal >= 0))) throw new HttpError(400, 'Enter the assessed duty amount.')
-    const timeline = (J(job.timeline) ?? []) as Row[]; timeline.push({ at: new Date().toISOString(), status: b.status, note: b.note, by })
-    await db.query(`update broker_jobs set status = $2, notes = case when $3 = '' then notes else $3 end, duty_local = coalesce($4, duty_local), duty_currency = coalesce($5, duty_currency), reference = coalesce($6, reference), fee_usd = coalesce($7, fee_usd), timeline = $8, updated_at = now() where id = $1`,
-      [job.id, b.status, b.note, b.dutyLocal ?? null, b.dutyCurrency?.toUpperCase() ?? null, b.reference ?? null, b.feeUsd ?? null, JSON.stringify(timeline.slice(-40))])
-    const label = jobStepLabels[b.status]
-    await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [job.shipment_id, job.s_status, job.destination, `Customs clearance (${job.b_name}): ${label}${b.status === 'assessed' && b.dutyLocal != null ? ` — ${(b.dutyCurrency ?? job.duty_currency ?? 'GHS').toUpperCase()} ${b.dutyLocal.toLocaleString()}${b.reference ? ` (${b.reference})` : ''}` : ''}${b.note ? ` — ${b.note}` : ''}`])
-    if (b.status === 'assessed' && b.dutyLocal != null) {
-      // Official assessment → the shipment's duty card shows it instead of the estimate.
-      const { rows: ss } = await db.query<Row>('select duty from shipments where id = $1', [job.shipment_id]); const saved = (J(ss[0]?.duty) as Row | null) ?? {}
-      const confirmed = { amountLocal: b.dutyLocal, currency: (b.dutyCurrency ?? job.duty_currency ?? (job.destination === 'NG' ? 'NGN' : 'GHS')).toUpperCase(), reference: b.reference ?? '', note: b.note || `Assessed via ${job.b_name}`, by: by, at: new Date().toISOString() }
-      await db.query('update shipments set duty = $2 where id = $1', [job.shipment_id, JSON.stringify({ ...saved, confirmed })])
-    }
-    if (byRole !== 'customer' && job.s_user_id) await notify(db, { userId: job.s_user_id, kind: 'customs', title: `${label} — ${job.ref}`, body: b.status === 'assessed' ? `Customs assessed ${(b.dutyCurrency ?? job.duty_currency ?? 'GHS').toUpperCase()} ${(b.dutyLocal ?? 0).toLocaleString()} on your shipment${b.reference ? ` (${b.reference})` : ''}. ${job.b_name} will arrange payment and release.` : b.status === 'declined' ? `${job.b_name} can't take this job${b.note ? `: ${b.note}` : ''}. Pick another broker from the shipment page.` : `${job.b_name}: ${b.note || label.toLowerCase()}.`, link: `/dashboard?tab=shipments&s=${job.shipment_id}`, dedupe: `cust:${job.id}:${b.status}`, emailSubject: `${label} — ${job.ref}` })
-    if (byRole !== 'office') await notifyShipperStaff(db, job.shipper_id, { kind: 'customs', title: `${job.ref}: ${label}`, body: `${job.b_name} · ${job.customer}${b.note ? ` — ${b.note}` : ''}${b.status === 'assessed' ? ` · duty ${(b.dutyCurrency ?? 'GHS').toUpperCase()} ${(b.dutyLocal ?? 0).toLocaleString()}` : ''}`, link: `/dashboard/shipments?q=${job.ref}&b=all`, dedupe: `cust:${job.id}:${b.status}:o` }, ['owner', 'dispatcher', 'agent'])
-  }
 
   /* ---- public directory ---- */
   r.get('/brokers', wrap(async (req, res) => {
@@ -140,6 +141,7 @@ export function mountBrokers(r: Router, d: Deps) {
     if (broker.email && emailProvider().id !== 'off') { try { await sendEmail(broker.email, `New clearance job — ${s.ref} at ${s.destination === 'NG' ? 'Lagos' : 'Tema'}`, emailTemplate({ name: broker.name, title: `Clearance request: ${s.ref}`, body: `${u.company ?? u.name} booked you to clear ${cargoLabel(s.cargo as CargoType).toLowerCase()} for ${s.customer} (${s.origin} → ${s.destination}). Fee on file: $${fee}. ${b.note ? `Note: ${b.note}` : ''} Open the job to accept it and keep everyone updated.`, link, cta: 'Open the job' })) } catch (e) { console.error('[brokers] email', e) } }
     if (!owner && s.user_id) await notify(db, { userId: s.user_id, kind: 'customs', title: `Customs broker booked for ${s.ref}`, body: `${broker.name}${broker.company ? ` (${broker.company})` : ''} will clear your goods at ${s.destination === 'NG' ? 'Lagos' : 'Tema'}. Clearance fee $${fee}.`, link: `/dashboard?tab=shipments&s=${s.id}`, dedupe: `cust:${id}:booked` })
     if (!office) await notifyShipperStaff(db, s.shipper_id, { kind: 'customs', title: `${s.customer} booked ${broker.name} to clear ${s.ref}`, body: `Clearance fee $${fee}. The broker's job link is on the shipment.`, link: `/dashboard/shipments?q=${s.ref}&b=all`, dedupe: `cust:${id}:booked:o` }, ['owner', 'dispatcher', 'agent'])
+    { const { notifyBroker } = await import('./brokerPortal'); await notifyBroker(db, broker.id, { title: `New clearance request: ${s.ref}`, body: `${u.company ?? u.name} · ${cargoLabel(s.cargo as CargoType)} · fee $${fee}${b.note ? ` — ${b.note}` : ''}`, link: `/broker-portal/jobs/${id}` }).catch(() => {}) }
     res.status(201).json({ job: jobOut(await jobById(db, id)), portalLink: link })
   }))
   r.get('/customs/jobs/:id/link', wrap(async (req, res) => {
@@ -150,7 +152,7 @@ export function mountBrokers(r: Router, d: Deps) {
     const db = await getDb(); const job = await jobById(db, String(req.params.id)); const { u, office, owner } = await access(db, req, job.shipment_id)
     const b = zStep.parse(req.body)
     if (owner && !office && !u.admin && b.status !== 'cancelled') throw new HttpError(403, 'Only the broker or the shipper updates the job; you can cancel it.')
-    await advance(db, job, b, u.name, u.admin && !office ? 'admin' : office ? 'office' : 'customer')
+    await advanceJob(db, job, b, u.name, u.admin && !office ? 'admin' : office ? 'office' : 'customer', HttpError)
     res.json({ job: jobOut(await jobById(db, job.id)) })
   }))
 
@@ -168,7 +170,7 @@ export function mountBrokers(r: Router, d: Deps) {
   r.post('/broker/:token/step', wrap(async (req, res) => {
     const db = await getDb(); const job = await jobByToken(db, String(req.params.token))
     const b = zStep.parse(req.body); if (b.status === 'cancelled') throw new HttpError(403, 'Brokers decline rather than cancel.')
-    await advance(db, job, b, job.b_name, 'broker')
+    await advanceJob(db, job, b, job.b_name, 'broker', HttpError)
     res.json({ job: jobOut(await jobById(db, job.id)) })
   }))
 

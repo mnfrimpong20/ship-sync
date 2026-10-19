@@ -11,6 +11,7 @@ import { mountOps } from './ops'
 import { mountDriverOps, driverForShipment } from './driverOps'
 import { mountDriverHr } from './driverHr'
 import { mountDriverHr2 } from './driverHr2'
+import { mountBrokerPortal } from './brokerPortal'
 import { mountDirectory } from './directory'
 import { mountInsights } from './insights'
 import { mountAnalytics } from './analytics'
@@ -852,6 +853,7 @@ export function apiRouter() {
   mountDriverOps(r, { getDb, requireUser, HttpError, wrap })
   mountDriverHr(r, { getDb, requireUser, HttpError, wrap })
   mountDriverHr2(r, { getDb, requireUser, HttpError, wrap })
+  mountBrokerPortal(r, { getDb, requireUser, HttpError, wrap })
   mountOps(r, { getDb, requireUser, createSession, loadUserWithCompany, HttpError, wrap, loadShipments })
   mountInsights(r, { getDb, requireUser, HttpError, wrap })
   mountAnalytics(r, { getDb, requireUser, HttpError, wrap })

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { BadgeCheck, Check, Copy, Landmark, Phone, X } from 'lucide-react'
+import { BadgeCheck, Check, Copy, FileText, Landmark, MessageSquare, Phone, Send, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { bpApi, type BpMessage } from '../lib/brokerPortal'
 import { brokersApi, jobStepLabels, JOB_STEPS, type Broker, type JobStep, type StepInput } from '../lib/brokers'
 import { Avatar, money } from './ui'
 import { Confirm } from './board'
@@ -47,6 +49,7 @@ export function CustomsCard({ shipmentId, destination }: { shipmentId: string; d
             {d.canManage && <button onClick={copyLink} className="btn-ghost !min-h-8 !px-2.5 text-xs"><Copy size={12} aria-hidden="true" /> Broker link</button>}
             {!['done', 'cancelled', 'declined'].includes(j.status) && <button onClick={() => setCancelling(true)} className="btn-ghost !min-h-8 !px-2.5 text-xs text-danger"><X size={12} aria-hidden="true" /> Cancel</button>}
           </div>
+          <BrokerChat jobId={j.id} brokerName={j.broker.name} office={d.canManage} />
           {stepping && (
             <form onSubmit={(e) => { e.preventDefault(); void act(() => brokersApi.step(j.id, stepping), 'Updated — both sides notified.', 'step') }} className="mt-3 grid gap-2 rounded-lg border border-border bg-surface-2/40 p-3" aria-label="Update clearance">
               <p className="text-xs font-semibold">{jobStepLabels[stepping.status]}</p>
@@ -74,6 +77,30 @@ export function CustomsCard({ shipmentId, destination }: { shipmentId: string; d
       )}
       {picking && <Confirm title={`Book ${picking.name} for this shipment?`} danger={false} body={<div><p>{picking.company || 'Independent agent'} · {picking.ports.join(', ')} · clearance fee <strong>{money(picking.feeUsd ?? 0)}</strong> (paid to the broker{picking.dutyAdvance ? '; they can advance the duty' : ''}). They get the shipment details and documents and update this card as it clears.</p><input aria-label="Note for the broker" className="input-dark mt-3 !min-h-9 w-full text-sm" placeholder="Anything the broker should know (optional)" value={note} onChange={(e) => setNote(e.target.value)} /></div>} confirmLabel="Book broker" busy={busy === 'book'} onClose={() => setPicking(null)} onConfirm={() => act(() => brokersApi.book(shipmentId, picking.id, note), `${picking.name} booked — they've been sent the job.`, 'book')} />}
       {cancelling && j && <Confirm title="Cancel this clearance job?" body={<p>{j.broker.name} will be told. You can book another broker afterwards.</p>} confirmLabel="Cancel job" busy={busy === 'cancel'} onClose={() => setCancelling(false)} onConfirm={() => act(() => brokersApi.step(j.id, { status: 'cancelled', note: 'Cancelled from the shipment page' }), 'Job cancelled.', 'cancel')} />}
+    </div>
+  )
+}
+
+/** Messages with the broker on this job, plus the broker's invoices for it (office only). */
+function BrokerChat({ jobId, brokerName, office }: { jobId: string; brokerName: string; office: boolean }) {
+  const [d, setD] = useState<{ messages: BpMessage[]; invoices: { id: string; number: string; status: string; totalUsd: number; dueAt: string | null }[] } | null>(null)
+  const [open, setOpen] = useState(false); const [body, setBody] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
+  const load = () => bpApi.officeMessages(jobId).then(setD).catch(() => setD({ messages: [], invoices: [] }))
+  useEffect(() => { void load() }, [jobId]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!d) return null
+  const shown = open ? d.messages : d.messages.slice(-2)
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-surface-2/30 p-3" data-testid="broker-chat">
+      <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-muted"><MessageSquare size={13} aria-hidden="true" /> Messages with {brokerName}</p>
+      {d.messages.length > 2 && !open && <button onClick={() => setOpen(true)} className="mb-1 block text-xs text-gold-deep hover:underline">Show all {d.messages.length}</button>}
+      <ul className="space-y-1.5">{shown.length ? shown.map((m) => <li key={m.id} className={`max-w-[92%] rounded-xl px-2.5 py-1.5 text-xs ${m.side === 'broker' ? 'bg-surface-2' : 'ml-auto bg-gold/15'}`}><span className="block text-[11px] text-text-muted">{m.from} · {fmt(m.at)}</span><span className="whitespace-pre-line">{m.body}</span></li>) : <li className="text-xs text-text-muted">No messages yet — ask the broker anything about this clearance.</li>}</ul>
+      <form onSubmit={async (e) => { e.preventDefault(); if (!body.trim()) return; setBusy(true); setErr(''); try { await bpApi.officeSend(jobId, body.trim()); setBody(''); setOpen(true); await load() } catch (er) { setErr(er instanceof Error ? er.message : 'Could not send.') } finally { setBusy(false) } }} className="mt-2 flex gap-2">
+        <label className="sr-only" htmlFor={`bc-${jobId}`}>Message to {brokerName}</label>
+        <input id={`bc-${jobId}`} className="input-dark !min-h-9 flex-1 text-sm" placeholder={`Message ${brokerName.split(' ')[0]}…`} value={body} onChange={(e) => setBody(e.target.value)} data-testid="broker-chat-body" />
+        <button disabled={busy || !body.trim()} className="btn-gold !min-h-9 !px-2.5" aria-label="Send"><Send size={14} aria-hidden="true" /></button>
+      </form>
+      {err && <p role="alert" className="mt-1 text-xs text-danger">{err}</p>}
+      {office && d.invoices.length > 0 && <ul className="mt-3 space-y-1 border-t border-border pt-2 text-xs" data-testid="broker-invoices">{d.invoices.map((i) => <li key={i.id} className="flex items-center justify-between gap-2"><Link to={`/dashboard/broker-invoices/${i.id}`} className="inline-flex items-center gap-1 font-semibold text-gold-deep hover:underline"><FileText size={12} aria-hidden="true" /> Invoice {i.number}</Link><span className="tabular-nums">{money(i.totalUsd)} · <span className={i.status === 'paid' ? 'text-teal' : 'text-text-muted'}>{i.status === 'paid' ? 'paid' : `due ${i.dueAt ?? '—'}`}</span></span></li>)}</ul>}
     </div>
   )
 }

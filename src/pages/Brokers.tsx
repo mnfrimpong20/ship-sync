@@ -269,7 +269,7 @@ export function BrokerPortal() {
   return (
     <div className="min-h-dvh bg-bg text-text">
       <div className="container-x max-w-2xl py-8 md:py-12">
-        <div className="flex items-center justify-between gap-3"><Logo /><span className="text-xs text-text-muted">Broker portal</span></div>
+        <div className="flex items-center justify-between gap-3"><Logo /><Link to="/broker-portal" className="text-sm font-semibold text-gold-deep underline" data-testid="bp-dashboard-link">Sign in to your broker dashboard</Link></div>
         <motion.div initial="hidden" animate="show" variants={stagger} className="mt-6">
           <motion.div variants={fadeUp} className="card-dark p-5" data-testid="portal-job">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow mb-1">Clearance job</p><h1 className="!text-2xl">{s.ref} · {s.cargoLabel}</h1><p className="mt-1 text-sm text-text-muted">For {s.customer} · shipped by {j.shipperName} · {s.pieces ? `${s.pieces} piece${s.pieces === 1 ? '' : 's'} · ` : ''}shipment status: {s.status.replace('_', ' ')}</p></div><Pill tone={j.status === 'done' ? 'green' : closed ? 'danger' : 'gold'}>{jobStepLabels[j.status]}</Pill></div>

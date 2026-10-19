@@ -5,7 +5,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Bot, LifeBuoy, Anchor, BarChart3, LineChart, Calculator, Megaphone, Plug, CreditCard, History, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X, Printer } from 'lucide-react'
-import { Avatar, Logo } from './ui'
+import { Avatar, Logo, Mark } from './ui'
 import { PlatformBanners } from './PlatformBanners'
 import { NotificationBell } from './NotificationBell'
 import { QuickSearch } from './QuickSearch'
@@ -15,7 +15,7 @@ import { clientsApi } from '../lib/clients'
 import { SOURCING_SHIPPER } from '../lib/sourcing'
 import { roleAllows, roleHome } from '../lib/ops'
 import { scanQueue, startQueueSync, SCAN_QUEUE_EVENT } from '../lib/scan'
-import { Type, WifiOff, CloudUpload, CalendarDays, MessageSquare, FolderArchive, Repeat, AlertTriangle, CircleUser, Contact, Home } from 'lucide-react'
+import { MoreHorizontal, PanelLeftClose, PanelLeftOpen, Type, WifiOff, CloudUpload, CalendarDays, MessageSquare, FolderArchive, Repeat, AlertTriangle, CircleUser, Contact, Home } from 'lucide-react'
 import { hubApi } from '../lib/customerHub'
 import { refreshSummary, useSummary } from '../lib/account'
 
@@ -31,6 +31,10 @@ export default function AppShell() {
   const outlet = useOutlet()
   const nav = useNavigate()
   const [open, setOpen] = useState(false)
+  // Desktop sidebar can shrink to an icon strip; remembered on this device.
+  const [rail, setRail] = useState(() => { try { return localStorage.getItem('ss-nav-rail') === '1' } catch { return false } })
+  const toggleRail = () => setRail((v) => { try { localStorage.setItem('ss-nav-rail', v ? '0' : '1') } catch { /* private mode */ } return !v })
+  const [tip, setTip] = useState<{ label: string; top: number } | null>(null)
   const [menu, setMenu] = useState(false)
   const [dueReminders, setDueReminders] = useState(0)
   const t = useT()
@@ -132,50 +136,82 @@ export default function AppShell() {
     if (it.end) return loc.search === '' || (!loc.search.includes('view=') && !loc.search.includes('tab='))
     return true
   }
-  const NavItems = ({ list }: { list: Item[] }) => (
+  const showTip = (label: string) => (e: React.SyntheticEvent<HTMLElement>) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ label, top: r.top + r.height / 2 }) }
+  const NavItems = ({ list, compact = false }: { list: Item[]; compact?: boolean }) => (
     <ul className="space-y-0.5">
       {list.map((it) => {
-        const act = isActive(it)
+        const act = isActive(it); const label = t(it.label)
         return (
           <li key={it.to}>
-            <NavLink to={it.to} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors focus-ring ${act ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} aria-current={act ? 'page' : undefined}>
-              <it.icon size={17} aria-hidden="true" /><span className="flex-1">{t(it.label)}</span>
-              {it.badge ? <span className={`rounded-full px-1.5 text-xs font-bold ${act ? 'bg-gold text-on-accent' : 'bg-surface-2 text-text'}`}>{it.badge}</span> : null}
+            <NavLink to={it.to} className={`relative flex min-h-10 items-center rounded-lg text-sm transition-colors focus-ring ${compact ? 'mx-auto w-11 justify-center' : 'gap-3 px-3'} ${act ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} aria-current={act ? 'page' : undefined}
+              {...(compact ? { 'aria-label': it.badge ? `${label} (${it.badge})` : label, onMouseEnter: showTip(label), onFocus: showTip(label), onMouseLeave: () => setTip(null), onBlur: () => setTip(null) } : {})}>
+              <it.icon size={compact ? 19 : 17} aria-hidden="true" />
+              {compact
+                ? (it.badge ? <span className={`absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full px-1 text-[11px] font-bold leading-none ${act ? 'bg-gold text-on-accent' : 'bg-gold/90 text-on-accent'}`} aria-hidden="true">{typeof it.badge === 'number' && it.badge > 99 ? '99+' : typeof it.badge === 'string' ? '•' : it.badge}</span> : null)
+                : <><span className="flex-1">{label}</span>{it.badge ? <span className={`rounded-full px-1.5 text-xs font-bold ${act ? 'bg-gold text-on-accent' : 'bg-surface-2 text-text'}`}>{it.badge}</span> : null}</>}
             </NavLink>
           </li>
         )
       })}
     </ul>
   )
-  const sidebar = (
-    <div className="flex h-full flex-col">
-      <div className="flex h-16 items-center justify-between px-5"><Logo partner={isShipper} /><button onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-lg text-text-muted lg:hidden focus-ring" aria-label="Close menu"><X size={18} /></button></div>
-      <div className="flex items-center gap-2.5 px-4 pb-3">
-        {isShipper && company && <Avatar initials={company.initials} hue={company.hue} logo={company.logo} size={32} />}
-        <div className="min-w-0"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : t('Customer')}</p>{isShipper && user.staffRole && <p className="text-xs text-text-muted">{user.staffRole.charAt(0).toUpperCase() + user.staffRole.slice(1)}</p>}</div>
+  const renderSidebar = (compact: boolean) => {
+    const groups = Array.from(new Set(visible.filter((i) => !i.more).map((i) => i.group).filter(Boolean))) as string[]
+    const rest = [...visible, ...tools].filter((i) => i.more); const open2 = moreOpen || rest.some(isActive)
+    const Head = ({ label, first }: { label: string; first?: boolean }) => compact ? (first ? null : <div className="mx-auto my-2 h-px w-8 bg-border" aria-hidden="true" />) : <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-text-muted">{t(label)}</p>
+    return (
+      <div className="flex h-full flex-col">
+        <div className={`flex h-16 items-center ${compact ? 'justify-center' : 'justify-between px-5'}`}>
+          {compact ? <Link to="/" className="rounded-md focus-ring" aria-label={isShipper ? 'Ntemtem Partner home' : 'Ntemtem home'}><Mark size={34} partner={isShipper} /></Link> : <Logo partner={isShipper} />}
+          <button onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-lg text-text-muted lg:hidden focus-ring" aria-label="Close menu"><X size={18} /></button>
+        </div>
+        {compact
+          ? (isShipper && company ? <div className="flex justify-center pb-3" title={user.company ?? ''}><Avatar initials={company.initials} hue={company.hue} logo={company.logo} size={32} /></div> : null)
+          : <div className="flex items-center gap-2.5 px-4 pb-3">
+              {isShipper && company && <Avatar initials={company.initials} hue={company.hue} logo={company.logo} size={32} />}
+              <div className="min-w-0"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : t('Customer')}</p>{isShipper && user.staffRole && <p className="text-xs text-text-muted">{user.staffRole.charAt(0).toUpperCase() + user.staffRole.slice(1)}</p>}</div>
+            </div>}
+        <nav className={`flex-1 overflow-y-auto overflow-x-hidden ${compact ? 'px-2 space-y-1' : `px-3 ${isShipper ? 'space-y-5' : 'space-y-3.5'}`}`} aria-label="Application" onScroll={() => setTip(null)}>
+          <NavItems list={visible.filter((i) => !i.group && !i.more)} compact={compact} />
+          {groups.map((g) => <div key={g}><Head label={g} /><NavItems list={visible.filter((i) => i.group === g && !i.more)} compact={compact} /></div>)}
+          {tools.some((i) => !i.more) && <div><Head label="Tools" /><NavItems list={tools.filter((i) => !i.more)} compact={compact} /></div>}
+          {rest.length > 0 && (
+            <div data-testid="nav-more">
+              {compact && <div className="mx-auto my-2 h-px w-8 bg-border" aria-hidden="true" />}
+              <button type="button" onClick={() => toggleMore()} aria-expanded={open2}
+                className={`flex min-h-10 items-center rounded-lg text-sm text-text-muted hover:bg-surface-2 hover:text-text focus-ring ${compact ? 'mx-auto w-11 justify-center' : 'w-full gap-3 px-3'}`}
+                {...(compact ? { 'aria-label': open2 ? t('Less') : t('More'), onMouseEnter: showTip(open2 ? t('Less') : t('More')), onFocus: showTip(open2 ? t('Less') : t('More')), onMouseLeave: () => setTip(null), onBlur: () => setTip(null) } : {})}>
+                {compact ? <MoreHorizontal size={19} aria-hidden="true" /> : <><ChevronDown size={17} className={`transition-transform ${open2 ? 'rotate-180' : ''}`} aria-hidden="true" /><span className="flex-1 text-left">{open2 ? t('Less') : t('More')}</span></>}
+              </button>
+              {open2 && <NavItems list={rest} compact={compact} />}
+            </div>
+          )}
+        </nav>
+        <div className={`space-y-0.5 border-t border-border ${compact ? 'px-2 py-2' : 'p-3'}`}>
+          {isShipper && (compact
+            ? <Link to="/" className="mx-auto grid h-10 w-11 place-items-center rounded-lg text-text-muted hover:bg-surface-2 hover:text-text focus-ring" aria-label="Ntemtem website" onMouseEnter={showTip('Ntemtem website')} onFocus={showTip('Ntemtem website')} onMouseLeave={() => setTip(null)} onBlur={() => setTip(null)}><Globe size={19} aria-hidden="true" /></Link>
+            : <Link to="/" className="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm text-text-muted hover:bg-surface-2 hover:text-text focus-ring"><Globe size={17} aria-hidden="true" /> Ntemtem website <ExternalLink size={12} className="ml-auto" aria-hidden="true" /></Link>)}
+          <button type="button" onClick={() => { setTip(null); toggleRail() }} aria-expanded={!compact} aria-controls="portal-sidebar"
+            className={`hidden min-h-10 items-center rounded-lg text-sm text-text-muted hover:bg-surface-2 hover:text-text focus-ring lg:flex ${compact ? 'mx-auto w-11 justify-center' : 'w-full gap-3 px-3'}`}
+            {...(compact ? { 'aria-label': t('Expand menu'), onMouseEnter: showTip(t('Expand menu')), onFocus: showTip(t('Expand menu')), onMouseLeave: () => setTip(null), onBlur: () => setTip(null) } : {})}
+            data-testid="rail-toggle">
+            {compact ? <PanelLeftOpen size={19} aria-hidden="true" /> : <><PanelLeftClose size={17} aria-hidden="true" /><span className="flex-1 text-left">{t('Collapse menu')}</span></>}
+          </button>
+        </div>
       </div>
-      <nav className={`flex-1 overflow-y-auto px-3 ${isShipper ? 'space-y-5' : 'space-y-3.5'}`} aria-label="Application">
-        <NavItems list={visible.filter((i) => !i.group && !i.more)} />
-        {Array.from(new Set(visible.filter((i) => !i.more).map((i) => i.group).filter(Boolean))).map((g) => <div key={g}><p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-text-muted">{t(g!)}</p><NavItems list={visible.filter((i) => i.group === g && !i.more)} /></div>)}
-        {tools.some((i) => !i.more) && <div><p className="mb-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-text-muted">{t('Tools')}</p><NavItems list={tools.filter((i) => !i.more)} /></div>}
-        {[...visible, ...tools].some((i) => i.more) && (() => { const rest = [...visible, ...tools].filter((i) => i.more); const open2 = moreOpen || rest.some(isActive); return (
-          <div data-testid="nav-more"><button type="button" onClick={() => toggleMore()} aria-expanded={open2} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-text-muted hover:bg-surface-2 hover:text-text focus-ring"><ChevronDown size={17} className={`transition-transform ${open2 ? 'rotate-180' : ''}`} aria-hidden="true" /><span className="flex-1 text-left">{open2 ? t('Less') : t('More')}</span></button>{open2 && <NavItems list={rest} />}</div>) })()}
-      </nav>
- {isShipper && <div className="border-t border-border p-3">
-        <Link to="/" className="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm text-text-muted hover:bg-surface-2 hover:text-text focus-ring"><Globe size={17} aria-hidden="true" /> Ntemtem website <ExternalLink size={12} className="ml-auto" aria-hidden="true" /></Link>
-      </div>}
-    </div>
-  )
+    )
+  }
 
   return (
-    <div className={`min-h-screen bg-bg text-text lg:grid lg:grid-cols-[256px_minmax(0,1fr)] ${isShipper ? 'ss-partner' : ''}`}>
+    <div className={`min-h-screen bg-bg text-text lg:grid ${rail ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[256px_minmax(0,1fr)]'} ${isShipper ? 'ss-partner' : ''}`}>
       <a href="#main" onClick={(e) => { e.preventDefault(); const m = document.getElementById('main'); m?.focus(); m?.scrollIntoView() }} className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-gold focus:px-4 focus:py-2 focus:font-semibold focus:text-on-accent" data-testid="skip-link">{t('Skip to content')}</a>
-      <aside aria-label="Portal menu" className="ss-sidebar no-print sticky top-0 hidden h-screen border-r border-border bg-surface/60 lg:block">{sidebar}</aside>
+      <aside id="portal-sidebar" aria-label="Portal menu" className="ss-sidebar no-print sticky top-0 hidden h-screen border-r border-border bg-surface/60 lg:block" data-rail={rail ? '1' : '0'}>{renderSidebar(rail)}</aside>
+      {rail && tip && <div role="tooltip" className="pointer-events-none fixed left-[80px] z-[80] -translate-y-1/2 whitespace-nowrap rounded-lg bg-ink px-2.5 py-1.5 text-sm font-medium text-white shadow-lg" style={{ top: tip.top }} data-testid="rail-tip">{tip.label}</div>}
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 lg:hidden">
             <button className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} aria-label="Close menu" />
-            <motion.aside aria-label="Portal menu" initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }} className="ss-sidebar absolute inset-y-0 left-0 w-72 border-r border-border bg-bg">{sidebar}</motion.aside>
+            <motion.aside aria-label="Portal menu" initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }} className="ss-sidebar absolute inset-y-0 left-0 w-72 border-r border-border bg-bg">{renderSidebar(false)}</motion.aside>
           </motion.div>
         )}
       </AnimatePresence>

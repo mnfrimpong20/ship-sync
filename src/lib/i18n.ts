@@ -58,6 +58,7 @@ const FR: Record<string, string> = {
   'Quotes & wins': 'Devis et succès', 'Operations': 'Opérations', 'Good morning': 'Bonjour', 'Good afternoon': 'Bon après-midi', 'Good evening': 'Bonsoir',
   '1 thing needs attention today.': '1 point demande votre attention aujourd’hui.', '{n} things need attention today.': '{n} points demandent votre attention aujourd’hui.', '{n} to look at, nothing urgent.': '{n} à regarder, rien d’urgent.', 'Everything is on track.': 'Tout est en ordre.',
   'Workspace': 'Espace de travail', 'Edit profile': 'Modifier le profil', 'View public profile': 'Voir le profil public',
+  'Collapse menu': 'Réduire le menu', 'Expand menu': 'Agrandir le menu',
   // display settings
   'Display & language': 'Affichage et langue', 'Text size': 'Taille du texte', 'Normal': 'Normale', 'Large': 'Grande', 'Larger': 'Très grande', 'Theme': 'Thème', 'Light': 'Clair', 'Dark': 'Sombre', 'Match my device': 'Comme mon appareil', 'Language': 'Langue',
   'Saved to your account, so it follows you to every device.': 'Enregistré sur votre compte : vous le retrouvez sur tous vos appareils.',

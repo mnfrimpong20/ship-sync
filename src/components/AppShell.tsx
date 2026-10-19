@@ -35,6 +35,12 @@ export default function AppShell() {
   const [rail, setRail] = useState(() => { try { return localStorage.getItem('ss-nav-rail') === '1' } catch { return false } })
   const toggleRail = () => setRail((v) => { try { localStorage.setItem('ss-nav-rail', v ? '0' : '1') } catch { /* private mode */ } return !v })
   const [tip, setTip] = useState<{ label: string; top: number } | null>(null)
+  // Sidebar sections the person folded away (by heading), remembered on this device.
+  const [folded, setFolded] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('ss-nav-folded') ?? '[]') } catch { return [] } })
+  // Page visits count up; a section folded before the latest visit reopens while you're on one of its pages.
+  const [navTick, setNavTick] = useState(0); const [foldTick, setFoldTick] = useState<Record<string, number>>({})
+  useEffect(() => { setNavTick((n) => n + 1) }, [loc.pathname, loc.search])
+  const toggleFold = (g: string) => { setFoldTick((m) => ({ ...m, [g]: navTick })); setFolded((f) => { const n = f.includes(g) ? f.filter((x) => x !== g) : [...f, g]; try { localStorage.setItem('ss-nav-folded', JSON.stringify(n)) } catch { /* private mode */ } return n }) }
   const [menu, setMenu] = useState(false)
   const [dueReminders, setDueReminders] = useState(0)
   const t = useT()
@@ -158,7 +164,24 @@ export default function AppShell() {
   const renderSidebar = (compact: boolean) => {
     const groups = Array.from(new Set(visible.filter((i) => !i.more).map((i) => i.group).filter(Boolean))) as string[]
     const rest = [...visible, ...tools].filter((i) => i.more); const open2 = moreOpen || rest.some(isActive)
-    const Head = ({ label, first }: { label: string; first?: boolean }) => compact ? (first ? null : <div className="mx-auto my-2 h-px w-8 bg-border" aria-hidden="true" />) : <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-text-muted">{t(label)}</p>
+    /** A section: heading button that folds its links away. Going to a page inside a folded section opens it again. */
+    const Section = ({ label, items }: { label: string; items: Item[] }) => {
+      if (compact) return <div><div className="mx-auto my-2 h-px w-8 bg-border" aria-hidden="true" /><NavItems list={items} compact /></div>
+      const here = items.some(isActive); const shut = folded.includes(label) && !(here && (foldTick[label] ?? -1) < navTick)
+      const id = `nav-sec-${label.replace(/\W+/g, '-').toLowerCase()}`
+      const count = items.reduce((n, i) => n + (typeof i.badge === 'number' ? i.badge : 0), 0)
+      return (
+        <div data-testid="nav-section">
+          <button type="button" onClick={() => (folded.includes(label) && !shut ? setFoldTick((m) => ({ ...m, [label]: navTick })) : toggleFold(label))} aria-expanded={!shut} aria-controls={id}
+            className="group flex min-h-8 w-full items-center gap-2 rounded-md px-3 text-xs font-semibold uppercase tracking-wider text-text-muted hover:bg-surface-2 hover:text-text focus-ring" data-testid="nav-section-toggle">
+            <span className="flex-1 text-left">{t(label)}</span>
+            {shut && count > 0 && <span className="rounded-full bg-gold/20 px-1.5 text-[11px] font-bold normal-case tracking-normal text-gold-deep" aria-label={`${count} waiting`}>{count}</span>}
+            <ChevronDown size={14} className={`transition-transform ${shut ? '-rotate-90' : ''}`} aria-hidden="true" />
+          </button>
+          {!shut && <div id={id} className="mt-0.5"><NavItems list={items} /></div>}
+        </div>
+      )
+    }
     return (
       <div className="flex h-full flex-col">
         <div className={`flex h-16 items-center ${compact ? 'justify-center' : 'justify-between px-5'}`}>
@@ -171,10 +194,10 @@ export default function AppShell() {
               {isShipper && company && <Avatar initials={company.initials} hue={company.hue} logo={company.logo} size={32} />}
               <div className="min-w-0"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : t('Customer')}</p>{isShipper && user.staffRole && <p className="text-xs text-text-muted">{user.staffRole.charAt(0).toUpperCase() + user.staffRole.slice(1)}</p>}</div>
             </div>}
-        <nav className={`flex-1 overflow-y-auto overflow-x-hidden ${compact ? 'px-2 space-y-1' : `px-3 ${isShipper ? 'space-y-5' : 'space-y-3.5'}`}`} aria-label="Application" onScroll={() => setTip(null)}>
+        <nav className={`flex-1 overflow-y-auto overflow-x-hidden ${compact ? 'px-2 space-y-1' : `px-3 ${isShipper ? 'space-y-3' : 'space-y-2.5'}`}`} aria-label="Application" onScroll={() => setTip(null)}>
           <NavItems list={visible.filter((i) => !i.group && !i.more)} compact={compact} />
-          {groups.map((g) => <div key={g}><Head label={g} /><NavItems list={visible.filter((i) => i.group === g && !i.more)} compact={compact} /></div>)}
-          {tools.some((i) => !i.more) && <div><Head label="Tools" /><NavItems list={tools.filter((i) => !i.more)} compact={compact} /></div>}
+          {groups.map((g) => <Section key={g} label={g} items={visible.filter((i) => i.group === g && !i.more)} />)}
+          {tools.some((i) => !i.more) && <Section label="Tools" items={tools.filter((i) => !i.more)} />}
           {rest.length > 0 && (
             <div data-testid="nav-more">
               {compact && <div className="mx-auto my-2 h-px w-8 bg-border" aria-hidden="true" />}

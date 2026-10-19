@@ -31,7 +31,7 @@ export function AdminPayments() {
       <p className="mt-1 text-text-muted">Customers pay Ntemtem; funds are released to the shipper’s balance at the milestone below, less the take-rate. Payouts are sent by bank transfer and marked here.</p>
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Volume" value={usd(d.totals.volume)} hint={`Platform fees ${usd(d.totals.fees)}`} icon={Wallet} />
         <StatCard label="In escrow" value={usd(d.totals.held)} hint="Awaiting release" icon={Lock} />
         <StatCard label="Owed to shippers" value={usd(d.totals.owed)} hint="Released, not yet requested" icon={Banknote} />
@@ -98,7 +98,7 @@ export function AdminPayments() {
           <label className="mt-3 block text-sm">Release funds when the shipment is<select className="input-dark mt-1 !min-h-9 w-full text-sm" value={st.releaseOn} onChange={(e) => setSt({ ...st, releaseOn: e.target.value as PaymentSettings['releaseOn'] })}><option value="in_transit">In transit (sailed / flown)</option><option value="delivered">Delivered</option></select></label>
           <label className="mt-3 block text-xs text-text-muted">Note shown to customers<textarea rows={3} className="input-dark mt-1 w-full py-2 text-sm" value={st.customerNote} onChange={(e) => setSt({ ...st, customerNote: e.target.value })} /></label>
           <label className="mt-3 block text-xs text-text-muted">Note shown to shippers<textarea rows={3} className="input-dark mt-1 w-full py-2 text-sm" value={st.payoutNote} onChange={(e) => setSt({ ...st, payoutNote: e.target.value })} /></label>
-          <p className="mt-4 text-[11px] text-text-muted">Receivers pay destination charges by mobile money through Paystack — see Receiver mobile money below. <Link to="/dashboard/payments" className="text-gold-deep hover:underline">Shipper view →</Link></p>
+          <p className="mt-4 text-xs text-text-muted">Receivers pay destination charges by mobile money through Paystack — see Receiver mobile money below. <Link to="/dashboard/payments" className="text-gold-deep hover:underline">Shipper view →</Link></p>
         </div>
       </div>
     </section>

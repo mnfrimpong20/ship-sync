@@ -56,7 +56,7 @@ export function ExportCard({ shipmentId }: { shipmentId: string }) {
           <label className="text-xs text-text-muted">Note<input className="input-dark mt-1 !min-h-9 text-sm" value={f.note} onChange={(x) => setF({ ...f, note: x.target.value })} placeholder="Filed by our broker…" /></label>
           {error && <p role="alert" className="text-xs text-danger sm:col-span-2">{error}</p>}
           <div className="flex items-center justify-end gap-2 sm:col-span-2">{ok && <span className="text-xs text-teal">{ok}</span>}<button disabled={busy} className="btn-gold !min-h-8 !px-3 text-xs" data-testid="export-save">{busy ? 'Saving…' : 'Save filing'}</button></div>
-          <p className="text-[11px] text-text-muted sm:col-span-2">File through AESDirect (ACE) or your customs broker. The shipment can’t be moved to “At origin port” until this is cleared. {e.filedBy ? `Last recorded by ${e.filedBy}${e.filedAt ? ` on ${fmtDate(e.filedAt)}` : ''}.` : ''}</p>
+          <p className="text-xs text-text-muted sm:col-span-2">File through AESDirect (ACE) or your customs broker. The shipment can’t be moved to “At origin port” until this is cleared. {e.filedBy ? `Last recorded by ${e.filedBy}${e.filedAt ? ` on ${fmtDate(e.filedAt)}` : ''}.` : ''}</p>
         </form>
       ) : e.cleared ? null : <p className="mt-2 text-xs text-text-muted">Your shipper files this with US Customs. Keep your ID{e.vehicle ? ' and the original title' : ''} ready.</p>}
     </div>

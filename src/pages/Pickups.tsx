@@ -33,7 +33,7 @@ function Availability({ onSaved }: { onSaved: (msg: string) => void }) {
       <ul className="mt-3 space-y-2">
         {wins === null && <li className="text-sm text-text-muted">Loading…</li>}
         {wins?.map((w, i) => (
-          <li key={i} className={`grid grid-cols-[auto_1fr] items-center gap-2 rounded-lg border border-border p-2 sm:grid-cols-[84px_minmax(0,1fr)_10px_minmax(0,1fr)_minmax(0,1.3fr)_48px_auto_auto] ${w.active ? '' : 'opacity-60'}`} data-testid="pickup-window">
+          <li key={i} className={`grid grid-cols-[auto_1fr] items-center gap-2 rounded-lg border border-border p-2 sm:grid-cols-[84px_minmax(0,1fr)_10px_minmax(0,1fr)_minmax(0,1.3fr)_48px_auto_auto] ${w.active ? '' : 'dimmed'}`} data-testid="pickup-window">
             <select aria-label="Weekday" disabled={!canEdit} className="input-dark !min-h-8 !min-w-0 !px-2 text-xs" value={w.weekday} onChange={(e) => upd(i, { weekday: Number(e.target.value) })}>{WEEKDAYS.map((d, k) => <option key={d} value={k}>{d.slice(0, 3)}</option>)}</select>
             <div className="flex items-center gap-1 sm:contents"><input type="time" aria-label="From" disabled={!canEdit} className="input-dark !min-h-8 !min-w-0 !px-1.5 text-xs" value={w.start} onChange={(e) => upd(i, { start: e.target.value })} /><span className="text-xs text-text-muted">–</span><input type="time" aria-label="To" disabled={!canEdit} className="input-dark !min-h-8 !min-w-0 !px-1.5 text-xs" value={w.end} onChange={(e) => upd(i, { end: e.target.value })} /></div>
             <input list="pk-areas" aria-label="Area" disabled={!canEdit} className="input-dark !min-h-8 !min-w-0 !px-2 text-xs col-span-2 sm:col-span-1" placeholder="Any area" value={w.area} onChange={(e) => upd(i, { area: e.target.value })} />
@@ -94,7 +94,7 @@ export default function Pickups() {
           {toast && <p role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</p>}
           {error && <p role="alert" className="mt-6 text-sm text-danger">{error}</p>}
 
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="To confirm" value={count('requested')} hint={count('requested') ? 'Customers are waiting' : 'Nothing waiting'} icon={Clock} warn={count('requested') > 0} active={filter === 'requested'} onClick={() => setFilter(filter === 'requested' ? 'open' : 'requested')} />
             <StatCard label="Confirmed" value={count('confirmed')} hint="On a run" icon={CalendarCheck} active={filter === 'confirmed'} onClick={() => setFilter(filter === 'confirmed' ? 'open' : 'confirmed')} />
             <StatCard label="Today" value={todayCount} hint="Collections scheduled today" icon={Truck} />
@@ -116,7 +116,7 @@ export default function Pickups() {
                   <table className="w-full min-w-[820px] text-sm">
                     <thead><tr className={thead}><Th>When</Th><Th>Shipment</Th><Th>Address</Th><Th>Contact</Th><Th>Status</Th><Th className="text-right">Actions</Th></tr></thead>
                     <tbody>
-                      {data === null && !error && <tr><td colSpan={6} className="px-3 py-10 text-center text-text-muted">Loading…</td></tr>}
+                      {data === null && !error && <tr><td colSpan={6}><BrandLoader full={false} /></td></tr>}
                       {data && pg.rows.length === 0 && <tr><td colSpan={6} className="px-3 py-10"><Empty title={all.length ? 'No pickups match' : 'No pickup bookings yet'} body={all.length ? 'Try another filter.' : 'Once your pickup hours are set, customers with a booked shipment can pick a slot from their dashboard.'} /></td></tr>}
                       {pg.rows.map((p) => (
                         <tr key={p.id} className={trow(false, p.status === 'cancelled')} data-testid="pickup-row">
@@ -124,7 +124,7 @@ export default function Pickups() {
                           <td className="px-3 py-3"><Link to={`/dashboard/shipments?q=${p.shipmentRef}&b=all`} className="font-mono text-xs text-gold-deep hover:underline">{p.shipmentRef}</Link><p className="text-xs text-text-muted">{p.customer}</p></td>
                           <td className="px-3 py-3"><p>{p.address}</p><p className="text-xs text-text-muted">{p.city}{p.notes ? ` · ${p.notes}` : ''}</p></td>
                           <td className="px-3 py-3 text-xs"><p>{p.contactName}</p><p className="text-text-muted">{p.contactPhone}</p></td>
-                          <td className="whitespace-nowrap px-3 py-3"><Pill tone={tone[p.status]}>{pickupStatusLabels[p.status]}</Pill>{p.runId && p.status !== 'cancelled' && <Link to={`/dashboard/routes/${p.runId}`} className="ml-2 text-xs text-text-muted hover:text-gold-deep">run →</Link>}{p.note && <p className="mt-1 max-w-[200px] truncate text-[11px] text-text-muted" title={p.note}>“{p.note}”</p>}</td>
+                          <td className="whitespace-nowrap px-3 py-3"><Pill tone={tone[p.status]}>{pickupStatusLabels[p.status]}</Pill>{p.runId && p.status !== 'cancelled' && <Link to={`/dashboard/routes/${p.runId}`} className="ml-2 text-xs text-text-muted hover:text-gold-deep">run →</Link>}{p.note && <p className="mt-1 max-w-[200px] truncate text-xs text-text-muted" title={p.note}>“{p.note}”</p>}</td>
                           <td className="px-3 py-3 text-right">
                             {(p.status === 'requested' || p.status === 'confirmed') && (
                               <div className="inline-flex gap-1.5">

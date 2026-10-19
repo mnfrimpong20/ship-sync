@@ -77,7 +77,7 @@ export default function Receive() {
             <p className="inline-flex items-center gap-2 text-sm font-semibold">{s.mode === 'air' ? <Plane size={16} className="text-sky" aria-hidden="true" /> : <Ship size={16} className="text-sea" aria-hidden="true" />} {t.steps[Math.max(0, STEP_DONE.map((f) => f(s.status)).lastIndexOf(true))]}</p>
             {s.eta && !delivered && <p className="text-xs text-text-muted">{t.expected} {fmtD(s.eta + 'T12:00:00Z', lang)}</p>}
           </div>
-          <ol className="mt-4 grid grid-cols-5 gap-1 text-center text-[11px]">
+          <ol className="mt-4 grid grid-cols-5 gap-1 text-center text-xs">
             {t.steps.map((label, i) => { const on = STEP_DONE[i](s.status); return <li key={label} className={on ? 'text-text' : 'text-text-muted'}><span className={`mx-auto mb-1 block h-2 rounded-full ${on ? 'bg-gold' : 'bg-border'}`} />{label}</li> })}
           </ol>
           {collect && (
@@ -110,7 +110,7 @@ export default function Receive() {
                 </li>
               ))}
             </ul>
-            {due.length > 0 && (d.online ? d.methods && <p className="mt-3 text-[11px] text-text-muted">{d.methods}</p> : <p className="mt-3 text-xs text-text-muted">{t.payAtCollection}</p>)}
+            {due.length > 0 && (d.online ? d.methods && <p className="mt-3 text-xs text-text-muted">{d.methods}</p> : <p className="mt-3 text-xs text-text-muted">{t.payAtCollection}</p>)}
           </motion.div>
         )}
 
@@ -142,7 +142,7 @@ export default function Receive() {
           <summary className="cursor-pointer text-sm font-semibold">{t.history}</summary>
           <ol className="mt-3 space-y-2 text-xs">{[...d.events].reverse().map((e, i) => <li key={i}><span className="font-semibold">{lang === 'fr' ? STATUS_FR[e.status] ?? e.label : e.label}</span>{e.place ? ` · ${e.place}` : ''}{e.at ? <span className="text-text-muted"> · {fmtD(e.at, lang, true)}</span> : ''}{e.note ? <span className="block text-text-muted">{e.note}</span> : null}</li>)}</ol>
         </motion.details>
-        <p className="mt-6 text-center text-[11px] text-text-muted">{t.footer(d.shipper.name)}</p>
+        <p className="mt-6 text-center text-xs text-text-muted">{t.footer(d.shipper.name)}</p>
       </motion.div>
     </div>
   )

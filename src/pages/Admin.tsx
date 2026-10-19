@@ -97,7 +97,7 @@ export default function Admin() {
                   : <button onClick={() => act(s, { verified: true })} disabled={busy === s.id} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60"><ShieldCheck size={14} aria-hidden="true" /> {busy === s.id ? 'Saving…' : 'Verify'}</button>}
               </div>
             </div>
-            {s.verifiedAt && <p className="mt-3 text-[11px] text-text-muted">Verified {fmtDate(s.verifiedAt)}</p>}
+            {s.verifiedAt && <p className="mt-3 text-xs text-text-muted">Verified {fmtDate(s.verifiedAt)}</p>}
             {openId === s.id && <ShipperDocs shipper={s} onDecline={(note) => act(s, { verified: false, note })} busy={busy === s.id} />}
           </li>
         ))}
@@ -134,7 +134,7 @@ export default function Admin() {
           <motion.nav variants={fadeUp} className="mt-6 -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0" aria-label="Admin sections">
             <ul className="flex w-max gap-1 rounded-full border border-border bg-surface p-1 md:w-auto md:flex-wrap">
               {VIEWS.map(([v, label]) => (
-                <li key={v}><button onClick={() => setSp(v === 'overview' ? {} : { view: v })} aria-current={view === v ? 'page' : undefined} className={`min-h-9 whitespace-nowrap rounded-full px-3.5 text-sm transition-colors focus-ring ${view === v ? 'bg-gold text-on-accent font-semibold' : 'text-text-muted hover:text-text'}`}>{label}{v === 'attention' && urgent ? <span className="ml-1.5 rounded-full bg-danger px-1.5 text-[10px] font-bold text-white">{urgent}</span> : null}{v === 'shippers' && pending > 0 ? <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 text-[10px] font-bold text-text">{pending}</span> : null}</button></li>
+                <li key={v}><button onClick={() => setSp(v === 'overview' ? {} : { view: v })} aria-current={view === v ? 'page' : undefined} className={`min-h-9 whitespace-nowrap rounded-full px-3.5 text-sm transition-colors focus-ring ${view === v ? 'bg-gold text-on-accent font-semibold' : 'text-text-muted hover:text-text'}`}>{label}{v === 'attention' && urgent ? <span className="ml-1.5 rounded-full bg-danger px-1.5 text-[11px] font-bold text-white">{urgent}</span> : null}{v === 'shippers' && pending > 0 ? <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 text-[11px] font-bold text-text">{pending}</span> : null}</button></li>
               ))}
             </ul>
           </motion.nav>
@@ -206,7 +206,7 @@ function ShipperDocs({ shipper, onDecline, busy }: { shipper: AdminShipper; onDe
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Setup progress {d?.onboarding ? `· ${d.onboarding.progress}%` : ''}</p>
         {d?.onboarding?.requestedAt && <p className="mt-1 flex items-center gap-1 text-xs text-gold-deep"><Clock size={12} aria-hidden="true" /> Review requested {fmtDateTime(d.onboarding.requestedAt)}</p>}
-        <ul className="mt-2 space-y-1 text-xs">{d?.onboarding?.steps.map((st) => <li key={st.id} className={`flex items-center gap-2 ${st.done ? '' : 'text-text-muted'}`}>{st.done ? <Check size={12} className="text-teal" aria-hidden="true" /> : <span className="inline-block h-3 w-3 rounded-full border border-border" aria-hidden="true" />}{st.title}{st.optional ? <span className="text-[10px] uppercase tracking-wider text-text-muted">opt</span> : null}</li>)}</ul>
+        <ul className="mt-2 space-y-1 text-xs">{d?.onboarding?.steps.map((st) => <li key={st.id} className={`flex items-center gap-2 ${st.done ? '' : 'text-text-muted'}`}>{st.done ? <Check size={12} className="text-teal" aria-hidden="true" /> : <span className="inline-block h-3 w-3 rounded-full border border-border" aria-hidden="true" />}{st.title}{st.optional ? <span className="text-[11px] uppercase tracking-wider text-text-muted">opt</span> : null}</li>)}</ul>
       </div>
     </div>
   )

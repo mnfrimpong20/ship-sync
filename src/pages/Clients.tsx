@@ -9,7 +9,7 @@ import { Empty, Pill, fmtDate, money } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 
 const initialsOf = (n: string) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
-const hueFor = (id: string) => `hsl(${[...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 55% 55%)`
+const hueFor = (id: string) => `hsl(${[...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 65% 85%)`
 export const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, '')}`
 
 export function ClientAvatar({ c, size = 40 }: { c: Pick<Client, 'id' | 'name'>; size?: number }) {
@@ -163,7 +163,7 @@ export default function Clients() {
                     <div className="min-w-0 flex-1">
                       <p className="flex flex-wrap items-center gap-2 font-semibold text-text">{c.name}{c.company && <span className="font-normal text-text-muted">· {c.company}</span>}{c.source === 'marketplace' ? <Pill tone="teal">Ntemtem</Pill> : <Pill tone="muted">Own client</Pill>}{c.status === 'archived' && <Pill tone="muted">Archived</Pill>}</p>
                       <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-text-muted">{c.city && <span>{c.city}</span>}{c.phone && <span className="inline-flex items-center gap-1"><Phone size={11} aria-hidden="true" />{c.phone}</span>}{c.email && <span className="inline-flex items-center gap-1"><Mail size={11} aria-hidden="true" />{c.email}</span>}{c.whatsapp && <span className="inline-flex items-center gap-1"><MessageCircle size={11} aria-hidden="true" />WhatsApp</span>}</p>
-                      {c.tags.length > 0 && <p className="mt-1.5 flex flex-wrap gap-1">{c.tags.map((t) => <span key={t} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted">{t}</span>)}</p>}
+                      {c.tags.length > 0 && <p className="mt-1.5 flex flex-wrap gap-1">{c.tags.map((t) => <span key={t} className="rounded-full border border-border px-2 py-0.5 text-xs text-text-muted">{t}</span>)}</p>}
                     </div>
                     <div className="grid grid-cols-3 gap-4 text-right text-xs text-text-muted sm:min-w-[300px]">
                       <div><p className="font-heading text-lg font-bold text-text">{c.shipmentCount ?? 0}</p><p>shipments{c.activeShipments ? ` · ${c.activeShipments} active` : ''}</p></div>

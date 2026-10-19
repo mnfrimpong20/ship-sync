@@ -31,7 +31,7 @@ export function CustomsCard({ shipmentId, destination }: { shipmentId: string; d
     <div className="min-w-0 rounded-xl border border-border bg-surface p-4" data-testid="customs-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Landmark size={14} className="text-gold-deep" aria-hidden="true" /> Customs clearance at {port}</p>
-        {j && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${j.status === 'done' ? 'bg-teal/15 text-teal' : j.status === 'cancelled' || j.status === 'declined' ? 'bg-danger/15 text-danger' : 'bg-gold/15 text-gold-deep'}`} data-testid="job-status">{jobStepLabels[j.status]}</span>}
+        {j && <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${j.status === 'done' ? 'bg-teal/15 text-teal' : j.status === 'cancelled' || j.status === 'declined' ? 'bg-danger/15 text-danger' : 'bg-gold/15 text-gold-deep'}`} data-testid="job-status">{jobStepLabels[j.status]}</span>}
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
       {error && <p role="alert" className="mt-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
@@ -62,7 +62,7 @@ export function CustomsCard({ shipmentId, destination }: { shipmentId: string; d
           <ul className="mt-3 space-y-2" data-testid="broker-options">
             {d.brokers.slice(0, 4).map((b) => (
               <li key={b.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-2.5">
-                <div className="flex min-w-0 items-center gap-2"><Avatar initials={b.initials} hue={b.hue} size={32} /><div className="min-w-0"><p className="truncate text-sm font-semibold">{b.name}{b.verified && <BadgeCheck size={13} className="ml-1 inline text-teal" aria-label="Verified" />}</p><p className="truncate text-[11px] text-text-muted">{b.ports.join(', ')} · ★ {b.rating.toFixed(1)} ({b.reviews}) · replies in ~{b.responseHours}h{b.dutyAdvance ? ' · advances duty' : ''}</p></div></div>
+                <div className="flex min-w-0 items-center gap-2"><Avatar initials={b.initials} hue={b.hue} size={32} /><div className="min-w-0"><p className="truncate text-sm font-semibold">{b.name}{b.verified && <BadgeCheck size={13} className="ml-1 inline text-teal" aria-label="Verified" />}</p><p className="truncate text-xs text-text-muted">{b.ports.join(', ')} · ★ {b.rating.toFixed(1)} ({b.reviews}) · replies in ~{b.responseHours}h{b.dutyAdvance ? ' · advances duty' : ''}</p></div></div>
                 <div className="flex shrink-0 items-center gap-2"><span className="text-sm font-semibold tabular-nums">{money(b.feeUsd ?? 0)}</span><button onClick={() => { setPicking(b); setNote('') }} className="btn-gold !min-h-8 !px-2.5 text-xs" data-testid="pick-broker">Book</button></div>
               </li>
             ))}

@@ -21,7 +21,7 @@ export default function EmbedTrack() {
           <p className="text-lg font-bold">{res.statusLabel}</p><p className="text-sm text-[#5B6578]">{res.ref} · {String(res.origin).split(',')[0]} → {res.destination}{res.eta ? ` · ETA ${new Date(res.eta + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}{res.vessel ? ` · ${res.vessel}` : ''}</p>
           <ol className="mt-3 space-y-2">{(res.events as { status: string; label: string; at: string; place: string }[]).map((e, i, a) => <li key={i} className="flex gap-2 text-sm">{i === a.length - 1 ? <CheckCircle2 size={16} style={{ color }} aria-hidden="true" /> : <Circle size={16} className="text-[#C9C2B4]" aria-hidden="true" />}<span><b>{e.label}</b> <span className="text-[#5B6578]">{new Date(e.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{e.place ? ` · ${e.place}` : ''}</span></span></li>)}</ol>
         </div>}
-        <p className="mt-4 text-center text-[11px] text-[#5B6578]">Tracking by Ntemtem</p>
+        <p className="mt-4 text-center text-xs text-[#5B6578]">Tracking by Ntemtem</p>
       </div>
     </div>
   )

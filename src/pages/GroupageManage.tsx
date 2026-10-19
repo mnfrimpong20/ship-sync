@@ -24,7 +24,7 @@ function SlotForm({ kinds, initial, onSaved, onCancel }: { kinds: GroupageKindIn
     <form onSubmit={submit} className="card-dark grid gap-3 p-5 sm:grid-cols-2" aria-label={initial.id ? 'Edit shared slot' : 'Open a shared slot'} data-testid="slot-form">
       <h2 className="!text-base sm:col-span-2">{initial.id ? 'Edit slot' : 'Open a shared slot'}</h2>
       {error && <p role="alert" className="text-sm text-danger sm:col-span-2">{error}</p>}
-      <label className="text-xs text-text-muted">Kind<select className="input-dark mt-1 !min-h-9 text-sm" value={f.kind} disabled={!!initial.id} onChange={(e) => { const nk = kinds.find((x) => x.id === e.target.value); setF({ ...f, kind: e.target.value as GroupageInput['kind'], capacity: nk?.defaultCapacity ?? f.capacity, pricePerUnitUsd: e.target.value === 'barrel' ? 45 : 320 }) }}>{kinds.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select>{k && <span className="mt-1 block text-[11px]">{k.hint}</span>}</label>
+      <label className="text-xs text-text-muted">Kind<select className="input-dark mt-1 !min-h-9 text-sm" value={f.kind} disabled={!!initial.id} onChange={(e) => { const nk = kinds.find((x) => x.id === e.target.value); setF({ ...f, kind: e.target.value as GroupageInput['kind'], capacity: nk?.defaultCapacity ?? f.capacity, pricePerUnitUsd: e.target.value === 'barrel' ? 45 : 320 }) }}>{kinds.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select>{k && <span className="mt-1 block text-xs">{k.hint}</span>}</label>
       <label className="text-xs text-text-muted">Title<input required minLength={3} className="input-dark mt-1 !min-h-9 text-sm" placeholder="e.g. November barrel to Tema" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></label>
       <label className="text-xs text-text-muted">Origin<input required className="input-dark mt-1 !min-h-9 text-sm" value={f.origin} onChange={(e) => setF({ ...f, origin: e.target.value })} /></label>
       <div className="grid grid-cols-2 gap-2"><label className="text-xs text-text-muted">Destination<select className="input-dark mt-1 !min-h-9 text-sm" value={f.destination} onChange={(e) => setF({ ...f, destination: e.target.value })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label><label className="text-xs text-text-muted">City / port<input className="input-dark mt-1 !min-h-9 text-sm" value={f.destinationCity} onChange={(e) => setF({ ...f, destinationCity: e.target.value })} /></label></div>
@@ -74,7 +74,7 @@ export default function GroupageManage() {
           </div>
           {toast && <p role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</p>}
           {error && <p role="alert" className="mt-6 text-sm text-danger">{error}</p>}
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="Filling" value={live.length} hint={`${live.filter((g) => g.status === 'full').length} full`} icon={Package} />
             <StatCard label="Reserved" value={live.reduce((n, g) => n + g.reserved, 0)} hint="Units across open slots" icon={Boxes} />
             <StatCard label="People" value={live.reduce((n, g) => n + g.participants, 0)} hint="Waiting to be booked" icon={Users} />
@@ -82,10 +82,10 @@ export default function GroupageManage() {
           </motion.div>
           {editing && data && <motion.div variants={fadeUp} className="mt-6"><SlotForm kinds={data.kinds} initial={editing} onSaved={() => { setEditing(null); void load(); setToast(editing.id ? 'Slot updated.' : 'Slot opened — it’s live on the public page.') }} onCancel={() => setEditing(null)} /></motion.div>}
           <motion.div variants={fadeUp} className="mt-6 space-y-4">
-            {data === null && !error && <p className="text-sm text-text-muted">Loading…</p>}
+            {data === null && !error && <BrandLoader full={false} />}
             {data && all.length === 0 && <Empty title="No shared slots yet" body="Open a barrel or a container on your next sailing. Customers with less than a full load find it on the public page and reserve space." />}
             {all.map((g) => (
-              <div key={g.id} className={`card-dark p-5 ${g.status === 'cancelled' ? 'opacity-60' : ''}`} data-testid="slot-row">
+              <div key={g.id} className={`card-dark p-5 ${g.status === 'cancelled' ? 'dimmed' : ''}`} data-testid="slot-row">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0"><p className="font-semibold">{g.title} <Pill tone={g.status === 'full' ? 'teal' : g.status === 'closed' ? 'green' : g.status === 'cancelled' ? 'muted' : 'gold'}>{groupageStatusLabels[g.status]}</Pill></p><p className="mt-0.5 text-xs text-text-muted">{g.kindLabel} · {g.origin} → {g.destinationCity || g.destinationName} · {money(g.pricePerUnitUsd)} per {g.unit} · closes {day(g.closesAt)} · sails {day(g.departsAt)}</p></div>
                   <div className="flex flex-wrap gap-2">
@@ -102,7 +102,7 @@ export default function GroupageManage() {
                   <ul className="mt-3 divide-y divide-border/70 text-sm" data-testid="spot-list">
                     {g.spots.length === 0 && <li className="py-2 text-text-muted">Nobody has reserved yet. Share the public page.</li>}
                     {g.spots.map((s: Spot) => (
-                      <li key={s.id} className={`flex flex-wrap items-center justify-between gap-2 py-2 ${s.status === 'cancelled' ? 'opacity-60' : ''}`}>
+                      <li key={s.id} className={`flex flex-wrap items-center justify-between gap-2 py-2 ${s.status === 'cancelled' ? 'dimmed' : ''}`}>
                         <div className="min-w-0"><p className="font-medium">{s.name} <span className="font-normal text-text-muted">· {unitsLabel(g, s.units)} · {money(s.amountUsd)}{s.pickup ? ' · wants pickup' : ''}</span></p><p className="truncate text-xs text-text-muted">{s.description} · {s.phone}</p></div>
                         <div className="flex items-center gap-2">{s.shipmentRef ? <Link to={`/dashboard/shipments?q=${s.shipmentRef}&b=all`} className="font-mono text-xs text-gold-deep hover:underline">{s.shipmentRef}</Link> : <Pill tone={s.status === 'cancelled' ? 'muted' : 'gold'}>{s.status}</Pill>}{s.status === 'reserved' && <button onClick={() => act(() => groupageApi.cancelSpot(s.id), 'Reservation removed.', s.id)} disabled={busy === s.id} className="text-xs text-text-muted hover:text-danger">Remove</button>}</div>
                       </li>

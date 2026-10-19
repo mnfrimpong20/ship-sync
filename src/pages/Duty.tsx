@@ -33,7 +33,7 @@ export default function Duty() {
           <motion.div variants={fadeUp} className="card-dark p-5">
             <h2 className="flex items-center gap-2 !text-base"><Calculator size={16} className="text-gold-deep" aria-hidden="true" /> Your shipment</h2>
             <div className="mt-3"><DutyForm value={input} onChange={setInput} meta={meta} /></div>
-            <p className="mt-3 text-[11px] text-text-muted">Value = what the goods are worth (for used items, a fair second-hand value). Customs assess on CIF: value + freight + insurance.</p>
+            <p className="mt-3 text-xs text-text-muted">Value = what the goods are worth (for used items, a fair second-hand value). Customs assess on CIF: value + freight + insurance.</p>
           </motion.div>
           <motion.div variants={fadeUp} className="card-dark p-5" aria-live="polite">
             {error && <p role="alert" className="mb-3 text-sm text-danger">{error}</p>}

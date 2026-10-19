@@ -3,6 +3,7 @@
  * consignees in West Africa). Staff sign in as normal users linked to the company; what they may do depends on their role.
  */
 import { assertRelease, owedFor } from './flow'
+import { humanizeDates } from '../src/lib/dates'
 import { prefsOf } from './shipmentOps'
 import type { Request, Response, NextFunction, Router } from 'express'
 import { randomBytes } from 'node:crypto'
@@ -35,7 +36,7 @@ export const staffOut = (r: Row) => ({ id: r.id, shipperId: r.shipper_id, userId
 const vehicleOut = (r: Row) => ({ id: r.id, name: r.name, type: r.type, plate: r.plate, capacityKg: num(r.capacity_kg), capacityNote: r.capacity_note, base: r.base as 'origin' | 'destination', city: r.city, country: r.country, status: r.status as 'available' | 'on_run' | 'maintenance' | 'retired', driverId: r.driver_id ?? undefined, notes: r.notes, createdAt: ISO(r.created_at) })
 const stopOut = (r: Row) => ({ collectUsd: r.collect_usd ?? undefined, collectRule: r.collect_rule ?? undefined, id: r.id, runId: r.run_id, seq: Number(r.seq), shipmentId: r.shipment_id ?? undefined, label: r.label, address: r.address, lat: num(r.lat), lon: num(r.lon), contact: r.contact, phone: r.phone, status: r.status as 'pending' | 'done' | 'skipped', doneAt: r.done_at ? ISO(r.done_at) : undefined, note: r.note, shipmentRef: r.shipment_ref ?? undefined, shipmentStatus: r.shipment_status ?? undefined })
 const runOut = (r: Row, stops: Row[]) => ({
-  id: r.id, name: r.name, kind: r.kind as 'pickup' | 'delivery', date: DATE(r.run_date), driverId: r.driver_id ?? undefined, vehicleId: r.vehicle_id ?? undefined,
+  id: r.id, name: humanizeDates(r.name), kind: r.kind as 'pickup' | 'delivery', date: DATE(r.run_date), driverId: r.driver_id ?? undefined, vehicleId: r.vehicle_id ?? undefined,
   start: r.start_lat != null ? { label: r.start_label, lat: Number(r.start_lat), lon: Number(r.start_lon) } : null,
   status: r.status as 'planned' | 'in_progress' | 'done' | 'cancelled', distanceKm: num(r.distance_km), notes: r.notes, createdAt: ISO(r.created_at),
   stops: stops.map(stopOut), driverName: r.driver_name ?? undefined, vehicleName: r.vehicle_name ?? undefined,

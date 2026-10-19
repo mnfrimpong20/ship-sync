@@ -33,7 +33,7 @@ export function AdminSupplies() {
       <p className="mt-1 text-text-muted">Printers, scanners and labels Ntemtem sells and rents to shipping companies, and the packing supplies Ntemtem sends to customers whose shipper doesn’t stock them (marked “Customer”). Stock is held back when an order is placed and goes back on the shelf if it’s cancelled or a rental comes home. Kits use the stock of the parts inside them.</p>
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
         <StatCard label="Sales this month" value={usd(d.stats.salesMonthUsd)} icon={Wallet} />
         <StatCard label="Rental income" value={`${usd(d.stats.rentalMrrUsd)}/mo`} icon={RotateCcw} />
         <StatCard label="Orders to fulfil" value={d.stats.openOrders} icon={ShoppingCart} warn={d.stats.openOrders > 0} />
@@ -50,11 +50,11 @@ export function AdminSupplies() {
               {!open.length && <tr><td colSpan={6} className="px-3 py-8 text-center text-text-muted">No orders yet.</td></tr>}
               {open.map((o) => (
                 <tr key={o.id} className={trow(false, o.status === 'delivered')} data-testid="admin-order">
-                  <td className="px-3 py-3"><span className="font-mono text-xs font-semibold">{o.ref}</span><p className="text-[11px] text-text-muted">{o.createdAt ? fmtDate(o.createdAt) : ''}</p></td>
-                  <td className="px-3 py-3 text-xs">{o.kind === 'customer' ? <><span className="mr-1 rounded-full bg-gold/20 px-1.5 py-0.5 text-[10px] font-semibold text-gold-deep">Customer</span>{o.customerName}<p className="text-text-muted">for {o.shipmentRef} · {o.shipperName}</p></> : o.shipperName}<p className="text-text-muted">{[o.shipTo.city, o.shipTo.state, o.shipTo.country].filter(Boolean).join(', ')}</p></td>
+                  <td className="px-3 py-3"><span className="font-mono text-xs font-semibold">{o.ref}</span><p className="text-xs text-text-muted">{o.createdAt ? fmtDate(o.createdAt) : ''}</p></td>
+                  <td className="px-3 py-3 text-xs">{o.kind === 'customer' ? <><span className="mr-1 rounded-full bg-gold/20 px-1.5 py-0.5 text-[11px] font-semibold text-gold-deep">Customer</span>{o.customerName}<p className="text-text-muted">for {o.shipmentRef} · {o.shipperName}</p></> : o.shipperName}<p className="text-text-muted">{[o.shipTo.city, o.shipTo.state, o.shipTo.country].filter(Boolean).join(', ')}</p></td>
                   <td className="px-3 py-3 text-xs">{o.items.map((i) => <p key={i.productId + i.mode}>{i.qty} × {i.name}{i.mode !== 'buy' ? <span className="text-text-muted"> ({i.mode === 'rent' ? 'rent' : 'with plan'})</span> : null}</p>)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{o.totalUsd ? usd(o.totalUsd) : 'Free'}{o.monthlyUsd ? <p className="text-[11px] text-text-muted">+ {usd(o.monthlyUsd)}/mo</p> : null}</td>
-                  <td className="px-3 py-3"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone[o.status]}`}>{orderStatusLabels[o.status]}</span>{o.tracking && <p className="mt-1 font-mono text-[11px] text-text-muted">{o.carrier} {o.tracking}</p>}</td>
+                  <td className="px-3 py-3 text-right tabular-nums">{o.totalUsd ? usd(o.totalUsd) : 'Free'}{o.monthlyUsd ? <p className="text-xs text-text-muted">+ {usd(o.monthlyUsd)}/mo</p> : null}</td>
+                  <td className="px-3 py-3"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tone[o.status]}`}>{orderStatusLabels[o.status]}</span>{o.tracking && <p className="mt-1 font-mono text-xs text-text-muted">{o.carrier} {o.tracking}</p>}</td>
                   <td className="px-3 py-3 text-right"><div className="flex justify-end gap-1">
                     {o.status === 'awaiting_payment' && <button disabled={!!busy} onClick={() => act(o.id, () => suppliesApi.orderAction(o.id, 'paid'), `${o.ref} marked paid.`)} className="btn-gold !min-h-8 !px-2.5 text-xs">Mark paid</button>}
                     {o.status === 'paid' && <button disabled={!!busy} onClick={() => act(o.id, () => suppliesApi.orderAction(o.id, 'packed'), `${o.ref} packed.`)} className="btn-ghost !min-h-8 !px-2.5 text-xs">Packed</button>}
@@ -77,7 +77,7 @@ export function AdminSupplies() {
             <tbody>
               {d.products.map((p) => (
                 <tr key={p.id} className={trow(false, !p.active)} data-testid="admin-product">
-                  <td className="px-3 py-3"><button type="button" onClick={() => setEdit({ id: p.id, f: toInput(p), specs: p.specs.join('\n') })} className="inline-flex items-center gap-1.5 text-left font-semibold hover:text-gold-deep focus-ring rounded">{p.name} <Pencil size={12} aria-hidden="true" /></button><p className="text-[11px] text-text-muted">{categoryLabels[p.category]}{p.sku ? ` · ${p.sku}` : ''}{p.kit.length ? ` · ${p.kit.map((k) => `${k.qty}× ${k.name}`).join(', ')}` : ''}{!p.active ? ' · hidden' : ''}</p></td>
+                  <td className="px-3 py-3"><button type="button" onClick={() => setEdit({ id: p.id, f: toInput(p), specs: p.specs.join('\n') })} className="inline-flex items-center gap-1.5 text-left font-semibold hover:text-gold-deep focus-ring rounded">{p.name} <Pencil size={12} aria-hidden="true" /></button><p className="text-xs text-text-muted">{categoryLabels[p.category]}{p.sku ? ` · ${p.sku}` : ''}{p.kit.length ? ` · ${p.kit.map((k) => `${k.qty}× ${k.name}`).join(', ')}` : ''}{!p.active ? ' · hidden' : ''}</p></td>
                   <td className={`px-3 py-3 text-right tabular-nums font-semibold ${p.available <= p.reorderLevel && !p.kit.length ? 'text-danger' : ''}`}>{p.available}{p.available <= p.reorderLevel && !p.kit.length ? <AlertTriangle size={12} className="ml-1 inline" aria-label="Low stock" /> : null}</td>
                   <td className="px-3 py-3 text-right tabular-nums text-text-muted">{p.kit.length ? '—' : p.reorderLevel}</td>
                   <td className="px-3 py-3 text-right tabular-nums">{usd(p.priceUsd)}</td>
@@ -103,7 +103,7 @@ export function AdminSupplies() {
             <ul className="divide-y divide-border text-sm">{d.rentals.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center gap-2 p-3" data-testid="admin-rental">
                 <span className="min-w-0 flex-1"><b>{r.qty > 1 ? `${r.qty} × ` : ''}{r.productName}</b><span className="block text-xs text-text-muted">{r.shipperName} · {r.mode === 'included' ? 'free with plan' : `${usd(r.monthlyUsd)}/mo`}{r.startedAt ? ` · since ${fmtDate(r.startedAt)}` : ''}</span></span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${r.status === 'return_requested' ? 'bg-gold/15 text-gold-deep' : r.status === 'active' ? 'bg-teal/15 text-teal' : 'bg-surface-2 text-text-muted'}`}>{rentalStatusLabels[r.status]}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.status === 'return_requested' ? 'bg-gold/15 text-gold-deep' : r.status === 'active' ? 'bg-teal/15 text-teal' : 'bg-surface-2 text-text-muted'}`}>{rentalStatusLabels[r.status]}</span>
                 {(r.status === 'active' || r.status === 'return_requested') && <button disabled={!!busy} onClick={() => act(r.id, () => suppliesApi.rentalAction(r.id, 'returned'), `${r.productName} checked back in.`)} className="btn-ghost !min-h-8 !px-2.5 text-xs">Received back</button>}
                 {r.status === 'return_requested' && <button disabled={!!busy} onClick={() => act(r.id, () => suppliesApi.rentalAction(r.id, 'keep'), 'Return cancelled.')} className="text-xs text-text-muted hover:underline">Keep out</button>}
               </li>

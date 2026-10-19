@@ -47,7 +47,7 @@ export function RecipientEditor({ s, consignees: given, onSaved }: { s: Shipment
           <label className="grid gap-1 text-xs sm:col-span-2"><span className="text-text-muted">Relationship to the sender (optional)</span><input className="input-dark !min-h-9 text-sm" placeholder="Brother, business partner…" value={f.relationship} onChange={(e) => setF({ ...f, relationship: e.target.value })} /></label>
         </div>
       )}
-      <p className="text-[11px] text-text-muted">Saved to the client’s recipients too, so it’s one tap next time. The customer is told who you added.</p>
+      <p className="text-xs text-text-muted">Saved to the client’s recipients too, so it’s one tap next time. The customer is told who you added.</p>
       <div className="flex justify-end"><button disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60" data-testid="rcp-save"><Check size={13} aria-hidden="true" /> {busy ? 'Saving…' : 'Save recipient'}</button></div>
     </form>
   )
@@ -58,7 +58,7 @@ export function AutoTag({ s, onOverride }: { s: Shipment; onOverride?: () => voi
   if (!s.autoBy) return null
   const why = s.autoBy.kind === 'container' ? `Status follows container ${s.autoBy.label.replace('follows ', '')} through Customs` : s.autoBy.kind === 'run' ? `Moves when the driver works the ${s.autoBy.label}` : 'Moves to Picked up when a piece label is scanned'
   return (
-    <button type="button" onClick={onOverride} title={`${why}. Open Manage to override by hand.`} className="inline-flex max-w-[210px] items-center gap-1 whitespace-nowrap rounded-full border border-teal/40 bg-teal/10 px-2.5 py-1 text-[11px] font-medium text-teal focus-ring" data-testid="auto-tag">
+    <button type="button" onClick={onOverride} title={`${why}. Open Manage to override by hand.`} className="inline-flex max-w-[210px] items-center gap-1 whitespace-nowrap rounded-full border border-teal/40 bg-teal/10 px-2.5 py-1 text-xs font-medium text-teal focus-ring" data-testid="auto-tag">
       <Bot size={12} className="shrink-0" aria-hidden="true" /> <span className="truncate">Auto · {s.autoBy.label}</span>
     </button>
   )
@@ -168,7 +168,7 @@ export function ShipmentManage({ s, consignees, onChanged, onDeleted }: { s: Shi
           : auto?.next ? <p className="mt-1 text-sm"><Zap size={13} className="mr-1 inline text-gold-deep" aria-hidden="true" />Goes to <strong>{statusLabels[auto.next.to]}</strong> when {auto.next.how}.</p>
           : <p className="mt-1 text-sm text-text-muted">Loading…</p>}
         {auto && (auto.wired.pickupRun || auto.wired.container || auto.wired.deliveryRun || auto.wired.pieces > 0 || auto.wired.vessel) && (
-          <ul className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+          <ul className="mt-2 flex flex-wrap gap-1.5 text-xs">
             {auto.wired.pieces > 0 && <li className="rounded-full border border-teal/40 bg-teal/10 px-2 py-0.5 text-teal">{auto.wired.pieces} label{auto.wired.pieces === 1 ? '' : 's'} — scans update it</li>}
             {auto.wired.pickupRun && <li className="rounded-full border border-teal/40 bg-teal/10 px-2 py-0.5 text-teal">Pickup run {auto.wired.pickupRun.date}</li>}
             {auto.wired.container && <li className="rounded-full border border-teal/40 bg-teal/10 px-2 py-0.5 text-teal">Container {auto.wired.container.ref}{auto.wired.container.carrierTracking ? ' · carrier-tracked' : ''}</li>}
@@ -205,7 +205,7 @@ export function ShipmentManage({ s, consignees, onChanged, onDeleted }: { s: Shi
               <label className="grid gap-1 text-xs sm:col-span-2"><span className="text-text-muted">Note (optional)</span><input className={fieldCls} value={ci.note} onChange={(e) => setCi({ ...ci, note: e.target.value })} placeholder="One barrel lid cracked — taped" /></label>
               <label className="grid gap-1 text-xs"><span className="text-text-muted">Invoice adjustment (optional)</span><input className={fieldCls} value={ci.adjDesc} onChange={(e) => setCi({ ...ci, adjDesc: e.target.value })} placeholder="Extra box + 40 kg" data-testid="ci-adj-desc" /></label>
               <label className="grid gap-1 text-xs"><span className="text-text-muted">Amount, USD (− for a credit)</span><input inputMode="decimal" className={fieldCls} value={ci.adjAmt} onChange={(e) => setCi({ ...ci, adjAmt: e.target.value.replace(/[^\d.-]/g, '') })} data-testid="ci-adj-amt" /></label>
-              <p className="text-[11px] text-text-muted sm:col-span-2">Moves it to Picked up, creates labels for any extra pieces, and adds the adjustment to the open invoice (or raises a new one if it’s paid).</p>
+              <p className="text-xs text-text-muted sm:col-span-2">Moves it to Picked up, creates labels for any extra pieces, and adds the adjustment to the open invoice (or raises a new one if it’s paid).</p>
               <div className="flex justify-end gap-1.5 sm:col-span-2"><button type="button" onClick={closeForm} className="btn-ghost !min-h-8 !px-2.5 text-xs">Cancel</button><button disabled={busy} className="btn-gold !min-h-8 !px-3 text-xs disabled:opacity-60" data-testid="ci-save">{busy ? 'Saving…' : 'Check in'}</button></div>
             </form>
           )}
@@ -220,8 +220,8 @@ export function ShipmentManage({ s, consignees, onChanged, onDeleted }: { s: Shi
             <form onSubmit={(e) => { e.preventDefault(); void go() }} className="mt-2 grid gap-2">
               <label className="grid gap-1 text-xs"><span className="text-text-muted">{needOverride ? 'Release with money owed — why? (owner, dispatcher or finance)' : mode === 'revert' ? 'Why? (shown on the timeline and to the customer)' : mode === 'forward' ? (s.autoBy ? `Why override? This normally moves on its own (${s.autoBy.label}).` : 'Note for the timeline (optional)') : mode === 'cancel' ? 'Why? (sent to the client)' : 'Reason (sent to the customer, optional)'}</span>
                 <input autoFocus className="input-dark !min-h-9 text-sm" required={mode === 'revert' || mode === 'cancel' || needOverride || (mode === 'forward' && !!s.autoBy)} minLength={mode === 'revert' || mode === 'cancel' || needOverride || (mode === 'forward' && s.autoBy) ? 3 : 0} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={mode === 'revert' ? 'Marked by mistake' : mode === 'forward' ? 'Carrier update is late — confirmed by phone' : mode === 'cancel' ? 'Client changed plans' : 'Duplicate booking'} data-testid="manage-reason" /></label>
-              {mode === 'delete' && <p className="text-[11px] text-text-muted">Only possible while nothing depends on it — no payment, sent invoice, scans or container. A marketplace booking reopens the customer’s request.</p>}
-              {mode === 'cancel' && <><label className="flex items-center gap-2 text-xs text-text-muted"><input type="checkbox" className="accent-gold" checked={refund} onChange={(e) => setRefund(e.target.checked)} /> Refund online payments held for it</label><p className="text-[11px] text-text-muted">Unloads it from its container (if it hasn’t left the yard), removes run stops and pickups, voids unpaid invoices and tells the client. The record is kept.</p></>}
+              {mode === 'delete' && <p className="text-xs text-text-muted">Only possible while nothing depends on it — no payment, sent invoice, scans or container. A marketplace booking reopens the customer’s request.</p>}
+              {mode === 'cancel' && <><label className="flex items-center gap-2 text-xs text-text-muted"><input type="checkbox" className="accent-gold" checked={refund} onChange={(e) => setRefund(e.target.checked)} /> Refund online payments held for it</label><p className="text-xs text-text-muted">Unloads it from its container (if it hasn’t left the yard), removes run stops and pickups, voids unpaid invoices and tells the client. The record is kept.</p></>}
               <div className="flex justify-end gap-1.5"><button type="button" onClick={closeForm} className="btn-ghost !min-h-8 !px-2.5 text-xs">Back</button><button disabled={busy} className={`!min-h-8 !px-3 text-xs disabled:opacity-60 ${mode === 'delete' || mode === 'cancel' ? 'btn-ghost !border-danger text-danger' : 'btn-gold'}`} data-testid="manage-confirm">{busy ? 'Working…' : needOverride ? 'Release anyway' : mode === 'forward' ? `Move to ${statusLabels[nextSt!]}` : mode === 'revert' ? 'Move back' : mode === 'cancel' ? 'Cancel shipment' : 'Delete for good'}</button></div>
             </form>
           )}
@@ -248,7 +248,7 @@ export function AutomationPrefs({ onClose }: { onClose?: () => void }) {
     <div className="card-dark p-5" data-testid="automation-prefs">
       <div className="flex items-start justify-between gap-3"><div><h2 className="!text-base">Automation</h2><p className="text-xs text-text-muted">What happens without anyone clicking.</p></div>{saved && <span className="text-xs text-teal" role="status">Saved</span>}{onClose && <button onClick={onClose} className="text-xs text-text-muted hover:text-text">Close</button>}</div>
       {err && <p role="alert" className="mt-2 text-xs text-danger">{err}</p>}
-      <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-text-muted">Bookings</p>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-text-muted">Bookings</p>
       <div className="divide-y divide-border">
         <Toggle k="autoInvoice" label="Invoice the customer when they accept a quote" hint="The invoice uses the quoted price and what it includes, and appears in the client’s Invoices tab." />
         <Row label="Invoices are due after"><span className="flex items-center gap-2"><input type="number" min={0} max={120} className="input-dark !min-h-9 !w-20 text-sm" value={p.invoiceDueDays} onChange={(e) => setP({ ...p, invoiceDueDays: Number(e.target.value) })} onBlur={() => save({ invoiceDueDays: p.invoiceDueDays })} data-testid="pref-due" /> days</span></Row>
@@ -258,7 +258,7 @@ export function AutomationPrefs({ onClose }: { onClose?: () => void }) {
         <Toggle k="recipientNudges" label="Ask the client for a missing recipient" hint="Up to 3 reminders with a link they can fill in without logging in." />
         <Toggle k="autoConfirmPickups" label="Confirm customer pickup requests automatically" hint="Requests in an open slot go straight onto that day’s pickup run." />
       </div>
-      <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-text-muted">At destination</p>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-text-muted">At destination</p>
       <div className="divide-y divide-border">
         <Row label="Recipients usually" hint="Each booking can override it."><select className="input-dark !min-h-9 !w-auto text-sm" value={p.defaultHandover} onChange={(e) => save({ defaultHandover: e.target.value as Handover })} data-testid="pref-handover"><option value="collection">Collect from our warehouse</option><option value="delivery">Get door delivery</option></select></Row>
         <Row label="Collection text adds" hint="Hours, what to bring…"><input className="input-dark !min-h-9 !w-64 max-w-full text-sm" value={p.collectionNote} onChange={(e) => setP({ ...p, collectionNote: e.target.value })} onBlur={() => save({ collectionNote: p.collectionNote })} maxLength={200} /></Row>
@@ -266,7 +266,7 @@ export function AutomationPrefs({ onClose }: { onClose?: () => void }) {
         <Row label="Unpaid at handover" hint="Invoices plus storage due."><select className="input-dark !min-h-9 !w-auto text-sm" value={p.holdUnpaid} onChange={(e) => save({ holdUnpaid: e.target.value as ShipperPrefs['holdUnpaid'] })} data-testid="pref-hold"><option value="warn">Tell the driver/desk to collect it</option><option value="block">Block until paid (owners can override)</option><option value="off">Don’t check</option></select></Row>
         <Toggle k="stuckAlerts" label="Alert me when a shipment looks stuck" hint="When it sits in one status much longer than normal for its lane." />
       </div>
-      <p className="mt-3 text-[11px] text-text-muted">Storage after the free days uses the rates on your destination warehouse (Warehouse page).</p>
+      <p className="mt-3 text-xs text-text-muted">Storage after the free days uses the rates on your destination warehouse (Warehouse page).</p>
     </div>
   )
 }

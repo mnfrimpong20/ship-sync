@@ -21,7 +21,7 @@ export function SignaturePad({ value, onChange, height = 140 }: { value: string;
   return (
     <div data-testid="signature-pad">
       <div className="relative overflow-hidden rounded-lg border border-border bg-white"><canvas ref={ref} style={{ height, touchAction: 'none' }} className="block w-full cursor-crosshair" aria-label="Signature" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={up} />{!dirty && <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs text-slate-400">Sign here with a finger</p>}</div>
-      <div className="mt-1 flex justify-end"><button type="button" onClick={clear} className="inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-danger"><Eraser size={11} aria-hidden="true" /> Clear</button></div>
+      <div className="mt-1 flex justify-end"><button type="button" onClick={clear} className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-danger"><Eraser size={11} aria-hidden="true" /> Clear</button></div>
     </div>
   )
 }

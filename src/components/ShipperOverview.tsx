@@ -1,4 +1,5 @@
 import { StuckCard } from './FlowCards'
+import { useT } from '../lib/i18n'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -13,10 +14,10 @@ import { useStore } from '../lib/store'
 
 /* ---------- small pieces ---------- */
 function Delta({ d }: { d?: number | null }) {
-  if (d == null) return <span className="text-[11px] text-text-muted">new</span>
-  if (d === 0) return <span className="text-[11px] text-text-muted">flat vs last 30d</span>
+  if (d == null) return <span className="text-xs text-text-muted">new</span>
+  if (d === 0) return <span className="text-xs text-text-muted">flat vs last 30d</span>
   const up = d > 0
-  return <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${up ? 'text-teal' : 'text-danger'}`}>{up ? <TrendingUp size={12} aria-hidden="true" /> : <TrendingDown size={12} aria-hidden="true" />}{up ? '+' : ''}{d}% <span className="font-normal text-text-muted">vs last 30d</span></span>
+  return <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${up ? 'text-teal' : 'text-danger'}`}>{up ? <TrendingUp size={12} aria-hidden="true" /> : <TrendingDown size={12} aria-hidden="true" />}{up ? '+' : ''}{d}% <span className="font-normal text-text-muted">vs last 30d</span></span>
 }
 
 /** Tiny area sparkline; the last point is emphasised. */
@@ -128,7 +129,8 @@ export default function ShipperOverview({ firstName }: { firstName: string }) {
   const [sp, setSp] = useSearchParams()
   const tab = sp.get('ov') === 'operations' ? 'operations' : 'quotes'
   const pick = (k: string) => { const n = new URLSearchParams(sp); if (k === 'quotes') n.delete('ov'); else n.set('ov', k); setSp(n, { replace: true }) }
-  return <><OverviewTabs tabs={[['quotes', 'Quotes & wins'], ['operations', 'Operations']]} active={tab} onPick={pick} />{tab === 'operations' ? <OpsOverview scope="shipper" /> : <QuotesOverview firstName={firstName} />}</>
+  const t = useT()
+  return <><OverviewTabs tabs={[['quotes', t('Quotes & wins')], ['operations', t('Operations')]]} active={tab} onPick={pick} />{tab === 'operations' ? <OpsOverview scope="shipper" /> : <QuotesOverview firstName={firstName} />}</>
 }
 
 function QuotesOverview({ firstName }: { firstName: string }) {
@@ -136,13 +138,14 @@ function QuotesOverview({ firstName }: { firstName: string }) {
   const [o, setO] = useState<Overview | null>(null)
   const [error, setError] = useState('')
   useEffect(() => { let live = true; insightsApi.overview().then((d) => live && setO(d)).catch((e) => live && setError(e instanceof Error ? e.message : 'Could not load insights.')); return () => { live = false } }, [])
-  const hour = new Date().getHours(); const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+  const t = useT()
+  const hour = new Date().getHours(); const greet = t(hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening')
   if (error) return <p role="alert" className="mt-6 text-sm text-danger">{error}</p>
   if (!o) return <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-busy="true">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-2xl border border-border bg-surface/60" />)}</div>
   const k = o.kpis
   const stageTotal = o.byStatus.reduce((a, s) => a + s.n, 0)
   const critical = o.attention.filter((a) => a.severity === 'critical').length
-  const summary = critical ? `${critical} thing${critical === 1 ? '' : 's'} need${critical === 1 ? 's' : ''} attention today.` : o.attention.length ? `${o.attention.length} item${o.attention.length === 1 ? '' : 's'} to look at, nothing urgent.` : 'Everything is on track.'
+  const summary = critical ? t(critical === 1 ? '1 thing needs attention today.' : '{n} things need attention today.', { n: critical }) : o.attention.length ? t('{n} to look at, nothing urgent.', { n: o.attention.length }) : t('Everything is on track.')
 
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="mt-8 space-y-8">
@@ -174,7 +177,7 @@ function QuotesOverview({ firstName }: { firstName: string }) {
           { l: 'Delivered · 30 days', v: k.delivered.value, h: k.delivered.hint, i: Package, to: '/dashboard/shipments' },
           { l: 'Collected · 30 days', v: money(k.collected.value ?? 0), h: k.collected.delta != null ? `${k.collected.delta > 0 ? '+' : ''}${k.collected.delta}% vs last 30d` : k.collected.hint, i: Wallet, to: '/dashboard/clients?filter=owing' },
           { l: 'Active clients', v: k.clients.value, h: k.clients.hint, i: Users, to: '/dashboard/clients' },
-        ].map((s) => <Link key={s.l} to={s.to} className="flex items-start gap-3 px-4 py-4 hover:bg-surface-2 focus-ring first:rounded-l-[var(--radius-lg)] last:rounded-r-[var(--radius-lg)]"><s.i size={16} className="mt-0.5 shrink-0 text-text-muted" aria-hidden="true" /><span className="min-w-0"><span className="block text-xs text-text-muted">{s.l}</span><span className="block font-heading text-xl font-bold tabular-nums">{s.v}</span><span className="block truncate text-[11px] text-text-muted">{s.h}</span></span></Link>)}
+        ].map((s) => <Link key={s.l} to={s.to} className="flex items-start gap-3 px-4 py-4 hover:bg-surface-2 focus-ring first:rounded-l-[var(--radius-lg)] last:rounded-r-[var(--radius-lg)]"><s.i size={16} className="mt-0.5 shrink-0 text-text-muted" aria-hidden="true" /><span className="min-w-0"><span className="block text-xs text-text-muted">{s.l}</span><span className="block font-heading text-xl font-bold tabular-nums">{s.v}</span><span className="block truncate text-xs text-text-muted">{s.h}</span></span></Link>)}
       </motion.div>
 
       {/* charts + ops */}
@@ -202,7 +205,7 @@ function QuotesOverview({ firstName }: { firstName: string }) {
               <div className="flex h-3 overflow-hidden rounded-full bg-surface-2" role="img" aria-label={o.byStatus.filter((s) => s.n).map((s) => `${s.label}: ${s.n}`).join(', ')}>
                 {o.byStatus.filter((s) => s.n).map((s, i, arr) => <div key={s.status} title={`${s.label}: ${s.n}`} style={{ width: `${(s.n / stageTotal) * 100}%`, background: s.status === 'delivered' ? 'var(--color-teal)' : `color-mix(in srgb, var(--color-gold) ${45 + Math.round((i / Math.max(1, arr.length - 1)) * 55)}%, var(--color-surface-2))`, marginRight: i < arr.length - 1 ? 2 : 0 }} />)}
               </div>
-              <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-text-muted">{o.byStatus.filter((s) => s.n).map((s) => <li key={s.status}><b className="text-text tabular-nums">{s.n}</b> {s.label}</li>)}</ul>
+              <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">{o.byStatus.filter((s) => s.n).map((s) => <li key={s.status}><b className="text-text tabular-nums">{s.n}</b> {s.label}</li>)}</ul>
             </div>
           )}
         </motion.section>
@@ -236,11 +239,11 @@ function QuotesOverview({ firstName }: { firstName: string }) {
         <motion.section variants={fadeUp} className="card-dark p-5 xl:col-span-5" aria-labelledby="act-h">
           <div className="mb-3 flex items-center justify-between"><h2 id="act-h" className="!text-base">Recent activity</h2><Link to="/dashboard/clients" className="text-xs text-text-muted hover:text-text focus-ring">Clients →</Link></div>
           {o.activity.length === 0 ? <p className="text-sm text-text-muted">Nothing logged yet.</p> : (
-            <ul className="space-y-2.5">{o.activity.map((a) => <li key={a.id} className="flex gap-3 text-sm"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-gold" aria-hidden="true" /><span className="min-w-0"><span className="line-clamp-2">{a.body}</span><span className="block text-[11px] text-text-muted"><Link to={`/dashboard/clients/${a.clientId}`} className="hover:text-text">{a.clientName}</Link> · {fmtDateTime(a.at)}</span></span></li>)}</ul>
+            <ul className="space-y-2.5">{o.activity.map((a) => <li key={a.id} className="flex gap-3 text-sm"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-gold" aria-hidden="true" /><span className="min-w-0"><span className="line-clamp-2">{a.body}</span><span className="block text-xs text-text-muted"><Link to={`/dashboard/clients/${a.clientId}`} className="hover:text-text">{a.clientName}</Link> · {fmtDateTime(a.at)}</span></span></li>)}</ul>
           )}
         </motion.section>
       </div>
-      <motion.p variants={fadeUp} className="flex items-center gap-1.5 text-[11px] text-text-muted"><CalendarDays size={12} aria-hidden="true" /> 30-day figures compare with the previous 30 days. Win rate and response time use the last 90 days.</motion.p>
+      <motion.p variants={fadeUp} className="flex items-center gap-1.5 text-xs text-text-muted"><CalendarDays size={12} aria-hidden="true" /> 30-day figures compare with the previous 30 days. Win rate and response time use the last 90 days.</motion.p>
     </motion.div>
   )
 }

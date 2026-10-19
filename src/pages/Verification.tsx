@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -24,7 +25,7 @@ export default function Verification() {
   const load = () => onboardingApi.docs().then(setD).catch((e) => setErr(e instanceof Error ? e.message : 'Could not load.'))
   useEffect(() => { if (ready && user?.role === 'shipper') load() }, [ready, user])
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 4000); return () => clearTimeout(t) }, [toast])
-  if (!ready) return <div className="p-10 text-center text-text-muted">Loading…</div>
+  if (!ready) return <BrandLoader partner />
   if (!user) return <Navigate to="/login?next=/dashboard/verification" replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   const canEdit = canManageOps(user.staffRole)
@@ -64,12 +65,12 @@ export default function Verification() {
             {d?.note && !d.verified && <p className="mt-3 rounded-lg bg-danger/10 p-3 text-xs text-danger">{d.note}</p>}
             {d && (
               <ul className="mt-4 space-y-1.5 text-sm" aria-label="Required documents">
-                {d.kinds.filter((k) => k.id !== 'other').map((k) => <li key={k.id} className="flex items-center gap-2">{have(k.id) ? <Check size={14} className="text-teal" aria-hidden="true" /> : <span className="inline-block h-3.5 w-3.5 rounded-full border border-border" aria-hidden="true" />}<span className={have(k.id) ? '' : 'text-text-muted'}>{k.label}</span>{k.required && !have(k.id) && <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-gold-deep">required</span>}</li>)}
+                {d.kinds.filter((k) => k.id !== 'other').map((k) => <li key={k.id} className="flex items-center gap-2">{have(k.id) ? <Check size={14} className="text-teal" aria-hidden="true" /> : <span className="inline-block h-3.5 w-3.5 rounded-full border border-border" aria-hidden="true" />}<span className={have(k.id) ? '' : 'text-text-muted'}>{k.label}</span>{k.required && !have(k.id) && <span className="ml-auto text-[11px] font-semibold uppercase tracking-wider text-gold-deep">required</span>}</li>)}
               </ul>
             )}
             {canEdit && d && !d.verified && !d.requestedAt && <button onClick={request} disabled={busy || !requiredDone} className="btn-gold mt-4 w-full !min-h-10 text-sm disabled:opacity-60" data-testid="request-verification"><ShieldCheck size={16} aria-hidden="true" /> Request verification</button>}
-            {!requiredDone && !d?.verified && <p className="mt-2 text-[11px] text-text-muted">Upload the required documents to request review.</p>}
-            <p className="mt-4 text-[11px] text-text-muted">Part of your <Link to="/dashboard/shipper" className="underline hover:text-gold-deep">setup checklist</Link>.</p>
+            {!requiredDone && !d?.verified && <p className="mt-2 text-xs text-text-muted">Upload the required documents to request review.</p>}
+            <p className="mt-4 text-xs text-text-muted">Part of your <Link to="/dashboard/shipper" className="underline hover:text-gold-deep">setup checklist</Link>.</p>
           </div>
 
           <div className="lg:col-span-2 space-y-5">
@@ -82,7 +83,7 @@ export default function Verification() {
                 </div>
                 <label className="mt-3 grid gap-1 text-xs"><span className="text-text-muted">Note for the reviewer (optional)</span><input className="input-dark !min-h-10" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="e.g. Licence is held by our parent company, Atlantic Bridge Holdings" /></label>
                 <input ref={fileRef} type="file" accept="application/pdf,image/png,image/jpeg,image/webp" className="hidden" onChange={pick} data-testid="doc-file" />
-                <p className="mt-2 text-[11px] text-text-muted">PDF, JPG, PNG or WebP · under 4 MB · a clear photo of the paper certificate is fine.</p>
+                <p className="mt-2 text-xs text-text-muted">PDF, JPG, PNG or WebP · under 4 MB · a clear photo of the paper certificate is fine.</p>
               </div>
             )}
             <div className="card-dark p-5">

@@ -13,11 +13,11 @@ const fmtBucket = (iso: string, bucket: 'week' | 'month') => new Date(iso + 'T12
 
 /* ------------------------------ stat tile ------------------------------ */
 export function Delta({ k, better = 'up', suffix }: { k: Pick<Kpi, 'delta' | 'unit' | 'prev'>; better?: 'up' | 'down'; suffix?: string }) {
-  if (k.delta == null) return <span className="text-[11px] text-text-muted">{k.prev == null || k.prev === 0 ? 'no earlier data' : '—'}</span>
-  if (k.delta === 0) return <span className="inline-flex items-center gap-0.5 text-[11px] text-text-muted"><Minus size={11} aria-hidden="true" /> flat {suffix}</span>
+  if (k.delta == null) return <span className="text-xs text-text-muted">{k.prev == null || k.prev === 0 ? 'no earlier data' : '—'}</span>
+  if (k.delta === 0) return <span className="inline-flex items-center gap-0.5 text-xs text-text-muted"><Minus size={11} aria-hidden="true" /> flat {suffix}</span>
   const up = k.delta > 0; const good = better === 'up' ? up : !up
   const Icon = up ? ArrowUpRight : ArrowDownRight
-  return <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${good ? 'text-teal' : 'text-danger'}`}><Icon size={12} aria-hidden="true" />{up ? '+' : ''}{k.delta}{k.unit === 'pts' ? ' pts' : '%'} <span className="font-normal text-text-muted">{suffix}</span></span>
+  return <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${good ? 'text-teal' : 'text-danger'}`}><Icon size={12} aria-hidden="true" />{up ? '+' : ''}{k.delta}{k.unit === 'pts' ? ' pts' : '%'} <span className="font-normal text-text-muted">{suffix}</span></span>
 }
 
 export function Stat({ label, value, kpi, better, hint, icon: I, tone, testid }: { label: string; value: ReactNode; kpi?: Kpi; better?: 'up' | 'down'; hint?: string; icon?: LucideIcon; tone?: 'bad' | 'good'; testid?: string }) {
@@ -25,7 +25,7 @@ export function Stat({ label, value, kpi, better, hint, icon: I, tone, testid }:
     <div className={`card-dark p-4 ${tone === 'bad' ? 'border-l-4 border-l-danger' : ''}`} data-testid={testid ?? 'stat'}>
       <div className="flex items-center justify-between gap-2"><p className="text-xs text-text-muted">{label}</p>{I && <I size={15} className={tone === 'bad' ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" />}</div>
       <p className="mt-1 font-heading text-2xl font-bold tabular-nums">{value ?? '—'}</p>
-      <div className="mt-0.5 flex flex-wrap items-center gap-x-2">{kpi && <Delta k={kpi} better={better} suffix="vs prior" />}{hint && <span className="text-[11px] text-text-muted">{hint}</span>}</div>
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2">{kpi && <Delta k={kpi} better={better} suffix="vs prior" />}{hint && <span className="text-xs text-text-muted">{hint}</span>}</div>
     </div>
   )
 }
@@ -140,7 +140,7 @@ export function Stages({ rows }: { rows: { key: string; label: string; n: number
           const slow = worst?.key === r.key && r.platformMedianDays != null && r.medianDays! - r.platformMedianDays >= 1
           return (
             <li key={r.key} className="grid grid-cols-[minmax(7rem,13rem)_1fr_4.5rem] items-center gap-3 text-sm max-sm:grid-cols-[1fr_4.5rem]">
-              <span className="truncate text-text-muted max-sm:col-span-2 max-sm:-mb-2">{r.label}{slow && <span className="ml-1.5 rounded bg-danger/10 px-1.5 py-0.5 text-[10px] font-semibold text-danger">bottleneck</span>}</span>
+              <span className="truncate text-text-muted max-sm:col-span-2 max-sm:-mb-2">{r.label}{slow && <span className="ml-1.5 rounded bg-danger/10 px-1.5 py-0.5 text-[11px] font-semibold text-danger">bottleneck</span>}</span>
               <span className="relative h-4" aria-hidden="true">
                 <span className="absolute top-1/2 h-0.5 -translate-y-1/2" style={{ left: 0, width: `${((r.p90Days ?? 0) / max) * 100}%`, background: 'var(--color-border)' }} />
                 <span className="absolute inset-y-0 left-0 rounded" style={{ width: `${Math.max(1.5, (r.medianDays! / max) * 100)}%`, background: slow ? C.bad : C.focus }} />
@@ -168,15 +168,15 @@ export function DataTable<T extends Record<string, any>>({ rows, cols, csvName, 
     <div data-testid={testid}>
       <div className="-mx-5 overflow-x-auto px-5">
         <table className="w-full min-w-[22rem] whitespace-nowrap text-sm">
-          <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-text-muted">
-            {cols.map((c) => <th key={c.key} className={`px-2 py-2 font-semibold ${c.align === 'right' ? 'text-right' : ''}`} aria-sort={sort?.k === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}><button type="button" onClick={() => setSort((s) => ({ k: c.key, dir: s?.k === c.key ? ((s.dir * -1) as 1 | -1) : -1 }))} className="uppercase tracking-wider hover:text-text focus-ring">{c.label}{sort?.k === c.key ? (sort.dir === 1 ? ' ↑' : ' ↓') : ''}</button></th>)}
+          <thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-text-muted">
+            {cols.map((c) => !c.label ? <th key={c.key} className="px-2 py-2"><span className="sr-only">Actions</span></th> : <th key={c.key} className={`px-2 py-2 font-semibold ${c.align === 'right' ? 'text-right' : ''}`} aria-sort={sort?.k === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}><button type="button" onClick={() => setSort((s) => ({ k: c.key, dir: s?.k === c.key ? ((s.dir * -1) as 1 | -1) : -1 }))} className="-my-1 min-h-8 uppercase tracking-wider hover:text-text focus-ring">{c.label}{sort?.k === c.key ? (sort.dir === 1 ? ' ↑' : ' ↓') : ''}</button></th>)}
           </tr></thead>
           <tbody>{shown.map((r, i) => <tr key={i} className="border-b border-border/60 last:border-0">{cols.map((c) => <td key={c.key} className={`px-2 py-2 ${c.align === 'right' ? 'text-right tabular-nums' : ''}`}>{c.format ? c.format(r[c.key], r) : r[c.key] ?? '—'}</td>)}</tr>)}</tbody>
         </table>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
-        {rows.length > limit ? <button type="button" onClick={() => setAll(!all)} className="hover:text-text focus-ring">{all ? 'Show fewer' : `Show all ${rows.length}`}</button> : <span>{rows.length} row{rows.length === 1 ? '' : 's'}</span>}
-        {csvName && <button type="button" onClick={() => downloadCsv(csvName, sorted.map((r) => Object.fromEntries(cols.map((c) => [c.label, c.csv ? c.csv(r) : r[c.key]]))))} className="inline-flex items-center gap-1 hover:text-text focus-ring" data-testid="csv"><Download size={12} aria-hidden="true" /> CSV</button>}
+        {rows.length > limit ? <button type="button" onClick={() => setAll(!all)} className="inline-flex min-h-10 items-center font-semibold hover:text-text focus-ring">{all ? 'Show fewer' : `Show all ${rows.length}`}</button> : <span>{rows.length} row{rows.length === 1 ? '' : 's'}</span>}
+        {csvName && <button type="button" onClick={() => downloadCsv(csvName, sorted.map((r) => Object.fromEntries(cols.map((c) => [c.label, c.csv ? c.csv(r) : r[c.key]]))))} className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2 font-semibold hover:bg-surface-2 hover:text-text focus-ring" data-testid="csv"><Download size={12} aria-hidden="true" /> CSV</button>}
       </div>
     </div>
   )

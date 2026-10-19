@@ -43,14 +43,14 @@ function Bars({ data, bucket, kind }: { data: Operations['series']; bucket: 'wee
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`${kind === 'usd' ? 'Money' : 'Shipments'} per ${bucket}: ${data.map((d, i) => `${lab(d.start)} ${fmt(vals[i])}`).join(', ')}`} onMouseLeave={() => setHover(null)}>
-        {ticks.map((t) => { const y = T + plotH - (t / top) * plotH; return <g key={t}><line x1={L} x2={W - 8} y1={y} y2={y} stroke="var(--viz-grid)" /><text x={L - 6} y={y + 4} textAnchor="end" className="fill-[var(--color-text-muted)] text-[11px]">{fmt(t)}</text></g> })}
+        {ticks.map((t) => { const y = T + plotH - (t / top) * plotH; return <g key={t}><line x1={L} x2={W - 8} y1={y} y2={y} stroke="var(--viz-grid)" /><text x={L - 6} y={y + 4} textAnchor="end" className="fill-[var(--color-text-muted)] text-xs">{fmt(t)}</text></g> })}
         {data.map((d, i) => {
           const v = vals[i]; const h = (v / top) * plotH; const x = L + i * bw; const w = Math.max(4, Math.min(42, bw - 6)); const cx = x + (bw - w) / 2; const y = T + plotH - h
           return (
             <g key={d.start} onMouseEnter={() => setHover(i)}>
               <rect x={x} y={T} width={bw} height={plotH} fill="transparent" />
               {v > 0 && <path d={`M${cx},${T + plotH} L${cx},${y + Math.min(4, h)} Q${cx},${y} ${cx + Math.min(4, w / 2)},${y} L${cx + w - Math.min(4, w / 2)},${y} Q${cx + w},${y} ${cx + w},${y + Math.min(4, h)} L${cx + w},${T + plotH} Z`} fill="var(--viz-1)" opacity={hover == null || hover === i ? 1 : 0.45} />}
-              {i % every === 0 && <text x={x + bw / 2} y={H - 8} textAnchor="middle" className="fill-[var(--color-text-muted)] text-[11px]">{lab(d.start)}</text>}
+              {i % every === 0 && <text x={x + bw / 2} y={H - 8} textAnchor="middle" className="fill-[var(--color-text-muted)] text-xs">{lab(d.start)}</text>}
             </g>
           )
         })}
@@ -85,7 +85,7 @@ function Donut({ rows }: { rows: Operations['statuses'] }) {
       <svg viewBox="0 0 180 180" className="h-44 w-44 shrink-0" role="img" aria-label={rows.map((r) => `${r.label}: ${r.n}`).join(', ')}>
         {total === 0 ? <circle cx={C} cy={C} r={(R + r0) / 2} fill="none" stroke="var(--color-surface-2)" strokeWidth={R - r0} /> : arcs.map((a) => <path key={a.key} d={a.d} fill={SLOT[a.key]} opacity={hover == null || hover === a.key ? 1 : 0.4} onMouseEnter={() => setHover(a.key)} onMouseLeave={() => setHover(null)}><title>{`${a.label}: ${a.n}`}</title></path>)}
         <text x={C} y={C - 2} textAnchor="middle" className="fill-[var(--color-text)] font-heading text-[26px] font-bold">{total}</text>
-        <text x={C} y={C + 16} textAnchor="middle" className="fill-[var(--color-text-muted)] text-[11px]">shipments</text>
+        <text x={C} y={C + 16} textAnchor="middle" className="fill-[var(--color-text-muted)] text-xs">shipments</text>
       </svg>
       <ul className="w-full space-y-2 text-sm" data-testid="ops-status-legend">
         {rows.map((r) => (

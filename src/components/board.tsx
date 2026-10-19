@@ -28,22 +28,22 @@ export function Pager({ p, noun, note }: { p: ReturnType<typeof usePaged<unknown
 }
 
 export function StatCard({ label, value, hint, icon: I, active, warn, onClick }: { label: string; value: ReactNode; hint?: string; icon: LucideIcon; active?: boolean; warn?: boolean; onClick?: () => void }) {
-  const cls = `card-dark p-4 text-left transition-colors focus-ring ${onClick ? 'hover:border-gold/40' : ''} ${active ? '!border-gold' : ''} ${warn ? 'border-l-4 border-l-danger' : ''}`
-  const body = <><div className="flex items-center justify-between"><p className="text-xs text-text-muted">{label}</p><I size={15} className={warn ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" /></div><p className="mt-1 font-heading text-2xl font-bold tabular-nums">{value}</p>{hint && <p className="text-[11px] text-text-muted">{hint}</p>}</>
+  const cls = `card-dark min-w-0 p-3.5 sm:p-4 text-left transition-colors focus-ring ${onClick ? 'hover:border-gold/40' : ''} ${active ? '!border-gold' : ''} ${warn ? 'border-l-4 border-l-danger' : ''}`
+  const body = <><div className="flex items-center justify-between"><p className="text-xs text-text-muted">{label}</p><I size={15} className={warn ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" /></div><p className="mt-1 break-words font-heading text-xl font-bold tabular-nums sm:text-2xl">{value}</p>{hint && <p className="line-clamp-2 text-xs text-text-muted">{hint}</p>}</>
   return onClick ? <button onClick={onClick} aria-pressed={!!active} className={cls}>{body}</button> : <div className={cls}>{body}</div>
 }
 
 export function Chip({ active, onClick, children, count }: { active: boolean; onClick: () => void; children: ReactNode; count?: number }) {
-  return <button onClick={onClick} aria-pressed={active} className={`rounded-full border px-3 py-1.5 text-sm focus-ring ${active ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{children}{count !== undefined && <span className="ml-1 tabular-nums opacity-70">{count}</span>}</button>
+  return <button onClick={onClick} aria-pressed={active} className={`inline-flex min-h-10 items-center rounded-full border px-3.5 text-sm focus-ring ${active ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{children}{count !== undefined && <span className="ml-1 tabular-nums">{count}</span>}</button>
 }
 
 export function SearchBox({ value, onChange, placeholder, label }: { value: string; onChange: (v: string) => void; placeholder: string; label: string }) {
   return <div className="relative min-w-[220px] flex-1"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" /><input aria-label={label} className="input-dark !min-h-10 !pl-9 text-sm" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} /></div>
 }
 
-export const Th = ({ children, className = '' }: { children?: ReactNode; className?: string }) => <th className={`px-3 py-3 ${className}`}>{children}</th>
-export const thead = 'border-b border-border text-left text-[11px] uppercase tracking-wider text-text-muted'
-export const trow = (open = false, dim = false) => `border-b border-border/70 align-top transition-colors hover:bg-surface-2/60 ${open ? 'bg-surface-2/40' : ''} ${dim ? 'opacity-60' : ''}`
+export const Th = ({ children, className = '' }: { children?: ReactNode; className?: string }) => <th className={`px-3 py-3 ${className}`}>{children ?? <span className="sr-only">Details</span>}</th>
+export const thead = 'border-b border-border text-left text-xs uppercase tracking-wider text-text-muted'
+export const trow = (open = false, dim = false) => `border-b border-border/70 align-top transition-colors hover:bg-surface-2/60 ${open ? 'bg-surface-2/40' : ''} ${dim ? 'dimmed' : ''}`
 
 /** The chevron that opens an expandable row. */
 export function Expander({ open, onClick, label }: { open: boolean; onClick: () => void; label: string }) {

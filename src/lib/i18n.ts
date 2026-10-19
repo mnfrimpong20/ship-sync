@@ -33,6 +33,31 @@ const FR: Record<string, string> = {
   'Tracking': 'Suivi', 'Customs & duty': 'Douane et droits', 'Recipient & pickup': 'Destinataire et retrait', 'Pay all in one checkout': 'Tout payer en une fois', 'What’s inside': 'Contenu', 'Customs': 'Douane', 'People': 'Personnes', 'Chat': 'Discussion', 'Docs': 'Documents',
   // notifications
   'Notifications': 'Notifications', 'Mark all read': 'Tout marquer comme lu', 'Nothing new.': 'Rien de nouveau.', 'See all': 'Tout voir',
+  // shipper portal — menu
+  'Activity log': 'Journal d’activité', 'Analytics': 'Statistiques', 'Autopilot': 'Pilote automatique', 'Book a sailing': 'Réserver un départ', 'Branded page': 'Page à vos couleurs', 'Campaigns': 'Campagnes',
+  'Client shipments': 'Envois clients', 'Clients': 'Clients', 'Collections': 'Recouvrement', 'Company profile': 'Profil de l’entreprise', 'Containers': 'Conteneurs', 'Costs & profit': 'Coûts et marge',
+  'Equipment & supplies': 'Équipement et fournitures', 'Fill a barrel': 'Remplir un fût', 'Fleet': 'Flotte', 'Integrations': 'Intégrations', 'Lane intelligence': 'Analyse des lignes', 'My runs': 'Mes tournées',
+  'Payments': 'Paiements', 'Pickups': 'Enlèvements', 'Plan & billing': 'Abonnement et facturation', 'Rate cards': 'Grilles tarifaires', 'Requests': 'Demandes', 'Reviews': 'Avis', 'Routes': 'Tournées',
+  'Sourcing board': 'Tableau des achats', 'Suppliers': 'Fournisseurs', 'Team': 'Équipe', 'Today (phone)': 'Aujourd’hui (mobile)', 'Verification': 'Vérification', 'Warehouse': 'Entrepôt',
+  'Company': 'Entreprise', 'Operate': 'Opérations', 'Sell': 'Vendre', 'Scan a sticker': 'Scanner une étiquette', 'Partner': 'Partenaire', 'Close': 'Fermer',
+  // quick search
+  'Search': 'Rechercher', 'Find a shipment, client or page': 'Trouver un envoi, un client ou une page', 'Reference, client, place or page…': 'Référence, client, lieu ou page…', 'Reference, place or page…': 'Référence, lieu ou page…',
+  'Results': 'Résultats', 'Nothing matches “{q}”.': 'Aucun résultat pour « {q} ».', 'Pages': 'Pages', 'to move': 'pour naviguer', 'to open': 'pour ouvrir', 'to close': 'pour fermer',
+  // statuses
+  'Picked up': 'Enlevé', 'At origin port': 'Au port de départ', 'In transit': 'En transit', 'Ready for collection': 'Prêt à retirer', 'Out for delivery': 'En livraison',
+  // shipper shipments page
+  '{n} active shipments': '{n} envois en cours', '{n} active shipment': '{n} envoi en cours', 'One row per client booking — from accepted quotes or booked by you. A container holds many shipments. Status changes go straight to the client’s tracking page.': 'Une ligne par réservation client. Un conteneur regroupe plusieurs envois. Chaque changement de statut apparaît sur la page de suivi du client.',
+  'Print labels': 'Imprimer les étiquettes', 'Export CSV': 'Exporter (CSV)', 'Automation': 'Automatisation', 'New shipment': 'Nouvel envoi', 'Awaiting pickup': 'En attente d’enlèvement', 'On the water / in the air': 'En mer / en vol',
+  'At destination': 'À destination', 'Past ETA': 'En retard', 'Stuck': 'Bloqué', 'No live tracking': 'Sans suivi en direct', 'Search ref, customer, cargo, vessel…': 'Référence, client, marchandise, navire…',
+  'Air & ocean': 'Aérien et maritime', 'Ocean': 'Maritime', 'Air': 'Aérien', 'All destinations': 'Toutes destinations', 'Latest activity': 'Activité récente', 'ETA soonest': 'Arrivée la plus proche', 'By stage': 'Par étape', 'Reference': 'Référence', 'Reset': 'Réinitialiser',
+  'Client': 'Client', 'Route': 'Trajet', 'Cargo': 'Marchandise', 'Stage': 'Étape', 'ETA': 'Arrivée', 'Actions': 'Actions', 'Next step': 'Étape suivante', 'Hand over': 'Remettre', 'No recipient': 'Sans destinataire', 'unpaid': 'impayé',
+  'Select every shipment on this page': 'Sélectionner tous les envois de la page', '{n} selected': '{n} sélectionné(s)', 'Move to…': 'Passer à…', 'Labels': 'Étiquettes', 'Payment reminders': 'Relances de paiement', 'Container': 'Conteneur', 'Clear selection': 'Effacer la sélection',
+  'Booked or collected, not yet at port': 'Réservé ou enlevé, pas encore au port', 'At origin port or sailing': 'Au port de départ ou en mer', 'Arrived, customs or out for delivery': 'Arrivé, en douane ou en livraison',
+  'Update the ETA or the status': 'Mettez à jour l’arrivée ou le statut', 'Much longer than usual in one status': 'Bien plus long que d’habitude à une étape', 'Add vessel MMSI or flight': 'Ajoutez le MMSI du navire ou le vol', 'No recipient — add': 'Sans destinataire — ajouter',
+  'Showing {a}–{b} of {n}': '{a}–{b} sur {n}', 'No results': 'Aucun résultat',
+  'Quotes & wins': 'Devis et succès', 'Operations': 'Opérations', 'Good morning': 'Bonjour', 'Good afternoon': 'Bon après-midi', 'Good evening': 'Bonsoir',
+  '1 thing needs attention today.': '1 point demande votre attention aujourd’hui.', '{n} things need attention today.': '{n} points demandent votre attention aujourd’hui.', '{n} to look at, nothing urgent.': '{n} à regarder, rien d’urgent.', 'Everything is on track.': 'Tout est en ordre.',
+  'Workspace': 'Espace de travail', 'Edit profile': 'Modifier le profil', 'View public profile': 'Voir le profil public',
   // display settings
   'Display & language': 'Affichage et langue', 'Text size': 'Taille du texte', 'Normal': 'Normale', 'Large': 'Grande', 'Larger': 'Très grande', 'Theme': 'Thème', 'Light': 'Clair', 'Dark': 'Sombre', 'Match my device': 'Comme mon appareil', 'Language': 'Langue',
   'Saved to your account, so it follows you to every device.': 'Enregistré sur votre compte : vous le retrouvez sur tous vos appareils.',

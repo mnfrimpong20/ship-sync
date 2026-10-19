@@ -59,7 +59,7 @@ export default function Collections() {
           </div>
           {toast && <p role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</p>}
           {error && <p role="alert" className="mt-6 text-sm text-danger">{error}</p>}
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="Outstanding" value={usd(t?.outstanding ?? 0)} hint="Sent, not yet paid" icon={Receipt} active={filter === 'open'} onClick={() => setFilter('open')} />
             <StatCard label="Overdue" value={usd(t?.overdue ?? 0)} hint={`${t?.overdueCount ?? 0} invoice${t?.overdueCount === 1 ? '' : 's'}`} icon={AlertTriangle} warn={(t?.overdueCount ?? 0) > 0} active={filter === 'overdue'} onClick={() => setFilter(filter === 'overdue' ? 'open' : 'overdue')} />
             <StatCard label="Collected (30d)" value={usd(t?.collected30 ?? 0)} hint="All methods" icon={Check} active={filter === 'paid'} onClick={() => setFilter(filter === 'paid' ? 'open' : 'paid')} />
@@ -80,7 +80,7 @@ export default function Collections() {
                   <table className="w-full min-w-[640px] text-sm">
                     <thead><tr className={thead}><Th>Invoice</Th><Th>Client</Th><Th>Due</Th><Th className="text-right">Balance</Th><Th>Sent</Th><Th className="text-right">Actions</Th></tr></thead>
                     <tbody>
-                      {data === null && !error && <tr><td colSpan={6} className="px-3 py-10 text-center text-text-muted">Loading…</td></tr>}
+                      {data === null && !error && <tr><td colSpan={6}><BrandLoader full={false} /></td></tr>}
                       {data && pg.rows.length === 0 && <tr><td colSpan={6} className="px-3 py-10"><Empty title={all.length ? 'Nothing matches' : 'No invoices sent yet'} body={all.length ? 'Try another filter.' : 'Raise an invoice on a client and send it — the pay link does the rest.'} /></td></tr>}
                       {pg.rows.map((inv) => (
                         <tr key={inv.id} className={trow(false, inv.status === 'paid')} data-testid="collection-row">

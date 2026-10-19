@@ -90,7 +90,7 @@ export function DocumentsPanel({ shipmentId, shipmentRef, onCount }: { shipmentI
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-gold-deep" aria-hidden="true">{icon(d)}</span>
             <div className="min-w-0 flex-1">
               <Link to={`/dashboard/documents/${d.id}`} className="block truncate text-sm font-semibold hover:underline">{d.title}</Link>
-              <p className="truncate text-[11px] text-text-muted">{docKindLabels[d.kind]}{d.source === 'generated' ? ' · generated' : d.size ? ` · ${fmtBytes(d.size)}` : ''}{d.uploadedBy ? ` · ${d.uploadedBy}` : ''}{d.updatedAt ? ` · ${fmtDateTime(d.updatedAt)}` : ''}{canManage ? (d.visibility === 'shared' ? ' · customer can see' : ' · office only') : ''}{d.shareToken ? ' · link on' : ''}</p>
+              <p className="truncate text-xs text-text-muted">{docKindLabels[d.kind]}{d.source === 'generated' ? ' · generated' : d.size ? ` · ${fmtBytes(d.size)}` : ''}{d.uploadedBy ? ` · ${d.uploadedBy}` : ''}{d.updatedAt ? ` · ${fmtDateTime(d.updatedAt)}` : ''}{canManage ? (d.visibility === 'shared' ? ' · customer can see' : ' · office only') : ''}{d.shareToken ? ' · link on' : ''}</p>
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
               <Link to={`/dashboard/documents/${d.id}`} className="grid h-8 w-8 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text focus-ring" aria-label={`Open ${d.title}`}><ExternalLink size={14} /></Link>

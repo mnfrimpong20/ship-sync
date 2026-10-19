@@ -24,11 +24,11 @@ export function MessageThread({ requestId, shipperId, onClose, compact }: { requ
   return (
     <div className="rounded-lg border border-border bg-surface-2/30 p-3" data-testid="message-thread">
       <div className="flex items-center justify-between gap-2"><p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-muted"><MessageSquare size={13} aria-hidden="true" /> Messages</p>{onClose && <button onClick={onClose} className="text-xs text-text-muted hover:text-text">Close</button>}</div>
-      {!shared && <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-text-muted"><Lock size={11} aria-hidden="true" /> Phone numbers and emails are shared once you book — that keeps your payment protected.</p>}
+      {!shared && <p className="mt-1 inline-flex items-center gap-1 text-xs text-text-muted"><Lock size={11} aria-hidden="true" /> Phone numbers and emails are shared once you book — that keeps your payment protected.</p>}
       <div className={`mt-2 space-y-2 overflow-y-auto ${compact ? 'max-h-48' : 'max-h-72'}`}>
         {msgs === null && !err && <p className="text-xs text-text-muted">Loading…</p>}
         {msgs?.length === 0 && <p className="text-xs text-text-muted">No messages yet. Ask about sailing dates, packing or what’s included.</p>}
-        {msgs?.map((m) => <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.from === me ? 'ml-auto bg-gold/15' : 'bg-surface'}`} data-testid="message"><p className="whitespace-pre-wrap">{m.body}</p><p className="mt-0.5 text-[10px] text-text-muted">{m.name} · {fmtDateTime(m.at)}{m.masked ? ' · contact details removed' : ''}</p></div>)}
+        {msgs?.map((m) => <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.from === me ? 'ml-auto bg-gold/15' : 'bg-surface'}`} data-testid="message"><p className="whitespace-pre-wrap">{m.body}</p><p className="mt-0.5 text-[11px] text-text-muted">{m.name} · {fmtDateTime(m.at)}{m.masked ? ' · contact details removed' : ''}</p></div>)}
         <div ref={end} />
       </div>
       {err && <p role="alert" className="mt-1 text-xs text-danger">{err}</p>}
@@ -73,23 +73,23 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
               const dead = !live(q) && q.status !== 'accepted'
               return (
                 <div key={q.id} className={`relative rounded-[var(--radius-md)] border p-4 ${q.status === 'accepted' ? 'border-teal bg-teal/5' : dead ? 'border-border opacity-55' : t.includes('Lowest price') ? 'border-gold' : 'border-border bg-surface'}`} data-testid="quote-card">
-                  {t.length > 0 && r.status === 'open' && <div className="absolute -top-2.5 left-4 flex gap-1">{t.map((x) => <span key={x} className="rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent" data-testid="quote-tag">{x}</span>)}</div>}
+                  {t.length > 0 && r.status === 'open' && <div className="absolute -top-2.5 left-4 flex gap-1">{t.map((x) => <span key={x} className="rounded-full bg-gold px-2 py-0.5 text-xs font-bold text-on-accent" data-testid="quote-tag">{x}</span>)}</div>}
                   <div className="flex items-start gap-3">
                     <Avatar initials={s.initials} hue={s.hue} logo={'logo' in s ? s.logo : null} size={40} />
                     <div className="min-w-0 flex-1"><p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{s.name}</p>{s.verified && <p className="mt-1"><VerifiedBadge /></p>}<div className="mt-1 flex flex-wrap gap-1.5"><Rating value={s.rating} count={s.reviews} /></div></div>
                     <div className="text-right"><p className="font-heading text-2xl font-bold text-text" data-testid="quote-total">{money(totalOf(q))}</p><p className="text-xs text-text-muted">{q.suppliesUsd ? `${money(q.price)} freight + ${money(q.suppliesUsd)} supplies · ` : ''}~{q.transitDays} days{q.kind === 'estimate' ? ' · estimate' : ''}</p></div>
                   </div>
-                  <ul className="mt-3 flex flex-wrap gap-1.5">{q.includes.map((x) => <li key={x} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted">{x}</li>)}</ul>
+                  <ul className="mt-3 flex flex-wrap gap-1.5">{q.includes.map((x) => <li key={x} className="rounded-full border border-border px-2 py-0.5 text-xs text-text-muted">{x}</li>)}</ul>
                   {(q.supplies?.length ?? 0) > 0 && (
                     <ul className="mt-3 space-y-1 rounded-lg bg-surface-2/60 p-2.5 text-xs" data-testid="quote-supply-lines">
                       {q.supplies!.map((l) => <li key={l.kind} className="flex items-center justify-between gap-2">{l.source === 'none'
                         ? <span className="text-danger">Can’t supply the {SUPPLY_WORD[l.kind] ?? l.kind} you asked for</span>
-                        : <><span className="min-w-0 truncate">{l.qty} × {l.name} <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${l.source === 'ntemtem' ? 'bg-gold/20 text-gold-deep' : 'bg-teal/15 text-teal'}`}>{l.source === 'ntemtem' ? 'Sent by Ntemtem' : 'From the shipper'}</span></span><span className="shrink-0 tabular-nums">{money((l.unitUsd ?? 0) * l.qty)}</span></>}</li>)}
+                        : <><span className="min-w-0 truncate">{l.qty} × {l.name} <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${l.source === 'ntemtem' ? 'bg-gold/20 text-gold-deep' : 'bg-teal/15 text-teal'}`}>{l.source === 'ntemtem' ? 'Sent by Ntemtem' : 'From the shipper'}</span></span><span className="shrink-0 tabular-nums">{money((l.unitUsd ?? 0) * l.qty)}</span></>}</li>)}
                     </ul>
                   )}
-                  {missing.length > 0 && <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-danger/10 px-2 py-1 text-[11px] text-danger" data-testid="quote-missing"><AlertTriangle size={11} aria-hidden="true" /> Doesn’t include {missing.join(', ')} you asked for — ask before booking</p>}
-                  {q.kind === 'estimate' && <p className="mt-2 text-[11px] text-text-muted">Estimate: the final price is confirmed when your pieces are weighed at the warehouse.</p>}
-                  {q.stale && live(q) && <p className="mt-2 text-[11px] text-gold-deep">You changed the request after this quote — the shipper may update it.</p>}
+                  {missing.length > 0 && <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-danger/10 px-2 py-1 text-xs text-danger" data-testid="quote-missing"><AlertTriangle size={11} aria-hidden="true" /> Doesn’t include {missing.join(', ')} you asked for — ask before booking</p>}
+                  {q.kind === 'estimate' && <p className="mt-2 text-xs text-text-muted">Estimate: the final price is confirmed when your pieces are weighed at the warehouse.</p>}
+                  {q.stale && live(q) && <p className="mt-2 text-xs text-gold-deep">You changed the request after this quote — the shipper may update it.</p>}
                   {q.notes && <p className="mt-3 text-xs text-text-muted">{q.notes}</p>}
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs text-text-muted">{q.status === 'withdrawn' ? 'Withdrawn by the shipper' : !live(q) && q.status !== 'accepted' && q.status !== 'declined' ? `Expired ${fmtDate(q.validUntil)}` : `Valid until ${fmtDate(q.validUntil)}`}</p>
@@ -144,7 +144,7 @@ export function RequestManage({ r, wantMarket }: { r: QuoteRequest; wantMarket?:
           <label className="grid gap-1 text-xs"><span className="text-text-muted">Declared value, USD</span><input inputMode="decimal" className={cls} value={f.declared} onChange={(e) => setF({ ...f, declared: e.target.value.replace(/[^\d.]/g, '') })} /></label>
           <div className="flex flex-wrap items-end gap-3 text-xs">{(['pickup', 'delivery', 'insurance'] as const).map((k) => <label key={k} className="flex items-center gap-1.5"><input type="checkbox" className="accent-gold" checked={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.checked })} />{k === 'pickup' ? 'Pickup' : k === 'delivery' ? 'Door delivery' : 'Insurance'}</label>)}</div>
           <label className="grid gap-1 text-xs sm:col-span-3"><span className="text-text-muted">Description</span><textarea rows={2} className="input-dark py-2 text-sm" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
-          <p className="text-[11px] text-text-muted sm:col-span-3">To change the route, mode or cargo type, cancel and post a new request.</p>
+          <p className="text-xs text-text-muted sm:col-span-3">To change the route, mode or cargo type, cancel and post a new request.</p>
           <div className="flex justify-end gap-1.5 sm:col-span-3"><button type="button" onClick={() => setMode('')} className="btn-ghost !min-h-8 !px-2.5 text-xs">Back</button><button disabled={busy} className="btn-gold !min-h-8 !px-3 text-xs" data-testid="request-save">Save changes</button></div>
         </form>
       )}

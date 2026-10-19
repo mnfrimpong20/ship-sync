@@ -6,6 +6,7 @@
  * automatically before the due date and after it (per-shipper schedule), with a log on the invoice.
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { niceDay } from '../src/lib/dates'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { uid, type Db } from './db'
@@ -53,7 +54,7 @@ export async function sendInvoiceMessage(db: Db, inv: Row, kind: 'invoice' | 're
   const token = await ensureToken(db, inv); const cfg = await collectionSettings(db, inv.shipper_id)
   const { rows: pays } = await db.query<Row>('select coalesce(sum(amount),0)::float as paid from payments where invoice_id = $1', [inv.id])
   const balance = Math.max(0, Number(inv.total) - Number(pays[0].paid))
-  const due = DATE(inv.due_at)
+  const due = DATE(inv.due_at) ? niceDay(DATE(inv.due_at)) : null
   const titles = { invoice: `Invoice ${inv.number} from ${inv.shipper_name} — $${balance.toLocaleString()}`, reminder: `Reminder: invoice ${inv.number} is due ${due ?? 'soon'}`, overdue: `Overdue: invoice ${inv.number} — $${balance.toLocaleString()} outstanding`, receipt: `Paid — invoice ${inv.number}` }
   const bodies = {
     invoice: `${cfg.message}${inv.shipment_ref ? ` This invoice is for shipment ${inv.shipment_ref}.` : ''}${due ? ` Due ${due}.` : ''}`,
@@ -179,6 +180,23 @@ export function mountCollections(r: Router, d: Deps) {
     const b = zSettings.parse({ ...(await collectionSettings(db, u.shipperId!)), ...req.body })
     await db.query('update shippers set collections = $2 where id = $1', [u.shipperId, JSON.stringify(b)])
     res.json({ settings: b })
+  }))
+  /** Bulk: remind every client with an unpaid invoice on the chosen shipments (one message per invoice). */
+  r.post('/collections/remind-shipments', wrap(async (req, res) => {
+    const db = await getDb(); const u = await office(db, req)
+    const { shipmentIds } = z.object({ shipmentIds: z.array(z.string()).min(1).max(200) }).parse(req.body ?? {})
+    const { rows } = await db.query<Row>(`${SELECT} where i.shipper_id = $1 and i.shipment_id = any($2::text[]) and i.status not in ('paid','void')`, [u.shipperId, shipmentIds])
+    const full = await withPayments(db, rows)
+    let sent = 0; const skipped: string[] = []
+    for (const r of rows) {
+      const f = full.find((x) => x.id === r.id)!
+      if (f.balance <= 0) continue
+      if (!r.client_email && !r.client_user_id) { skipped.push(`${r.number} (no email for ${r.client_name})`); continue }
+      if (r.status === 'draft') await db.query(`update invoices set status = 'sent' where id = $1`, [r.id])
+      const overdue = !!r.due_at && DATE(r.due_at)! < today()
+      try { await sendInvoiceMessage(db, r, r.status === 'draft' ? 'invoice' : overdue ? 'overdue' : 'reminder', { by: u.name }); sent++ } catch { skipped.push(`${r.number} (could not send)`) }
+    }
+    res.json({ sent, skipped, invoices: rows.length })
   }))
   r.post('/invoices/:id/send', wrap(async (req, res) => {
     const db = await getDb(); const u = await office(db, req)

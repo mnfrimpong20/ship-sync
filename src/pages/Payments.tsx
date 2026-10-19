@@ -81,7 +81,7 @@ export default function Payments() {
           {error && <p role="alert" className="mt-6 text-sm text-danger">{error}</p>}
           {data && !data.config.online && <p className="mt-6 rounded-lg border border-gold/40 bg-gold/10 px-4 py-2.5 text-sm text-gold-deep">Online card payments aren’t switched on for the platform yet — you can still record payments received directly on each shipment.</p>}
 
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="In escrow" value={usd(b?.heldUsd ?? 0)} hint="Released when goods move" icon={Lock} active={filter === 'held'} onClick={() => setFilter(filter === 'held' ? 'all' : 'held')} />
             <StatCard label="Available" value={usd(b?.availableUsd ?? 0)} hint={b?.pendingPayoutUsd ? `${usd(b.pendingPayoutUsd)} payout pending` : 'Ready to pay out'} icon={Wallet} active={filter === 'released'} onClick={() => setFilter(filter === 'released' ? 'all' : 'released')} />
             <StatCard label="Paid out" value={usd(b?.paidOutUsd ?? 0)} hint="Sent to your account" icon={Banknote} active={filter === 'paid_out'} onClick={() => setFilter(filter === 'paid_out' ? 'all' : 'paid_out')} />
@@ -104,7 +104,7 @@ export default function Payments() {
                   <table className="w-full min-w-[560px] text-sm">
                     <thead><tr className={thead}><Th>Paid</Th><Th>Shipment</Th><Th>What</Th><Th className="text-right">Amount</Th><Th className="text-right">Fee</Th><Th className="text-right">Yours</Th><Th>Status</Th></tr></thead>
                     <tbody>
-                      {data === null && !error && <tr><td colSpan={7} className="px-3 py-10 text-center text-text-muted">Loading…</td></tr>}
+                      {data === null && !error && <tr><td colSpan={7}><BrandLoader full={false} /></td></tr>}
                       {data && pg.rows.length === 0 && <tr><td colSpan={7} className="px-3 py-10"><Empty title={all.length ? 'No payments match' : 'No payments yet'} body={all.length ? 'Try another filter.' : 'When a customer pays for a booked shipment it shows up here, held in escrow until the goods are on their way.'} /></td></tr>}
                       {pg.rows.map((p) => (
                         <tr key={p.id} className={trow(false, p.status === 'refunded' || p.status === 'cancelled')} data-testid="payment-row">
@@ -114,7 +114,7 @@ export default function Payments() {
                           <td className="px-3 py-3 text-right tabular-nums">{usd(p.amountUsd)}</td>
                           <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-text-muted">{p.feeUsd ? `−${usd(p.feeUsd)}` : "—"}</td>
                           <td className="px-3 py-3 text-right font-semibold tabular-nums">{p.status === 'refunded' ? '—' : usd(p.provider === 'manual' ? p.amountUsd : p.netUsd)}</td>
-                          <td className="whitespace-nowrap px-3 py-3"><Pill tone={tone[p.status]}>{paymentStatusLabels[p.status]}</Pill>{p.status === 'released' && p.payoutId && <p className="mt-1 text-[11px] text-text-muted">payout requested</p>}{p.releasedAt && p.status !== 'refunded' && <p className="mt-1 text-[11px] text-text-muted">released {fmt(p.releasedAt)}</p>}</td>
+                          <td className="whitespace-nowrap px-3 py-3"><Pill tone={tone[p.status]}>{paymentStatusLabels[p.status]}</Pill>{p.status === 'released' && p.payoutId && <p className="mt-1 text-xs text-text-muted">payout requested</p>}{p.releasedAt && p.status !== 'refunded' && <p className="mt-1 text-xs text-text-muted">released {fmt(p.releasedAt)}</p>}</td>
                         </tr>
                       ))}
                     </tbody>

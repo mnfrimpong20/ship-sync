@@ -10,18 +10,18 @@ import { fmtDate } from '../components/ui'
 export function ManifestTable({ m, showMoney = false }: { m: Manifest; showMoney?: boolean }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[820px] text-sm print:min-w-0 print:text-[11px]">
-        <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="px-2 py-2">#</th><th className="px-2 py-2">Ref</th><th className="px-2 py-2">Goods</th><th className="px-2 py-2 text-right">Pcs</th><th className="px-2 py-2 text-right">Kg</th><th className="px-2 py-2">Sender</th><th className="px-2 py-2">Recipient</th><th className="px-2 py-2">Handover</th><th className="px-2 py-2">Status</th>{showMoney && <th className="px-2 py-2 text-right">Owed</th>}</tr></thead>
+      <table className="w-full min-w-[820px] text-sm print:min-w-0 print:text-xs">
+        <thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-text-muted"><th className="px-2 py-2">#</th><th className="px-2 py-2">Ref</th><th className="px-2 py-2">Goods</th><th className="px-2 py-2 text-right">Pcs</th><th className="px-2 py-2 text-right">Kg</th><th className="px-2 py-2">Sender</th><th className="px-2 py-2">Recipient</th><th className="px-2 py-2">Handover</th><th className="px-2 py-2">Status</th>{showMoney && <th className="px-2 py-2 text-right">Owed</th>}</tr></thead>
         <tbody>
           {m.shipments.map((s, i) => (
             <tr key={s.id} className="border-b border-border/60 align-top">
               <td className="px-2 py-2 tabular-nums text-text-muted">{i + 1}</td>
               <td className="px-2 py-2 font-mono text-xs">{s.ref}</td>
-              <td className="max-w-[220px] px-2 py-2">{s.description}{s.declaredValueUsd ? <span className="block text-[11px] text-text-muted">Declared ${s.declaredValueUsd.toLocaleString()}</span> : null}</td>
+              <td className="max-w-[220px] px-2 py-2">{s.description}{s.declaredValueUsd ? <span className="block text-xs text-text-muted">Declared ${s.declaredValueUsd.toLocaleString()}</span> : null}</td>
               <td className="px-2 py-2 text-right tabular-nums">{s.pieces ?? '—'}</td>
               <td className="px-2 py-2 text-right tabular-nums">{s.weightKg ?? '—'}</td>
-              <td className="px-2 py-2">{s.sender}{s.senderPhone && <span className="block text-[11px] text-text-muted">{s.senderPhone}</span>}</td>
-              <td className="px-2 py-2">{s.recipient ? <>{s.recipient.name}<span className="block text-[11px] text-text-muted">{[s.recipient.phone, s.recipient.city].filter(Boolean).join(' · ')}</span></> : <span className="text-danger">Missing</span>}</td>
+              <td className="px-2 py-2">{s.sender}{s.senderPhone && <span className="block text-xs text-text-muted">{s.senderPhone}</span>}</td>
+              <td className="px-2 py-2">{s.recipient ? <>{s.recipient.name}<span className="block text-xs text-text-muted">{[s.recipient.phone, s.recipient.city].filter(Boolean).join(' · ')}</span></> : <span className="text-danger">Missing</span>}</td>
               <td className="px-2 py-2 text-xs">{s.handover === 'collection' ? 'Collects' : 'Door delivery'}</td>
               <td className="px-2 py-2 text-xs">{statusLabels[s.status]}</td>
               {showMoney && <td className="px-2 py-2 text-right tabular-nums">{s.owedUsd ? `$${s.owedUsd.toLocaleString()}` : '—'}</td>}

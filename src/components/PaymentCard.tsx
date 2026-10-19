@@ -44,7 +44,7 @@ export function PaymentCard({ shipmentId }: { shipmentId: string }) {
     <div className="min-w-0 rounded-xl border border-border bg-surface p-4" data-testid="payment-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Wallet size={14} className="text-gold-deep" aria-hidden="true" /> Payment</p>
-        {p && p.status !== 'cancelled' && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone[p.status]}`} data-testid="payment-status">{paymentStatusLabels[p.status]}</span>}
+        {p && p.status !== 'cancelled' && <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tone[p.status]}`} data-testid="payment-status">{paymentStatusLabels[p.status]}</span>}
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
       {error && <p role="alert" className="mt-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
@@ -70,7 +70,7 @@ export function PaymentCard({ shipmentId }: { shipmentId: string }) {
             <>
               <p className="mt-2 inline-flex items-start gap-1.5 text-xs text-text-muted"><Lock size={12} className="mt-0.5 shrink-0 text-teal" aria-hidden="true" /> {d.config.customerNote}</p>
               <ProtectedNote className="mt-3" /><div className="mt-3 flex justify-end"><button onClick={checkout} disabled={busy === 'pay' || busy === 'verify'} className="btn-gold !min-h-9 !px-4 text-sm disabled:opacity-60" data-testid="pay-now"><CreditCard size={14} aria-hidden="true" /> {busy === 'pay' ? 'Opening secure checkout…' : busy === 'verify' ? 'Confirming…' : `Pay ${usd(d.due.amountUsd)} securely`}</button></div>
-              {d.config.mode === 'test' && <p className="mt-2 text-right text-[11px] text-text-muted">Test mode — use card 4242 4242 4242 4242.</p>}
+              {d.config.mode === 'test' && <p className="mt-2 text-right text-xs text-text-muted">Test mode — use card 4242 4242 4242 4242.</p>}
             </>
           ) : d.canManage ? (
             <>

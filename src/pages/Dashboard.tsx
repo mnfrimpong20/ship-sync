@@ -36,12 +36,13 @@ import { AccountTab, DocumentsTab, InboxTab, IssuesTab, MoneyTab, SavedTab, Week
 import { DutyEarly, FamilyShare, NextStep, PackingList, ShipmentChat } from '../components/ShipmentExtras'
 
 function Layout({ title, sub, children, cta, eyebrow = 'Workspace' }: { title: string; sub: string; children: React.ReactNode; cta?: React.ReactNode; eyebrow?: string }) {
+  const t = useT()
   return (
     <div className="bg-bg text-text">
       <div className="container-x py-10 md:py-14">
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div><motion.p variants={fadeUp} className="eyebrow mb-1">{eyebrow}</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{title}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">{sub}</motion.p></div>
+            <div><motion.p variants={fadeUp} className="eyebrow mb-1">{t(eyebrow)}</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{t(title)}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">{sub}</motion.p></div>
             {cta && <motion.div variants={fadeUp}>{cta}</motion.div>}
           </div>
           {children}
@@ -207,12 +208,12 @@ function GroupageTab() {
       {spots && spots.length === 0 && <div className="mt-6"><Empty title="No shared-slot reservations" body="Sending less than a barrel? Reserve the space you need in a shipper's shared barrel or container and pay only for that." action={<Link to="/groupage" className="btn-gold">Browse open slots</Link>} /></div>}
       <ul className="mt-4 grid gap-3 md:grid-cols-2">
         {spots?.map((s) => (
-          <li key={s.id} className={`card-dark min-w-0 p-5 ${s.status === 'cancelled' ? 'opacity-60' : ''}`} data-testid="my-spot">
+          <li key={s.id} className={`card-dark min-w-0 p-5 ${s.status === 'cancelled' ? 'dimmed' : ''}`} data-testid="my-spot">
             <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate font-semibold">{g(s).title}</p><p className="text-xs text-text-muted">{g(s).shipperName} · {g(s).origin} → {g(s).destination}</p></div><Pill tone={s.status === 'booked' ? 'green' : s.status === 'cancelled' ? 'muted' : 'gold'}>{s.status === 'booked' ? 'Booked' : s.status === 'cancelled' ? 'Cancelled' : 'Reserved'}</Pill></div>
             <p className="mt-2 text-sm">{unitsLabel({ unit: g(s).kind === 'barrel' ? 'bag or box' : 'barrel', unitPlural: g(s).kind === 'barrel' ? 'bags / boxes' : 'barrels' }, s.units)} · <strong className="tabular-nums">{money(s.amountUsd)}</strong></p>
             <p className="mt-1 truncate text-xs text-text-muted">{s.description}</p>
             <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-gold" style={{ width: `${g(s).fillPct}%` }} /></div>
-            <p className="mt-1 text-[11px] text-text-muted">{g(s).fillPct}% filled · closes {g(s).closesAt ? fmtDate(g(s).closesAt + 'T12:00:00Z') : '—'} · sails {g(s).departsAt ? fmtDate(g(s).departsAt + 'T12:00:00Z') : '—'}</p>
+            <p className="mt-1 text-xs text-text-muted">{g(s).fillPct}% filled · closes {g(s).closesAt ? fmtDate(g(s).closesAt + 'T12:00:00Z') : '—'} · sails {g(s).departsAt ? fmtDate(g(s).departsAt + 'T12:00:00Z') : '—'}</p>
             <div className="mt-3 flex gap-2">
               {s.shipmentId && <Link to={`/dashboard?tab=shipments&s=${s.shipmentId}`} className="btn-gold !min-h-8 !px-3 text-xs">Open shipment {s.shipmentRef}</Link>}
               {s.status === 'reserved' && <button onClick={() => cancel(s)} disabled={busy === s.id} className="btn-ghost !min-h-8 !px-3 text-xs text-danger disabled:opacity-60">Cancel reservation</button>}
@@ -279,7 +280,7 @@ function ShipmentsTab() {
   const views = s && <>
 
           <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl border border-border bg-surface p-1 lg:flex-wrap" role="tablist" aria-label="Shipment sections" data-testid="ship-views">
-            {SHIP_VIEWS.map((v) => <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => pick(s.id, v.id)} className={`relative min-h-9 shrink-0 whitespace-nowrap rounded-lg px-3 text-sm font-medium focus-ring ${view === v.id ? 'bg-gold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid={`sv-${v.id}`}>{t(v.label)}{v.id === 'pay' && due ? <span className={`ml-1.5 rounded-full px-1.5 text-[10px] font-bold ${view === v.id ? 'bg-on-accent/20' : 'bg-gold/20 text-gold-deep'}`}>{money(due)}</span> : null}</button>)}
+            {SHIP_VIEWS.map((v) => <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => pick(s.id, v.id)} className={`relative min-h-9 shrink-0 whitespace-nowrap rounded-lg px-3 text-sm font-medium focus-ring ${view === v.id ? 'bg-gold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid={`sv-${v.id}`}>{t(v.label)}{v.id === 'pay' && due ? <span className={`ml-1.5 rounded-full px-1.5 text-[11px] font-bold ${view === v.id ? 'bg-on-accent/20' : 'bg-gold/20 text-gold-deep'}`}>{money(due)}</span> : null}</button>)}
           </div>
           <div className="space-y-4" data-testid={`ship-view-${view}`}>
             {view === 'tracking' && <><ShipmentDetail s={s} compact /><Link to={`/track?ref=${s.ref}`} className="inline-flex items-center gap-1 text-sm text-gold-deep hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link><NextStep shipmentId={s.id} /><CollectionNotice s={s} /><OffersCard s={s} /></>}

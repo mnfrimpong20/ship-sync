@@ -52,13 +52,13 @@ export function AddressLookup({ country, value, onChange, compact = false, label
           <span className="relative block">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" />
             <input className={`${cls} !pl-9`} value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => hits.length && setOpen(true)} placeholder={country === 'GH' ? 'e.g. Spintex Road, Accra' : 'Start typing…'} role="combobox" aria-expanded={open} aria-controls="addr-hits" aria-autocomplete="list" data-testid="address-search" />
-            {busy && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-text-muted">…</span>}
+            {busy && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-muted">…</span>}
           </span>
         </label>
         {open && hits.length > 0 && (
           <ul id="addr-hits" role="listbox" className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
             {hits.map((h, i) => <li key={i} role="option" aria-selected="false"><button type="button" onClick={() => pick(h)} className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"><MapPin size={14} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" /><span className="min-w-0"><span className="block truncate">{h.label}</span><span className="block truncate text-xs text-text-muted">{h.sub}</span></span></button></li>)}
-            <li className="px-3 py-1.5 text-[10px] text-text-muted">© OpenStreetMap contributors</li>
+            <li className="px-3 py-1.5 text-[11px] text-text-muted">© OpenStreetMap contributors</li>
           </ul>
         )}
       </div>

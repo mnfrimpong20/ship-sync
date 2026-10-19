@@ -44,7 +44,7 @@ export default function Footer() {
         </div>
         {cols.map((c) => (
           <nav key={c.title} aria-label={c.title} className="lg:col-span-2">
-            <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.14em] text-gold-deep">{c.title}</p>
+            <p className="mb-4 text-xs font-bold uppercase tracking-[0.14em] text-gold-deep">{c.title}</p>
             <ul className="space-y-3">
               {c.links.map(([label, to]) => (
                 <li key={label}><Link to={to} className="text-[15px] text-text-muted transition-colors hover:text-text focus-ring rounded">{label}</Link></li>
@@ -56,7 +56,7 @@ export default function Footer() {
       <div className="container-fluid pb-8"><NeedHelpBar /></div>
       <div className="container-fluid">
         <div className="flex flex-col gap-4 border-t border-border py-6 lg:flex-row lg:items-center lg:gap-6" data-testid="footer-destinations">
-          <p className="shrink-0 text-[11px] font-bold uppercase tracking-[0.14em] text-gold-deep">We ship to</p>
+          <p className="shrink-0 text-xs font-bold uppercase tracking-[0.14em] text-gold-deep">We ship to</p>
           <ul className="flex flex-wrap gap-2">
             {countries.map((c) => (
               <li key={c.code}><Link to={`/quote?destination=${c.code}`} className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border px-3.5 text-sm text-text-muted transition-colors hover:border-gold hover:text-text focus-ring"><span aria-hidden="true"><Flag code={c.code} /></span>{c.name}</Link></li>

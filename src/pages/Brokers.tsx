@@ -19,7 +19,7 @@ export function BrokerCard({ b, cargo }: { b: Broker; cargo?: CargoType }) {
       {b.specialties.length > 0 && <ul className="mt-2 flex flex-wrap gap-1.5">{b.specialties.map((s) => <li key={s}><Pill tone="muted">{s}</Pill></li>)}</ul>}
       <div className="flex-1" />
       <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3 text-xs">{(cargo ? [cargo] : (['barrels', 'vehicle', 'container20'] as CargoType[])).map((c) => <div key={c}><dt className="text-text-muted">{cargoTypes.find((x) => x.id === c)?.label}</dt><dd className="font-semibold tabular-nums">{b.fees[c] != null ? money(b.fees[c]!) : '—'}</dd></div>)}</dl>
-      <p className="mt-2 text-[11px] text-text-muted">{b.licenceAuthority}{b.licenceNo ? ` · ${b.licenceNo}` : ''}{b.dutyAdvance ? ' · can advance duty' : ''}</p>
+      <p className="mt-2 text-xs text-text-muted">{b.licenceAuthority}{b.licenceNo ? ` · ${b.licenceNo}` : ''}{b.dutyAdvance ? ' · can advance duty' : ''}</p>
     </div>
   )
 }
@@ -33,7 +33,7 @@ export function BrokerDirectoryCard({ b, cargo }: { b: Broker; cargo?: CargoType
       <div className="flex items-start gap-3.5">
         <Avatar initials={b.initials} hue={b.hue} size={52} />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">{b.verified && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal"><BadgeCheck size={13} aria-hidden="true" /> Licence checked</span>}{b.dutyAdvance && <span className="inline-flex items-center gap-1 rounded-full border border-gold/50 px-2 py-0.5 text-[11px] font-semibold text-gold-deep">Advances duty</span>}</div>
+          <div className="flex flex-wrap items-center gap-2">{b.verified && <span className="inline-flex items-center gap-1 text-xs font-semibold text-teal"><BadgeCheck size={13} aria-hidden="true" /> Licence checked</span>}{b.dutyAdvance && <span className="inline-flex items-center gap-1 rounded-full border border-gold/50 px-2 py-0.5 text-xs font-semibold text-gold-deep">Advances duty</span>}</div>
           <h3 className="mt-1 truncate !text-[17px] leading-tight"><Link to={`/brokers/${b.id}`} className="focus-ring hover:text-gold-deep" data-testid="broker-name">{b.name}</Link></h3>
           <p className="truncate text-sm leading-5 text-text-muted">{b.company || 'Independent clearing agent'}</p>
         </div>
@@ -44,10 +44,10 @@ export function BrokerDirectoryCard({ b, cargo }: { b: Broker; cargo?: CargoType
       </div>
       <p className="mt-3 flex items-center gap-1.5 text-sm text-text-muted"><Anchor size={13} aria-hidden="true" /> {b.ports.join(' · ')}</p>
       <p className="mt-2 line-clamp-2 text-sm text-text-muted">{b.about}</p>
-      {b.specialties.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{b.specialties.slice(0, 3).map((x) => <li key={x} className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-text-muted">{x}</li>)}</ul>}
+      {b.specialties.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{b.specialties.slice(0, 3).map((x) => <li key={x} className="rounded-md bg-surface-2 px-2 py-0.5 text-xs text-text-muted">{x}</li>)}</ul>}
       <div className="flex-1" />
       <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3 text-center text-xs">{cols.map((c) => <div key={c}><dt className="truncate text-text-muted">{cargoLabel(c)}</dt><dd className={`font-semibold tabular-nums ${cargo === c ? 'text-gold-deep' : ''}`}>{b.fees[c] != null ? money(b.fees[c]!) : '—'}</dd></div>)}</dl>
-      <p className="mt-2 text-center text-[11px] text-text-muted">Replies ~{b.responseHours}h · {b.jobs} job{b.jobs === 1 ? '' : 's'} on Ntemtem</p>
+      <p className="mt-2 text-center text-xs text-text-muted">Replies ~{b.responseHours}h · {b.jobs} job{b.jobs === 1 ? '' : 's'} on Ntemtem</p>
       <div className="mt-4 flex gap-2">
         <Link to={`/brokers/${b.id}`} className="btn-ghost flex-1 !min-h-10 !px-3 text-sm">Profile</Link>
         <Link to={`/brokers/${b.id}#book`} className="btn-gold flex-1 !min-h-10 !px-3 text-sm" data-testid="broker-book">Book</Link>
@@ -90,12 +90,12 @@ export default function BrokersPage() {
     <div className="grid gap-5">
       <fieldset><legend className="label-dark">Country</legend>
         <div className="grid gap-1">
-          <button onClick={() => set({ destination: undefined, port: undefined })} aria-pressed={!dest} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${!dest ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>All countries</span><span className="text-xs opacity-70">{all?.length ?? ''}</span></button>
-          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code, port: undefined })} aria-pressed={dest === c.code} disabled={!count(c.code)} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring disabled:opacity-40 ${dest === c.code ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} data-testid={`bf-country-${c.code}`}><span><Flag code={c.code} /> {c.name}</span><span className="text-xs opacity-70">{count(c.code) || ''}</span></button>)}
+          <button onClick={() => set({ destination: undefined, port: undefined })} aria-pressed={!dest} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${!dest ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>All countries</span><span className="text-xs tabular-nums">{all?.length ?? ''}</span></button>
+          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code, port: undefined })} aria-pressed={dest === c.code} disabled={!count(c.code)} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring disabled:opacity-40 ${dest === c.code ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} data-testid={`bf-country-${c.code}`}><span><Flag code={c.code} /> {c.name}</span><span className="text-xs tabular-nums">{count(c.code) || ''}</span></button>)}
         </div>
       </fieldset>
       <div><label htmlFor="bf-port" className="label-dark">Port</label><select id="bf-port" className="input-dark !min-h-10 text-sm" value={port} onChange={(e) => set({ port: e.target.value || undefined })} data-testid="bf-port"><option value="">Any port</option>{ports.map((p) => <option key={p}>{p}</option>)}</select></div>
-      <div><label htmlFor="bf-cargo" className="label-dark">What you're clearing</label><select id="bf-cargo" className="input-dark !min-h-10 text-sm" value={cargo} onChange={(e) => set({ cargo: e.target.value || undefined })} data-testid="bf-cargo"><option value="">Anything</option>{cargoTypes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select><p className="mt-1 text-[11px] text-text-muted">Shows each broker's fee for it.</p></div>
+      <div><label htmlFor="bf-cargo" className="label-dark">What you're clearing</label><select id="bf-cargo" className="input-dark !min-h-10 text-sm" value={cargo} onChange={(e) => set({ cargo: e.target.value || undefined })} data-testid="bf-cargo"><option value="">Anything</option>{cargoTypes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select><p className="mt-1 text-xs text-text-muted">Shows each broker's fee for it.</p></div>
       <label className="flex min-h-10 cursor-pointer items-center gap-3 text-sm"><input type="checkbox" className="h-5 w-5 accent-gold" checked={verified} onChange={(e) => set({ verified: e.target.checked ? '1' : undefined })} data-testid="bf-verified" /> Licence checked only</label>
       <label className="flex min-h-10 cursor-pointer items-center gap-3 text-sm"><input type="checkbox" className="h-5 w-5 accent-gold" checked={advance} onChange={(e) => set({ advance: e.target.checked ? '1' : undefined })} data-testid="bf-advance" /> Can pay the duty for you</label>
       {(active > 0 || q) && <button onClick={clear} className="btn-ghost !min-h-9 text-sm"><X size={15} aria-hidden="true" /> Clear all</button>}
@@ -223,7 +223,7 @@ export function BrokerProfile() {
               <div className="card-dark p-6 lg:sticky lg:top-24" id="book" data-testid="broker-book-card">
                 <p className="eyebrow mb-1">Book {b.name.split(' ')[0]}</p>
                 <p className="text-sm text-text-muted">Brokers are booked on a shipment so they get the documents, the container and the consignee in one go.</p>
-                <ol className="mt-4 space-y-2 text-sm">{['Open your shipment', `Under Customs clearance, choose ${b.name}`, 'They accept, lodge the papers and post every step to your tracking page'].map((t, i) => <li key={t} className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gold/15 text-[11px] font-bold text-gold-deep">{i + 1}</span>{t}</li>)}</ol>
+                <ol className="mt-4 space-y-2 text-sm">{['Open your shipment', `Under Customs clearance, choose ${b.name}`, 'They accept, lodge the papers and post every step to your tracking page'].map((t, i) => <li key={t} className="flex gap-2"><span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gold/15 text-xs font-bold text-gold-deep">{i + 1}</span>{t}</li>)}</ol>
                 <Link to={bookLink} className="btn-gold mt-5 w-full" data-testid="broker-book-cta">{user ? 'Go to my shipments' : 'Sign in to book'}</Link>
                 <Link to="/duty" className="btn-ghost mt-2 w-full !min-h-10 text-sm"><Calculator size={15} aria-hidden="true" /> Estimate the duty first</Link>
               </div>
@@ -283,7 +283,7 @@ export function BrokerPortal() {
               {j.notes && <div className="sm:col-span-2"><dt className="text-xs text-text-muted">Notes</dt><dd>{j.notes}</dd></div>}
             </dl>
             {d.documents.length > 0 && <div className="mt-4"><p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Documents</p><ul className="mt-1 flex flex-wrap gap-2">{d.documents.map((x) => x.link ? <li key={x.id}><Link to={x.link} target="_blank" className="btn-ghost !min-h-8 !px-2.5 text-xs"><FileText size={12} aria-hidden="true" /> {x.title}</Link></li> : <li key={x.id} className="text-xs text-text-muted">{x.title} (ask the shipper for a share link)</li>)}</ul></div>}
-            <ol className="mt-5 space-y-1.5" aria-label="Steps">{JOB_STEPS.map((st, i) => <li key={st} className={`flex items-center gap-2 text-sm ${i <= idx ? 'text-text' : 'text-text-muted'}`}><span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] ${i < idx ? 'bg-teal text-on-accent' : i === idx ? 'bg-gold text-on-accent' : 'bg-surface-2'}`}>{i < idx ? '✓' : i + 1}</span>{jobStepLabels[st]}</li>)}</ol>
+            <ol className="mt-5 space-y-1.5" aria-label="Steps">{JOB_STEPS.map((st, i) => <li key={st} className={`flex items-center gap-2 text-sm ${i <= idx ? 'text-text' : 'text-text-muted'}`}><span className={`grid h-5 w-5 place-items-center rounded-full text-[11px] ${i < idx ? 'bg-teal text-on-accent' : i === idx ? 'bg-gold text-on-accent' : 'bg-surface-2'}`}>{i < idx ? '✓' : i + 1}</span>{jobStepLabels[st]}</li>)}</ol>
             {!closed && !f && (
               <div className="mt-5 flex flex-wrap gap-2">
                 {next && <button onClick={() => setF({ status: next, note: '', dutyCurrency: j.dutyCurrency ?? (s.destination === 'NG' ? 'NGN' : 'GHS') })} className="btn-gold" data-testid="portal-next">{j.status === 'requested' ? 'Accept the job' : `Mark: ${jobStepLabels[next]}`}</button>}
@@ -325,7 +325,7 @@ export function AdminBrokers() {
       <p className="mt-1 text-text-muted">Licensed agents customers and shippers can book per shipment. Verify a listing once you've seen the licence.</p>
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
-      <div className="mt-6 grid gap-4 sm:grid-cols-3"><StatCard label="Listed" value={list?.length ?? 0} hint="All ports" icon={Landmark} /><StatCard label="Verified" value={list?.filter((b) => b.verified).length ?? 0} hint="Licence checked" icon={BadgeCheck} /><StatCard label="Jobs" value={list?.reduce((n, b) => n + b.jobs, 0) ?? 0} hint="Booked through the platform" icon={FileText} /></div>
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4"><StatCard label="Listed" value={list?.length ?? 0} hint="All ports" icon={Landmark} /><StatCard label="Verified" value={list?.filter((b) => b.verified).length ?? 0} hint="Licence checked" icon={BadgeCheck} /><StatCard label="Jobs" value={list?.reduce((n, b) => n + b.jobs, 0) ?? 0} hint="Booked through the platform" icon={FileText} /></div>
       <div className="mt-4 flex justify-end">{!form && <button onClick={() => setForm(blank())} className="btn-gold !min-h-9 !px-4 text-sm" data-testid="new-broker">Add a broker</button>}</div>
       {form && (
         <form onSubmit={(e) => { e.preventDefault(); void act(async () => { if (form.id) await brokersApi.update(form.id, form); else await brokersApi.create(form); setForm(null) }, form.id ? 'Broker updated.' : 'Broker listed.', 'save') }} className="card-dark mt-4 grid gap-3 p-5 sm:grid-cols-2" aria-label="Broker form" data-testid="broker-form">
@@ -340,14 +340,14 @@ export function AdminBrokers() {
           <label className="text-xs text-text-muted sm:col-span-2">Email (receives job links)<input type="email" className="input-dark mt-1 !min-h-9 text-sm" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
           <label className="text-xs text-text-muted sm:col-span-2">About<textarea rows={2} className="input-dark mt-1 py-2 text-sm" value={form.about} onChange={(e) => setForm({ ...form, about: e.target.value })} /></label>
           <label className="text-xs text-text-muted sm:col-span-2">Specialties (comma-separated)<input className="input-dark mt-1 !min-h-9 text-sm" value={form.specialties.join(', ')} onChange={(e) => setForm({ ...form, specialties: e.target.value.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 8) })} /></label>
-          <div className="grid grid-cols-4 gap-2 sm:col-span-2">{cargoTypes.map((c) => <label key={c.id} className="text-[11px] text-text-muted">{c.label}<input type="number" min={0} className="input-dark mt-1 !min-h-8 text-xs tabular-nums" value={form.fees[c.id] ?? ''} onChange={(e) => fee(c.id, e.target.value)} /></label>)}</div>
+          <div className="grid grid-cols-4 gap-2 sm:col-span-2">{cargoTypes.map((c) => <label key={c.id} className="text-xs text-text-muted">{c.label}<input type="number" min={0} className="input-dark mt-1 !min-h-8 text-xs tabular-nums" value={form.fees[c.id] ?? ''} onChange={(e) => fee(c.id, e.target.value)} /></label>)}</div>
           <div className="flex flex-wrap gap-4 text-sm sm:col-span-2"><label className="inline-flex items-center gap-2"><input type="checkbox" className="h-4 w-4 accent-[var(--color-gold)]" checked={form.verified} onChange={(e) => setForm({ ...form, verified: e.target.checked })} /> Verified</label><label className="inline-flex items-center gap-2"><input type="checkbox" className="h-4 w-4 accent-[var(--color-gold)]" checked={form.dutyAdvance} onChange={(e) => setForm({ ...form, dutyAdvance: e.target.checked })} /> Advances duty</label><label className="inline-flex items-center gap-2"><input type="checkbox" className="h-4 w-4 accent-[var(--color-gold)]" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /> Listed</label><label className="inline-flex items-center gap-2">Replies in <input type="number" min={1} className="input-dark !min-h-8 !w-16 text-xs tabular-nums" value={form.responseHours} onChange={(e) => setForm({ ...form, responseHours: Number(e.target.value) || 24 })} /> h</label></div>
           <div className="flex justify-end gap-2 sm:col-span-2"><button type="button" onClick={() => setForm(null)} className="btn-ghost !min-h-9 !px-4 text-sm">Cancel</button><button disabled={busy === 'save'} className="btn-gold !min-h-9 !px-4 text-sm disabled:opacity-60">{busy === 'save' ? 'Saving…' : form.id ? 'Save' : 'List broker'}</button></div>
         </form>
       )}
       <ul className="mt-4 grid gap-3 md:grid-cols-2">
         {list?.map((b) => (
-          <li key={b.id} className={`card-dark p-4 ${b.active ? '' : 'opacity-60'}`} data-testid="admin-broker-row">
+          <li key={b.id} className={`card-dark p-4 ${b.active ? '' : 'dimmed'}`} data-testid="admin-broker-row">
             <div className="flex items-start justify-between gap-2"><div className="flex min-w-0 items-center gap-2"><Avatar initials={b.initials} hue={b.hue} size={32} /><div className="min-w-0"><p className="truncate text-sm font-semibold">{b.name}{b.verified && <BadgeCheck size={13} className="ml-1 inline text-teal" />}</p><p className="truncate text-xs text-text-muted">{b.company || 'Independent'} · {b.countryName} · {b.ports.join(', ')} · {b.jobs} job{b.jobs === 1 ? '' : 's'}</p></div></div><div className="flex gap-1.5"><button onClick={() => act(() => brokersApi.update(b.id, { verified: !b.verified }), b.verified ? 'Verification removed.' : 'Broker verified.', b.id)} disabled={busy === b.id} className="btn-ghost !min-h-8 !px-2.5 text-xs">{b.verified ? 'Unverify' : 'Verify'}</button><button onClick={() => setForm({ id: b.id, name: b.name, company: b.company, country: b.country, ports: b.ports, licenceNo: b.licenceNo, licenceAuthority: b.licenceAuthority, phone: b.phone, whatsapp: b.whatsapp, email: b.email, about: b.about, specialties: b.specialties, fees: b.fees, dutyAdvance: b.dutyAdvance, responseHours: b.responseHours, verified: b.verified, active: b.active })} className="btn-ghost !min-h-8 !px-2.5 text-xs">Edit</button></div></div>
           </li>
         ))}

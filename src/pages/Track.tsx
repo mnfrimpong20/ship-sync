@@ -170,8 +170,8 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
             <div className="relative h-2 overflow-hidden rounded-full bg-surface-2">
               <motion.div className="absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,var(--color-teal),var(--color-gold))]" initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} />
             </div>
-            <p className="mt-2 flex justify-between text-[11px] text-text-muted md:hidden"><span className="font-semibold text-text">{statusLabels[s.status]}</span><span>step {idx + 1} of {flow.length}</span></p>
-            <ol className="mt-3 hidden grid-cols-8 gap-1 text-[11px] text-text-muted md:grid">
+            <p className="mt-2 flex justify-between text-xs text-text-muted md:hidden"><span className="font-semibold text-text">{statusLabels[s.status]}</span><span>step {idx + 1} of {flow.length}</span></p>
+            <ol className="mt-3 hidden grid-cols-8 gap-1 text-xs text-text-muted md:grid">
               {flow.map((st, i) => <li key={st} className={i <= idx ? 'text-text' : ''}>{statusLabels[st]}</li>)}
             </ol>
           </div>

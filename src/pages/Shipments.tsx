@@ -1,9 +1,12 @@
 import { BrandLoader } from '../components/BrandLoader'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { AlertTriangle, Bot, ChevronDown, Hourglass, Container, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Filter, Package, Plane, Plus, Radar, Search, Ship, Tag, X } from 'lucide-react'
 import { useStore } from '../lib/store'
+import { BulkBar } from '../components/ShipmentBulk'
+import { useT } from '../lib/i18n'
 import { countries, countryByCode, flowFor, flowIndex, nextStatus, statusLabels, statusOrder, type Handover, type Mode, type Shipment, type ShipmentStatus } from '../lib/data'
 import { clientsApi, type Client } from '../lib/clients'
 import { Empty, ModeBadge, Pill, fmtDate } from '../components/ui'
@@ -57,9 +60,43 @@ function TrackingForm({ s, onDone }: { s: Shipment; onDone: (msg: string) => voi
       {s.mode === 'air'
         ? <div><label htmlFor={`fl-${s.id}`} className="label-dark">Flight callsign (ICAO)</label><input id={`fl-${s.id}`} className="input-dark !min-h-10 uppercase" placeholder="e.g. CLX775" value={tf.flight} onChange={(e) => setTf({ ...tf, flight: e.target.value })} required /></div>
         : <div className="grid gap-2 sm:grid-cols-2"><div><label htmlFor={`vn-${s.id}`} className="label-dark">Vessel name</label><input id={`vn-${s.id}`} className="input-dark !min-h-10" placeholder="e.g. MSC Alessia" value={tf.vesselName} onChange={(e) => setTf({ ...tf, vesselName: e.target.value })} /></div><div><label htmlFor={`mm-${s.id}`} className="label-dark">MMSI (9 digits)</label><input id={`mm-${s.id}`} className="input-dark !min-h-10 font-mono" placeholder="e.g. 636019825" inputMode="numeric" value={tf.mmsi} onChange={(e) => setTf({ ...tf, mmsi: e.target.value.replace(/\D/g, '').slice(0, 9) })} /></div></div>}
-      <p className="text-[11px] text-text-muted">{s.mode === 'air' ? 'The ICAO callsign is on the airway bill (British Airways 75 = BAW75).' : 'The MMSI is on the bill of lading or any vessel-tracking site; it switches the customer’s tracking page to the live AIS position.'}</p>
+      <p className="text-xs text-text-muted">{s.mode === 'air' ? 'The ICAO callsign is on the airway bill (British Airways 75 = BAW75).' : 'The MMSI is on the bill of lading or any vessel-tracking site; it switches the customer’s tracking page to the live AIS position.'}</p>
       <div className="flex justify-end"><button disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60">{busy ? 'Saving…' : 'Save tracking'}</button></div>
     </form>
+  )
+}
+
+/** Everything about one shipment: tracking, documents, chat on the left; the office cards on the right. */
+function ShipmentPanel({ s, tracking, setTracking, onToast, onClosed }: { s: Shipment; tracking: string | null; setTracking: (id: string | null) => void; onToast: (m: string) => void; onClosed: () => void }) {
+  const { refresh } = useStore()
+  const setToast = onToast; const setOpen = (_: null) => onClosed()
+  return (
+                            <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="min-w-0 space-y-4">
+        <div className="rounded-xl border border-border bg-surface p-4"><ShipmentDetail s={s} compact /></div>
+        <DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} />
+        <PackingList shipmentId={s.id} destination={s.destination} />
+        <ShipmentChat shipmentId={s.id} office />
+      </div>
+      <div className="min-w-0 space-y-4">
+        <ShipmentManage s={s} onChanged={async (m) => { await refresh(); setToast(m) }} onDeleted={async (m) => { setOpen(null); await refresh(); setToast(m) }} />
+        <ReviewCard shipmentId={s.id} /><DisputeCard shipmentId={s.id} />
+        <ExportCard shipmentId={s.id} />
+        <ReceiverChargesCard shipmentId={s.id} />
+        <MeasureCard shipmentId={s.id} />
+        <PriceAdjustmentCard shipmentId={s.id} />
+        <PackingSuppliesCard shipmentId={s.id} />
+        <PaymentCard shipmentId={s.id} />
+        {s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}
+        <PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} />
+        <RecipientPanel key={s.consigneeId ?? 'none'} shipmentId={s.id} shipmentRef={s.ref} status={s.status} />
+        <InsuranceCard shipmentId={s.id} cargo={s.cargo} />
+        <CustomsCard shipmentId={s.id} destination={s.destination} />
+        <DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} />
+        {s.status !== 'delivered' && <div className="rounded-xl border border-border bg-surface p-4"><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">Live tracking</p>{tracking === s.id ? <TrackingForm s={s} onDone={(m) => { setTracking(null); setToast(m) }} /> : <button onClick={() => setTracking(s.id)} className="btn-ghost !min-h-9 w-full text-xs">{s.flight || s.vesselName ? 'Edit tracking details' : `Add ${s.mode === 'air' ? 'flight' : 'vessel & MMSI'}`}</button>}</div>}
+        <div className="rounded-xl border border-border bg-surface p-4 text-xs text-text-muted"><p className="mb-1 font-semibold uppercase tracking-wider">Links</p><ul className="space-y-1"><li><Link to={`/track?ref=${s.ref}`} className="text-gold-deep hover:underline">Customer tracking page ↗</Link></li><li><Link to={`/dashboard/labels?shipments=${s.id}`} className="text-gold-deep hover:underline">Print piece labels (stickers)</Link></li>{s.clientId && <li><Link to={`/dashboard/clients/${s.clientId}?tab=shipments`} className="text-gold-deep hover:underline">Client record — {s.customer}</Link></li>}{s.clientId && <li><Link to={`/dashboard/clients/${s.clientId}?tab=invoices`} className="text-gold-deep hover:underline">Invoices for this client</Link></li>}{(s.mmsi || s.flight) && <li><Link to={s.mmsi ? `/live?vessel=${s.mmsi}` : `/live?flight=${s.flight}`} className="text-gold-deep hover:underline">Show on live map</Link></li>}</ul></div>
+      </div>
+    </div>
   )
 }
 
@@ -87,17 +124,31 @@ function NewShipmentModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function Shipments() {
-  const { ready, user, shipments, advanceShipment, refresh } = useStore()
+  const t = useT()
+  const { ready, user, shipments, advanceShipment } = useStore()
   const [prefsOpen, setPrefsOpen] = useState(false)
   const [sp, setSp] = useSearchParams()
   const bucket = (sp.get('b') as Bucket | null) ?? 'active'
   const q = sp.get('q') ?? ''; const mode = (sp.get('mode') as Mode | null) ?? ''; const dest = sp.get('destination') ?? ''; const sort = (sp.get('sort') as Sort | null) ?? 'newest'; const page = Math.max(1, Number(sp.get('page') ?? 1))
   const set = (patch: Record<string, string | undefined>, keepPage = false) => { const n = new URLSearchParams(sp); for (const [k, v] of Object.entries(patch)) { if (v) n.set(k, v); else n.delete(k) } if (!keepPage) n.delete('page'); setSp(n, { replace: true }) }
   const [typed, setTyped] = useState(q)
+  useEffect(() => { setTyped(q) }, [q])
   useEffect(() => { const t = setTimeout(() => { if (typed !== q) set({ q: typed }) }, 300); return () => clearTimeout(t) }, [typed]) // eslint-disable-line react-hooks/exhaustive-deps
   const [open, setOpen] = useState<string | null>(null)
   const [tracking, setTracking] = useState<string | null>(null)
   const [modal, setModal] = useState(false)
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [sheet, setSheet] = useState<string | null>(null)
+  const sheetBack = useRef<HTMLButtonElement>(null); const sheetFrom = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!sheet) return
+    const prev = document.body.style.overflow; document.body.style.overflow = 'hidden'; setTimeout(() => sheetBack.current?.focus(), 30)
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') closeSheet() }
+    window.addEventListener('keydown', k); return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', k) }
+  }, [sheet]) // eslint-disable-line react-hooks/exhaustive-deps
+  const closeSheet = () => { setSheet(null); setTimeout(() => sheetFrom.current?.focus(), 30) }
+  const openSheet = (id: string) => { sheetFrom.current = document.activeElement as HTMLElement; setSheet(id) }
+  const togglePick = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const [toast, setToast] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
   const [containers, setContainers] = useState<ContainerRec[]>([])
   useEffect(() => { if (ready && user?.role === 'shipper' && user.staffRole !== 'driver') containersApi.list().then(setContainers).catch(() => {}) }, [ready, user])
@@ -125,89 +176,65 @@ export default function Shipments() {
     const lines = list.map((s) => [s.ref, statusLabels[s.status], s.mode, s.origin, countryByCode(s.destination)?.name ?? s.destination, s.cargo, s.description, s.customer, s.eta ?? '', s.flight ?? s.vesselName ?? '', s.mmsi ?? ''].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
     const blob = new Blob([[head.join(','), ...lines].join('\n')], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `shipments-${today()}.csv`; a.click(); URL.revokeObjectURL(a.href)
   }
-  const chip = (b: Bucket, label: string, n: number, tone = '') => <button key={b} onClick={() => set({ b: b === 'active' ? undefined : b })} aria-pressed={bucket === b} className={`rounded-full border px-3 py-1.5 text-sm focus-ring ${bucket === b ? 'border-gold bg-gold/15 text-gold-deep font-semibold' : 'border-border text-text-muted hover:text-text'} ${tone}`}>{label} <span className="tabular-nums opacity-70">{n}</span></button>
+  const chip = (b: Bucket, label: string, n: number, tone = '') => <button key={b} onClick={() => set({ b: b === 'active' ? undefined : b })} aria-pressed={bucket === b} className={`inline-flex min-h-10 items-center gap-1 rounded-full border px-3.5 text-sm focus-ring ${bucket === b ? 'border-gold bg-gold/15 text-gold-deep font-semibold' : 'border-border text-text-muted hover:text-text'} ${tone}`}>{label} <span className="tabular-nums">{n}</span></button>
 
   return (
     <div className="bg-bg text-text">
-      <div className="container-x py-10 md:py-14">
+      <div className={`container-x py-10 md:py-14 ${picked.size ? 'pb-40' : ''}`}>
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Client shipments</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{counts.active} active shipment{counts.active === 1 ? '' : 's'}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">One row per client booking — from accepted quotes or booked by you. A container holds many shipments. Status changes go straight to the client’s tracking page.</motion.p></div>
-            <motion.div variants={fadeUp} className="flex gap-2"><Link to={`/dashboard/labels?shipments=${rows.filter((s) => s.status !== 'delivered').map((s) => s.id).join(',')}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Labels for every active shipment on this page"><Tag size={15} aria-hidden="true" /> Print labels</Link><button onClick={exportCsv} className="btn-ghost !min-h-10 !px-4 text-sm"><Download size={15} aria-hidden="true" /> Export CSV</button>{user.staffRole !== 'driver' && <button onClick={() => setPrefsOpen((v) => !v)} aria-expanded={prefsOpen} className="btn-ghost !min-h-10 !px-4 text-sm" data-testid="prefs-toggle"><Bot size={15} aria-hidden="true" /> Automation</button>}<button onClick={() => setModal(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> New shipment</button></motion.div>
+            <div><motion.p variants={fadeUp} className="eyebrow mb-1">{t('Client shipments')}</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{t(counts.active === 1 ? '{n} active shipment' : '{n} active shipments', { n: counts.active })}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">{t('One row per client booking — from accepted quotes or booked by you. A container holds many shipments. Status changes go straight to the client’s tracking page.')}</motion.p></div>
+            <motion.div variants={fadeUp} className="flex flex-wrap gap-2"><Link to={`/dashboard/labels?shipments=${rows.filter((s) => s.status !== 'delivered').map((s) => s.id).join(',')}`} className="btn-ghost !min-h-10 !px-4 text-sm" title="Labels for every active shipment on this page"><Tag size={15} aria-hidden="true" /> {t('Print labels')}</Link><button onClick={exportCsv} className="btn-ghost !min-h-10 !px-4 text-sm"><Download size={15} aria-hidden="true" /> {t('Export CSV')}</button>{user.staffRole !== 'driver' && <button onClick={() => setPrefsOpen((v) => !v)} aria-expanded={prefsOpen} className="btn-ghost !min-h-10 !px-4 text-sm" data-testid="prefs-toggle"><Bot size={15} aria-hidden="true" /> {t('Automation')}</button>}<button onClick={() => setModal(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> {t('New shipment')}</button></motion.div>
           </div>
 
           {prefsOpen && <div className="mt-6 max-w-2xl"><AutomationPrefs onClose={() => setPrefsOpen(false)} /></div>}
           <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-text">{toast}</motion.p>}</AnimatePresence>
           {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
 
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-3 xl:grid-cols-6">
+          <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-6">
             {([['pickup', 'Awaiting pickup', Package, counts.pickup, 'Booked or collected, not yet at port'], ['transit', 'On the water / in the air', Ship, counts.transit, 'At origin port or sailing'], ['destination', 'At destination', Radar, counts.destination, 'Arrived, customs or out for delivery'], ['late', 'Past ETA', AlertTriangle, counts.late, 'Update the ETA or the status'], ['stuck', 'Stuck', Hourglass, counts.stuck, 'Much longer than usual in one status'], ['untracked', 'No live tracking', Plane, counts.untracked, 'Add vessel MMSI or flight']] as const).map(([b, l, I, n, h]) => (
-              <button key={b} onClick={() => set({ b })} aria-pressed={bucket === b} className={`card-dark p-4 text-left transition-colors hover:border-gold/40 focus-ring ${bucket === b ? '!border-gold' : ''} ${(b === 'late' || b === 'stuck') && n > 0 ? 'border-l-4 border-l-danger' : ''}`}>
-                <div className="flex items-center justify-between"><p className="text-xs text-text-muted">{l}</p><I size={15} className={(b === 'late' || b === 'stuck') && n > 0 ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" /></div>
-                <p className="mt-1 font-heading text-2xl font-bold tabular-nums">{n}</p><p className="text-[11px] text-text-muted">{h}</p>
+              <button key={b} onClick={() => set({ b })} aria-pressed={bucket === b} className={`card-dark p-3.5 text-left transition-colors hover:border-gold/40 focus-ring sm:p-4 ${bucket === b ? '!border-gold' : ''} ${(b === 'late' || b === 'stuck') && n > 0 ? 'border-l-4 border-l-danger' : ''}`}>
+                <div className="flex items-center justify-between"><p className="text-xs text-text-muted">{t(l)}</p><I size={15} className={(b === 'late' || b === 'stuck') && n > 0 ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" /></div>
+                <p className="mt-1 font-heading text-2xl font-bold tabular-nums">{n}</p><p className="hidden text-xs text-text-muted sm:block">{t(h)}</p>
               </button>
             ))}
           </motion.div>
 
           <motion.div variants={fadeUp} className="mt-6 flex flex-wrap items-center gap-2">
-            {chip('active', 'Active', counts.active)}{chip('delivered', 'Delivered', counts.delivered)}{chip('all', 'All', mine.length)}
+            {chip('active', t('Active'), counts.active)}{chip('delivered', t('Delivered'), counts.delivered)}{chip('all', t('All'), mine.length)}
             <span className="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
-            <div className="relative min-w-[220px] flex-1"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" /><input aria-label="Search shipments" className="input-dark !min-h-10 !pl-9 text-sm" placeholder="Search ref, customer, cargo, vessel…" value={typed} onChange={(e) => setTyped(e.target.value)} /></div>
-            <select aria-label="Mode" className="input-dark !min-h-10 !w-auto text-sm" value={mode} onChange={(e) => set({ mode: e.target.value })}><option value="">Air & ocean</option><option value="ocean">Ocean</option><option value="air">Air</option></select>
-            <select aria-label="Destination" className="input-dark !min-h-10 !w-auto text-sm" value={dest} onChange={(e) => set({ destination: e.target.value })}><option value="">All destinations</option>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select>
-            <select aria-label="Sort" className="input-dark !min-h-10 !w-auto text-sm" value={sort} onChange={(e) => set({ sort: e.target.value === 'newest' ? undefined : e.target.value }, true)}><option value="newest">Latest activity</option><option value="eta">ETA soonest</option><option value="status">By stage</option><option value="ref">Reference</option></select>
-            {(q || mode || dest || (bucket !== 'active')) && <button onClick={() => { setTyped(''); setSp(new URLSearchParams(), { replace: true }) }} className="btn-ghost !min-h-10 !px-3 text-sm"><Filter size={14} aria-hidden="true" /> Reset</button>}
+            <div className="relative min-w-[220px] flex-1"><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" /><input aria-label="Search shipments" className="input-dark !min-h-10 !pl-9 text-sm" placeholder={t('Search ref, customer, cargo, vessel…')} value={typed} onChange={(e) => setTyped(e.target.value)} /></div>
+            <select aria-label="Mode" className="input-dark !min-h-10 !w-auto text-sm" value={mode} onChange={(e) => set({ mode: e.target.value })}><option value="">{t('Air & ocean')}</option><option value="ocean">{t('Ocean')}</option><option value="air">{t('Air')}</option></select>
+            <select aria-label="Destination" className="input-dark !min-h-10 !w-auto text-sm" value={dest} onChange={(e) => set({ destination: e.target.value })}><option value="">{t('All destinations')}</option>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select>
+            <select aria-label="Sort" className="input-dark !min-h-10 !w-auto text-sm" value={sort} onChange={(e) => set({ sort: e.target.value === 'newest' ? undefined : e.target.value }, true)}><option value="newest">{t('Latest activity')}</option><option value="eta">{t('ETA soonest')}</option><option value="status">{t('By stage')}</option><option value="ref">{t('Reference')}</option></select>
+            {(q || mode || dest || (bucket !== 'active')) && <button onClick={() => { setTyped(''); setSp(new URLSearchParams(), { replace: true }) }} className="btn-ghost !min-h-10 !px-3 text-sm"><Filter size={14} aria-hidden="true" /> {t('Reset')}</button>}
           </motion.div>
 
           <motion.div variants={fadeUp} className="card-dark mt-4 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[960px] text-sm">
-                <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="w-8 px-3 py-3" /><th className="px-3 py-3">Client</th><th className="px-3 py-3">Reference</th><th className="px-3 py-3">Route</th><th className="px-3 py-3">Cargo</th><th className="px-3 py-3">Stage</th><th className="px-3 py-3">ETA</th><th className="px-3 py-3">Tracking</th><th className="sticky right-0 bg-surface px-3 py-3 text-right shadow-[-8px_0_12px_-10px_rgba(0,0,0,0.25)]">Actions</th></tr></thead>
+                <thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-text-muted"><th className="w-10 pl-3"><label className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg hover:bg-surface-2"><input type="checkbox" className="h-[18px] w-[18px] accent-gold" aria-label={t('Select every shipment on this page')} checked={rows.length > 0 && rows.every((r) => picked.has(r.id))} onChange={(e) => setPicked((p) => { const n = new Set(p); for (const r of rows) { if (e.target.checked) n.add(r.id); else n.delete(r.id) } return n })} data-testid="pick-all" /></label></th><th className="w-8 px-1 py-3"><span className="sr-only">Details</span></th><th className="px-3 py-3">{t('Client')}</th><th className="px-3 py-3">{t('Reference')}</th><th className="px-3 py-3">{t('Route')}</th><th className="px-3 py-3">{t('Cargo')}</th><th className="px-3 py-3">{t('Stage')}</th><th className="px-3 py-3">{t('ETA')}</th><th className="px-3 py-3">{t('Tracking')}</th><th className="sticky right-0 bg-surface px-3 py-3 text-right shadow-[-8px_0_12px_-10px_rgba(0,0,0,0.25)]">{t('Actions')}</th></tr></thead>
                 <tbody>
-                  {rows.length === 0 && <tr><td colSpan={9} className="px-3 py-10"><Empty title={mine.length ? 'No shipments match' : 'No shipments yet'} body={mine.length ? 'Try another filter or search.' : 'When a client accepts your quote it lands here as a shipment — or book one directly for a client.'} action={<button onClick={() => setModal(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> New shipment</button>} /></td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={10} className="px-3 py-10"><Empty title={mine.length ? 'No shipments match' : 'No shipments yet'} body={mine.length ? 'Try another filter or search.' : 'When a client accepts your quote it lands here as a shipment — or book one directly for a client.'} action={<button onClick={() => setModal(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> New shipment</button>} /></td></tr>}
                   {rows.map((s) => {
                     const d = countryByCode(s.destination); const late = isLate(s); const isOpen = open === s.id
                     return (
                       <Fragment key={s.id}>
-                        <tr className={`border-b border-border/70 align-top transition-colors hover:bg-surface-2/60 ${isOpen ? 'bg-surface-2/40' : ''}`}>
-                          <td className="px-3 py-3"><button onClick={() => setOpen(isOpen ? null : s.id)} className="grid h-7 w-7 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text focus-ring" aria-expanded={isOpen} aria-label={`${isOpen ? 'Hide' : 'Show'} details for ${s.ref}`}><ChevronDown size={15} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} /></button></td>
+                        <tr className={`border-b border-border/70 align-top transition-colors hover:bg-surface-2/60 ${isOpen ? 'bg-surface-2/40' : ''} ${picked.has(s.id) ? '!bg-gold/5' : ''}`}>
+                          <td className="pl-3 pt-1.5"><label className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg hover:bg-surface-2"><input type="checkbox" className="h-[18px] w-[18px] accent-gold" aria-label={`Select ${s.ref}`} checked={picked.has(s.id)} onChange={() => togglePick(s.id)} data-testid="pick-row" /></label></td>
+                          <td className="px-1 py-3"><button onClick={() => setOpen(isOpen ? null : s.id)} className="grid h-9 w-9 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text focus-ring" aria-expanded={isOpen} aria-label={`${isOpen ? 'Hide' : 'Show'} details for ${s.ref}`}><ChevronDown size={15} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} /></button></td>
                           <td className="px-3 py-3"><p className="font-semibold">{s.clientId ? <Link to={`/dashboard/clients/${s.clientId}`} className="hover:text-gold-deep focus-ring">{s.customer}</Link> : s.customer}</p></td>
                           <td className="px-3 py-3"><Link to={`/track?ref=${s.ref}`} className="font-mono text-xs text-gold-deep hover:underline focus-ring">{s.ref}</Link><div className="mt-1"><ModeBadge mode={s.mode} /></div></td>
                           <td className="whitespace-nowrap px-3 py-3"><p className="font-semibold">{s.origin}</p><p className="text-xs text-text-muted">→ {d?.name ?? s.destination}</p></td>
                           <td className="max-w-[220px] px-3 py-3"><p className="truncate" title={s.description}>{s.description || '—'}</p><p className="text-xs capitalize text-text-muted">{s.cargo.replace('container', 'container ')}</p></td>
-                          <td className="px-3 py-3"><Pill tone={s.status === 'delivered' ? 'green' : late ? 'danger' : 'teal'}>{statusLabels[s.status]}</Pill><div className="mt-1.5"><Progress status={s.status} handover={s.handover} /></div>{!s.consigneeId && s.status !== 'delivered' && <button onClick={() => setOpen(s.id)} className="mt-1.5 block text-[11px] font-medium text-danger hover:underline focus-ring" data-testid="no-recipient">No recipient — add</button>}{s.stuck && <span className="mt-1 block text-[11px] font-medium text-danger" data-testid="stuck-badge">Stuck {s.stuck.days}d (usually {s.stuck.typical})</span>}{s.owedUsd && s.status !== 'delivered' ? <span className="mt-1 block text-[11px] text-gold-deep" data-testid="owed-badge">${s.owedUsd.toLocaleString()} unpaid</span> : null}{s.handover === 'collection' && s.status !== 'delivered' && <span className="mt-1 block text-[11px] text-text-muted">Recipient collects</span>}</td>
-                          <td className="whitespace-nowrap px-3 py-3 tabular-nums">{s.eta ? <span className={late ? 'font-semibold text-danger' : ''}>{fmtDate(s.eta + 'T12:00:00Z')}{late && <span className="block text-[11px] font-normal">past ETA</span>}</span> : '—'}</td>
-                          <td className="px-3 py-3 text-xs">{(s.documents ?? 0) > 0 && <span className="mb-1 mr-1 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted" title={`${s.documents} document${s.documents === 1 ? '' : 's'}`}><FileText size={11} aria-hidden="true" /> {s.documents}</span>}{(() => { const c = containerOf(s); return <>{c && <Link to={`/dashboard/containers/${c.id}`} className="mb-1 inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold-deep hover:border-gold focus-ring"><Container size={11} aria-hidden="true" /> {c.ref}</Link>}{c && <br />}{s.flight || s.vesselName ? <span className="inline-flex items-center gap-1">{s.mode === 'air' ? <Plane size={13} className="text-sky" aria-hidden="true" /> : <Ship size={13} className="text-sea" aria-hidden="true" />}{s.flight ?? s.vesselName}{s.mmsi ? <span className="text-text-muted"> · {s.mmsi}</span> : ''}</span> : c ? <span className="text-text-muted">Follows container</span> : s.status !== 'delivered' ? <button onClick={() => { setOpen(s.id); setTracking(s.id) }} className="text-gold-deep hover:underline focus-ring">Add tracking</button> : <span className="text-text-muted">—</span>}</> })()}</td>
-                          <td className="sticky right-0 bg-surface px-3 py-3 text-right shadow-[-8px_0_12px_-10px_rgba(0,0,0,0.25)]"><div className="inline-flex gap-1.5">{s.status === 'ready_for_collection' ? <button onClick={() => setOpen(s.id)} className="btn-gold !min-h-8 whitespace-nowrap !px-2.5 text-xs" data-testid="handover-btn">Hand over</button> : s.status !== 'delivered' && (s.autoBy ? <AutoTag s={s} onOverride={() => setOpen(s.id)} /> : <button onClick={() => advance(s)} disabled={busy} className="btn-ghost !min-h-8 whitespace-nowrap !px-2.5 text-xs disabled:opacity-60" data-testid="next-step">Next step <ChevronRight size={13} aria-hidden="true" /></button>)}<Link to={`/dashboard/labels?shipments=${s.id}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Print labels for ${s.ref}`} title="Print labels"><Tag size={13} /></Link><Link to={`/track?ref=${s.ref}`} className="grid h-8 w-8 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Open tracking page for ${s.ref}`} title="Tracking page"><ExternalLink size={13} /></Link></div>{!s.autoBy && s.handover !== 'collection' && (s.status === 'arrived' || s.status === 'customs') && <Link to="/dashboard/routes" className="mt-1 block text-[11px] text-gold-deep hover:underline" data-testid="plan-delivery">Add to a delivery run to automate</Link>}</td>
+                          <td className="px-3 py-3"><Pill tone={s.status === 'delivered' ? 'green' : late ? 'danger' : 'teal'}>{t(statusLabels[s.status])}</Pill><div className="mt-1.5"><Progress status={s.status} handover={s.handover} /></div>{!s.consigneeId && s.status !== 'delivered' && <button onClick={() => setOpen(s.id)} className="mt-1.5 block text-xs font-medium text-danger hover:underline focus-ring" data-testid="no-recipient">{t('No recipient — add')}</button>}{s.stuck && <span className="mt-1 block text-xs font-medium text-danger" data-testid="stuck-badge">Stuck {s.stuck.days}d (usually {s.stuck.typical})</span>}{s.owedUsd && s.status !== 'delivered' ? <span className="mt-1 block text-xs text-gold-deep" data-testid="owed-badge">${s.owedUsd.toLocaleString()} unpaid</span> : null}{s.handover === 'collection' && s.status !== 'delivered' && <span className="mt-1 block text-xs text-text-muted">Recipient collects</span>}</td>
+                          <td className="whitespace-nowrap px-3 py-3 tabular-nums">{s.eta ? <span className={late ? 'font-semibold text-danger' : ''}>{fmtDate(s.eta + 'T12:00:00Z')}{late && <span className="block text-xs font-normal">past ETA</span>}</span> : '—'}</td>
+                          <td className="px-3 py-3 text-xs">{(s.documents ?? 0) > 0 && <span className="mb-1 mr-1 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-text-muted" title={`${s.documents} document${s.documents === 1 ? '' : 's'}`}><FileText size={11} aria-hidden="true" /> {s.documents}</span>}{(() => { const c = containerOf(s); return <>{c && <Link to={`/dashboard/containers/${c.id}`} className="mb-1 inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-xs font-medium text-gold-deep hover:border-gold focus-ring"><Container size={11} aria-hidden="true" /> {c.ref}</Link>}{c && <br />}{s.flight || s.vesselName ? <span className="inline-flex items-center gap-1">{s.mode === 'air' ? <Plane size={13} className="text-sky" aria-hidden="true" /> : <Ship size={13} className="text-sea" aria-hidden="true" />}{s.flight ?? s.vesselName}{s.mmsi ? <span className="text-text-muted"> · {s.mmsi}</span> : ''}</span> : c ? <span className="text-text-muted">Follows container</span> : s.status !== 'delivered' ? <button onClick={() => { setOpen(s.id); setTracking(s.id) }} className="text-gold-deep hover:underline focus-ring">Add tracking</button> : <span className="text-text-muted">—</span>}</> })()}</td>
+                          <td className="sticky right-0 bg-surface px-3 py-3 text-right shadow-[-8px_0_12px_-10px_rgba(0,0,0,0.25)]"><div className="inline-flex gap-1.5">{s.status === 'ready_for_collection' ? <button onClick={() => setOpen(s.id)} className="btn-gold !min-h-9 whitespace-nowrap !px-2.5 text-xs" data-testid="handover-btn">{t('Hand over')}</button> : s.status !== 'delivered' && (s.autoBy ? <AutoTag s={s} onOverride={() => setOpen(s.id)} /> : <button onClick={() => advance(s)} disabled={busy} className="btn-ghost !min-h-9 whitespace-nowrap !px-2.5 text-xs disabled:opacity-60" data-testid="next-step">{t('Next step')} <ChevronRight size={13} aria-hidden="true" /></button>)}<Link to={`/dashboard/labels?shipments=${s.id}`} className="grid h-9 w-9 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Print labels for ${s.ref}`} title="Print labels"><Tag size={13} /></Link><Link to={`/track?ref=${s.ref}`} className="grid h-9 w-9 place-items-center rounded-lg border border-border text-text-muted hover:text-text focus-ring" aria-label={`Open tracking page for ${s.ref}`} title="Tracking page"><ExternalLink size={13} /></Link></div>{!s.autoBy && s.handover !== 'collection' && (s.status === 'arrived' || s.status === 'customs') && <Link to="/dashboard/routes" className="mt-1 block text-xs text-gold-deep hover:underline" data-testid="plan-delivery">Add to a delivery run to automate</Link>}</td>
                         </tr>
                         {isOpen && (
-                          <tr className="border-b border-border/70 bg-surface-2/30"><td /><td colSpan={8} className="px-3 pb-5 pt-2">
-                            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-                              <div className="space-y-4">
-                                <div className="rounded-xl border border-border bg-surface p-4"><ShipmentDetail s={s} compact /></div>
-                                <DocumentsPanel shipmentId={s.id} shipmentRef={s.ref} />
-                                <PackingList shipmentId={s.id} destination={s.destination} />
-                                <ShipmentChat shipmentId={s.id} office />
-                              </div>
-                              <div className="space-y-4">
-                                <ShipmentManage s={s} onChanged={async (m) => { await refresh(); setToast(m) }} onDeleted={async (m) => { setOpen(null); await refresh(); setToast(m) }} />
-                                <ReviewCard shipmentId={s.id} /><DisputeCard shipmentId={s.id} />
-                                <ExportCard shipmentId={s.id} />
-                                <ReceiverChargesCard shipmentId={s.id} />
-                                <MeasureCard shipmentId={s.id} />
-                                <PriceAdjustmentCard shipmentId={s.id} />
-                                <PackingSuppliesCard shipmentId={s.id} />
-                                <PaymentCard shipmentId={s.id} />
-                                {s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}
-                                <PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} />
-                                <RecipientPanel key={s.consigneeId ?? 'none'} shipmentId={s.id} shipmentRef={s.ref} status={s.status} />
-                                <InsuranceCard shipmentId={s.id} cargo={s.cargo} />
-                                <CustomsCard shipmentId={s.id} destination={s.destination} />
-                                <DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} />
-                                {s.status !== 'delivered' && <div className="rounded-xl border border-border bg-surface p-4"><p className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-muted">Live tracking</p>{tracking === s.id ? <TrackingForm s={s} onDone={(m) => { setTracking(null); setToast(m) }} /> : <button onClick={() => setTracking(s.id)} className="btn-ghost !min-h-9 w-full text-xs">{s.flight || s.vesselName ? 'Edit tracking details' : `Add ${s.mode === 'air' ? 'flight' : 'vessel & MMSI'}`}</button>}</div>}
-                                <div className="rounded-xl border border-border bg-surface p-4 text-xs text-text-muted"><p className="mb-1 font-semibold uppercase tracking-wider">Links</p><ul className="space-y-1"><li><Link to={`/track?ref=${s.ref}`} className="text-gold-deep hover:underline">Customer tracking page ↗</Link></li><li><Link to={`/dashboard/labels?shipments=${s.id}`} className="text-gold-deep hover:underline">Print piece labels (stickers)</Link></li>{s.clientId && <li><Link to={`/dashboard/clients/${s.clientId}?tab=shipments`} className="text-gold-deep hover:underline">Client record — {s.customer}</Link></li>}{s.clientId && <li><Link to={`/dashboard/clients/${s.clientId}?tab=invoices`} className="text-gold-deep hover:underline">Invoices for this client</Link></li>}{(s.mmsi || s.flight) && <li><Link to={s.mmsi ? `/live?vessel=${s.mmsi}` : `/live?flight=${s.flight}`} className="text-gold-deep hover:underline">Show on live map</Link></li>}</ul></div>
-                              </div>
-                            </div>
+                          <tr className="border-b border-border/70 bg-surface-2/30"><td colSpan={2} /><td colSpan={8} className="px-3 pb-5 pt-2">
+                            <ShipmentPanel s={s} tracking={tracking} setTracking={setTracking} onToast={setToast} onClosed={() => setOpen(null)} />
                           </td></tr>
                         )}
                       </Fragment>
@@ -216,14 +243,54 @@ export default function Shipments() {
                 </tbody>
               </table>
             </div>
+            <ul className="divide-y divide-border md:hidden" aria-label="Shipments" data-testid="ship-cards">
+              {rows.length === 0 && <li className="p-6"><Empty title={mine.length ? 'No shipments match' : 'No shipments yet'} body={mine.length ? 'Try another filter or search.' : 'When a client accepts your quote it lands here as a shipment.'} /></li>}
+              {rows.map((s) => {
+                const d = countryByCode(s.destination); const late = isLate(s); const c = containerOf(s)
+                return (
+                  <li key={s.id} className={`flex gap-1 py-3 pl-1 pr-3 ${picked.has(s.id) ? 'bg-gold/5' : ''}`} data-testid="ship-card">
+                    <label className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center"><input type="checkbox" className="h-5 w-5 accent-gold" aria-label={`Select ${s.ref}`} checked={picked.has(s.id)} onChange={() => togglePick(s.id)} /></label>
+                    <div className="min-w-0 flex-1">
+                      <button onClick={() => openSheet(s.id)} className="block w-full rounded-lg text-left focus-ring" aria-label={`Open ${s.ref} — ${s.customer}`} data-testid="ship-card-open">
+                        <span className="flex items-center justify-between gap-2"><span className="font-mono text-xs text-gold-deep">{s.ref}</span><ModeBadge mode={s.mode} /></span>
+                        <span className="mt-0.5 block truncate font-semibold">{s.customer}</span>
+                        <span className="block truncate text-sm text-text-muted">{s.origin} → {d?.name ?? s.destination} · {s.description || s.cargo}</span>
+                        <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><Pill tone={s.status === 'delivered' ? 'green' : late ? 'danger' : 'teal'}>{t(statusLabels[s.status])}</Pill><Progress status={s.status} handover={s.handover} />{s.eta && <span className={`text-xs ${late ? 'font-semibold text-danger' : 'text-text-muted'}`}>{late ? `${t('Past ETA')} · ` : `${t('ETA')} `}{fmtDate(s.eta + 'T12:00:00Z')}</span>}</span>
+                        <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+                          {!s.consigneeId && s.status !== 'delivered' && <span className="font-medium text-danger">{t('No recipient')}</span>}
+                          {s.stuck && <span className="font-medium text-danger">Stuck {s.stuck.days}d</span>}
+                          {s.owedUsd && s.status !== 'delivered' ? <span className="text-gold-deep">${s.owedUsd.toLocaleString()} unpaid</span> : null}
+                          {c ? <span className="text-text-muted">In {c.ref}</span> : s.vesselName || s.flight ? <span className="text-text-muted">{s.flight ?? s.vesselName}</span> : null}
+                        </span>
+                      </button>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {s.status === 'ready_for_collection' ? <button onClick={() => openSheet(s.id)} className="btn-gold !min-h-11 !px-3 text-sm">{t('Hand over')}</button> : s.status !== 'delivered' && (s.autoBy ? <AutoTag s={s} onOverride={() => openSheet(s.id)} /> : <button onClick={() => advance(s)} disabled={busy} className="btn-ghost !min-h-11 !px-3 text-sm disabled:opacity-60">{t('Next step')} <ChevronRight size={14} aria-hidden="true" /></button>)}
+                        <Link to={`/dashboard/labels?shipments=${s.id}`} className="grid h-11 w-11 place-items-center rounded-lg border border-border text-text-muted" aria-label={`Print labels for ${s.ref}`}><Tag size={15} /></Link>
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-text-muted">
-              <span>{list.length === 0 ? 'No results' : `Showing ${(cur - 1) * PAGE + 1}–${Math.min(cur * PAGE, list.length)} of ${list.length}`}</span>
-              {pages > 1 && <nav className="flex items-center gap-1" aria-label="Pagination"><button onClick={() => set({ page: String(cur - 1) }, true)} disabled={cur <= 1} className="grid h-8 w-8 place-items-center rounded-md border border-border disabled:opacity-40 focus-ring" aria-label="Previous page"><ChevronLeft size={14} /></button>{Array.from({ length: pages }, (_, i) => i + 1).filter((n) => n === 1 || n === pages || Math.abs(n - cur) <= 1).map((n, i, arr) => <span key={n} className="contents">{i > 0 && arr[i - 1] !== n - 1 && <span className="px-1">…</span>}<button onClick={() => set({ page: String(n) }, true)} aria-current={n === cur ? 'page' : undefined} className={`h-8 min-w-8 rounded-md border px-2 focus-ring ${n === cur ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border'}`}>{n}</button></span>)}<button onClick={() => set({ page: String(cur + 1) }, true)} disabled={cur >= pages} className="grid h-8 w-8 place-items-center rounded-md border border-border disabled:opacity-40 focus-ring" aria-label="Next page"><ChevronRight size={14} /></button></nav>}
+              <span>{list.length === 0 ? t('No results') : t('Showing {a}–{b} of {n}', { a: (cur - 1) * PAGE + 1, b: Math.min(cur * PAGE, list.length), n: list.length })}</span>
+              {pages > 1 && <nav className="flex items-center gap-1" aria-label="Pagination"><button onClick={() => set({ page: String(cur - 1) }, true)} disabled={cur <= 1} className="grid h-10 w-10 place-items-center rounded-md border border-border disabled:opacity-40 focus-ring" aria-label="Previous page"><ChevronLeft size={14} /></button>{Array.from({ length: pages }, (_, i) => i + 1).filter((n) => n === 1 || n === pages || Math.abs(n - cur) <= 1).map((n, i, arr) => <span key={n} className="contents">{i > 0 && arr[i - 1] !== n - 1 && <span className="px-1">…</span>}<button onClick={() => set({ page: String(n) }, true)} aria-current={n === cur ? 'page' : undefined} className={`h-10 min-w-10 rounded-md border px-2 focus-ring ${n === cur ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border'}`}>{n}</button></span>)}<button onClick={() => set({ page: String(cur + 1) }, true)} disabled={cur >= pages} className="grid h-10 w-10 place-items-center rounded-md border border-border disabled:opacity-40 focus-ring" aria-label="Next page"><ChevronRight size={14} /></button></nav>}
             </div>
           </motion.div>
         </motion.div>
       </div>
       <AnimatePresence>{modal && <NewShipmentModal onClose={() => setModal(false)} />}</AnimatePresence>
+      {sheet && (() => { const s = mine.find((x) => x.id === sheet); if (!s) return null; return createPortal(
+        <div role="dialog" aria-modal="true" aria-labelledby="ship-sheet-h" className="ss-app fixed inset-0 z-[55] overflow-y-auto bg-bg text-text md:hidden" data-testid="ship-sheet">
+          <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-bg/95 px-3 py-2 backdrop-blur-xl"><button ref={sheetBack} onClick={closeSheet} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold focus-ring" data-testid="sheet-back"><ChevronLeft size={18} aria-hidden="true" /> {t('Back to shipments')}</button></div>
+          <div className="overflow-x-hidden px-4 pb-28 pt-4">
+            <h2 id="ship-sheet-h" className="!text-lg"><span className="font-mono text-gold-deep">{s.ref}</span> · {s.customer}</h2>
+            <p className="text-sm text-text-muted">{s.origin} → {countryByCode(s.destination)?.name} · {statusLabels[s.status]}</p>
+            <div className="mt-4"><ShipmentPanel s={s} tracking={tracking} setTracking={setTracking} onToast={setToast} onClosed={closeSheet} /></div>
+          </div>
+        </div>, document.body
+      ) })()}
+      <BulkBar ids={[...picked]} shipments={mine} containers={containers} onClear={() => setPicked(new Set())} onDone={(m) => { setToast(m) }} />
     </div>
   )
 }

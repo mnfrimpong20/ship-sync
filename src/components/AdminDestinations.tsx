@@ -37,7 +37,7 @@ export function AdminDestinations() {
     } finally { setBusy(false); await load() }
   }
   const Field = ({ label, k, placeholder, hint }: { label: string; k: keyof Destination; placeholder?: string; hint?: string }) => (
-    <label className="grid gap-1 text-xs"><span className="text-text-muted">{label}</span><input className="input-dark !min-h-10" value={Array.isArray(editing![k]) ? (editing![k] as string[]).join(', ') : String(editing![k] ?? '')} placeholder={placeholder} onChange={(e) => setEditing({ ...editing!, [k]: Array.isArray(editing![k]) ? split(e.target.value) : e.target.value })} disabled={k === 'code' && !isNew} data-testid={`dest-${k}`} />{hint && <span className="text-[11px] text-text-muted">{hint}</span>}</label>
+    <label className="grid gap-1 text-xs"><span className="text-text-muted">{label}</span><input className="input-dark !min-h-10" value={Array.isArray(editing![k]) ? (editing![k] as string[]).join(', ') : String(editing![k] ?? '')} placeholder={placeholder} onChange={(e) => setEditing({ ...editing!, [k]: Array.isArray(editing![k]) ? split(e.target.value) : e.target.value })} disabled={k === 'code' && !isNew} data-testid={`dest-${k}`} />{hint && <span className="text-xs text-text-muted">{hint}</span>}</label>
   )
   return (
     <div className="mt-8" data-testid="admin-destinations">
@@ -62,7 +62,7 @@ export function AdminDestinations() {
       )}
       <ul className="mt-4 divide-y divide-border rounded-xl border border-border" aria-label="Destinations">
         {list?.map((d) => (
-          <li key={d.code} className={`flex flex-wrap items-start justify-between gap-3 px-4 py-3 ${d.active ? '' : 'opacity-60'}`} data-testid="destination-row">
+          <li key={d.code} className={`flex flex-wrap items-start justify-between gap-3 px-4 py-3 ${d.active ? '' : 'dimmed'}`} data-testid="destination-row">
             <div className="min-w-0">
               <p className="flex flex-wrap items-center gap-2 font-semibold"><Flag code={d.code} /> {d.name} <span className="font-mono text-xs text-text-muted">{d.code}</span>{!d.active && <Pill tone="muted">hidden</Pill>}</p>
               <p className="text-xs text-text-muted">Ports: {d.ports.join(', ') || '—'} · Airports: {d.airports.join(', ') || '—'} · Ocean {d.oceanDays || '—'} d · Air {d.airDays || '—'} d{d.dialCode ? ` · +${d.dialCode}` : ''}</p>

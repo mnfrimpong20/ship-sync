@@ -37,7 +37,7 @@ export default function ReviewsPage() {
           </div>
           {toast && <p role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</p>}
           {error && <p role="alert" className="mt-6 text-sm text-danger">{error}</p>}
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="Rating" value={d ? d.rating.toFixed(1) : '—'} hint={`${d?.count ?? 0} reviews (incl. listing baseline)`} icon={Star} />
             <StatCard label="To reply" value={d?.reviews.filter((r) => !r.reply).length ?? 0} hint="Replies are public" icon={MessageSquare} />
             <StatCard label="Awaiting review" value={d?.awaiting ?? 0} hint="Delivered, not yet rated" icon={Star} />

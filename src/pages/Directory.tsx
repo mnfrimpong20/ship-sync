@@ -14,7 +14,7 @@ const priceLabel = (i: number) => (i === 1 ? '$' : i === 2 ? '$$' : '$$$')
 /* ---------- card ---------- */
 function PlanBadge({ s }: { s: Shipper }) {
   if (s.plan === 'enterprise') return <FeaturedBadge />
-  if (s.plan === 'pro') return <span className="inline-flex items-center gap-1 rounded-full border border-gold/50 px-2 py-0.5 text-[11px] font-semibold text-gold-deep">Pro</span>
+  if (s.plan === 'pro') return <span className="inline-flex items-center gap-1 rounded-full border border-gold/50 px-2 py-0.5 text-xs font-semibold text-gold-deep">Pro</span>
   return null
 }
 
@@ -36,7 +36,7 @@ export function DirectoryCard({ s, quote }: { s: Shipper; quote?: string }) {
         <span className="ml-auto text-xs font-semibold text-text-muted" title="Price level">{priceLabel(s.priceIndex)}</span>
       </div>
       <p className="mt-3 line-clamp-2 text-sm text-text-muted">Ships to {s.destinations.map((d) => countryByCode(d)?.name).filter(Boolean).join(', ')}<span className="text-text-muted"> · from {s.hq}</span></p>
-      {doorish.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{doorish.map((x) => <li key={x} className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-text-muted">{x}</li>)}</ul>}
+      {doorish.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{doorish.map((x) => <li key={x} className="rounded-md bg-surface-2 px-2 py-0.5 text-xs text-text-muted">{x}</li>)}</ul>}
       <div className="flex-1" />
       <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3 text-center text-xs">
         <div><dt className="text-text-muted">On-time</dt><dd className="font-semibold">{s.onTime}%</dd></div>
@@ -162,7 +162,7 @@ function Wizard({ initial, onClose, onApply }: { initial: Partial<Needs>; onClos
                   <div className="flex items-start gap-4">
                     <FitRing fit={m.fit} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">{i === 0 && <span className="rounded-full bg-gold px-2 py-0.5 text-[11px] font-bold text-on-accent">Best match</span>}<PlanBadge s={m.shipper} /><h3 className="!text-base"><Link to={`/shippers/${m.shipper.id}`} className="hover:text-gold-deep focus-ring">{m.shipper.name}</Link></h3>{m.shipper.verified && <VerifiedBadge />}</div>
+                      <div className="flex flex-wrap items-center gap-2">{i === 0 && <span className="rounded-full bg-gold px-2 py-0.5 text-xs font-bold text-on-accent">Best match</span>}<PlanBadge s={m.shipper} /><h3 className="!text-base"><Link to={`/shippers/${m.shipper.id}`} className="hover:text-gold-deep focus-ring">{m.shipper.name}</Link></h3>{m.shipper.verified && <VerifiedBadge />}</div>
                       <p className="text-xs text-text-muted">{m.shipper.tagline} · <Star size={11} className="inline text-gold-deep" aria-hidden="true" /> {m.shipper.rating} ({m.shipper.reviews}) · replies ~{m.shipper.responseHours}h · {priceLabel(m.shipper.priceIndex)}</p>
                       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                         {m.reasons.map((r) => <li key={r} className="inline-flex items-center gap-1 text-teal"><Check size={12} aria-hidden="true" /> {r}</li>)}
@@ -221,8 +221,8 @@ export default function Directory() {
     <div className="grid gap-5">
       <fieldset><legend className="label-dark">Destination</legend>
         <div className="grid gap-1">
-          <button onClick={() => set({ destination: undefined })} aria-pressed={!dest} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${!dest ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>All countries</span><span className="text-xs opacity-70">{res?.total != null && !dest && !q && active === 0 ? res.total : ''}</span></button>
-          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code })} aria-pressed={dest === c.code} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${dest === c.code ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>{c.name}</span><span className="text-xs opacity-70">{facetCount(c.code) ?? ''}</span></button>)}
+          <button onClick={() => set({ destination: undefined })} aria-pressed={!dest} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${!dest ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>All countries</span><span className="text-xs tabular-nums">{res?.total != null && !dest && !q && active === 0 ? res.total : ''}</span></button>
+          {countries.map((c) => <button key={c.code} onClick={() => set({ destination: c.code })} aria-pressed={dest === c.code} className={`flex min-h-9 items-center justify-between rounded-lg px-2.5 text-sm focus-ring ${dest === c.code ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`}><span>{c.name}</span><span className="text-xs tabular-nums">{facetCount(c.code) ?? ''}</span></button>)}
         </div>
       </fieldset>
       <div><label htmlFor="f-origin" className="label-dark">Shipping from</label><select id="f-origin" className="input-dark !min-h-10 text-sm" value={origin} onChange={(e) => set({ origin: e.target.value })}><option value="">Anywhere</option>{origins.map((o) => <option key={o}>{o}</option>)}</select></div>
@@ -313,7 +313,7 @@ export default function Directory() {
             ) : res && res.shippers.length === 0 ? (
               <Empty title="No shippers match" body="Try widening the destination or cargo type — or answer five questions and we’ll match you." action={<div className="flex gap-2"><button onClick={clear} className="btn-ghost !min-h-10 !px-4 text-sm">Clear filters</button><button onClick={() => setWizard(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Sparkles size={15} aria-hidden="true" /> Find my shipper</button></div>} />
             ) : (
-              <motion.div key={`${res?.page}-${res?.shippers.map((s) => s.id).join()}`} initial="hidden" animate="show" variants={stagger} className={`grid gap-5 md:grid-cols-2 xl:grid-cols-3 ${loading ? 'opacity-60' : ''}`} aria-busy={loading}>
+              <motion.div key={`${res?.page}-${res?.shippers.map((s) => s.id).join()}`} initial="hidden" animate="show" variants={stagger} className={`grid gap-5 md:grid-cols-2 xl:grid-cols-3 ${loading ? 'dimmed' : ''}`} aria-busy={loading}>
                 {res?.shippers.map((s) => <DirectoryCard key={s.id} s={s} quote={`/quote?shipper=${s.id}&destination=${dest || s.destinations[0]}${origin ? `&origin=${encodeURIComponent(origin)}` : ''}${mode !== 'either' ? `&mode=${mode}` : ''}${cargo ? `&cargo=${cargo}` : ''}`} />)}
               </motion.div>
             )}

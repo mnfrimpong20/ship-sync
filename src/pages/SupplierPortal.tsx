@@ -108,17 +108,17 @@ export default function SupplierPortalPage() {
           )}
 
           {d.photos.length > 0 && (
-            <motion.div variants={fadeUp} className="card-dark p-5"><p className="eyebrow mb-3"><L k="photos" /></p><ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label="Photos">{d.photos.map((p) => <li key={p.id}><a href={p.url} target="_blank" rel="noreferrer" className="block aspect-square overflow-hidden rounded-lg border border-border bg-surface-2"><img src={p.url} alt={p.title} className="h-full w-full object-cover" loading="lazy" /></a><p className="mt-1 truncate text-[11px] text-text-muted">{p.by} · {fmtDate(p.at)}</p></li>)}</ul></motion.div>
+            <motion.div variants={fadeUp} className="card-dark p-5"><p className="eyebrow mb-3"><L k="photos" /></p><ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label="Photos">{d.photos.map((p) => <li key={p.id}><a href={p.url} target="_blank" rel="noreferrer" className="block aspect-square overflow-hidden rounded-lg border border-border bg-surface-2"><img src={p.url} alt={p.title} className="h-full w-full object-cover" loading="lazy" /></a><p className="mt-1 truncate text-xs text-text-muted">{p.by} · {fmtDate(p.at)}</p></li>)}</ul></motion.div>
           )}
 
           <motion.div variants={fadeUp} className="card-dark p-5">
             <p className="eyebrow mb-3"><L k="history" /></p>
             <ol className="space-y-3 text-sm" aria-label="Updates">
-              {d.updates.map((u) => { const I = kindIcon[u.kind]; return <li key={u.id} className="flex gap-3"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${u.kind === 'delay' ? 'bg-danger/10 text-danger' : 'bg-gold/15 text-gold-deep'}`}><I size={14} aria-hidden="true" /></span><div className="min-w-0"><p className="font-medium"><L k={u.kind} />{u.pct != null && <span className="ml-2 text-xs text-text-muted tabular-nums">{u.pct}%</span>}{u.readyBy && <span className="ml-2 text-xs text-text-muted">→ {fmtDate(u.readyBy)}</span>}</p>{u.body && <p className="whitespace-pre-wrap text-text-muted">{u.body}</p>}<p className="text-[11px] text-text-muted">{u.by} · {fmtDateTime(u.at)}</p></div></li> })}
+              {d.updates.map((u) => { const I = kindIcon[u.kind]; return <li key={u.id} className="flex gap-3"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${u.kind === 'delay' ? 'bg-danger/10 text-danger' : 'bg-gold/15 text-gold-deep'}`}><I size={14} aria-hidden="true" /></span><div className="min-w-0"><p className="font-medium"><L k={u.kind} />{u.pct != null && <span className="ml-2 text-xs text-text-muted tabular-nums">{u.pct}%</span>}{u.readyBy && <span className="ml-2 text-xs text-text-muted">→ {fmtDate(u.readyBy)}</span>}</p>{u.body && <p className="whitespace-pre-wrap text-text-muted">{u.body}</p>}<p className="text-xs text-text-muted">{u.by} · {fmtDateTime(u.at)}</p></div></li> })}
               {d.updates.length === 0 && <li className="text-text-muted">No updates yet. 暂无更新。</li>}
             </ol>
           </motion.div>
-          <p className="text-center text-[11px] text-text-muted">This link is private to your factory. Do not forward it. · 此链接仅供贵厂使用，请勿转发。</p>
+          <p className="text-center text-xs text-text-muted">This link is private to your factory. Do not forward it. · 此链接仅供贵厂使用，请勿转发。</p>
         </motion.div>
       </div>
     </div>

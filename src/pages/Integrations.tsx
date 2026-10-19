@@ -9,9 +9,9 @@ import { NoData, Panel } from '../components/Charts'
 import { LineConnectionsPanel, QuickBooksPanel } from '../components/Connections'
 
 const cls = 'input-dark !min-h-10 text-sm'
-function CopyBox({ text, testid }: { text: string; testid?: string }) {
+function CopyBox({ text, testid, label }: { text: string; testid?: string; label?: string }) {
   const [done, setDone] = useState(false)
-  return <div className="flex gap-2"><input readOnly value={text} onFocus={(e) => e.currentTarget.select()} className={`${cls} flex-1 font-mono text-xs`} data-testid={testid} /><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500) } catch { /* select instead */ } }} className="btn-ghost !min-h-10 !px-3" aria-label="Copy">{done ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}</button></div>
+  return <div className="flex gap-2"><input readOnly aria-label={label ?? (testid === 'widget-script' ? 'Website widget code' : 'Link to copy')} value={text} onFocus={(e) => e.currentTarget.select()} className={`${cls} flex-1 font-mono text-xs`} data-testid={testid} /><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500) } catch { /* select instead */ } }} className="btn-ghost !min-h-10 !px-3" aria-label="Copy">{done ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}</button></div>
 }
 
 function WeeklyReport() {
@@ -96,7 +96,7 @@ function Webhooks() {
       {secret && <div className="mt-3 rounded-lg border border-gold/40 bg-gold/10 p-3 text-sm" data-testid="wh-secret"><p className="mb-1 font-semibold">Signing secret — copy it now, it won’t be shown again</p><CopyBox text={secret} /></div>}
       <ul className="mt-4 divide-y divide-border text-sm">{d.webhooks.map((w: Webhook) => (
         <li key={w.id} className="py-3" data-testid="wh-row">
-          <div className="flex flex-wrap items-center justify-between gap-2"><span className="min-w-0 truncate font-mono text-xs">{w.url}</span><span className={`rounded-full px-2 py-0.5 text-[11px] ${w.active ? 'bg-teal/10 text-teal' : 'bg-danger/10 text-danger'}`}>{w.active ? 'On' : 'Off'}</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><span className="min-w-0 truncate font-mono text-xs">{w.url}</span><span className={`rounded-full px-2 py-0.5 text-xs ${w.active ? 'bg-teal/10 text-teal' : 'bg-danger/10 text-danger'}`}>{w.active ? 'On' : 'Off'}</span></div>
           <p className="mt-0.5 text-xs text-text-muted">{w.events.length ? w.events.join(', ') : 'All events'} · last {w.lastStatus ?? '—'}{w.lastAt ? ` at ${fmtDateTime(w.lastAt)}` : ''}{w.failures ? ` · ${w.failures} failures in a row` : ''}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <button type="button" className="btn-ghost !min-h-8 !px-2.5 text-xs" onClick={async () => { const r = await platformApi.testWebhook(w.id); setMsg({ ...msg, [w.id]: r.ok ? `Delivered (HTTP ${r.status})` : `Failed: ${r.error || r.status}` }); load() }} data-testid="wh-test"><Send size={12} aria-hidden="true" /> Send test</button>

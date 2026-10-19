@@ -74,7 +74,7 @@ export function SupportPage() {
   if (ready && !user) return <Navigate to="/login?next=/support" replace />
   const create = async (e: React.FormEvent) => { e.preventDefault(); setBusy(true); setErr(''); try { const t = await supportApi.create(form); await load(); setSp({ t: t.id }); setForm({ subject: '', category: 'shipment', shipmentRef: '', body: '' }) } catch (er) { setErr(er instanceof Error ? er.message : 'Could not send.') } finally { setBusy(false) } }
   const send = async (e: React.FormEvent) => { e.preventDefault(); if (!open || !reply.trim()) return; setBusy(true); setErr(''); try { const m = await supportApi.reply(open.ticket.id, reply); setOpen({ ticket: { ...open.ticket, status: 'open' }, messages: m }); setReply(''); void load() } catch (er) { setErr(er instanceof Error ? er.message : 'Could not send.') } finally { setBusy(false) } }
-  const badge = (s: Ticket['status']) => <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${s === 'solved' ? 'bg-teal/15 text-teal' : s === 'waiting' ? 'bg-gold/20 text-gold-deep' : 'bg-sky/15 text-sky'}`}>{s === 'open' ? 'With Ntemtem' : s === 'waiting' ? 'Waiting for you' : 'Solved'}</span>
+  const badge = (s: Ticket['status']) => <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${s === 'solved' ? 'bg-teal/15 text-teal' : s === 'waiting' ? 'bg-gold/20 text-gold-deep' : 'bg-sky/15 text-sky'}`}>{s === 'open' ? 'With Ntemtem' : s === 'waiting' ? 'Waiting for you' : 'Solved'}</span>
   return (
     <div className="bg-bg text-text"><div className="container-x max-w-5xl py-10 md:py-14">
       <p className="eyebrow mb-2">Support</p>

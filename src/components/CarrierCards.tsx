@@ -40,7 +40,7 @@ export function VesselCard({ mmsi, v, err = '', onClose, footer, className = 'mb
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`card-dark p-5 ${className}`} aria-live="polite">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="eyebrow !text-[10px]">Vessel</p>
+          <p className="eyebrow !text-[11px]">Vessel</p>
           <h2 className="!text-lg leading-tight">{v?.name || 'Unnamed vessel'}</h2>
           <p className="mt-1 text-xs text-text-muted">{[flag, type].filter(Boolean).join(' · ') || 'Awaiting static data'}</p>
         </div>
@@ -90,7 +90,7 @@ export function FlightCard({ f, err = '', onClose, footer, className = 'mb-4' }:
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`card-dark p-5 ${className}`} aria-live="polite">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="eyebrow !text-[10px]">Aircraft</p>
+          <p className="eyebrow !text-[11px]">Aircraft</p>
           <h2 className="!text-lg leading-tight">{f?.callsign || f?.registration || 'Aircraft'}</h2>
           <p className="mt-1 text-xs text-text-muted">{[f?.route?.airline, f?.description ?? f?.type, f?.registration].filter(Boolean).join(' · ') || 'Awaiting identification'}</p>
         </div>

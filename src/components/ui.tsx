@@ -72,7 +72,7 @@ export function FeaturedMark({ size = 16, className = '', ...rest }: SVGProps<SV
 /** "Featured" pill — gold, navy text, the Featured mark. Only for shippers with paid featured placement. */
 export function FeaturedBadge({ large = false }: { large?: boolean }) {
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gold font-bold text-on-accent ${large ? 'py-1 pl-1 pr-3 text-xs' : 'py-0.5 pl-0.5 pr-2.5 text-[11px]'}`} title="Featured placement — a paid listing on the Enterprise plan" data-testid="featured-badge">
+    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gold font-bold text-on-accent ${large ? 'py-1 pl-1 pr-3 text-xs' : 'py-0.5 pl-0.5 pr-2.5 text-xs'}`} title="Featured placement — a paid listing on the Enterprise plan" data-testid="featured-badge">
       <FeaturedMark size={large ? 20 : 16} aria-hidden="true" /> Featured
     </span>
   )
@@ -81,7 +81,7 @@ export function FeaturedBadge({ large = false }: { large?: boolean }) {
 /** "Ntemtem Verified" — the brand-book badge: gold-tint pill, green mark, navy text. Only for shippers who passed vetting. */
 export function VerifiedBadge({ large = false }: { large?: boolean }) {
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gold-soft font-semibold text-text ${large ? 'py-1 pl-1 pr-3 text-xs' : 'py-0.5 pl-0.5 pr-2.5 text-[11px]'}`} title="Passed Ntemtem vetting: business registration, insurance, warehouse and track record" data-testid="verified-badge">
+    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gold-soft font-semibold text-text ${large ? 'py-1 pl-1 pr-3 text-xs' : 'py-0.5 pl-0.5 pr-2.5 text-xs'}`} title="Passed Ntemtem vetting: business registration, insurance, warehouse and track record" data-testid="verified-badge">
       <VerifiedMark size={large ? 20 : 16} aria-hidden="true" /> Ntemtem Verified
     </span>
   )
@@ -129,7 +129,7 @@ export function ModeBadge({ mode, light = false }: { mode: Mode; light?: boolean
 
 export function Rating({ value, count, light = false }: { value: number; count?: number; light?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1 text-sm ${light ? 'text-ink' : 'text-text'}`} aria-label={`Rated ${value} out of 5${count ? ` from ${count} reviews` : ''}`}>
+    <span className={`inline-flex items-center gap-1 text-sm ${light ? 'text-ink' : 'text-text'}`} role="img" aria-label={`Rated ${value} out of 5${count ? ` from ${count} reviews` : ''}`}>
       <Star size={15} className="fill-gold text-gold-deep" aria-hidden="true" />
       <span className="font-semibold">{value.toFixed(1)}</span>
       {count !== undefined && <span className={light ? 'text-ink-muted' : 'text-text-muted'}>({count})</span>}
@@ -195,7 +195,7 @@ export function Empty({ title, body, action }: { title: string; body: string; ac
   return (
     <div className="card-dark flex flex-col items-center px-6 py-14 text-center">
       <svg className="mb-4 h-16 w-20 text-text-muted" viewBox="0 0 80 64" fill="none" aria-hidden="true"><path d="M6 44h68l-8 12H14z" fill="var(--color-gold)" opacity=".9" /><path d="M20 44V22h14l8 8h14v14" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" opacity=".6" /><path d="M8 40c6-3 10 3 16 0s10 3 16 0 10 3 16 0 10 3 16 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity=".35" /><circle cx="62" cy="14" r="5" stroke="var(--color-gold)" strokeWidth="2" /></svg>
-      <h3 className="text-text">{title}</h3>
+      <h2 className="!text-[1.3rem] !leading-tight text-text">{title}</h2>
       <p className="mt-2 max-w-sm text-sm text-text-muted">{body}</p>
       {action && <div className="mt-5">{action}</div>}
     </div>

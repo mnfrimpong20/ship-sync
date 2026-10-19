@@ -105,7 +105,7 @@ export default function Fleet() {
 
           <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</motion.p>}</AnimatePresence>
 
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="Available" value={counts('available')} hint="Ready to be put on a run" icon={Truck} active={filter === 'available'} onClick={() => setFilter(filter === 'available' ? 'all' : 'available')} />
             <StatCard label="Out on runs" value={counts('on_run')} hint="Busy until the run is done" icon={Truck} active={filter === 'on_run'} onClick={() => setFilter(filter === 'on_run' ? 'all' : 'on_run')} />
             <StatCard label="In maintenance" value={counts('maintenance')} hint={counts('maintenance') ? 'Off the road for now' : 'All vehicles roadworthy'} icon={Wrench} warn={counts('maintenance') > 0} active={filter === 'maintenance'} onClick={() => setFilter(filter === 'maintenance' ? 'all' : 'maintenance')} />
@@ -137,7 +137,7 @@ export default function Fleet() {
               <table className="w-full min-w-[900px] text-sm">
                 <thead><tr className={thead}><Th className="w-8" /><Th>Vehicle</Th><Th>Type</Th><Th>Based at</Th><Th className="text-right">Capacity</Th><Th>Usual driver</Th><Th>Status</Th>{manage && <Th className="text-right">Actions</Th>}</tr></thead>
                 <tbody>
-                  {vehicles === null && !error && <tr><td colSpan={8} className="px-3 py-10 text-center text-text-muted">Loading…</td></tr>}
+                  {vehicles === null && !error && <tr><td colSpan={8}><BrandLoader full={false} /></td></tr>}
                   {vehicles && p.rows.length === 0 && <tr><td colSpan={8} className="px-3 py-10"><Empty title={all.length ? 'No vehicles match' : 'No vehicles yet'} body={all.length ? 'Try another filter or search.' : 'Add the vans and trucks you use for pickups and deliveries.'} action={manage && !all.length ? <button onClick={() => setEditing('new')} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Add vehicle</button> : undefined} /></td></tr>}
                   {p.rows.map((v) => {
                     const isOpen = open === v.id || editing === v.id
@@ -147,8 +147,8 @@ export default function Fleet() {
                           <td className="px-3 py-3"><Expander open={isOpen} onClick={() => { setOpen(isOpen ? null : v.id); if (editing === v.id) setEditing(null) }} label={`details for ${v.name}`} /></td>
                           <td className="px-3 py-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-gold-deep" aria-hidden="true"><Truck size={16} /></span><div><p className="font-semibold">{v.name}</p><p className="font-mono text-xs text-text-muted">{v.plate || 'No plate'}</p></div></div></td>
                           <td className="whitespace-nowrap px-3 py-3">{vehicleTypeLabels[v.type]}</td>
-                          <td className="px-3 py-3"><p>{v.city || (v.base === 'origin' ? 'Origin side' : 'Destination side')}</p><p className="text-[11px] text-text-muted">{v.base === 'origin' ? 'US / Europe' : 'West Africa'}</p></td>
-                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">{v.capacityKg ? `${v.capacityKg.toLocaleString()} kg` : <span className="text-text-muted">—</span>}{v.capacityNote && <p className="text-[11px] text-text-muted">{v.capacityNote}</p>}</td>
+                          <td className="px-3 py-3"><p>{v.city || (v.base === 'origin' ? 'Origin side' : 'Destination side')}</p><p className="text-xs text-text-muted">{v.base === 'origin' ? 'US / Europe' : 'West Africa'}</p></td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">{v.capacityKg ? `${v.capacityKg.toLocaleString()} kg` : <span className="text-text-muted">—</span>}{v.capacityNote && <p className="text-xs text-text-muted">{v.capacityNote}</p>}</td>
                           <td className="px-3 py-3">{driverName(v.driverId) ?? <span className="text-text-muted">Unassigned</span>}</td>
                           <td className="whitespace-nowrap px-3 py-3"><Pill tone={statusTone[v.status]}>{vehicleStatusLabels[v.status]}</Pill></td>
                           {manage && (

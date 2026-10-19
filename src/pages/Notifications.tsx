@@ -27,7 +27,7 @@ function ReceiverTexts({ canEdit }: { canEdit: boolean }) {
         <input type="checkbox" className="h-5 w-5 accent-[var(--color-gold)]" checked={s.enabled} disabled={!canEdit} onChange={(e) => void toggle(e.target.checked)} aria-label="Automatic receiver texts" />
       </label>
       {msg && <p role="status" className="mt-2 text-xs text-text-muted">{msg}</p>}
-      {s.provider === 'off' && <p className="mt-2 text-[11px] text-text-muted">To send for real, the administrator adds a provider — Twilio, Termii or Africa’s Talking — to the server settings (see .env.example).</p>}
+      {s.provider === 'off' && <p className="mt-2 text-xs text-text-muted">To send for real, the administrator adds a provider — Twilio, Termii or Africa’s Talking — to the server settings (see .env.example).</p>}
     </section>
   )
 }
@@ -80,7 +80,7 @@ export default function Notifications() {
         {data && data.unread > 0 && <button onClick={readAll} disabled={busy === 'all'} className="btn-ghost !min-h-10 !px-4 text-sm"><CheckCheck size={16} aria-hidden="true" /> Mark all as read</button>}
       </motion.div>
 
-      <motion.div variants={fadeUp} className="mt-6 grid gap-3 sm:grid-cols-3">
+      <motion.div variants={fadeUp} className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard label="Unread" value={data?.unread ?? '—'} hint={data?.unread ? 'Waiting for you' : 'All caught up'} icon={BellRing} active={filter === 'unread'} onClick={() => setFilter(filter === 'unread' ? 'all' : 'unread')} />
         <StatCard label="Last 30 days" value={items.filter((n) => Date.now() - new Date(n.at).getTime() < 30 * 86400000).length} hint="Alerts received" icon={Inbox} active={filter === 'all'} onClick={() => setFilter('all')} />
         <StatCard label="Email" value={emailOn ? (data?.prefs.email ? 'On' : 'Off') : 'Not set up'} hint={emailOn ? `${sent} sent to ${data?.email.to}` : 'Bell alerts only — see below'} icon={emailOn ? MailCheck : MailX} warn={!emailOn} />
@@ -109,10 +109,10 @@ export default function Notifications() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                       {n.link ? <Link to={n.link} onClick={() => readOne(n)} className={`text-sm hover:underline ${n.readAt ? 'text-text-muted' : 'font-semibold text-text'}`}>{n.title}</Link> : <span className={`text-sm ${n.readAt ? 'text-text-muted' : 'font-semibold text-text'}`}>{n.title}</span>}
-                      <span className="text-[11px] uppercase tracking-wider text-text-muted">{labelOf(n.kind)}</span>
+                      <span className="text-xs uppercase tracking-wider text-text-muted">{labelOf(n.kind)}</span>
                     </div>
                     {n.body && <p className="mt-0.5 text-sm text-text-muted">{n.body}</p>}
-                    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-text-muted">
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-text-muted">
                       <span title={fmtDateTime(n.at)}>{ago(n.at)}</span>
                       {n.emailStatus === 'sent' && <span className="inline-flex items-center gap-1"><Mail size={11} aria-hidden="true" /> emailed</span>}
                       {n.emailStatus === 'failed' && <span className="inline-flex items-center gap-1 text-danger"><MailX size={11} aria-hidden="true" /> email failed</span>}
@@ -137,7 +137,7 @@ export default function Notifications() {
               <span className="text-sm"><span className="block font-medium">Email alerts</span><span className="block text-xs text-text-muted">{emailOn ? `to ${data?.email.to}` : 'No email provider configured yet'}</span></span>
               <input type="checkbox" className="h-5 w-5 accent-[var(--color-gold)]" checked={Boolean(data?.prefs.email)} disabled={!data} onChange={(e) => void savePrefs({ email: e.target.checked })} aria-label="Email alerts" />
             </label>
-            <p className="mt-4 text-[11px] uppercase tracking-wider text-text-muted">Notify me about</p>
+            <p className="mt-4 text-xs uppercase tracking-wider text-text-muted">Notify me about</p>
             <ul className="mt-2 space-y-1.5">
               {(data?.kinds ?? []).map((k) => {
                 const on = !data?.prefs.muted.includes(k.id)

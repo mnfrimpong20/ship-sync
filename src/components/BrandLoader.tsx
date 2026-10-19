@@ -12,7 +12,7 @@ export function BrandLoader({ label, full = true, partner = false }: { label?: s
   useEffect(() => { const id = setTimeout(() => setSlow(true), 8000); return () => clearTimeout(id) }, [])
   const tile = partner ? '#24211C' : '#F2A900', trail = partner ? '#37B07A' : '#0A6842', lead = partner ? '#F2A900' : '#14213D'
   return (
-    <div role="status" aria-live="polite" aria-busy="true" className={`grid place-items-center bg-bg text-text ${full ? 'min-h-[70vh]' : 'py-16'}`} data-testid="brand-loader">
+    <div role="status" aria-live="polite" aria-busy="true" className={`grid place-items-center text-text ${full ? 'min-h-[70vh] bg-bg' : 'py-10'}`} data-testid="brand-loader">
       <div className="flex flex-col items-center">
         <svg width={full ? 72 : 52} height={full ? 72 : 52} viewBox="0 0 96 96" aria-hidden="true" className="ntm-loader drop-shadow-sm">
           <rect width="96" height="96" rx="22" fill={tile} />

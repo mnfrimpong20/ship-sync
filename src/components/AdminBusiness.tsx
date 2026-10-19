@@ -49,7 +49,7 @@ export function AdminBusiness() {
   if (!b || !s) return <p className="mt-6 text-sm text-text-muted">Loading the numbers…</p>
   const last4 = (a: number[]) => sum(a.slice(-4)); const prev4 = (a: number[]) => sum(a.slice(-8, -4))
   const delta = (a: number[]) => { const l = last4(a), p = prev4(a); return p === 0 ? null : Math.round(((l - p) / p) * 100) }
-  const Delta = ({ a }: { a: number[] }) => { const d = delta(a); if (d == null) return <span className="text-[11px] text-text-muted">4-week total</span>; return <span className={`text-[11px] font-semibold ${d >= 0 ? 'text-teal' : 'text-danger'}`}>{d >= 0 ? '+' : ''}{d}% <span className="font-normal text-text-muted">vs prior 4 weeks</span></span> }
+  const Delta = ({ a }: { a: number[] }) => { const d = delta(a); if (d == null) return <span className="text-xs text-text-muted">4-week total</span>; return <span className={`text-xs font-semibold ${d >= 0 ? 'text-teal' : 'text-danger'}`}>{d >= 0 ? '+' : ''}{d}% <span className="font-normal text-text-muted">vs prior 4 weeks</span></span> }
   const Tile = ({ label, value, hint, spark, icon: Icon, to, tone }: { label: string; value: string; hint?: React.ReactNode; spark?: number[]; icon: typeof Users; to?: string; tone?: 'gold' | 'teal' | 'sky' }) => {
     const color = tone === 'teal' ? 'var(--color-teal)' : tone === 'sky' ? 'var(--color-sky)' : 'var(--color-gold)'
     const body = <><div className="flex items-center justify-between"><p className="text-sm text-text-muted">{label}</p><Icon size={17} className="text-gold-deep" aria-hidden="true" /></div><div className="mt-2 flex items-end justify-between gap-3"><p className="font-heading text-[1.9rem] font-bold leading-none tabular-nums">{value}</p>{spark && <Spark values={spark} color={color} />}</div>{hint && <div className="mt-2 text-xs text-text-muted">{hint}</div>}</>
@@ -146,7 +146,7 @@ export function AdminBusiness() {
           <p className="mt-3 text-xs text-text-muted">Agents paid {money(b.sourcing.agentPaidUsd)} · owed {money(b.sourcing.agentOwedUsd)}</p>
         </div>
       </div>
-      <p className="mt-4 text-[11px] text-text-muted">Computed live from the database at {fmtDateTime(b.generatedAt)}.</p>
+      <p className="mt-4 text-xs text-text-muted">Computed live from the database at {fmtDateTime(b.generatedAt)}.</p>
     </div>
   )
 }
@@ -183,13 +183,13 @@ export function AdminAttention() {
             <li key={`${e.kind}:${e.id}`}>
               <Link to={e.link} className={`card-dark flex h-full gap-3 border-l-4 p-4 transition-colors hover:border-gold/40 focus-ring ${sevCls[e.severity]}`}>
                 <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${e.severity === 'high' ? 'bg-danger/10 text-danger' : e.severity === 'medium' ? 'bg-gold/15 text-gold-deep' : 'bg-sky/10 text-sky'}`}><Sev size={16} aria-hidden="true" /></span>
-                <span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><Pill tone="muted">{KIND_LABEL[e.kind] ?? e.kind}</Pill><span className="text-[11px] text-text-muted">since {fmtDateTime(e.since)}</span></span><span className="mt-1 block text-sm font-semibold leading-tight">{e.title}</span><span className="mt-1 block text-xs text-text-muted">{e.detail}</span></span>
+                <span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><Pill tone="muted">{KIND_LABEL[e.kind] ?? e.kind}</Pill><span className="text-xs text-text-muted">since {fmtDateTime(e.since)}</span></span><span className="mt-1 block text-sm font-semibold leading-tight">{e.title}</span><span className="mt-1 block text-xs text-text-muted">{e.detail}</span></span>
               </Link>
             </li>
           ) })}
         </ul>
       )}
-      <p className="mt-4 text-[11px] text-text-muted">Rules: requests unquoted after 48h · shipments 2+ days past ETA or 10 days without an event · escrow held 45+ days, on hold, or after delivery · disputes idle 3+ days · payouts waiting 3+ days · shippers unverified 3+ days · sourcing jobs unassigned 24h, quotes unanswered 7 days, no movement 14 days · contact messages unanswered 24h · unresolved errors.</p>
+      <p className="mt-4 text-xs text-text-muted">Rules: requests unquoted after 48h · shipments 2+ days past ETA or 10 days without an event · escrow held 45+ days, on hold, or after delivery · disputes idle 3+ days · payouts waiting 3+ days · shippers unverified 3+ days · sourcing jobs unassigned 24h, quotes unanswered 7 days, no movement 14 days · contact messages unanswered 24h · unresolved errors.</p>
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -17,7 +18,7 @@ export function FillBar({ g, compact = false }: { g: Pick<Groupage, 'fillPct' | 
   return (
     <div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={g.fillPct} aria-valuemin={0} aria-valuemax={100} aria-label="Filled"><div className={`h-full rounded-full ${full ? 'bg-teal' : 'bg-gold'}`} style={{ width: `${g.fillPct}%` }} /></div>
-      {!compact && <p className="mt-1 flex justify-between text-[11px] text-text-muted"><span>{g.reserved}/{g.capacity} {g.unitPlural} filled</span><span>{full ? 'Full' : `${unitsLabel(g, g.left)} left`}</span></p>}
+      {!compact && <p className="mt-1 flex justify-between text-xs text-text-muted"><span>{g.reserved}/{g.capacity} {g.unitPlural} filled</span><span>{full ? 'Full' : `${unitsLabel(g, g.left)} left`}</span></p>}
     </div>
   )
 }
@@ -71,7 +72,7 @@ function JoinDialog({ g, onClose, onDone }: { g: Groupage; onClose: () => void; 
             <label className="text-xs text-text-muted">Phone / WhatsApp<input required minLength={7} aria-label="Phone" className="input-dark mt-1 !min-h-10 text-sm" placeholder="+1 …" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
             <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-[var(--color-gold)]" checked={f.pickup} onChange={(e) => setF({ ...f, pickup: e.target.checked })} /> I’d like a pickup rather than dropping off</label>
             <div className="flex items-center justify-between rounded-lg border border-border bg-surface-2/40 px-3 py-2 text-sm"><span className="text-text-muted">Total when booked</span><strong className="tabular-nums" data-testid="join-total">{money(total)}</strong></div>
-            <p className="text-[11px] text-text-muted">Nothing is charged now. When {g.shipperName} closes the slot (by {day(g.closesAt)}) you get a shipment reference and pay from your dashboard — held in escrow until it sails.</p>
+            <p className="text-xs text-text-muted">Nothing is charged now. When {g.shipperName} closes the slot (by {day(g.closesAt)}) you get a shipment reference and pay from your dashboard — held in escrow until it sails.</p>
             <div className="flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-ghost !min-h-10 !px-4 text-sm">Cancel</button><button disabled={busy} className="btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60">{busy ? 'Reserving…' : `Reserve ${unitsLabel(g, f.units)}`}</button></div>
           </form>
         )}
@@ -112,7 +113,7 @@ export default function GroupagePage() {
           </motion.div>
           {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
           <motion.div variants={fadeUp} className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {data === null && !error && <p className="text-sm text-text-muted">Loading…</p>}
+            {data === null && !error && <BrandLoader full={false} />}
             {data && list.length === 0 && <div className="md:col-span-2 xl:col-span-3"><Empty title="No open slots on this lane right now" body="Try another destination, or request a quote and shippers will come to you." action={<Link to="/quote" className="btn-gold">Get a quote</Link>} /></div>}
             {list.map((g) => <GroupageCard key={g.id} g={g} onJoin={setJoining} />)}
           </motion.div>

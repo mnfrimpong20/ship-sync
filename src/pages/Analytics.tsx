@@ -36,7 +36,7 @@ function Insights({ items, area }: { items: Insight[]; area?: Insight['area'] })
       <ul className="grid gap-3 md:grid-cols-2">
         {shown.map((i) => { const t = TONE[i.tone]; return (
           <li key={i.id} className={`rounded-xl border border-border border-l-4 ${t.cls} bg-surface p-4`} data-testid="insight" data-tone={i.tone}>
-            <p className={`mb-1 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider ${t.text}`}><t.Icon size={13} aria-hidden="true" />{t.label}<span className="font-normal normal-case tracking-normal text-text-muted">· {AREA_LABEL[i.area]}</span></p>
+            <p className={`mb-1 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider ${t.text}`}><t.Icon size={13} aria-hidden="true" />{t.label}<span className="font-normal normal-case tracking-normal text-text-muted">· {AREA_LABEL[i.area]}</span></p>
             <p className="font-semibold leading-snug">{i.title}</p>
             <p className="mt-1 text-sm text-text-muted">{i.body}</p>
             {i.action && <Link to={i.action.to} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-gold-deep hover:underline">{i.action.label} <ArrowRight size={13} aria-hidden="true" /></Link>}
@@ -82,7 +82,7 @@ function Targets({ a, onSaved }: { a: Analytics; onSaved: () => void }) {
             <p className="flex items-baseline justify-between text-sm"><span className="text-text-muted">{r.label}</span><span className={`text-xs font-semibold ${st[1]}`}>{st[0]}</span></p>
             <p className="mt-0.5 font-heading text-xl font-bold tabular-nums">{fmt(r.actual, r.unit)}<span className="ml-1 text-sm font-normal text-text-muted">{r.target != null ? `of ${fmt(r.target, r.unit)}` : ''}</span></p>
             {r.target != null && <div className="mt-1 h-2 rounded-full bg-surface-2" aria-hidden="true"><div className="h-2 rounded-full" style={{ width: `${pct}%`, background: r.status === 'behind' ? C.bad : C.focus }} /></div>}
-            {r.projected != null && <p className="mt-1 text-[11px] text-text-muted">On pace for {fmt(r.projected, r.unit)}</p>}
+            {r.projected != null && <p className="mt-1 text-xs text-text-muted">On pace for {fmt(r.projected, r.unit)}</p>}
           </li>
         ) })}</ul>
       )}
@@ -362,7 +362,7 @@ export default function AnalyticsPage() {
           {err && <p role="alert" className="mt-6 text-sm text-danger">{err}</p>}
           {!a && !err && <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <div key={i} className="card-dark h-24 animate-pulse" />)}</div>}
           {a && (
-            <div className={`mt-6 transition-opacity ${busy ? 'opacity-60' : ''}`} role="tabpanel" data-testid={`panel-${tab}`}>
+            <div className={`mt-6 transition-opacity ${busy ? 'dimmed' : ''}`} role="tabpanel" data-testid={`panel-${tab}`}>
               {tab === 'overview' && <OverviewTab a={a} reload={() => setTick((n) => n + 1)} />}
               {tab === 'team' && <TeamTab a={a} />}
               {tab === 'sales' && a.sales && <SalesTab a={a} />}

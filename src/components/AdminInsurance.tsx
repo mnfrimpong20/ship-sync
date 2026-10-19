@@ -29,7 +29,7 @@ export function AdminInsurance() {
       <p className="mt-1 text-text-muted">Set the product once; customers add cover on booked shipments and shippers collect the premium with the freight. Plug in an underwriter by changing the provider and rates.</p>
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Insured value" value={money(d.totals.insured)} hint="Across live policies" icon={Shield} />
         <StatCard label="Premiums" value={money(d.totals.premiums)} hint="Written to date" icon={Shield} />
         <StatCard label="Ntemtem commission" value={money(d.totals.commission)} hint={`${Math.round(prod.commissionPct * 100)}% of premium`} icon={Shield} />
@@ -48,8 +48,8 @@ export function AdminInsurance() {
                     <td className="px-3 py-3"><span className="font-mono text-xs text-gold-deep">{p.shipmentRef}</span><p className="text-xs text-text-muted">{p.customer}</p></td>
                     <td className="px-3 py-3 text-xs">{p.shipperName}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{money(p.declaredValueUsd)}</td>
-                    <td className="px-3 py-3 text-right tabular-nums">{money(p.premiumUsd)}<p className={`text-[11px] ${p.paymentStatus === 'collected' ? 'text-teal' : 'text-text-muted'}`}>{p.paymentStatus}</p></td>
-                    <td className="px-3 py-3 text-xs">{policyStatusLabels[p.status]}{p.claim && <p className="max-w-[220px] truncate text-[11px] text-text-muted" title={p.claim.description}>{money(p.claim.amountUsd)} — {p.claim.description}</p>}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{money(p.premiumUsd)}<p className={`text-xs ${p.paymentStatus === 'collected' ? 'text-teal' : 'text-text-muted'}`}>{p.paymentStatus}</p></td>
+                    <td className="px-3 py-3 text-xs">{policyStatusLabels[p.status]}{p.claim && <p className="max-w-[220px] truncate text-xs text-text-muted" title={p.claim.description}>{money(p.claim.amountUsd)} — {p.claim.description}</p>}</td>
                     <td className="px-3 py-3 text-right">{p.status === 'claim_open' && <button onClick={() => { setResolving(p); setRs({ outcome: 'paid', amountUsd: String(Math.round(Math.max(0, (p.claim?.amountUsd ?? 0) - p.deductibleUsd))), note: '' }) }} className="btn-gold !min-h-8 !px-2.5 text-xs">Resolve</button>}{p.documentId && <Link to={`/dashboard/documents/${p.documentId}`} className="btn-ghost ml-1 !min-h-8 !px-2.5 text-xs">Cert</Link>}</td>
                   </tr>
                 ))}
@@ -62,7 +62,7 @@ export function AdminInsurance() {
           <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-[var(--color-gold)]" checked={prod.enabled} onChange={(e) => setProd({ ...prod, enabled: e.target.checked })} /> Offer insurance at checkout</label>
           <label className="mt-3 block text-xs text-text-muted">Provider / underwriter<input className="input-dark mt-1 !min-h-9 text-sm" value={prod.provider} onChange={(e) => setProd({ ...prod, provider: e.target.value })} /></label>
           <label className="mt-2 block text-xs text-text-muted">Coverage<input className="input-dark mt-1 !min-h-9 text-sm" value={prod.coverage} onChange={(e) => setProd({ ...prod, coverage: e.target.value })} /></label>
-          <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted">Premium % by cargo</p>
+          <p className="mt-3 text-xs font-semibold uppercase tracking-wider text-text-muted">Premium % by cargo</p>
           <div className="mt-1 grid grid-cols-2 gap-1.5">{cargoTypes.map((c) => <label key={c.id} className="text-xs text-text-muted">{c.label}<input type="number" step="0.1" min={0} max={50} aria-label={`${c.label} rate`} className="input-dark mt-0.5 !min-h-8 text-sm tabular-nums" value={Math.round(prod.rates[c.id as CargoType] * 1000) / 10} onChange={(e) => setProd({ ...prod, rates: { ...prod.rates, [c.id]: (Number(e.target.value) || 0) / 100 } })} /></label>)}</div>
           <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs text-text-muted">
             <label>Min premium ($)<input type="number" min={0} aria-label="Minimum premium" className="input-dark mt-0.5 !min-h-8 text-sm tabular-nums" value={prod.minPremiumUsd} onChange={(e) => setProd({ ...prod, minPremiumUsd: Number(e.target.value) || 0 })} /></label>

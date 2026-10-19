@@ -114,7 +114,7 @@ export default function Nav() {
                   <div role="menu" className="grid grid-cols-3 gap-2 p-3">
                     {groups.map((g) => (
                       <div key={g.title}>
-                        <p className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted">{g.title}</p>
+                        <p className="px-2 pb-1 pt-1 text-xs font-semibold uppercase tracking-wider text-text-muted">{g.title}</p>
                         <ul className="space-y-0.5">{g.items.map((i) => <li key={i.label}><ServiceLink item={i} partner={side === 'shippers'} /></li>)}</ul>
                       </div>
                     ))}
@@ -140,7 +140,7 @@ export default function Nav() {
           {user ? (
             <div className="relative">
               <button onClick={() => setMenu((m) => !m)} className="btn-ghost !min-h-10 whitespace-nowrap !px-3 text-sm" aria-expanded={menu} aria-haspopup="menu">
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-gold text-[11px] font-bold text-on-accent">{user.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}</span>
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-gold text-xs font-bold text-on-accent">{user.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}</span>
                 {user.name.split(' ')[0]} <ChevronDown size={14} aria-hidden="true" />
               </button>
               <AnimatePresence>
@@ -176,7 +176,7 @@ export default function Nav() {
               <p className="border-t border-border/60 pt-3 text-xs font-bold uppercase tracking-wider text-text">For senders</p>
               {services.map((g) => (
                 <div key={g.title} className="py-2">
-                  <p className="pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-text-muted">{g.title}</p>
+                  <p className="pb-1 pt-1 text-xs font-semibold uppercase tracking-wider text-text-muted">{g.title}</p>
                   {g.items.map((i) => <Link key={i.label} to={i.to} className="flex min-h-11 items-center gap-3 text-[15px] font-medium focus-ring"><i.icon size={16} className="text-gold-deep" aria-hidden="true" />{i.label}</Link>)}
                 </div>
               ))}

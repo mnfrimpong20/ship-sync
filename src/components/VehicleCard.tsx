@@ -18,7 +18,7 @@ export function VinField({ value, onChange, onDecoded, label = 'VIN (17 characte
     <div>
       <label className="text-xs text-text-muted">{label}<span className="relative block"><input aria-label="VIN" maxLength={17} className="input-dark mt-1 !min-h-10 w-full font-mono text-sm uppercase tracking-wider" placeholder="e.g. 1HGCV1F3XKA000000" value={value} onChange={(e) => onChange(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17))} />{busy && <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-text-muted" aria-hidden="true" />}</span></label>
       {d && <p className={`mt-1 text-xs ${d.valid && d.checkDigitOk ? 'text-teal' : 'text-gold-deep'}`} data-testid="vin-decoded">{d.valid ? <>{vehicleLabel(d as never)}{d.body ? ` · ${d.body}` : ''}{d.engineL ? ` · ${d.engineL} L` : ''}{d.source === 'builtin' ? ' (offline decode)' : ''}</> : null}{d.warnings.length ? ` — ${d.warnings[0]}` : ''}</p>}
-      <p className="mt-1 text-[11px] text-text-muted">On the driver’s door jamb, the dashboard by the windscreen, and the title. We decode year, make and model automatically.</p>
+      <p className="mt-1 text-xs text-text-muted">On the driver’s door jamb, the dashboard by the windscreen, and the title. We decode year, make and model automatically.</p>
     </div>
   )
 }
@@ -70,7 +70,7 @@ export function VehicleCard({ shipmentId, destination }: { shipmentId: string; d
     <div className="min-w-0 rounded-xl border border-border bg-surface p-4" data-testid="vehicle-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Car size={14} className="text-gold-deep" aria-hidden="true" /> Vehicle</p>
-        {v && !editing && <button onClick={() => setEditing(true)} className="btn-ghost !min-h-7 !px-2 text-[11px]"><Pencil size={11} aria-hidden="true" /> Edit</button>}
+        {v && !editing && <button onClick={() => setEditing(true)} className="btn-ghost !min-h-7 !px-2 text-xs"><Pencil size={11} aria-hidden="true" /> Edit</button>}
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
       {error && <p role="alert" className="mt-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
@@ -104,7 +104,7 @@ export function VehicleCard({ shipmentId, destination }: { shipmentId: string; d
         <div className="mt-3 text-sm">
           <p className="font-semibold">{vehicleLabel(v)}{v.trim ? ` ${v.trim}` : ''}</p>
           <p className="text-xs text-text-muted">{[v.body, v.engineL ? `${v.engineL} L` : '', v.fuel, v.color, v.mileage ? `${v.mileage.toLocaleString()} mi` : ''].filter(Boolean).join(' · ')}{v.vin ? <span className="block font-mono">{v.vin}</span> : null}</p>
-          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+          <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
             <span className="rounded-full bg-surface-2 px-2 py-0.5">{v.method === 'roro' ? 'RoRo' : 'Container'}</span>
             <span className={`rounded-full px-2 py-0.5 ${v.titleStatus === 'clean' ? 'bg-teal/15 text-teal' : 'bg-gold/15 text-gold-deep'}`}>{titleLabels[v.titleStatus]}{v.titleStatus === 'lien' && v.lienHolder ? ` · ${v.lienHolder}` : ''}</span>
             <span className={`rounded-full px-2 py-0.5 ${v.running ? 'bg-surface-2' : 'bg-danger/15 text-danger'}`}>{v.running ? 'Runs' : 'Non-running'}</span>
@@ -118,18 +118,18 @@ export function VehicleCard({ shipmentId, destination }: { shipmentId: string; d
             <p className="flex items-center justify-between"><span className="font-semibold">US export clearance</span><span className={stepTone(v.exportStep)} data-testid="export-step">{meta.exportSteps.find((s) => s.id === v.exportStep)?.label}</span></p>
             {v.aesItn && <p className="mt-1 text-text-muted">AES ITN {v.aesItn}</p>}
             <p className="mt-1 text-text-muted">The original title must be with US Customs at least 72 hours before the vessel sails (19 CFR 192.2). {destination.toUpperCase() === 'GH' ? 'Ghana allows vehicles up to 10 years old without the over-age penalty.' : destination.toUpperCase() === 'NG' ? 'Nigeria bans vehicles older than 12 years from import.' : ''}</p>
-            {d.canManage && !exp && <button onClick={() => setExp({ step: v.exportStep, aesItn: v.aesItn, note: '' })} className="btn-ghost mt-2 !min-h-7 !px-2 text-[11px]">Update clearance</button>}
+            {d.canManage && !exp && <button onClick={() => setExp({ step: v.exportStep, aesItn: v.aesItn, note: '' })} className="btn-ghost mt-2 !min-h-7 !px-2 text-xs">Update clearance</button>}
             {exp && (
               <form onSubmit={(e) => { e.preventDefault(); void act(() => vehiclesApi.exportStep(shipmentId, exp), 'Clearance updated.', 'exp') }} className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]" aria-label="Export clearance">
                 <select aria-label="Clearance step" className="input-dark !min-h-8 text-xs" value={exp.step} onChange={(e) => setExp({ ...exp, step: e.target.value as ExportStep })}>{meta.exportSteps.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
                 <input aria-label="AES ITN" className="input-dark !min-h-8 font-mono text-xs" placeholder="AES ITN (X2026…)" value={exp.aesItn} onChange={(e) => setExp({ ...exp, aesItn: e.target.value })} />
-                <div className="flex gap-1"><button type="button" onClick={() => setExp(null)} className="btn-ghost !min-h-8 !px-2 text-[11px]">Cancel</button><button disabled={busy === 'exp'} className="btn-gold !min-h-8 !px-2.5 text-[11px] disabled:opacity-60">Save</button></div>
+                <div className="flex gap-1"><button type="button" onClick={() => setExp(null)} className="btn-ghost !min-h-8 !px-2 text-xs">Cancel</button><button disabled={busy === 'exp'} className="btn-gold !min-h-8 !px-2.5 text-xs disabled:opacity-60">Save</button></div>
               </form>
             )}
           </div>
 
           <div className="mt-3 rounded-lg border border-border p-3 text-xs">
-            <p className="flex items-center justify-between"><span className="font-semibold">Handover</span>{!ho && (d.canManage || true) && <button onClick={() => setHo(v.handover ?? { location: '', date: '', contact: '', note: '' })} className="btn-ghost !min-h-7 !px-2 text-[11px]">{v.handover ? 'Change' : 'Arrange'}</button>}</p>
+            <p className="flex items-center justify-between"><span className="font-semibold">Handover</span>{!ho && (d.canManage || true) && <button onClick={() => setHo(v.handover ?? { location: '', date: '', contact: '', note: '' })} className="btn-ghost !min-h-7 !px-2 text-xs">{v.handover ? 'Change' : 'Arrange'}</button>}</p>
             {v.handover && !ho ? <p className="mt-1" data-testid="handover">{v.handover.date} at {v.handover.location}{v.handover.contact ? ` · ${v.handover.contact}` : ''}{v.handover.note ? ` — ${v.handover.note}` : ''}</p> : !ho ? <p className="mt-1 text-text-muted">Agree where and when the vehicle is dropped off (or collected).</p> : null}
             {ho && (
               <form onSubmit={(e) => { e.preventDefault(); void act(() => vehiclesApi.handover(shipmentId, ho), 'Handover arranged — the other side has been told.', 'ho') }} className="mt-2 grid gap-2 sm:grid-cols-2" aria-label="Handover">
@@ -137,7 +137,7 @@ export function VehicleCard({ shipmentId, destination }: { shipmentId: string; d
                 <input type="date" required aria-label="Date" className="input-dark !min-h-8 text-xs" value={ho.date} onChange={(e) => setHo({ ...ho, date: e.target.value })} />
                 <input aria-label="Contact" className="input-dark !min-h-8 text-xs" placeholder="Who to ask for" value={ho.contact} onChange={(e) => setHo({ ...ho, contact: e.target.value })} />
                 <input aria-label="Handover note" className="input-dark !min-h-8 text-xs sm:col-span-2" placeholder="Note" value={ho.note} onChange={(e) => setHo({ ...ho, note: e.target.value })} />
-                <div className="flex justify-end gap-1 sm:col-span-2"><button type="button" onClick={() => setHo(null)} className="btn-ghost !min-h-8 !px-2 text-[11px]">Cancel</button><button disabled={busy === 'ho'} className="btn-gold !min-h-8 !px-2.5 text-[11px] disabled:opacity-60">Save</button></div>
+                <div className="flex justify-end gap-1 sm:col-span-2"><button type="button" onClick={() => setHo(null)} className="btn-ghost !min-h-8 !px-2 text-xs">Cancel</button><button disabled={busy === 'ho'} className="btn-gold !min-h-8 !px-2.5 text-xs disabled:opacity-60">Save</button></div>
               </form>
             )}
           </div>
@@ -151,7 +151,7 @@ export function VehicleCard({ shipmentId, destination }: { shipmentId: string; d
             </ul>
             {!d.canManage && <p className="mt-2 text-text-muted">Bring these to the handover — the shipper ticks them off.</p>}
           </div>
-          {(destination.toUpperCase() === 'GH' || destination.toUpperCase() === 'NG') && <p className="mt-3 text-[11px] text-text-muted">Duty on arrival is estimated in the <strong>Duty</strong> card below from this year, engine size and value. <Link to={`/duty?destination=${destination}&goods=vehicle`} className="text-gold-deep hover:underline">Open the estimator</Link></p>}
+          {(destination.toUpperCase() === 'GH' || destination.toUpperCase() === 'NG') && <p className="mt-3 text-xs text-text-muted">Duty on arrival is estimated in the <strong>Duty</strong> card below from this year, engine size and value. <Link to={`/duty?destination=${destination}&goods=vehicle`} className="text-gold-deep hover:underline">Open the estimator</Link></p>}
         </div>
       ) : null}
     </div>

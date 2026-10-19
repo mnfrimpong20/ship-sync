@@ -204,7 +204,7 @@ export default function Scan() {
                 <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">This shipment</p>
                 <p className="mt-1 font-mono text-sm text-gold-deep">{(result ?? look)!.shipment.ref}</p>
                 <ul className="mt-2 grid grid-cols-4 gap-1" aria-label="Pieces">{(result ?? look)!.pieces.map((p) => <li key={p.id} title={`Piece ${p.seq}: ${pieceStatusLabels[p.status]}`} className={`grid h-9 place-items-center rounded-lg text-xs font-semibold ${p.status === 'delivered' ? 'bg-teal text-white' : p.status === 'devanned' ? 'bg-sky/30 text-text' : p.status === 'loaded' ? 'bg-gold/30 text-text' : 'bg-surface-2 text-text-muted'}`}>{p.seq}</li>)}</ul>
-                <p className="mt-2 text-[11px] text-text-muted">{counts.loaded}/{counts.total} loaded · {counts.devanned}/{counts.total} received · {counts.delivered}/{counts.total} delivered</p>
+                <p className="mt-2 text-xs text-text-muted">{counts.loaded}/{counts.total} loaded · {counts.devanned}/{counts.total} received · {counts.delivered}/{counts.total} delivered</p>
                 {(result ?? look)!.container && <p className="mt-2 text-xs text-text-muted"><ContainerIcon size={11} className="inline" aria-hidden="true" /> {(result ?? look)!.container!.ref}{(result ?? look)!.container!.number ? ` · ${(result ?? look)!.container!.number}` : ''}</p>}
               </div>
             )}
@@ -214,7 +214,7 @@ export default function Scan() {
                 <ul className="mt-2 space-y-1.5 text-xs">{recent.slice(0, 12).map((r) => <li key={r.id} className="flex items-center justify-between gap-2"><span className="min-w-0 truncate"><span className="font-mono text-gold-deep">{r.ref}</span> · piece {r.seq}/{r.total} · {scanKindShort[r.kind]}</span><span className="shrink-0 text-text-muted">{fmtDateTime(r.at)}</span></li>)}</ul>
               )}
             </div>
-            <p className="px-1 text-[11px] text-text-muted"><QrCode size={11} className="inline" aria-hidden="true" /> On iPhone, use Safari and allow the camera. Any phone camera app also opens the customer tracking page from the same sticker — that never changes anything.</p>
+            <p className="px-1 text-xs text-text-muted"><QrCode size={11} className="inline" aria-hidden="true" /> On iPhone, use Safari and allow the camera. Any phone camera app also opens the customer tracking page from the same sticker — that never changes anything.</p>
           </aside>
         </div>
       </div>

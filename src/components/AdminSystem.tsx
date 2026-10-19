@@ -108,8 +108,8 @@ function ErrorsCard() {
               </button>
               {!e.resolvedAt && <button onClick={() => resolve(e.id)} className="btn-ghost !min-h-8 !px-2.5 text-xs">Resolve</button>}
             </div>
-            {open === e.id && e.stack && <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-surface-2 p-3 font-mono text-[11px] leading-relaxed text-text-muted">{e.stack}</pre>}
-            {open === e.id && e.userAgent && <p className="mt-1 text-[11px] text-text-muted">{e.userAgent}{e.userId ? ` · user ${e.userId}` : ''}</p>}
+            {open === e.id && e.stack && <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-surface-2 p-3 font-mono text-xs leading-relaxed text-text-muted">{e.stack}</pre>}
+            {open === e.id && e.userAgent && <p className="mt-1 text-xs text-text-muted">{e.userAgent}{e.userId ? ` · user ${e.userId}` : ''}</p>}
           </li>
         ))}
         {data && data.errors.length === 0 && <li className="py-3 text-sm text-text-muted">Nothing has failed{showResolved ? '' : ' — or everything is resolved'}. Browser crashes and server 500s show up here automatically.</li>}
@@ -131,7 +131,7 @@ function ContactInbox() {
       {err && <p role="alert" className="mt-3 text-sm text-danger">{err}</p>}
       <ul className="mt-3 divide-y divide-border">
         {msgs?.slice(0, 50).map((m) => (
-          <li key={m.id} className={`py-3 text-sm ${m.handled ? 'opacity-60' : ''}`}>
+          <li key={m.id} className={`py-3 text-sm ${m.handled ? 'dimmed' : ''}`}>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2 font-semibold">{m.name} <Pill tone="muted">{m.topic}</Pill> <span className="text-xs font-normal text-text-muted">{fmtDateTime(m.createdAt)}</span></p>

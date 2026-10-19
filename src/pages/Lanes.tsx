@@ -18,7 +18,7 @@ function Range({ b }: { b: Benchmark }) {
   return (
     <div data-testid="price-range">
       <div className="relative mt-6 h-2 rounded-full bg-surface-2"><div className="absolute h-2 rounded-full bg-gold/50" style={{ left: x(p25 ?? min), width: `calc(${x(p75 ?? max)} - ${x(p25 ?? min)})` }} /><div className="absolute -top-1 h-4 w-1 rounded bg-gold" style={{ left: x(median) }} /></div>
-      <div className="mt-2 flex justify-between text-[11px] text-text-muted"><span>{money(min)}</span><span>p25 {money(p25 ?? min)}</span><span className="font-semibold text-text">median {money(median)}</span><span>p75 {money(p75 ?? max)}</span><span>{money(max)}</span></div>
+      <div className="mt-2 flex justify-between text-xs text-text-muted"><span>{money(min)}</span><span>p25 {money(p25 ?? min)}</span><span className="font-semibold text-text">median {money(median)}</span><span>p75 {money(p75 ?? max)}</span><span>{money(max)}</span></div>
     </div>
   )
 }
@@ -35,9 +35,9 @@ export function BenchmarkPanel({ b, title }: { b: Benchmark; title: string }) {
       <div className="flex items-start justify-between gap-2"><h2 className="!text-base">{title}</h2><span className="text-xs text-text-muted">{b.sample.quotes} quotes · {b.sample.shippers} shippers · 180 days</span></div>
       <Range b={b} />
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
-        <div><p className="text-xs text-text-muted">Transit (quoted)</p><p className="text-lg font-bold">{b.transit.quotedMedian != null ? `${b.transit.quotedMedian} days` : '—'}</p><p className="text-[11px] text-text-muted">{b.transit.quotedP25 != null ? `${b.transit.quotedP25}–${b.transit.quotedP75} typical` : ''}{b.transit.actualMedian != null ? ` · actual ${b.transit.actualMedian}d` : ''}</p></div>
-        <div><p className="text-xs text-text-muted">Demand (12 weeks)</p><div className="flex items-center gap-2"><Spark values={b.demand.series} /><span className={`inline-flex items-center gap-1 text-sm font-semibold ${b.demand.trendPct >= 0 ? 'text-teal' : 'text-danger'}`}>{b.demand.trendPct >= 0 ? <TrendingUp size={14} aria-hidden="true" /> : <TrendingDown size={14} aria-hidden="true" />}{b.demand.trendPct > 0 ? '+' : ''}{b.demand.trendPct}%</span></div><p className="text-[11px] text-text-muted">{b.sample.requests} requests · last 4 weeks vs prior 4</p></div>
-        <div><p className="text-xs text-text-muted">Win rate by price</p><p className="text-sm"><span className="font-semibold">{b.winRate.belowMedian.winRate ?? '—'}%</span> <span className="text-text-muted">below median</span></p><p className="text-sm"><span className="font-semibold">{b.winRate.aboveMedian.winRate ?? '—'}%</span> <span className="text-text-muted">above median</span></p><p className="text-[11px] text-text-muted">{b.winRate.decided} decided quotes</p></div>
+        <div><p className="text-xs text-text-muted">Transit (quoted)</p><p className="text-lg font-bold">{b.transit.quotedMedian != null ? `${b.transit.quotedMedian} days` : '—'}</p><p className="text-xs text-text-muted">{b.transit.quotedP25 != null ? `${b.transit.quotedP25}–${b.transit.quotedP75} typical` : ''}{b.transit.actualMedian != null ? ` · actual ${b.transit.actualMedian}d` : ''}</p></div>
+        <div><p className="text-xs text-text-muted">Demand (12 weeks)</p><div className="flex items-center gap-2"><Spark values={b.demand.series} /><span className={`inline-flex items-center gap-1 text-sm font-semibold ${b.demand.trendPct >= 0 ? 'text-teal' : 'text-danger'}`}>{b.demand.trendPct >= 0 ? <TrendingUp size={14} aria-hidden="true" /> : <TrendingDown size={14} aria-hidden="true" />}{b.demand.trendPct > 0 ? '+' : ''}{b.demand.trendPct}%</span></div><p className="text-xs text-text-muted">{b.sample.requests} requests · last 4 weeks vs prior 4</p></div>
+        <div><p className="text-xs text-text-muted">Win rate by price</p><p className="text-sm"><span className="font-semibold">{b.winRate.belowMedian.winRate ?? '—'}%</span> <span className="text-text-muted">below median</span></p><p className="text-sm"><span className="font-semibold">{b.winRate.aboveMedian.winRate ?? '—'}%</span> <span className="text-text-muted">above median</span></p><p className="text-xs text-text-muted">{b.winRate.decided} decided quotes</p></div>
       </div>
     </div>
   )
@@ -71,7 +71,7 @@ export default function LanesPage() {
           <motion.div variants={fadeUp} className="mt-4 flex flex-wrap gap-2 text-sm"><Link to={`/quote?origin=${encodeURIComponent(f.origin)}&destination=${f.destination}`} className="btn-gold !min-h-10 !px-4">Get quotes on this lane</Link><Link to={`/sailings?destination=${f.destination}`} className="btn-ghost !min-h-10 !px-4">Next sailings</Link><Link to={`/duty?destination=${f.destination}`} className="btn-ghost !min-h-10 !px-4">Duty estimate</Link></motion.div>
           <motion.div variants={fadeUp} className="card-dark mt-10 overflow-hidden">
             <div className="px-5 pt-5"><h2 className="!text-base">Busiest lanes right now</h2><p className="text-xs text-text-muted">Requests in the last 12 weeks across the marketplace.</p></div>
-            <div className="overflow-x-auto"><table className="mt-3 w-full min-w-[520px] text-sm"><thead><tr className={thead}><Th>Lane</Th><Th>Cargo</Th><Th className="text-right">Requests</Th><Th className="text-right">Shippers</Th><Th className="text-right">Median</Th></tr></thead><tbody>{top === null && <tr><td colSpan={5} className="px-3 py-6 text-center text-text-muted">Loading…</td></tr>}{top?.map((l, i) => <tr key={i} className={trow()} data-testid="top-lane"><td className="px-3 py-2.5"><button onClick={() => setF({ origin: origins.find((o) => o.startsWith(l.origin)) ?? l.origin, destination: l.destination, cargo: l.cargo })} className="text-left hover:text-gold-deep">{l.origin} → {l.destinationName}</button></td><td className="px-3 py-2.5 text-xs text-text-muted">{l.cargoLabel}</td><td className="px-3 py-2.5 text-right tabular-nums">{l.requests}</td><td className="px-3 py-2.5 text-right tabular-nums">{l.shippers}</td><td className="px-3 py-2.5 text-right tabular-nums">{l.median != null ? money(l.median) : '—'}</td></tr>)}</tbody></table></div>
+            <div className="overflow-x-auto"><table className="mt-3 w-full min-w-[520px] text-sm"><thead><tr className={thead}><Th>Lane</Th><Th>Cargo</Th><Th className="text-right">Requests</Th><Th className="text-right">Shippers</Th><Th className="text-right">Median</Th></tr></thead><tbody>{top === null && <tr><td colSpan={5}><BrandLoader full={false} /></td></tr>}{top?.map((l, i) => <tr key={i} className={trow()} data-testid="top-lane"><td className="px-3 py-2.5"><button onClick={() => setF({ origin: origins.find((o) => o.startsWith(l.origin)) ?? l.origin, destination: l.destination, cargo: l.cargo })} className="text-left hover:text-gold-deep">{l.origin} → {l.destinationName}</button></td><td className="px-3 py-2.5 text-xs text-text-muted">{l.cargoLabel}</td><td className="px-3 py-2.5 text-right tabular-nums">{l.requests}</td><td className="px-3 py-2.5 text-right tabular-nums">{l.shippers}</td><td className="px-3 py-2.5 text-right tabular-nums">{l.median != null ? money(l.median) : '—'}</td></tr>)}</tbody></table></div>
           </motion.div>
         </motion.div>
       </div>
@@ -99,7 +99,7 @@ export function ShipperLanes() {
             <motion.div variants={fadeUp}><Link to="/lanes" className="btn-ghost">Public benchmarks</Link></motion.div>
           </div>
           {error && <p role="alert" className="mt-6 text-sm text-danger">{error}</p>}
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-3">
+          <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
             <StatCard label="Lanes quoted" value={d?.lanes.length ?? 0} hint="Last 180 days" icon={BarChart3} />
             <StatCard label="Pricing tips" value={tips.length} hint={tips.length ? 'Worth a look' : 'Nothing to flag'} icon={Lightbulb} warn={tips.length > 0} />
             <StatCard label="Opportunities" value={d?.opportunities.length ?? 0} hint="Busy lanes you don't serve" icon={TrendingUp} />
@@ -109,7 +109,7 @@ export function ShipperLanes() {
             <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm">
               <thead><tr className={thead}><Th>Lane</Th><Th className="text-right">Quotes</Th><Th className="text-right">Your win rate</Th><Th className="text-right">Market</Th><Th className="text-right">Your median</Th><Th className="text-right">Market median</Th><Th className="text-right">vs market</Th><Th className="text-right">Reply</Th></tr></thead>
               <tbody>
-                {d === null && !error && <tr><td colSpan={8} className="px-3 py-8 text-center text-text-muted">Loading…</td></tr>}
+                {d === null && !error && <tr><td colSpan={8}><BrandLoader full={false} /></td></tr>}
                 {d && d.lanes.length === 0 && <tr><td colSpan={8} className="px-3 py-8"><Empty title="No quotes in the last six months" body="Quote a few leads and your lanes show up here against the market." /></td></tr>}
                 {d?.lanes.map((l: MyLane, i) => (
                   <Fragment key={l.origin + l.destination + l.cargo + i}>

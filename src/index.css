@@ -23,7 +23,7 @@
   --color-partner: #24211C;
   --color-border: #E3D8C3;
   --color-border-light: #E3D8C3;
-  --color-danger: #C2382C;
+  --color-danger: #AD2F26;
 
   --font-heading: "Bricolage Grotesque Variable", "Bricolage Grotesque", "Figtree Variable", system-ui, sans-serif;
   --font-sans: "Figtree Variable", "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -156,3 +156,24 @@ table, dl, .tabular-nums, [data-testid$="card"] { font-variant-numeric: tabular-
 @media (prefers-reduced-motion: reduce) { .ntm-chev, .ntm-box, .ntm-bar { animation: none } .ntm-bar { width: 100% } }
 /* Links inside sentences are underlined, not told apart by colour alone. */
 .ss-app p a:not([class*="btn"]), .ss-app li > p a:not([class*="btn"]), p > a.text-gold-deep:not([class*="btn"]) { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px }
+
+/* Finished / inactive rows: tinted instead of faded, so their text keeps full contrast. */
+.dimmed { background-color: color-mix(in srgb, var(--color-surface-2) 60%, transparent); }
+.dimmed :where(h2, h3, b, strong, .font-semibold) { color: var(--color-text-muted); }
+
+/* Touch screens: every control is at least 44px tall/wide (WCAG 2.5.5), without changing the mouse layout.
+   Inside the utilities layer so it can outrank !min-h-8 style utilities by specificity. */
+@layer utilities {
+  @media (pointer: coarse) {
+    .ss-app :is(.btn-gold, .btn-ghost, .input-dark, select) { min-height: 44px !important; }
+    .ss-app :is(a, button, [role="tab"]):is(.min-h-8, .min-h-9, .min-h-10) { min-height: 44px !important; }
+    .ss-app :is(a, button):is(.h-7, .h-8, .h-9, .h-10).grid { height: 44px; width: 44px; }
+    .ss-app input:is([type="checkbox"], [type="radio"]) { width: 22px; height: 22px; }
+    .ss-app th button { min-height: 44px; }
+    /* Names and references in tables: a taller hit area with no change to the row height. */
+    .ss-app :is(td a, a.font-mono):not([class*="btn"]):not(.grid) { display: inline-block; padding-block: .7rem; margin-block: -.7rem; }
+  }
+}
+
+/* Screen-reader-only text inside a sideways-scrolling table must not widen the page on phones. */
+.overflow-x-auto:not(.sticky):not(.fixed):not(.absolute) { position: relative; }

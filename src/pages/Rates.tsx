@@ -20,7 +20,7 @@ function RateForm({ initial, origins, onSave, onCancel, busy, error }: { initial
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(f) }} className="grid gap-3 md:grid-cols-3" aria-label="Rate card">
       {error && <p role="alert" className="md:col-span-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
-      <div><label htmlFor="r-origin" className="label-dark">Origin</label><input id="r-origin" list="r-origins" className="input-dark" placeholder="Any origin" value={f.origin} onChange={(e) => setF({ ...f, origin: e.target.value })} /><datalist id="r-origins">{origins.map((o) => <option key={o} value={o} />)}</datalist><p className="mt-1 text-[11px] text-text-muted">Leave blank to cover every pickup area you serve.</p></div>
+      <div><label htmlFor="r-origin" className="label-dark">Origin</label><input id="r-origin" list="r-origins" className="input-dark" placeholder="Any origin" value={f.origin} onChange={(e) => setF({ ...f, origin: e.target.value })} /><datalist id="r-origins">{origins.map((o) => <option key={o} value={o} />)}</datalist><p className="mt-1 text-xs text-text-muted">Leave blank to cover every pickup area you serve.</p></div>
       <div><label htmlFor="r-dest" className="label-dark">Destination</label><select id="r-dest" className="input-dark" value={f.destination} onChange={(e) => setF({ ...f, destination: e.target.value })}>{countries.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select></div>
       <div><label htmlFor="r-mode" className="label-dark">Mode</label><select id="r-mode" className="input-dark" value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value as Mode })}><option value="ocean">Ocean</option><option value="air">Air</option></select></div>
       <div><label htmlFor="r-cargo" className="label-dark">Cargo type</label><select id="r-cargo" className="input-dark" value={f.cargo} onChange={(e) => setF({ ...f, cargo: e.target.value as CargoType })}>{cargoTypes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
@@ -158,7 +158,7 @@ export default function Rates() {
 
           <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</motion.p>}</AnimatePresence>
 
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="Instant quotes" value={active.filter((r) => r.autoSend).length} hint="Sent the moment a request lands" icon={Zap} active={filter === 'auto'} onClick={() => setFilter(filter === 'auto' ? 'all' : 'auto')} />
             <StatCard label="Suggested only" value={active.filter((r) => !r.autoSend).length} hint="You confirm before it goes out" icon={Tag} active={filter === 'manual'} onClick={() => setFilter(filter === 'manual' ? 'all' : 'manual')} />
             <StatCard label="Destinations" value={new Set(active.map((r) => r.destination)).size} hint={Array.from(new Set(active.map((r) => countryByCode(r.destination)?.name ?? r.destination))).join(', ') || 'None yet'} icon={Tag} />
@@ -191,7 +191,7 @@ export default function Rates() {
                   <table className="w-full min-w-[860px] text-sm">
                     <thead><tr className={thead}><Th className="w-8" /><Th>Lane</Th><Th>Cargo</Th><Th className="text-right">Price</Th><Th>Extras</Th><Th className="text-right">Transit</Th><Th>Quoting</Th>{manage && <Th className="text-right">Actions</Th>}</tr></thead>
                     <tbody>
-                      {rates === null && !error && <tr><td colSpan={8} className="px-3 py-10 text-center text-text-muted">Loading…</td></tr>}
+                      {rates === null && !error && <tr><td colSpan={8}><BrandLoader full={false} /></td></tr>}
                       {rates && p.rows.length === 0 && <tr><td colSpan={8} className="px-3 py-10"><Empty title={all.length ? 'No rate cards match' : 'No rate cards yet'} body={all.length ? 'Try another filter.' : 'Publish a price per lane and cargo type and the platform quotes for you.'} action={manage && !all.length ? <button onClick={() => startNew()} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Add rate card</button> : undefined} /></td></tr>}
                       {p.rows.map((r) => {
                         const isOpen = open === r.id || editing === r.id
@@ -202,7 +202,7 @@ export default function Rates() {
                               <td className="px-3 py-3"><Expander open={isOpen} onClick={() => { setOpen(isOpen ? null : r.id); if (editing === r.id) setEditing(null) }} label={`details for ${r.origin || 'any origin'} to ${c?.name}`} /></td>
                               <td className="px-3 py-3"><p className="font-semibold">{r.origin || <span className="text-text-muted">Any origin</span>} → <Flag code={c?.code} /> {c?.name ?? r.destination}</p><div className="mt-1"><ModeBadge mode={r.mode} /></div></td>
                               <td className="px-3 py-3">{cargoLabel(r.cargo)}</td>
-                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums"><p className="font-semibold">{money(r.price)}</p><p className="text-[11px] text-text-muted">{unitLabel(r.cargo, r.unit)}{r.minCharge > r.price ? ` · min ${money(r.minCharge)}` : ''}</p></td>
+                              <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums"><p className="font-semibold">{money(r.price)}</p><p className="text-xs text-text-muted">{unitLabel(r.cargo, r.unit)}{r.minCharge > r.price ? ` · min ${money(r.minCharge)}` : ''}</p></td>
                               <td className="px-3 py-3 text-xs text-text-muted">{extras(r) || '—'}</td>
                               <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">{r.transitDays} d</td>
                               <td className="whitespace-nowrap px-3 py-3">{!r.active ? <Pill tone="muted">Paused</Pill> : r.autoSend ? <Pill tone="gold">Instant</Pill> : <Pill tone="teal">Suggested</Pill>}</td>

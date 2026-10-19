@@ -11,6 +11,7 @@
  * hiccup is retried instead of lost).
  */
 import type { Request, Response, NextFunction, Router } from 'express'
+import { humanizeDates } from '../src/lib/dates'
 import { z } from 'zod'
 import { uid, type Db } from './db'
 import type { ApiUser } from './api'
@@ -50,7 +51,7 @@ export interface NotifyInput {
 }
 
 const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v))
-export const notificationOut = (n: Row) => ({ id: n.id, kind: n.kind as NotifyKind, title: n.title, body: n.body, link: n.link, at: ISO(n.at), readAt: ISO(n.read_at), emailStatus: n.email_status as 'pending' | 'sent' | 'skipped' | 'failed' })
+export const notificationOut = (n: Row) => ({ id: n.id, kind: n.kind as NotifyKind, title: humanizeDates(n.title), body: humanizeDates(n.body), link: n.link, at: ISO(n.at), readAt: ISO(n.read_at), emailStatus: n.email_status as 'pending' | 'sent' | 'skipped' | 'failed' })
 
 /* ---------------- email transport ---------------- */
 export function emailProvider(): { id: 'resend' | 'log' | 'off'; label: string } {
@@ -129,7 +130,9 @@ async function prefsOf(db: Db, userId: string) {
 }
 
 /** Record one notification for one user. Returns the id, or null when the user has muted that kind. */
-export async function notify(db: Db, n: NotifyInput): Promise<string | null> {
+export async function notify(db: Db, n0: NotifyInput): Promise<string | null> {
+  // Stored text is read days later, so dates go in as "Fri 2 Oct" (no "in 3 days").
+  const n: NotifyInput = { ...n0, title: humanizeDates(n0.title), body: humanizeDates(n0.body ?? '') }
   const { rows: us } = await db.query<Row>('select id, email, name from users where id = $1', [n.userId])
   const u = us[0]; if (!u) return null
   const prefs = await prefsOf(db, u.id)

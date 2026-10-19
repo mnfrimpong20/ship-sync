@@ -124,9 +124,9 @@ function Equipment({ userName, company }: { userName: string; company: string })
               <article key={p.id} className="card-dark flex flex-col p-5" data-testid={`product-${p.id}`}>
                 <div className="flex items-start justify-between gap-3">
                   <span className="grid h-12 w-12 place-items-center rounded-xl bg-gold-soft text-ink"><Icon size={22} aria-hidden="true" /></span>
-                  {p.includedWith.length > 0 && <span className="rounded-full bg-teal/15 px-2 py-0.5 text-[11px] font-semibold text-teal">{p.includedClaimed ? 'On loan to you' : `Free with ${p.includedWith.map(planLabel).join(' / ')}`}</span>}
+                  {p.includedWith.length > 0 && <span className="rounded-full bg-teal/15 px-2 py-0.5 text-xs font-semibold text-teal">{p.includedClaimed ? 'On loan to you' : `Free with ${p.includedWith.map(planLabel).join(' / ')}`}</span>}
                 </div>
-                <h3 className="mt-3 !text-base">{p.name}</h3>
+                <h2 className="mt-3 !text-base">{p.name}</h2>
                 <p className="mt-1 text-sm text-text-muted">{p.blurb}</p>
                 <ul className="mt-3 flex-1 space-y-1 text-sm">{p.specs.map((s) => <li key={s} className="flex gap-1.5"><Check size={14} className="mt-0.5 shrink-0 text-teal" aria-hidden="true" />{s}</li>)}</ul>
                 <p className={`mt-3 text-xs font-semibold ${out ? 'text-danger' : p.available <= 5 ? 'text-gold-deep' : 'text-teal'}`}>{out ? 'Out of stock' : p.available <= 5 ? `Only ${p.available} left` : 'In stock — ships in 1–2 days'}</p>
@@ -175,7 +175,7 @@ function Equipment({ userName, company }: { userName: string; company: string })
                 </fieldset>
                 {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
                 <button disabled={busy === 'pay' || !d.canOrder} className="btn-gold mt-4 w-full !min-h-11 disabled:opacity-60" data-testid="place-order"><CreditCard size={16} aria-hidden="true" /> {busy === 'pay' ? 'One moment…' : today === 0 && monthly === 0 ? 'Place order — free' : d.online ? `Pay ${usd(today)}${monthly ? ` + ${usd(monthly + taxMonthly)}/mo` : ''} securely` : 'Place order — we’ll invoice you'}</button>
-                {d.mode === 'test' && (today > 0 || monthly > 0) && <p className="mt-2 text-center text-[11px] text-text-muted">Test mode — use card 4242 4242 4242 4242.</p>}
+                {d.mode === 'test' && (today > 0 || monthly > 0) && <p className="mt-2 text-center text-xs text-text-muted">Test mode — use card 4242 4242 4242 4242.</p>}
               </>
             )}
             {!d.canOrder && <p className="mt-3 text-xs text-text-muted">Only the account owner or finance can place equipment orders.</p>}
@@ -212,13 +212,13 @@ function Equipment({ userName, company }: { userName: string; company: string })
               <li key={o.id} className="card-dark p-4" data-testid="order">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <span className="font-mono text-sm font-semibold">{o.ref}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusTone[o.status]}`}>{orderStatusLabels[o.status]}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusTone[o.status]}`}>{orderStatusLabels[o.status]}</span>
                   <span className="text-xs text-text-muted">{o.createdAt ? fmtDate(o.createdAt) : ''} · by {o.placedBy}</span>
                   <span className="ml-auto text-sm font-semibold tabular-nums">{o.totalUsd ? usd(o.totalUsd) : 'Free'}{o.monthlyUsd ? <span className="font-normal text-text-muted"> + {usd(o.monthlyUsd)}/mo</span> : null}</span>
                 </div>
                 <p className="mt-1 text-sm text-text-muted">{o.items.map((i) => `${i.qty} × ${i.name}${i.mode === 'rent' ? ' (rent)' : i.mode === 'included' ? ' (with plan)' : ''}`).join(' · ')}</p>
                 {o.status !== 'cancelled' && o.status !== 'awaiting_payment' && (
-                  <ol className="mt-3 grid grid-cols-4 gap-1 text-[11px]" aria-label="Progress">{STEPS.map((s, k) => { const done = STEPS.indexOf(o.status) >= k; return <li key={s} className={`border-t-2 pt-1 ${done ? 'border-teal text-text' : 'border-border text-text-muted'}`}>{orderStatusLabels[s].split(' —')[0]}</li> })}</ol>
+                  <ol className="mt-3 grid grid-cols-4 gap-1 text-xs" aria-label="Progress">{STEPS.map((s, k) => { const done = STEPS.indexOf(o.status) >= k; return <li key={s} className={`border-t-2 pt-1 ${done ? 'border-teal text-text' : 'border-border text-text-muted'}`}>{orderStatusLabels[s].split(' —')[0]}</li> })}</ol>
                 )}
                 {o.tracking && <p className="mt-2 inline-flex items-center gap-1.5 text-xs"><Truck size={13} aria-hidden="true" /> {o.carrier || 'Tracking'} <span className="font-mono">{o.tracking}</span></p>}
                 {o.status === 'awaiting_payment' && <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-muted">{o.provider === 'manual' ? 'Ntemtem will email an invoice; we ship once it’s paid.' : 'Payment not finished.'}{d.canOrder && <button type="button" className="font-semibold text-danger hover:underline" onClick={async () => { await suppliesApi.cancel(o.id).catch((e) => setError(e.message)); await load() }}>Cancel order</button>}</div>}
@@ -245,7 +245,7 @@ function Packing() {
   return (
     <div className="mt-6" data-testid="packing">
       <p className="max-w-3xl text-text-muted">Barrels, boxes, locks and tape you sell to your own customers. They show on your profile, and senders add them to a booked shipment. You bring them before the pickup, and they’re paid together with the freight — protected by Ntemtem, like the rest of the shipment.</p>
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         <StatCard label="Items on your list" value={d.supplies.filter((s) => s.active).length} icon={Package} />
         <StatCard label="Sold, last 90 days" value={usd(d.sold90.valueUsd)} hint={`${d.sold90.units} units`} icon={ShoppingCart} />
         <StatCard label="To bring before pickup" value={d.toDeliver.length} icon={Truck} warn={d.toDeliver.some((x) => x.status === 'paid')} />
@@ -256,7 +256,7 @@ function Packing() {
           {!d.supplies.length ? <p className="p-6 text-sm text-text-muted">No items yet. Add the barrels and boxes you sell, with your price.</p> : (
             <ul className="divide-y divide-border">
               {d.supplies.map((s) => (
-                <li key={s.id} className={`flex flex-wrap items-center gap-3 p-4 ${s.active ? '' : 'opacity-60'}`} data-testid="packing-row">
+                <li key={s.id} className={`flex flex-wrap items-center gap-3 p-4 ${s.active ? '' : 'dimmed'}`} data-testid="packing-row">
                   <div className="min-w-0 flex-1"><p className="font-semibold">{s.name}{!s.active && <span className="ml-2 text-xs font-normal text-text-muted">hidden</span>}</p><p className="text-xs text-text-muted">{packingKindLabels[s.kind]}{s.note ? ` · ${s.note}` : ''}</p></div>
                   <span className="font-heading text-lg tabular-nums">{usd(s.priceUsd)}</span>
                   {d.canEdit && <span className="flex gap-1"><button type="button" aria-label={`Edit ${s.name}`} onClick={() => setEdit({ ...s })} className="grid h-9 w-9 place-items-center rounded-full border border-border focus-ring"><Pencil size={14} aria-hidden="true" /></button><button type="button" aria-label={`Delete ${s.name}`} onClick={() => setDel(s)} className="grid h-9 w-9 place-items-center rounded-full border border-border text-danger focus-ring"><Trash2 size={14} aria-hidden="true" /></button></span>}
@@ -268,7 +268,7 @@ function Packing() {
         <div className="card-dark p-4" data-testid="to-deliver">
           <h2 className="!text-base">To bring before pickup</h2>
           {!d.toDeliver.length ? <p className="mt-2 text-sm text-text-muted">Nothing ordered on upcoming pickups.</p> : (
-            <ul className="mt-2 divide-y divide-border text-sm">{d.toDeliver.map((x) => <li key={x.id} className="flex items-center justify-between gap-2 py-2"><span className="min-w-0"><b>{x.qty} × {x.name}</b><span className="block text-xs text-text-muted">{x.ref} · {x.customer}</span></span><span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${x.status === 'paid' ? 'bg-teal/15 text-teal' : 'bg-surface-2 text-text-muted'}`}>{x.status === 'paid' ? 'Paid' : 'Not paid yet'}</span></li>)}</ul>
+            <ul className="mt-2 divide-y divide-border text-sm">{d.toDeliver.map((x) => <li key={x.id} className="flex items-center justify-between gap-2 py-2"><span className="min-w-0"><b>{x.qty} × {x.name}</b><span className="block text-xs text-text-muted">{x.ref} · {x.customer}</span></span><span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${x.status === 'paid' ? 'bg-teal/15 text-teal' : 'bg-surface-2 text-text-muted'}`}>{x.status === 'paid' ? 'Paid' : 'Not paid yet'}</span></li>)}</ul>
           )}
         </div>
       </div>

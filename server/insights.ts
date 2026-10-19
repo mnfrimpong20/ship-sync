@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction, Router } from 'express'
+import { humanizeDates } from '../src/lib/dates'
 import type { Db } from './db'
 import type { ApiUser } from './api'
 import { countryByCode, statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
@@ -99,7 +100,7 @@ export function mountInsights(r: Router, d: Deps) {
     // ---- attention list (most urgent first)
     const attention: AttentionItem[] = []
     for (const l of staleLeads.slice(0, 3)) attention.push({ kind: 'lead', severity: 'warning', title: `Client request waiting ${Math.floor((now.getTime() - new Date(l.created_at).getTime()) / DAY)}d: ${l.origin} → ${countryByCode(l.destination)?.name ?? l.destination}`, body: `${l.contact_name} · ${l.quote_count} competing quote${l.quote_count === 1 ? '' : 's'}. Customers see your response time.`, to: '/dashboard/leads', at: iso(l.created_at) })
-    for (const s of late.slice(0, 3)) attention.push({ kind: 'shipment', severity: 'critical', title: `${s.ref} is past its ETA (${dateOnly(s.eta)})`, body: `${statusLabels[s.status as ShipmentStatus]} · ${s.customer}. Update the status or the ETA so the customer isn’t guessing.`, to: '/dashboard/shipments' })
+    for (const s of late.slice(0, 3)) attention.push({ kind: 'shipment', severity: 'critical', title: `${s.ref} is past its ETA · ${dateOnly(s.eta)}`, body: `${statusLabels[s.status as ShipmentStatus]} · ${s.customer}. Update the status or the ETA so the customer isn’t guessing.`, to: '/dashboard/shipments' })
     for (const i of overdue.slice(0, 3)) attention.push({ kind: 'invoice', severity: 'critical', title: `${i.number} overdue — $${(num(i.total) - num(i.paid)).toLocaleString()} outstanding`, body: `Due ${dateOnly(i.due_at)}. Send a reminder or record the payment.`, to: `/dashboard/invoices/${i.id}` })
     for (const s of stale.slice(0, 2)) attention.push({ kind: 'shipment', severity: 'warning', title: `${s.ref} hasn’t moved in ${Math.floor((now.getTime() - new Date(s.last_event).getTime()) / DAY)} days`, body: `Still “${statusLabels[s.status as ShipmentStatus]}”. Add an update so tracking stays honest.`, to: '/dashboard/shipments' })
     for (const f of followups.slice(0, 3)) attention.push({ kind: 'followup', severity: new Date(f.due_at) < now ? 'warning' : 'info', title: `Follow up with ${f.client_name}`, body: f.body, to: `/dashboard/clients/${f.client_id}?tab=activity`, at: iso(f.due_at) })
@@ -154,7 +155,7 @@ export function mountInsights(r: Router, d: Deps) {
       series, lanes: lanes.map((l) => ({ ...l, share: laneTotal ? Math.round((l.n / laneTotal) * 100) : 0 })), byStatus,
       pipeline: { leads: leads.length, quoted: q30.length, won: q30.filter((q) => q.status === 'accepted').length },
       ops: { runsToday: runsToday.map((x) => ({ id: x.id, name: x.name, kind: x.kind, status: x.status, driver: x.driver_name ?? null, stops: x.stops, pending: x.pending })), vehicles: { total: vehicles.length, available: vehicles.filter((v) => v.status === 'available').length, onRun: vehicles.filter((v) => v.status === 'on_run').length, maintenance: vehicles.filter((v) => v.status === 'maintenance').length }, team: { active: team.filter((t) => t.status === 'active').length, drivers: team.filter((t) => t.role === 'driver' && t.status === 'active').length, invited: team.filter((t) => t.status === 'invited').length }, followupsDue: followups.length },
-      attention: attention.slice(0, 8),
+      attention: attention.slice(0, 8).map((a) => ({ ...a, title: humanizeDates(a.title, { rel: true }), body: humanizeDates(a.body, { rel: true }) })),
       leads: leads.slice(0, 4).map((l) => ({ id: l.id, ref: l.ref, origin: l.origin, destination: l.destination, mode: l.mode, cargo: l.cargo, contact: l.contact_name, createdAt: iso(l.created_at), competing: l.quote_count })),
       activity: activity.map((a) => ({ id: a.id, type: a.type, body: a.body, at: iso(a.at), clientName: a.client_name, clientId: a.client_id })),
     })

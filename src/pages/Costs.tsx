@@ -79,7 +79,7 @@ export default function CostsPage() {
           { key: 'scope', label: 'For', format: (_v, r) => (r.shipmentRef ? `${r.shipmentRef}` : r.containerRef ? `${r.containerRef} (split)` : 'Overhead') },
           { key: 'vendor', label: 'Paid to' }, { key: 'description', label: 'Note' },
           { key: 'amountUsd', label: 'Amount', align: 'right', format: (v) => money(v as number) },
-          { key: 'id', label: '', format: (v) => <button type="button" aria-label="Delete cost" onClick={async () => { if (confirm('Delete this cost?')) { await platformApi.deleteCost(String(v)); load() } }} className="rounded p-1 text-text-muted hover:text-danger focus-ring"><Trash2 size={14} aria-hidden="true" /></button> },
+          { key: 'id', label: '', format: (v) => <button type="button" aria-label="Delete cost" onClick={async () => { if (confirm('Delete this cost?')) { await platformApi.deleteCost(String(v)); load() } }} className="grid h-9 w-9 place-items-center rounded-lg text-text-muted hover:bg-surface-2 hover:text-danger focus-ring"><Trash2 size={15} aria-hidden="true" /></button> },
         ]} />}
       </Panel>
     </div></div>

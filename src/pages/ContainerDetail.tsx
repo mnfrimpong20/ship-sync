@@ -74,9 +74,9 @@ function LoadPanel({ d, onClose, onDone }: { d: Detail; onClose: () => void; onD
       {error && <p role="alert" className="mt-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
       <div className="mt-4 overflow-hidden rounded-lg border border-border">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-border bg-surface-2/60 text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="w-10 px-3 py-2" /><th className="px-3 py-2">Shipment</th><th className="px-3 py-2">Route</th><th className="px-3 py-2">Cargo</th><th className="px-3 py-2">Customer</th><th className="px-3 py-2">Status</th></tr></thead>
+          <thead><tr className="border-b border-border bg-surface-2/60 text-left text-xs uppercase tracking-wider text-text-muted"><th className="w-10 px-3 py-2"><span className="sr-only">Details</span></th><th className="px-3 py-2">Shipment</th><th className="px-3 py-2">Route</th><th className="px-3 py-2">Cargo</th><th className="px-3 py-2">Customer</th><th className="px-3 py-2">Status</th></tr></thead>
           <tbody>
-            {cands === null && !error && <tr><td colSpan={6} className="px-3 py-6 text-center text-text-muted">Loading…</td></tr>}
+            {cands === null && !error && <tr><td colSpan={6}><BrandLoader full={false} /></td></tr>}
             {cands && cands.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-text-muted">No ocean shipments waiting. Win a quote or book a shipment for a client first.</td></tr>}
             {(cands ?? []).map((s) => {
               const on = picked.has(s.id)
@@ -84,7 +84,7 @@ function LoadPanel({ d, onClose, onDone }: { d: Detail; onClose: () => void; onD
                 <tr key={s.id} className={`cursor-pointer border-b border-border/70 transition-colors hover:bg-surface-2/60 ${on ? 'bg-gold/5' : ''}`} onClick={() => toggle(s.id)}>
                   <td className="px-3 py-2.5"><input type="checkbox" aria-label={`Select ${s.ref}`} checked={on} onChange={() => toggle(s.id)} onClick={(e) => e.stopPropagation()} className="h-4 w-4 accent-[var(--color-gold)]" /></td>
                   <td className="px-3 py-2.5 font-mono text-xs text-gold-deep">{s.ref}</td>
-                  <td className="px-3 py-2.5"><span className="font-medium">{s.origin}</span> <span className="text-text-muted">→ {countryByCode(s.destination)?.name ?? s.destination}</span>{!s.sameLane && <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-danger/40 px-1.5 text-[10px] text-danger"><AlertTriangle size={10} aria-hidden="true" /> other lane</span>}</td>
+                  <td className="px-3 py-2.5"><span className="font-medium">{s.origin}</span> <span className="text-text-muted">→ {countryByCode(s.destination)?.name ?? s.destination}</span>{!s.sameLane && <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-danger/40 px-1.5 text-[11px] text-danger"><AlertTriangle size={10} aria-hidden="true" /> other lane</span>}</td>
                   <td className="max-w-[220px] px-3 py-2.5"><p className="truncate" title={s.description}>{s.description || '—'}</p><p className="text-xs text-text-muted">{cargoLabel(s.cargo as CargoType)} · ~{cargoCbm[s.cargo] ?? 2} cbm</p></td>
                   <td className="px-3 py-2.5">{s.clientName ?? s.customer}</td>
                   <td className="px-3 py-2.5"><Pill tone="muted">{statusLabels[s.status]}</Pill></td>
@@ -98,7 +98,7 @@ function LoadPanel({ d, onClose, onDone }: { d: Detail; onClose: () => void; onD
         <div className="min-w-[220px] flex-1">
           <div className="flex justify-between text-xs text-text-muted"><span>Planned fill</span><span className="tabular-nums">{Math.round(used + adding)} / {cap} cbm{used + adding > cap ? ' — over capacity' : ''}</span></div>
           <div className="mt-1 h-2 overflow-hidden rounded-full bg-border" role="progressbar" aria-valuenow={Math.min(100, Math.round(((used + adding) / cap) * 100))} aria-valuemin={0} aria-valuemax={100}><div className="flex h-full"><div className="bg-teal" style={{ width: `${Math.min(100, (used / cap) * 100)}%` }} /><div className={used + adding > cap ? 'bg-danger' : 'bg-gold'} style={{ width: `${Math.min(100 - Math.min(100, (used / cap) * 100), (adding / cap) * 100)}%` }} /></div></div>
-          <p className="mt-1 text-[11px] text-text-muted">Estimated from cargo type — a planning guide, not a manifest.</p>
+          <p className="mt-1 text-xs text-text-muted">Estimated from cargo type — a planning guide, not a manifest.</p>
         </div>
         <div className="flex items-center gap-2">
           {offLane > 0 && <span className="text-xs text-danger">{offLane} shipment{offLane === 1 ? ' is' : 's are'} bound for another country</span>}
@@ -169,7 +169,7 @@ export default function ContainerDetail() {
             <motion.div variants={fadeUp} className="flex items-center gap-4">
               <span className="grid h-14 w-14 place-items-center rounded-2xl bg-surface-2 text-gold-deep" aria-hidden="true"><ContainerIcon size={26} /></span>
               <div>
-                <div className="flex flex-wrap items-center gap-2"><h1 className="!text-[clamp(1.5rem,3vw,2.1rem)]">{c.ref}</h1><Pill tone={stageTone(c.status)}>{stageLabels[c.status]}</Pill>{c.tracking.status === 'live' && <span className="inline-flex items-center gap-1 rounded-full border border-teal/40 bg-teal/10 px-2 py-0.5 text-[11px] font-medium text-teal"><Radio size={11} aria-hidden="true" /> Auto-updating from {c.line || 'carrier'}</span>}</div>
+                <div className="flex flex-wrap items-center gap-2"><h1 className="!text-[clamp(1.5rem,3vw,2.1rem)]">{c.ref}</h1><Pill tone={stageTone(c.status)}>{stageLabels[c.status]}</Pill>{c.tracking.status === 'live' && <span className="inline-flex items-center gap-1 rounded-full border border-teal/40 bg-teal/10 px-2 py-0.5 text-xs font-medium text-teal"><Radio size={11} aria-hidden="true" /> Auto-updating from {c.line || 'carrier'}</span>}</div>
                 <p className="mt-1 text-sm text-text-muted">{sizeLabels[c.size]} · {c.line}{c.number ? ` · ${c.number}` : ''} · {c.originPort || '—'} → {c.destinationPort || dest?.name || c.destination}{c.destinationPort && dest ? `, ${dest.name}` : ''}</p>
               </div>
             </motion.div>
@@ -210,14 +210,14 @@ export default function ContainerDetail() {
               <motion.section variants={fadeUp} className="card-dark overflow-hidden" aria-labelledby="shipments-h">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
                   <div><h2 id="shipments-h" className="!text-lg">Loaded shipments <span className="ml-1 text-sm font-normal text-text-muted">{d.shipments.length}</span></h2></div>
-                  <div className="min-w-[200px]"><div className="flex justify-between text-[11px] text-text-muted"><span>Planned fill</span><span className="tabular-nums">{Math.round(used)} / {cap} cbm</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-border"><div className={`h-full ${used > cap ? 'bg-danger' : 'bg-teal'}`} style={{ width: `${Math.min(100, (used / cap) * 100)}%` }} /></div></div>
+                  <div className="min-w-[200px]"><div className="flex justify-between text-xs text-text-muted"><span>Planned fill</span><span className="tabular-nums">{Math.round(used)} / {cap} cbm</span></div><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-border"><div className={`h-full ${used > cap ? 'bg-danger' : 'bg-teal'}`} style={{ width: `${Math.min(100, (used / cap) * 100)}%` }} /></div></div>
                 </div>
                 {d.shipments.length === 0 ? (
                   <div className="p-6"><Empty title="Nothing loaded yet" body={canLoad(c.status) ? 'Add the ocean shipments you have won for this lane. Each one moves with the container from here on.' : 'This container moved on without any shipments.'} action={canLoad(c.status) ? <button onClick={() => setLoading(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Load shipments</button> : undefined} /></div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[640px] text-sm">
-                      <thead><tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-text-muted"><th className="px-4 py-2.5">Shipment</th><th className="px-4 py-2.5">Cargo</th><th className="px-4 py-2.5">Pieces</th><th className="px-4 py-2.5">Customer</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">ETA</th><th className="px-4 py-2.5 text-right">Actions</th></tr></thead>
+                      <thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-text-muted"><th className="px-4 py-2.5">Shipment</th><th className="px-4 py-2.5">Cargo</th><th className="px-4 py-2.5">Pieces</th><th className="px-4 py-2.5">Customer</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">ETA</th><th className="px-4 py-2.5 text-right">Actions</th></tr></thead>
                       <tbody>
                         {d.shipments.map((s) => (
                           <tr key={s.id} className="border-b border-border/70 align-top">
@@ -250,7 +250,7 @@ export default function ContainerDetail() {
                       <li key={i} className={`flex gap-3 ${milestone ? '' : 'pl-1'}`}>
                         <span className={`mt-1 grid shrink-0 place-items-center rounded-full ${milestone ? 'h-6 w-6' : 'ml-1 h-4 w-4'} ${i === 0 && milestone ? 'bg-gold text-on-accent' : e.source === 'carrier' ? 'bg-teal/15 text-teal' : 'bg-surface-2 text-text-muted'}`} aria-hidden="true">{milestone ? (i === 0 ? <Ship size={12} /> : <Check size={12} />) : <Radio size={9} />}</span>
                         <div className={milestone ? '' : 'text-sm'}>
-                          <p className={milestone ? 'font-medium' : 'font-medium text-text-muted'}>{milestone ? stageLabels[e.status] : eventTitles[e.code] ?? e.code}{e.place ? <span className="font-normal text-text-muted"> · {e.place}</span> : null}{e.source === 'carrier' && <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-teal/40 px-1.5 text-[10px] font-medium text-teal"><Radio size={9} aria-hidden="true" /> via carrier</span>}</p>
+                          <p className={milestone ? 'font-medium' : 'font-medium text-text-muted'}>{milestone ? stageLabels[e.status] : eventTitles[e.code] ?? e.code}{e.place ? <span className="font-normal text-text-muted"> · {e.place}</span> : null}{e.source === 'carrier' && <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-teal/40 px-1.5 text-[11px] font-medium text-teal"><Radio size={9} aria-hidden="true" /> via carrier</span>}</p>
                           <p className="text-xs text-text-muted">{fmtDateTime(e.at)}{e.by ? ` · ${e.by}` : ''}</p>{e.note && <p className="mt-1 text-sm text-text-muted">{e.note}</p>}
                         </div>
                       </li>

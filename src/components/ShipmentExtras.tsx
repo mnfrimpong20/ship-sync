@@ -14,7 +14,7 @@ export function NextStep({ shipmentId }: { shipmentId: string }) {
   if (!t) return null
   return (
     <div className={card} data-testid="next-step">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Now</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Now</p>
       <p className="mt-0.5 font-semibold">{t.next.title}</p>
       <p className="mt-1 text-sm text-text-muted">{t.next.body}</p>
       {t.next.you && <p className="mt-2 rounded-lg bg-gold/10 px-3 py-2 text-sm"><b>Your part:</b> {t.next.you}</p>}
@@ -97,7 +97,7 @@ export function ShipmentChat({ shipmentId, office = false }: { shipmentId: strin
   return (
     <div className={card} data-testid="shipment-chat">
       <p className="inline-flex items-center gap-1.5 font-semibold"><MessageCircle size={15} aria-hidden="true" /> {office ? 'Messages with the client' : 'Messages with your shipper'}</p>
-      <ul className="mt-2 max-h-72 space-y-2 overflow-y-auto">{(list ?? []).map((m) => <li key={m.id} className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${m.mine ? 'ml-auto bg-gold/15' : 'bg-surface-2'}`} data-testid="chat-msg"><p className="whitespace-pre-wrap">{m.body}</p>{m.photo && <img src={m.photo} alt="Attached" className="mt-1.5 max-h-40 rounded" />}<p className="mt-0.5 text-[10px] text-text-muted">{m.author} · {fmtDateTime(m.at)}</p></li>)}{list && !list.length && <li className="text-sm text-text-muted">No messages yet.</li>}</ul>
+      <ul className="mt-2 max-h-72 space-y-2 overflow-y-auto">{(list ?? []).map((m) => <li key={m.id} className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${m.mine ? 'ml-auto bg-gold/15' : 'bg-surface-2'}`} data-testid="chat-msg"><p className="whitespace-pre-wrap">{m.body}</p>{m.photo && <img src={m.photo} alt="Attached" className="mt-1.5 max-h-40 rounded" />}<p className="mt-0.5 text-[11px] text-text-muted">{m.author} · {fmtDateTime(m.at)}</p></li>)}{list && !list.length && <li className="text-sm text-text-muted">No messages yet.</li>}</ul>
       <form onSubmit={send} className="mt-2 flex gap-2">
         <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a message…" className={`${cls} flex-1`} aria-label="Message" data-testid="chat-input" />
         <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={async (e) => { const f = e.target.files?.[0]; if (f) try { setPhoto(await readImage(f)) } catch (x) { setErr(x instanceof Error ? x.message : 'Bad photo') } }} />

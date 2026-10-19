@@ -20,7 +20,7 @@ function CopyLink({ token }: { token: string }) {
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-xs">
       <Link2 size={13} className="text-gold-deep" aria-hidden="true" />
       <span className="text-text-muted">Invite link:</span>
-      <input readOnly aria-label="Invitation link" value={link} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-text outline-none" />
+      <input readOnly aria-label="Invitation link" value={link} onFocus={(e) => e.currentTarget.select()} className="min-w-0 flex-1 bg-transparent font-mono text-xs text-text outline-none" />
       <button type="button" onClick={copy} className="btn-ghost !min-h-8 !px-2.5 text-xs">{copied ? <><Check size={13} aria-hidden="true" /> Copied</> : <><Copy size={13} aria-hidden="true" /> Copy</>}</button>
     </div>
   )
@@ -101,7 +101,7 @@ export default function Team() {
 
           <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</motion.p>}</AnimatePresence>
 
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="Active members" value={counts.active} hint="Can sign in right now" icon={Users} active={filter === 'active'} onClick={() => setFilter(filter === 'active' ? 'all' : 'active')} />
             <StatCard label="Drivers" value={counts.drivers} hint="See only their own runs" icon={Truck} active={role === 'driver'} onClick={() => setRole(role === 'driver' ? '' : 'driver')} />
             <StatCard label="Invitations pending" value={counts.invited} hint={counts.invited ? 'Haven’t opened their link yet' : 'Everyone invited has joined'} icon={Mail} warn={counts.invited > 0} active={filter === 'invited'} onClick={() => setFilter(filter === 'invited' ? 'all' : 'invited')} />
@@ -161,7 +161,7 @@ export default function Team() {
               <table className="w-full min-w-[900px] text-sm">
                 <thead><tr className={thead}><Th className="w-8" /><Th>Member</Th><Th>Role</Th><Th>Contact</Th><Th>Works at</Th><Th>This week</Th><Th>Last active</Th><Th>Status</Th>{manage && <Th className="text-right">Actions</Th>}</tr></thead>
                 <tbody>
-                  {team === null && !error && <tr><td colSpan={9} className="px-3 py-10 text-center text-text-muted">Loading…</td></tr>}
+                  {team === null && !error && <tr><td colSpan={9}><BrandLoader full={false} /></td></tr>}
                   {team && p.rows.length === 0 && <tr><td colSpan={9} className="px-3 py-10"><Empty title={all.length ? 'No one matches' : 'Just you so far'} body={all.length ? 'Try another filter or search.' : 'Invite dispatchers, agents and drivers so everyone works from the same shipments.'} action={manage && !all.length ? <button onClick={() => setInviting(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Invite teammate</button> : undefined} /></td></tr>}
                   {p.rows.map((s) => {
                     const isMe = s.userId === user.id; const canEdit = manage && !(s.role === 'owner' && !isOwner); const isOpen = open === s.id
@@ -169,10 +169,10 @@ export default function Team() {
                       <Fragment key={s.id}>
                         <tr className={trow(isOpen, s.status === 'inactive')}>
                           <td className="px-3 py-3"><Expander open={isOpen} onClick={() => setOpen(isOpen ? null : s.id)} label={`details for ${s.name}`} /></td>
-                          <td className="px-3 py-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 font-heading text-xs font-bold text-gold-deep" aria-hidden="true">{initialsOf(s.name)}</span><div><p className="font-semibold">{s.name}{isMe && <span className="ml-1.5 text-xs font-normal text-text-muted">(you)</span>}</p><p className="text-[11px] text-text-muted">Joined {fmtDate(s.createdAt)}</p></div></div></td>
+                          <td className="px-3 py-3"><div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 font-heading text-xs font-bold text-gold-deep" aria-hidden="true">{initialsOf(s.name)}</span><div><p className="font-semibold">{s.name}{isMe && <span className="ml-1.5 text-xs font-normal text-text-muted">(you)</span>}</p><p className="text-xs text-text-muted">Joined {fmtDate(s.createdAt)}</p></div></div></td>
                           <td className="whitespace-nowrap px-3 py-3">{canEdit && s.status !== 'inactive' ? <><label className="sr-only" htmlFor={`role-${s.id}`}>Role for {s.name}</label><select id={`role-${s.id}`} className="input-dark !min-h-8 !w-auto !py-0 text-xs" value={s.role} onChange={(e) => patch(s, { role: e.target.value as StaffRole }, `${s.name} is now ${roleLabels[e.target.value as StaffRole].toLowerCase()}.`)}>{(Object.keys(roleLabels) as StaffRole[]).filter((r) => r !== 'owner' || isOwner).map((r) => <option key={r} value={r}>{roleLabels[r]}</option>)}</select></> : <Pill tone={roleTone[s.role]}>{roleLabels[s.role]}</Pill>}</td>
                           <td className="px-3 py-3 text-xs"><p className="inline-flex items-center gap-1"><Mail size={11} aria-hidden="true" /> <a href={`mailto:${s.email}`} className="hover:text-gold-deep">{s.email}</a></p>{s.phone && <p className="inline-flex items-center gap-1 text-text-muted"><Phone size={11} aria-hidden="true" /> <a href={`tel:${s.phone}`} className="hover:text-gold-deep">{s.phone}</a></p>}</td>
-                          <td className="px-3 py-3"><p>{s.city || (s.base === 'origin' ? 'Origin side' : 'Destination side')}</p><p className="text-[11px] text-text-muted">{s.base === 'origin' ? 'US / Europe' : 'West Africa'}</p></td>
+                          <td className="px-3 py-3"><p>{s.city || (s.base === 'origin' ? 'Origin side' : 'Destination side')}</p><p className="text-xs text-text-muted">{s.base === 'origin' ? 'US / Europe' : 'West Africa'}</p></td>
                           <td className="whitespace-nowrap px-3 py-3 text-xs tabular-nums"><Activity s={s} /></td>
                           <td className="whitespace-nowrap px-3 py-3 text-xs text-text-muted">{s.status === 'invited' ? <span className="text-gold-deep">Never — invite not opened</span> : s.lastActiveAt ? relTime(s.lastActiveAt) : '—'}</td>
                           <td className="whitespace-nowrap px-3 py-3"><Pill tone={s.status === 'active' ? 'green' : s.status === 'invited' ? 'gold' : 'danger'}>{s.status === 'active' ? 'Active' : s.status === 'invited' ? 'Invited' : 'Deactivated'}</Pill></td>

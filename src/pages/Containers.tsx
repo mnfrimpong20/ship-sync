@@ -22,7 +22,7 @@ export function StageStepper({ status, compact = false }: { status: ContainerSta
       {CONTAINER_STAGES.map((s, i) => (
         <li key={s} className="flex-1" title={stageLabels[s]}>
           <span className={`block rounded-full ${compact ? 'h-1' : 'h-1.5'} ${i < idx ? 'bg-teal' : i === idx ? 'bg-gold' : 'bg-border'}`} />
-          {!compact && <span className={`mt-1.5 hidden text-[10px] leading-tight lg:block ${i === idx ? 'font-semibold text-text' : 'text-text-muted'}`}>{stageLabels[s].replace(' with line', '').replace(' at port', '')}</span>}
+          {!compact && <span className={`mt-1.5 hidden text-[11px] leading-tight lg:block ${i === idx ? 'font-semibold text-text' : 'text-text-muted'}`}>{stageLabels[s].replace(' with line', '').replace(' at port', '')}</span>}
         </li>
       ))}
     </ol>
@@ -105,7 +105,7 @@ export default function Containers() {
     setBusy(true); setError('')
     try { const d = await containersApi.create(c); setModal(false); nav(`/dashboard/containers/${d.container.id}`) } catch (e) { setError(e instanceof Error ? e.message : 'Could not book the container.') } finally { setBusy(false) }
   }
-  const chip = (t: Tab, label: string, count: number) => <button onClick={() => setTab(t)} aria-pressed={tab === t} className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors focus-ring ${tab === t ? 'border-gold bg-gold/10 text-text' : 'border-border text-text-muted hover:text-text'}`}>{label} <span className="rounded-full bg-surface-2 px-1.5 text-[11px] tabular-nums">{count}</span></button>
+  const chip = (t: Tab, label: string, count: number) => <button onClick={() => setTab(t)} aria-pressed={tab === t} className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors focus-ring ${tab === t ? 'border-gold bg-gold/10 text-text' : 'border-border text-text-muted hover:text-text'}`}>{label} <span className="rounded-full bg-surface-2 px-1.5 text-xs tabular-nums">{count}</span></button>
 
   return (
     <div className="bg-bg text-text">
@@ -117,7 +117,7 @@ export default function Containers() {
           </div>
 
           <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {stats.map((s) => <div key={s.label} className="card-dark p-4"><div className="flex items-center justify-between"><p className="text-xs text-text-muted">{s.label}</p><s.icon size={15} className="text-gold-deep" aria-hidden="true" /></div><p className="mt-1 font-heading text-2xl font-bold tabular-nums">{s.value}</p><p className="text-[11px] text-text-muted">{s.hint}</p></div>)}
+            {stats.map((s) => <div key={s.label} className="card-dark p-4"><div className="flex items-center justify-between"><p className="text-xs text-text-muted">{s.label}</p><s.icon size={15} className="text-gold-deep" aria-hidden="true" /></div><p className="mt-1 font-heading text-2xl font-bold tabular-nums">{s.value}</p><p className="text-xs text-text-muted">{s.hint}</p></div>)}
           </motion.div>
 
           <motion.div variants={fadeUp} className="mt-6 flex flex-wrap items-center gap-2">
@@ -129,16 +129,16 @@ export default function Containers() {
           {!modal && error && <p role="alert" className="mt-6 text-sm text-danger">{error}</p>}
 
           <motion.ul variants={fadeUp} className="mt-6 grid gap-4 md:grid-cols-2" aria-label="Containers">
-            {list === null && !error && <li className="md:col-span-2 py-10 text-center text-text-muted">Loading…</li>}
+            {list === null && !error && <li className="md:col-span-2"><BrandLoader full={false} /></li>}
             {list && rows.length === 0 && <li className="md:col-span-2"><Empty title={all.length ? 'No containers match' : 'No containers yet'} body={all.length ? 'Try another tab or search.' : 'Book your first container with the shipping line, then load the ocean shipments you have won into it.'} action={<button onClick={() => setModal(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Plus size={15} aria-hidden="true" /> Book a container</button>} /></li>}
             {rows.map((c) => {
               const d = countryByCode(c.destination)
               return (
                 <li key={c.id}>
-                  <Link to={`/dashboard/containers/${c.id}`} className={`card-dark block p-5 transition-colors hover:border-gold/40 focus-ring ${!isOpen(c.status) ? 'opacity-70' : ''}`}>
+                  <Link to={`/dashboard/containers/${c.id}`} className={`card-dark block p-5 transition-colors hover:border-gold/40 focus-ring ${!isOpen(c.status) ? 'dimmed' : ''}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-surface-2 text-gold-deep" aria-hidden="true"><ContainerIcon size={20} /></span><div><p className="font-semibold">{c.ref}{c.number && <span className="ml-2 font-mono text-xs font-normal text-text-muted">{c.number}</span>}</p><p className="text-xs text-text-muted">{sizeLabels[c.size]} · {c.line}{c.bookingRef ? ` · ${c.bookingRef}` : ''}</p></div></div>
-                      <div className="flex flex-col items-end gap-1"><Pill tone={stageTone(c.status)}>{stageLabels[c.status]}</Pill>{c.tracking?.status === 'live' && <span className="inline-flex items-center gap-1 text-[10px] font-medium text-teal"><Radio size={10} aria-hidden="true" /> auto-updating</span>}</div>
+                      <div className="flex flex-col items-end gap-1"><Pill tone={stageTone(c.status)}>{stageLabels[c.status]}</Pill>{c.tracking?.status === 'live' && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-teal"><Radio size={10} aria-hidden="true" /> auto-updating</span>}</div>
                     </div>
                     <div className="mt-4"><StageStepper status={c.status} compact /></div>
                     <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm sm:grid-cols-4">

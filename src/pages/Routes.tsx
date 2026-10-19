@@ -140,7 +140,7 @@ export default function Routes() {
           <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</motion.p>}</AnimatePresence>
           {error && <p role="alert" className="mt-6 text-sm text-danger">{error}</p>}
 
-          <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="Runs today" value={counts.today} hint={counts.today ? 'Scheduled for today' : 'Nothing scheduled today'} icon={CalendarDays} active={bucket === 'today'} onClick={() => set({ b: 'today' })} />
             <StatCard label="On the road now" value={counts.active} hint="Started, not yet finished" icon={Truck} active={bucket === 'active'} onClick={() => set({ b: 'active' })} />
             <StatCard label="Needs a driver" value={counts.unassigned} hint={counts.overdue ? `${counts.overdue} planned run${counts.overdue === 1 ? '' : 's'} past its date` : 'Planned runs without a driver'} icon={UserX} warn={counts.overdue > 0 || counts.unassigned > 0} active={bucket === 'unassigned'} onClick={() => set({ b: 'unassigned' })} />
@@ -165,7 +165,7 @@ export default function Routes() {
               <table className="w-full min-w-[960px] text-sm">
                 <thead><tr className={thead}><Th className="w-8" /><Th>Run</Th><Th>Date</Th><Th>Driver</Th><Th>Vehicle</Th><Th>Stops</Th><Th>Distance</Th><Th>Status</Th><Th className="text-right">Actions</Th></tr></thead>
                 <tbody>
-                  {runs === null && !error && <tr><td colSpan={9} className="px-3 py-10 text-center text-text-muted">Loading…</td></tr>}
+                  {runs === null && !error && <tr><td colSpan={9}><BrandLoader full={false} /></td></tr>}
                   {runs && p.rows.length === 0 && <tr><td colSpan={9} className="px-3 py-10"><Empty title={all.length ? 'No runs match' : 'No runs planned yet'} body={all.length ? 'Try another filter or search.' : 'Plan your first run: pick the shipments that need collecting or delivering, and we’ll order the stops for you.'} action={manage && !all.length ? <Link to="/dashboard/routes/new" className="btn-gold !min-h-10 !px-4 text-sm">Plan a run</Link> : undefined} /></td></tr>}
                   {p.rows.map((r) => {
                     const done = r.stops.filter((s) => s.status !== 'pending').length; const isOpen = open === r.id; const late = r.status === 'planned' && r.date < today(); const closed = r.status === 'done' || r.status === 'cancelled'
@@ -173,8 +173,8 @@ export default function Routes() {
                       <Fragment key={r.id}>
                         <tr className={trow(isOpen, r.status === 'cancelled')}>
                           <td className="px-3 py-3"><Expander open={isOpen} onClick={() => setOpen(isOpen ? null : r.id)} label={`stops for ${r.name}`} /></td>
-                          <td className="px-3 py-3"><Link to={`/dashboard/routes/${r.id}`} className="font-semibold hover:text-gold-deep focus-ring">{r.name}</Link><p className="mt-1"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${r.kind === 'pickup' ? 'bg-teal/15 text-teal' : 'bg-gold/15 text-gold-deep'}`}><MapPinned size={10} aria-hidden="true" /> {r.kind === 'pickup' ? 'Pickups' : 'Deliveries'}</span></p></td>
-                          <td className="whitespace-nowrap px-3 py-3 tabular-nums"><p>{r.date ? fmtDate(r.date + 'T12:00:00Z') : '—'}</p>{r.date && !closed && <p className={`text-[11px] ${late ? 'font-semibold text-danger' : 'text-text-muted'}`}>{late ? `${dayWord(r.date)} — not started` : dayWord(r.date)}</p>}</td>
+                          <td className="px-3 py-3"><Link to={`/dashboard/routes/${r.id}`} className="font-semibold hover:text-gold-deep focus-ring">{r.name}</Link><p className="mt-1"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${r.kind === 'pickup' ? 'bg-teal/15 text-teal' : 'bg-gold/15 text-gold-deep'}`}><MapPinned size={10} aria-hidden="true" /> {r.kind === 'pickup' ? 'Pickups' : 'Deliveries'}</span></p></td>
+                          <td className="whitespace-nowrap px-3 py-3 tabular-nums"><p>{r.date ? fmtDate(r.date + 'T12:00:00Z') : '—'}</p>{r.date && !closed && <p className={`text-xs ${late ? 'font-semibold text-danger' : 'text-text-muted'}`}>{late ? `${dayWord(r.date)} — not started` : dayWord(r.date)}</p>}</td>
                           <td className="px-3 py-3">{r.driverName ?? <span className="inline-flex items-center gap-1 text-danger"><AlertTriangle size={12} aria-hidden="true" /> Unassigned</span>}</td>
                           <td className="px-3 py-3">{r.vehicleName ?? <span className="text-text-muted">—</span>}</td>
                           <td className="px-3 py-3"><div className="flex items-center gap-2"><span className="tabular-nums">{r.status === 'planned' ? r.stops.length : `${done}/${r.stops.length}`}</span><span className="h-1.5 w-20 overflow-hidden rounded-full bg-border" aria-hidden="true"><span className={`block h-full ${r.status === 'done' ? 'bg-teal' : 'bg-gold'}`} style={{ width: `${r.stops.length ? (done / r.stops.length) * 100 : 0}%` }} /></span></div></td>
@@ -209,7 +209,7 @@ export default function Routes() {
                                 {r.stops.length === 0 ? <p className="text-sm text-text-muted">No stops yet — open the run to add shipments.</p> : (
                                   <ol className="space-y-1.5 text-sm">{r.stops.map((s, i) => (
                                     <li key={s.id} className="flex items-start gap-2">
-                                      <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-semibold ${s.status === 'done' ? 'bg-teal text-white' : s.status === 'skipped' ? 'bg-border text-text-muted line-through' : 'bg-surface-2 text-text-muted'}`} aria-label={s.status}>{s.status === 'done' ? <Check size={11} /> : i + 1}</span>
+                                      <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-xs font-semibold ${s.status === 'done' ? 'bg-teal text-white' : s.status === 'skipped' ? 'bg-border text-text-muted line-through' : 'bg-surface-2 text-text-muted'}`} aria-label={s.status}>{s.status === 'done' ? <Check size={11} /> : i + 1}</span>
                                       <span className="min-w-0"><span className={s.status === 'skipped' ? 'line-through text-text-muted' : ''}>{s.label}</span>{s.shipmentRef && <Link to={`/dashboard/shipments?q=${s.shipmentRef}&b=all`} className="ml-2 font-mono text-xs text-gold-deep hover:underline">{s.shipmentRef}</Link>}<span className="block text-xs text-text-muted">{s.address}{s.contact ? ` · ${s.contact}` : ''}{s.phone ? ` · ${s.phone}` : ''}{s.note ? ` — ${s.note}` : ''}</span></span>
                                     </li>
                                   ))}</ol>

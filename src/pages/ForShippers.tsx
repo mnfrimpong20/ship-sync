@@ -42,7 +42,7 @@ const features: Feature[] = [
 const sections: [string, string][] = [['how', 'How it works'], ['win', 'Win'], ['run', 'Run'], ['paid', 'Get paid'], ['grow', 'Grow'], ['equipment', 'Equipment'], ['plans', 'Plans'], ['faq', 'Questions']]
 
 const Eyebrow = ({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) => <p className={`mb-3 text-xs font-bold uppercase tracking-[0.12em] ${dark ? 'text-gold' : 'text-gold-deep'}`}>{children}</p>
-const ExampleTag = () => <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Example</span>
+const ExampleTag = () => <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Example</span>
 const go = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
 /* ------------------------------------------------------------------ small example screens */
@@ -137,7 +137,7 @@ export default function ForShippersPage() {
           <motion.div className="lg:col-span-7" initial="hidden" animate="show" variants={stagger}>
             <motion.div variants={fadeUp} className="mb-6 flex items-center gap-3">
               <Mark size={44} partner />
-              <span className="flex flex-col leading-none"><span className="font-heading text-2xl font-extrabold tracking-[-0.02em]">ntemtem</span><span className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-gold">Partner</span></span>
+              <span className="flex flex-col leading-none"><span className="font-heading text-2xl font-extrabold tracking-[-0.02em]">ntemtem</span><span className="mt-1 text-[11px] font-bold uppercase tracking-[0.16em] text-gold">Partner</span></span>
             </motion.div>
             <motion.h1 variants={fadeUp} className="max-w-3xl">Run your shipping business on <span className="text-gold">Ntemtem.</span></motion.h1>
             <motion.p variants={fadeUp} className="mt-6 max-w-xl text-lg text-[#D8D1C3] md:text-xl">Customers find you, compare your quote and pay upfront. You load the container, scan every box, and your agent at the port hands it over — all in one place, built for barrels, cars and containers to West Africa.</motion.p>
@@ -268,7 +268,7 @@ export default function ForShippersPage() {
           <div className="grid gap-4 sm:grid-cols-3 lg:col-span-7">
             {catalog.slice(0, 3).map((p) => (
               <div key={p.id} className="card-light flex flex-col p-5">
-                {p.includedWith.length > 0 && <span className="mb-2 self-start rounded-full bg-teal/15 px-2 py-0.5 text-[11px] font-semibold text-teal">Free with {p.includedWith.map((x) => x[0].toUpperCase() + x.slice(1)).join(' / ')}</span>}
+                {p.includedWith.length > 0 && <span className="mb-2 self-start rounded-full bg-teal/15 px-2 py-0.5 text-xs font-semibold text-teal">Free with {p.includedWith.map((x) => x[0].toUpperCase() + x.slice(1)).join(' / ')}</span>}
                 <h3 className="!text-base">{p.name}</h3>
                 <ul className="mt-2 flex-1 space-y-1 text-sm text-text-muted">{p.specs.slice(0, 3).map((x) => <li key={x}>{x}</li>)}</ul>
                 <p className="mt-4 font-heading text-2xl font-extrabold">{money(p.priceUsd)}</p>
@@ -289,7 +289,7 @@ export default function ForShippersPage() {
               const pro = p.key === 'pro'
               return (
                 <div key={p.key} className={`flex flex-col rounded-[var(--radius-lg)] p-7 ${pro ? 'bg-partner text-[#FBF6EC] md:-my-3 md:py-10' : 'card-light'}`}>
-                  {pro && <span className="mb-3 self-start rounded-full bg-gold px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-on-accent">{d?.trialDays ? `${d.trialDays} days free` : 'Free trial'}</span>}
+                  {pro && <span className="mb-3 self-start rounded-full bg-gold px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-on-accent">{d?.trialDays ? `${d.trialDays} days free` : 'Free trial'}</span>}
                   <h3 className="!text-2xl">{p.label}</h3>
                   <p className="mt-2 font-heading text-3xl font-extrabold">{p.key === 'enterprise' && !p.priceUsd ? 'Talk to us' : !p.priceUsd ? 'Free' : <>{money(p.priceUsd)}<span className={`font-sans text-[15px] font-normal ${pro ? 'text-[#C9C1B1]' : 'text-text-muted'}`}> / month</span></>}</p>
                   <p className={`mt-2 text-[15px] ${pro ? 'text-[#D8D1C3]' : 'text-text-muted'}`}>{p.blurb}</p>

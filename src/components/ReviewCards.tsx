@@ -5,7 +5,7 @@ import { money } from './ui'
 import { Confirm } from './board'
 
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '')
-export const Stars = ({ n, size = 14 }: { n: number; size?: number }) => <span className="inline-flex gap-0.5" aria-label={`${n} out of 5`}>{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={size} className={i < n ? 'fill-gold text-gold-deep' : 'text-border'} aria-hidden="true" />)}</span>
+export const Stars = ({ n, size = 14 }: { n: number; size?: number }) => <span className="inline-flex gap-0.5" role="img" aria-label={`${n} out of 5`}>{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={size} className={i < n ? 'fill-gold text-gold-deep' : 'text-border'} aria-hidden="true" />)}</span>
 
 /** Customer rates a delivered shipment; the office replies. */
 export function ReviewCard({ shipmentId, shipperName }: { shipmentId: string; shipperName?: string }) {
@@ -64,7 +64,7 @@ export function DisputeCard({ shipmentId }: { shipmentId: string }) {
     <div className={`min-w-0 rounded-xl border bg-surface p-4 ${dp?.status === 'open' ? 'border-danger/40' : 'border-border'}`} data-testid="dispute-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><AlertOctagon size={14} className={dp?.status === 'open' ? 'text-danger' : 'text-text-muted'} aria-hidden="true" /> Dispute</p>
-        {dp && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${dp.status === 'open' ? 'bg-danger/15 text-danger' : 'bg-surface-2 text-text-muted'}`} data-testid="dispute-status">{dp.status === 'open' ? 'Open — Ntemtem mediating' : dp.status === 'withdrawn' ? 'Withdrawn' : `Resolved: ${outcomeLabels[dp.resolution?.outcome ?? ''] ?? ''}`}</span>}
+        {dp && <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${dp.status === 'open' ? 'bg-danger/15 text-danger' : 'bg-surface-2 text-text-muted'}`} data-testid="dispute-status">{dp.status === 'open' ? 'Open — Ntemtem mediating' : dp.status === 'withdrawn' ? 'Withdrawn' : `Resolved: ${outcomeLabels[dp.resolution?.outcome ?? ''] ?? ''}`}</span>}
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}

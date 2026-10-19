@@ -36,7 +36,7 @@ export function InsuranceCard({ shipmentId, cargo }: { shipmentId: string; cargo
     <div className="min-w-0 rounded-xl border border-border bg-surface p-4" data-testid="insurance-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted"><Shield size={14} className="text-gold-deep" aria-hidden="true" /> Insurance</p>
-        {p && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone[p.status]}`}>{policyStatusLabels[p.status]}</span>}
+        {p && <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tone[p.status]}`}>{policyStatusLabels[p.status]}</span>}
       </div>
       {toast && <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-xs text-teal"><Check size={12} aria-hidden="true" /> {toast}</p>}
       {error && <p role="alert" className="mt-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
@@ -55,7 +55,7 @@ export function InsuranceCard({ shipmentId, cargo }: { shipmentId: string; cargo
             <form onSubmit={(e) => { e.preventDefault(); void act(() => insuranceApi.claim(p.id, { description: cl.description, amountUsd: Number(cl.amountUsd) || 0, contact: cl.contact }), 'Claim filed — the shipper and the claims team have been notified.', 'claim') }} className="mt-3 grid gap-2 rounded-lg border border-border bg-surface-2/40 p-3" aria-label="File a claim" data-testid="claim-form">
               <textarea required minLength={10} rows={3} aria-label="What happened" className="input-dark py-2 text-sm" placeholder="What happened? Which pieces, what damage or loss…" value={cl.description} onChange={(e) => setCl({ ...cl, description: e.target.value })} />
               <div className="grid gap-2 sm:grid-cols-2"><input type="number" min={1} required aria-label="Amount claimed (USD)" className="input-dark !min-h-9 text-sm tabular-nums" placeholder="Amount claimed (USD)" value={cl.amountUsd} onChange={(e) => setCl({ ...cl, amountUsd: e.target.value })} /><input aria-label="Contact" className="input-dark !min-h-9 text-sm" placeholder="Best phone / WhatsApp" value={cl.contact} onChange={(e) => setCl({ ...cl, contact: e.target.value })} /></div>
-              <p className="text-[11px] text-text-muted">Upload photos of the damage to this shipment’s documents. Claims within 14 days of delivery; settlement up to the declared value less the {money(p.deductibleUsd)} deductible.</p>
+              <p className="text-xs text-text-muted">Upload photos of the damage to this shipment’s documents. Claims within 14 days of delivery; settlement up to the declared value less the {money(p.deductibleUsd)} deductible.</p>
               <div className="flex justify-end gap-2"><button type="button" onClick={() => setClaiming(false)} className="btn-ghost !min-h-8 !px-3 text-xs">Cancel</button><button disabled={busy === 'claim'} className="btn-gold !min-h-8 !px-3 text-xs disabled:opacity-60">{busy === 'claim' ? 'Filing…' : 'Submit claim'}</button></div>
             </form>
           )}
@@ -72,10 +72,10 @@ export function InsuranceCard({ shipmentId, cargo }: { shipmentId: string; cargo
           <p className="text-sm text-text-muted">{prod.coverage} cover on the declared value — {(prod.rate * 100).toFixed(1)}% premium, minimum {money(prod.minPremiumUsd)}, up to {money(prod.maxValueUsd)} insured.</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
             <label className="text-xs text-text-muted">Declared value (USD)<input type="number" min={1} aria-label="Declared value (USD)" className="input-dark mt-1 !min-h-9 text-sm tabular-nums" placeholder="What the goods are worth" value={value} onChange={(e) => setValue(e.target.value)} /></label>
-            <div className="rounded-lg border border-border bg-surface-2/40 px-3 py-2 text-sm" data-testid="premium-quote">{q ? <><span className="text-xs text-text-muted">Premium</span><br /><strong className="tabular-nums">{money(q.premiumUsd)}</strong>{q.capped ? <span className="block text-[11px] text-danger">Cover capped at {money(prod.maxValueUsd)}</span> : null}</> : <span className="text-xs text-text-muted">Enter a value</span>}</div>
+            <div className="rounded-lg border border-border bg-surface-2/40 px-3 py-2 text-sm" data-testid="premium-quote">{q ? <><span className="text-xs text-text-muted">Premium</span><br /><strong className="tabular-nums">{money(q.premiumUsd)}</strong>{q.capped ? <span className="block text-xs text-danger">Cover capped at {money(prod.maxValueUsd)}</span> : null}</> : <span className="text-xs text-text-muted">Enter a value</span>}</div>
           </div>
           <label className="mt-2 flex items-start gap-2 text-xs"><input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--color-gold)]" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span>I’ve declared the true value and accept the <button type="button" onClick={() => setTerms((t) => !t)} className="text-gold-deep hover:underline">cover terms</button>. The premium is collected by the shipper with the freight charge.</span></label>
-          {terms && <p className="mt-2 rounded-lg border border-border bg-surface-2/40 p-3 text-[11px] leading-relaxed text-text-muted">{prod.terms}</p>}
+          {terms && <p className="mt-2 rounded-lg border border-border bg-surface-2/40 p-3 text-xs leading-relaxed text-text-muted">{prod.terms}</p>}
           <div className="mt-3 flex justify-end"><button onClick={() => act(() => insuranceApi.buy(shipmentId, Number(value)), 'Cover added — your certificate is in the documents.', 'buy')} disabled={!q || !agree || busy === 'buy'} className="btn-gold !min-h-9 !px-4 text-sm disabled:opacity-60"><ShieldCheck size={14} aria-hidden="true" /> {busy === 'buy' ? 'Adding…' : `Add cover${q ? ` for ${money(q.premiumUsd)}` : ''}`}</button></div>
         </div>
       ) : (

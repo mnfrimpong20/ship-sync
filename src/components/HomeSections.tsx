@@ -98,8 +98,8 @@ export function FamilyUpdates() {
           <div className="w-full max-w-[340px] rounded-[2.5rem] border-[10px] border-[#202B48] bg-[#EFE9DE] p-0 shadow-[0_40px_80px_-30px_rgba(0,0,0,.7)]" aria-label="Example message to the receiver">
             <div className="flex items-center gap-3 rounded-t-[1.9rem] bg-white px-4 pb-3 pt-5">
               <Mark size={36} />
-              <div className="leading-tight"><p className="text-sm font-bold text-ink">Ntemtem</p><p className="text-[11px] text-ink-muted">Business account</p></div>
-              <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-ink-muted">Example</span>
+              <div className="leading-tight"><p className="text-sm font-bold text-ink">Ntemtem</p><p className="text-xs text-ink-muted">Business account</p></div>
+              <span className="ml-auto text-[11px] font-bold uppercase tracking-wider text-ink-muted">Example</span>
             </div>
             <div className="space-y-2.5 px-3 py-4 text-[13.5px] leading-snug text-ink">
               <div className="max-w-[88%] rounded-[4px_14px_14px_14px] bg-white px-3 py-2 shadow-sm">Akwaaba, Ama! Your package from Kofi is on its way on the MSC Lagos, arriving around 14 Nov. Ref NT-4821. Follow it: ntemtem.com/r/…</div>
@@ -107,7 +107,7 @@ export function FamilyUpdates() {
               <div className="max-w-[88%] rounded-[4px_14px_14px_14px] bg-white px-3 py-2 shadow-sm"><strong>Good news, Ama</strong> — your package NT-4821 is ready for collection at Gold Coast Freight, Kumasi. Bring your ID and this ref.</div>
               <div className="ml-auto max-w-[60%] rounded-[14px_4px_14px_14px] bg-[#D8EFE2] px-3 py-2 text-right shadow-sm">Medaase! I’ll come tomorrow 🙏🏾</div>
             </div>
-            <p className="rounded-b-[1.9rem] bg-white/60 px-4 py-2.5 text-center text-[11px] text-ink-muted">WhatsApp or SMS · sent automatically</p>
+            <p className="rounded-b-[1.9rem] bg-white/60 px-4 py-2.5 text-center text-xs text-ink-muted">WhatsApp or SMS · sent automatically</p>
           </div>
         </motion.div>
       </motion.div>
@@ -160,7 +160,7 @@ export function ForShippers() {
           </motion.div>
         </div>
         <motion.div variants={fadeUp} className="card-dark p-6 md:p-8">
-          <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-text-muted">What a partner sees · new requests on their lanes</p><span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Example</span></div>
+          <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-text-muted">What a partner sees · new requests on their lanes</p><span className="text-xs font-bold uppercase tracking-wider text-text-muted">Example</span></div>
           <ul className="mt-4 divide-y divide-border">
             {[
               ['4 barrels → Kumasi, Ghana', 'Ocean · pickup requested', ''],
@@ -170,7 +170,7 @@ export function ForShippers() {
             ].map(([a, b, c]) => (
               <li key={a} className="flex items-center justify-between gap-4 py-3.5">
                 <div><p className="text-[15px] font-medium text-text">{a}</p><p className="text-xs text-text-muted">{b}</p></div>
-                <div className="text-right"><p className="text-xs text-text-muted">{c}</p><span className="mt-1 inline-block rounded-full bg-teal/15 px-2 py-0.5 text-[11px] font-semibold text-teal">New</span></div>
+                <div className="text-right"><p className="text-xs text-text-muted">{c}</p><span className="mt-1 inline-block rounded-full bg-teal/15 px-2 py-0.5 text-xs font-semibold text-teal">New</span></div>
               </li>
             ))}
           </ul>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useScroll, useSpring } from 'motion/react'
-import { LifeBuoy, Anchor, ArrowRight, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X, Printer } from 'lucide-react'
+import { Mail, LifeBuoy, Anchor, ArrowRight, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X, Printer } from 'lucide-react'
 import { Logo, VerifiedMark } from './ui'
 import { useStore } from '../lib/store'
 
@@ -136,6 +136,7 @@ export default function Nav() {
         </nav>
         <div className="hidden shrink-0 items-center gap-2 lg:flex">
           {user?.role !== 'shipper' && <Link to="/for-shippers" className="hidden min-h-10 items-center gap-2 whitespace-nowrap rounded-full border border-border px-4 text-sm font-semibold text-text hover:border-text focus-ring xl:inline-flex" data-testid="nav-for-shippers"><span className="h-2 w-2 rounded-[2px] bg-partner" aria-hidden="true" />For shipping companies</Link>}
+          <Link to="/help" className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-text-muted hover:text-text focus-ring" data-testid="nav-help"><LifeBuoy size={16} aria-hidden="true" /> Help</Link>
           {user ? (
             <div className="relative">
               <button onClick={() => setMenu((m) => !m)} className="btn-ghost !min-h-10 whitespace-nowrap !px-3 text-sm" aria-expanded={menu} aria-haspopup="menu">
@@ -187,6 +188,7 @@ export default function Nav() {
                   <Link to="/signup?role=shipper" className="inline-flex min-h-11 items-center justify-center rounded-full bg-gold text-[15px] font-bold text-on-accent focus-ring">List your company</Link>
                 </div>
               </div>
+              <div className="mt-3 grid grid-cols-2 gap-2" data-testid="mobile-help"><Link to="/help" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-[15px] font-semibold focus-ring"><LifeBuoy size={16} aria-hidden="true" /> Help centre</Link><Link to="/contact" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-[15px] font-semibold focus-ring"><Mail size={16} aria-hidden="true" /> Contact us</Link></div>
               <div className="mt-3 flex flex-col gap-2 pb-2">
                 {user ? (
                   <>

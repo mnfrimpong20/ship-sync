@@ -1,3 +1,4 @@
+import { NeedHelpBar } from './HelpBits'
 import { Link } from 'react-router-dom'
 import { Lock, Mail, MessageCircle, Phone, Radar } from 'lucide-react'
 import { Logo, VerifiedMark, Flag } from './ui'
@@ -52,6 +53,7 @@ export default function Footer() {
           </nav>
         ))}
       </div>
+      <div className="container-fluid pb-8"><NeedHelpBar /></div>
       <div className="container-fluid">
         <div className="flex flex-col gap-4 border-t border-border py-6 lg:flex-row lg:items-center lg:gap-6" data-testid="footer-destinations">
           <p className="shrink-0 text-[11px] font-bold uppercase tracking-[0.14em] text-gold-deep">We ship to</p>

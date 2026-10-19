@@ -293,7 +293,7 @@ export function FAQ() {
       <div className="grid gap-10 lg:grid-cols-12">
         <div className="lg:col-span-4">
           <SectionHeader align="left" eyebrow="FAQ" title="Questions people ask before their first shipment" />
-          <motion.p variants={fadeUp} className="-mt-8 text-text-muted">Still unsure? Email <a href="mailto:hello@ntemtem.com" className="text-gold-deep hover:underline">hello@ntemtem.com</a> — a real person replies.</motion.p>
+          <motion.p variants={fadeUp} className="-mt-8 text-text-muted">Still unsure? Search the <Link to="/help" className="text-gold-deep hover:underline">help centre</Link> or <Link to="/contact" className="text-gold-deep hover:underline">contact us</Link> — a real person replies.</motion.p>
         </div>
         <div className="lg:col-span-8">
           {faqs.map((f, i) => (
@@ -311,6 +311,7 @@ export function FAQ() {
               </AnimatePresence>
             </motion.div>
           ))}
+          <motion.div variants={fadeUp} className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface/50 p-4" data-testid="faq-more"><p className="text-sm"><strong>More answers</strong> <span className="text-text-muted">— paying, documents, weights, duty and collecting your goods.</span></p><div className="flex gap-2"><Link to="/help" className="btn-ghost !min-h-10 !px-4 text-sm">Help centre</Link><Link to="/contact" className="btn-gold !min-h-10 !px-4 text-sm">Contact us</Link></div></motion.div>
         </div>
       </div>
     </Section>

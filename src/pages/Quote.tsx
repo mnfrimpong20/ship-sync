@@ -1,3 +1,4 @@
+import { HelpLine } from '../components/HelpBits'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -232,6 +233,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                 {submitting ? <><Loader2 size={18} className="animate-spin" aria-hidden="true" /> Sending to shippers…</> : step === 3 ? <>Send request <Check size={18} aria-hidden="true" /></> : <>Continue <ArrowRight size={18} aria-hidden="true" /></>}
               </motion.button>
             </div>
+            <HelpLine className="mt-4 justify-center" text="Not sure what to choose?" topic="quote" waText="Hi Ntemtem, I need help with a quote. I want to send " />
           </div>
         </div>
 

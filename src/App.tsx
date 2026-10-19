@@ -1,3 +1,4 @@
+import { WhatsAppBubble } from './components/HelpBits'
 import { Suspense, lazy, useEffect, useState } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useOutlet } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
@@ -118,6 +119,7 @@ function MarketingLayout() {
       </main>
       <Footer />
       <MobileCta />
+      <WhatsAppBubble />
     </div>
   )
 }

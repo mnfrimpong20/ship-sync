@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Check, Globe2, Mail, MapPin, MessageCircle, Phone, Search, ShieldCheck, Users } from 'lucide-react'
+import { LifeBuoy, Check, Globe2, Mail, MapPin, MessageCircle, Phone, Search, ShieldCheck, Users } from 'lucide-react'
 import { siteApi, useSiteConfig, type ContactInput, type SiteStats } from '../lib/site'
 import { fadeUp, stagger } from '../lib/motion'
 import { Logo } from '../components/ui'
+import { HELP } from '../lib/help'
+import { useStore } from '../lib/store'
 
 const err = (e: unknown, fb: string) => (e instanceof Error ? e.message : fb)
 
@@ -50,6 +52,7 @@ export function AboutPage() {
 /* ================= Contact ================= */
 export function ContactPage() {
   const cfg = useSiteConfig()
+  const { user } = useStore()
   const [sp] = useSearchParams()
   const linkTopic = sp.get('topic') as ContactInput['topic'] | null
   const [f, setF] = useState<ContactInput>({ name: '', email: '', phone: '', company: '', topic: linkTopic && ['quote', 'tracking', 'shipper', 'sourcing', 'partnership', 'other'].includes(linkTopic) ? linkTopic : 'quote', message: '', website: '' })
@@ -63,6 +66,9 @@ export function ContactPage() {
           <div>
             <p className="eyebrow mb-2">Contact</p><h1 className="!text-3xl md:!text-4xl">How can we help?</h1>
             <p className="mt-2 text-text-muted">Tell us what you are shipping or what you need, and the right person — US office, UK team or China team — replies within one business day.</p>
+            {!done && (() => { const slugs = ({ quote: ['get-a-quote', 'paying', 'declaration'], tracking: ['track', 'collect', 'damage'], shipper: ['shipper-join', 'shipper-supplies', 'shipper-weigh'], sourcing: [], partnership: ['shipper-join'], other: ['damage', 'paying', 'receiver-pay'] } as Record<string, string[]>)[f.topic] ?? []; const arts = slugs.map((x) => HELP.find((a) => a.slug === x)).filter(Boolean) as typeof HELP; return arts.length ? (
+              <div className="mt-6 rounded-2xl border border-border bg-surface/50 p-4" data-testid="contact-answers"><p className="text-sm font-semibold">Quick answers</p><ul className="mt-2 grid gap-1.5 sm:grid-cols-2">{arts.map((a) => <li key={a.slug}><Link to={`/help/${a.slug}`} className="group flex items-start gap-2 text-sm"><LifeBuoy size={14} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" /><span><span className="font-medium group-hover:underline">{a.title}</span><span className="block text-xs text-text-muted">{a.summary}</span></span></Link></li>)}</ul><p className="mt-2 text-xs text-text-muted">Not it? Send us a message below{cfg?.whatsappUrl ? <> or <a href={cfg.whatsappUrl} target="_blank" rel="noreferrer" className="text-gold-deep hover:underline">chat on WhatsApp</a></> : ''} — {user ? <>or <Link to="/support?new=1" className="text-gold-deep hover:underline">open a support ticket</Link> to follow it in your account</> : 'we reply by email'}.</p></div>
+            ) : null })()}
             {done ? <div className="card-dark mt-6 p-6" data-testid="contact-done"><p className="inline-flex items-center gap-2 font-semibold text-teal"><Check size={16} aria-hidden="true" /> Message sent</p><p className="mt-2 text-sm text-text-muted">Thanks {f.name.split(' ')[0]} — we will reply to {f.email}. If it is about a live shipment, the tracking page is the fastest place to see what is happening right now.</p><div className="mt-4 flex gap-2"><Link to="/track" className="btn-ghost !min-h-9 text-sm">Track a shipment</Link><Link to="/quote" className="btn-gold !min-h-9 text-sm">Get a quote</Link></div></div> : (
               <form onSubmit={submit} className="card-dark mt-6 grid gap-4 p-6" data-testid="contact-form">
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -91,7 +97,7 @@ export function ContactPage() {
               </ul>
               {cfg?.hoursNote && <p className="mt-3 text-xs text-text-muted">{cfg.hoursNote}</p>}
             </div>
-            <div className="card-dark p-5 text-sm"><p className="eyebrow mb-2">Faster than a message</p><ul className="space-y-2"><li><Link to="/track" className="inline-flex items-center gap-2 hover:text-gold-deep"><Search size={14} className="text-gold-deep" aria-hidden="true" /> Track a shipment by reference</Link></li><li><Link to="/quote" className="inline-flex items-center gap-2 hover:text-gold-deep"><Check size={14} className="text-gold-deep" aria-hidden="true" /> Get quotes in minutes</Link></li><li><Link to="/#faq" className="inline-flex items-center gap-2 hover:text-gold-deep"><Users size={14} className="text-gold-deep" aria-hidden="true" /> Read the FAQ</Link></li></ul></div>
+            <div className="card-dark p-5 text-sm"><p className="eyebrow mb-2">Faster than a message</p><ul className="space-y-2"><li><Link to="/track" className="inline-flex items-center gap-2 hover:text-gold-deep"><Search size={14} className="text-gold-deep" aria-hidden="true" /> Track a shipment by reference</Link></li><li><Link to="/quote" className="inline-flex items-center gap-2 hover:text-gold-deep"><Check size={14} className="text-gold-deep" aria-hidden="true" /> Get quotes in minutes</Link></li><li><Link to="/help" className="inline-flex items-center gap-2 hover:text-gold-deep"><LifeBuoy size={14} className="text-gold-deep" aria-hidden="true" /> Search the help centre</Link></li></ul></div>
           </aside>
         </div>
       </div>

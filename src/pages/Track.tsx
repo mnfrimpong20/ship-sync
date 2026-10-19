@@ -1,3 +1,4 @@
+import { HelpLine } from '../components/HelpBits'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -53,6 +54,7 @@ export default function Track() {
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold !min-h-12" disabled={loading}>{loading ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Looking up</> : 'Track'}</motion.button>
           </motion.form>
           {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
+          {error && error !== 'Enter a shipment reference.' && <div className="mt-3 rounded-xl border border-border bg-surface p-4 text-left" data-testid="track-help"><p className="text-sm font-semibold">Can’t find it?</p><ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-text-muted"><li>The reference is on your booking email and the text from your shipper — it starts with NT- (or SS- for older bookings).</li><li>Receivers: open the link in the text message you were sent — no reference needed.</li><li>New bookings can take a few minutes to appear.</li></ul><HelpLine className="mt-3" text="Still stuck?" topic="tracking" waText="Hi Ntemtem, I can’t find my shipment. My reference is " /></div>}
           <motion.p variants={fadeUp} className="mt-3 text-xs text-text-muted">Try a sample: {samples.map((r) => <button key={r} onClick={() => { setRef(r); setSp({ ref: r }) }} className="ml-2 font-mono text-gold-deep hover:underline focus-ring rounded">{r}</button>)}</motion.p>
         </motion.div>
 

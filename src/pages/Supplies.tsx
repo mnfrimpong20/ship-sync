@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Barcode, Check, CreditCard, Gift, Minus, Package, PackageCheck, Pencil, Plus, Printer, RotateCcw, ShoppingCart, Tag, Trash2, Truck, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useStore } from '../lib/store'
+import { api, useStore } from '../lib/store'
 import { categoryLabels, orderStatusLabels, packingKindLabels, planLabel, rentalStatusLabels, suppliesApi, type Address, type Category, type Mode, type Order, type PackingInput, type PackingItem, type PackingKind, type Product, type StoreView } from '../lib/supplies'
 import { usd } from '../lib/payments'
 import { fmtDate } from '../components/ui'
@@ -43,6 +43,8 @@ function Equipment({ userName, company }: { userName: string; company: string })
   const [cart, setCart] = useState<Line[]>([])
   const [addr, setAddr] = useState<Address>(() => blankAddress(userName, company))
   const [note, setNote] = useState('')
+  const [tax, setTax] = useState<{ rate: number; shipping: boolean; rentals: boolean }>({ rate: 0, shipping: true, rentals: true })
+  useEffect(() => { const st = addr.state.trim(); if (st.length !== 2) { setTax((t) => ({ ...t, rate: 0 })); return } api<{ rate: number; tax: { taxShipping: boolean; taxRentals: boolean } }>(`/supplies/tax-rate?state=${encodeURIComponent(st)}&country=${encodeURIComponent(addr.country)}`).then((r) => setTax({ rate: r.rate, shipping: r.tax.taxShipping, rentals: r.tax.taxRentals })).catch(() => {}) }, [addr.state, addr.country])
   const [busy, setBusy] = useState(''); const [error, setError] = useState(''); const [toast, setToast] = useState('')
   const [returning, setReturning] = useState<string | null>(null)
   const [filter, setFilter] = useState<Category | 'all'>('all')
@@ -64,7 +66,9 @@ function Equipment({ userName, company }: { userName: string; company: string })
   const sub = cart.filter((l) => l.mode === 'buy').reduce((a, l) => a + (byId.get(l.productId)?.priceUsd ?? 0) * l.qty, 0)
   const monthly = cart.filter((l) => l.mode === 'rent').reduce((a, l) => a + (byId.get(l.productId)?.rentUsd ?? 0) * l.qty, 0)
   const shipping = sub > 0 && sub < d.shipping.freeOverUsd ? d.shipping.flatUsd : 0
-  const today = sub + shipping
+  const taxToday = Math.round((sub + (tax.shipping ? shipping : 0)) * tax.rate * 100) / 100
+  const taxMonthly = tax.rentals ? Math.round(monthly * tax.rate * 100) / 100 : 0
+  const today = sub + shipping + taxToday
   const included = d.products.filter((p) => p.includedNow)
   const shown = d.products.filter((p) => filter === 'all' || p.category === filter)
   const cats = [...new Set(d.products.map((p) => p.category))]
@@ -152,8 +156,9 @@ function Equipment({ userName, company }: { userName: string; company: string })
                 <dl className="mt-2 space-y-1 border-t border-border pt-3 text-sm">
                   {sub > 0 && <div className="flex justify-between"><dt className="text-text-muted">Equipment</dt><dd className="tabular-nums">{usd(sub)}</dd></div>}
                   {sub > 0 && <div className="flex justify-between"><dt className="text-text-muted">Shipping</dt><dd className="tabular-nums">{shipping ? usd(shipping) : 'Free'}</dd></div>}
+                  {taxToday > 0 && <div className="flex justify-between"><dt className="text-text-muted">Sales tax ({addr.state.toUpperCase()} {Math.round(tax.rate * 10000) / 100}%)</dt><dd className="tabular-nums" data-testid="cart-tax">{usd(taxToday)}</dd></div>}
                   <div className="flex justify-between font-semibold"><dt>Due today</dt><dd className="tabular-nums" data-testid="cart-today">{usd(today)}</dd></div>
-                  {monthly > 0 && <div className="flex justify-between font-semibold"><dt>Then every month</dt><dd className="tabular-nums" data-testid="cart-monthly">{usd(monthly)}</dd></div>}
+                  {monthly > 0 && <div className="flex justify-between font-semibold"><dt>Then every month</dt><dd className="tabular-nums" data-testid="cart-monthly">{usd(monthly + taxMonthly)}</dd></div>}
                 </dl>
                 {sub > 0 && shipping > 0 && <p className="mt-1 text-xs text-text-muted">Free shipping on equipment over {usd(d.shipping.freeOverUsd)}.</p>}
                 {monthly > 0 && <p className="mt-1 text-xs text-text-muted">Rentals are billed monthly until you send them back. Repairs and swaps are on us.</p>}
@@ -168,7 +173,7 @@ function Equipment({ userName, company }: { userName: string; company: string })
                   <input aria-label="Note" placeholder="Note (optional)" className="input-dark col-span-2 !min-h-9 text-sm" value={note} onChange={(e) => setNote(e.target.value)} />
                 </fieldset>
                 {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
-                <button disabled={busy === 'pay' || !d.canOrder} className="btn-gold mt-4 w-full !min-h-11 disabled:opacity-60" data-testid="place-order"><CreditCard size={16} aria-hidden="true" /> {busy === 'pay' ? 'One moment…' : today === 0 && monthly === 0 ? 'Place order — free' : d.online ? `Pay ${usd(today)}${monthly ? ` + ${usd(monthly)}/mo` : ''} securely` : 'Place order — we’ll invoice you'}</button>
+                <button disabled={busy === 'pay' || !d.canOrder} className="btn-gold mt-4 w-full !min-h-11 disabled:opacity-60" data-testid="place-order"><CreditCard size={16} aria-hidden="true" /> {busy === 'pay' ? 'One moment…' : today === 0 && monthly === 0 ? 'Place order — free' : d.online ? `Pay ${usd(today)}${monthly ? ` + ${usd(monthly + taxMonthly)}/mo` : ''} securely` : 'Place order — we’ll invoice you'}</button>
                 {d.mode === 'test' && (today > 0 || monthly > 0) && <p className="mt-2 text-center text-[11px] text-text-muted">Test mode — use card 4242 4242 4242 4242.</p>}
               </>
             )}

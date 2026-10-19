@@ -50,6 +50,8 @@ import { mountBooking } from './booking'
 import { mountWarehouse } from './warehouse'
 import { mountLanes } from './lanes'
 import { mountOperations } from './operations'
+import { mountScreening, screenSubject, screeningHold } from './screening'
+import { mountCompliance, evaluateExport, assertExportCleared, zDeclaration, DECLARATION_VERSION } from './compliance'
 import { mountSupplies, attachDefaultSupplies, defaultQuoteSupplies, resolveQuoteSupplies, suppliesFromQuote, suppliesTotal, type QuoteSupplyLine, type SupplyNeed } from './supplies'
 import { mountReviews } from './reviews'
 import { mountBrand } from './brand'
@@ -105,6 +107,7 @@ const requestOut = (r: Row, quotes: Row[]) => ({
   id: r.id, ref: r.ref, userId: r.user_id, createdAt: ISO(r.created_at), origin: r.origin, destination: r.destination, mode: r.mode, cargo: r.cargo, quantity: r.quantity, weightKg: r.weight_kg ?? undefined,
   description: r.description, pickup: r.pickup, delivery: r.delivery, insurance: r.insurance, readyDate: DATE(r.ready_date),
   contact: { name: r.contact_name, email: r.contact_email, phone: r.contact_phone }, status: r.status, quotes: quotes.map((q) => ({ ...quoteOut(q), stale: !!r.updated_at && new Date(q.updated_at ?? q.sent_at) < new Date(r.updated_at) })),
+  declaration: r.declaration ? (J(r.declaration) as { accepted: boolean; includes: string[]; at: string; version: string }) : undefined,
   supplies: r.supplies ? (J(r.supplies) as SupplyNeed[]) : [], suppliesAddress: r.supplies_address ? J(r.supplies_address) : undefined,
   dims: r.dims ?? '', declaredValueUsd: r.declared_value_usd == null ? undefined : Number(r.declared_value_usd), expiresAt: r.expires_at ? ISO(r.expires_at) : undefined, updatedAt: r.updated_at ? ISO(r.updated_at) : undefined, cancelReason: r.cancel_reason ?? undefined, openedToMarket: !!r.opened_to_market_at, vehicle: r.vehicle ? J(r.vehicle) : undefined, consignee: r.consignee ? J(r.consignee) : undefined, source: r.source ?? 'marketplace', preferredShipperId: r.preferred_shipper_id ?? undefined,
 })
@@ -417,6 +420,8 @@ const zRequest = zMatch.extend({
   source: z.enum(['marketplace', 'picked', 'link', 'branded']).optional(),
   /** Packing supplies the customer needs before pickup (from their shipper, or sent by Ntemtem). */
   supplies: z.array(z.object({ kind: z.enum(['barrel', 'box', 'lock', 'tape', 'other']), qty: z.number().int().min(1).max(50) })).max(5).optional(),
+  /** The sender confirms nothing prohibited is inside, and flags restricted items for the shipper. */
+  declaration: zDeclaration,
   suppliesAddress: z.object({ name: z.string().trim().min(2).max(80), line1: z.string().trim().min(3).max(160), line2: z.string().trim().max(160).default(''), city: z.string().trim().min(2).max(80), state: z.string().trim().max(40).default(''), zip: z.string().trim().max(20).default(''), country: z.string().trim().min(2).max(40).default('US'), phone: z.string().trim().max(40).default('') }).optional(),
 })
 const zTransit = z.object({
@@ -547,6 +552,7 @@ export function apiRouter() {
     const b = zVerify.parse(req.body)
     const { rows: ex } = await db.query<Row>('select id, verified from shippers where id = $1', [req.params.id])
     if (!ex[0]) throw new HttpError(404, 'Shipper not found.')
+    if (b.verified && (await screeningHold(db, 'shipper', String(req.params.id)))) throw new HttpError(409, 'This company has a sanctions-screening match to review first (Admin → Screening).')
     await db.query('update shippers set verified = $2, verified_at = case when $2 then now() else null end, verified_by = case when $2 then $3 else null end, plan = coalesce($4, plan) where id = $1', [req.params.id, b.verified, admin.email, b.plan ?? null])
     const { rows } = await db.query<Row>('select * from shippers where id = $1', [req.params.id])
     if (b.verified !== !!ex[0].verified || b.note) await onVerified(db, String(req.params.id), b.verified, b.note ?? '')
@@ -612,6 +618,8 @@ export function apiRouter() {
       await db.query('update requests set po_number = $2, created_by_name = $3 where id = $1', [id, String(req.body?.poNumber ?? '').trim().slice(0, 40), user.actingBy?.name ?? user.name])
     }
     if (body.consignee) await rememberConsignee(db, user.id, body.consignee)
+    await screenSubject(db, { type: 'request', id, names: [{ role: 'sender', name: body.contact.name }, { role: 'receiver', name: body.consignee?.name ?? '' }, { role: 'supplies', name: body.suppliesAddress?.name ?? '' }] }).catch((e) => console.error('[screening]', e))
+    await db.query('update requests set declaration = $2 where id = $1', [id, JSON.stringify({ accepted: true, includes: body.declaration.includes, at: new Date().toISOString(), ip: clientIp(req), version: DECLARATION_VERSION })])
     if (body.supplies?.length) {
       if (!body.suppliesAddress) { await db.query('delete from requests where id = $1', [id]); throw new HttpError(400, 'Add the address the packing supplies should go to.') }
       const merged = Object.values(body.supplies.reduce<Record<string, { kind: string; qty: number }>>((a, n) => { a[n.kind] = { kind: n.kind, qty: Math.min(50, (a[n.kind]?.qty ?? 0) + n.qty) }; return a }, {}))
@@ -675,6 +683,7 @@ export function apiRouter() {
     const { rows: rs } = await db.query<Row>('select * from requests where id = $1', [q.request_id])
     const r0 = rs[0]
     if (r0.status !== 'open') throw new HttpError(409, r0.status === 'booked' ? 'This request has already been booked.' : `This request is ${r0.status}.`)
+    { const hold = await screeningHold(db, 'request', r0.id); if (hold) throw new HttpError(409, hold === 'confirmed' ? 'We can’t book this shipment. Please contact Ntemtem support.' : 'This request is going through a routine compliance check. We’ll email you as soon as you can book — usually within a business day.') }
     const { rows: ss } = await db.query<Row>('select * from shippers where id = $1', [q.shipper_id])
     const shipper = shipperOut(ss[0])
     const includes: string[] = J(q.includes)
@@ -701,6 +710,7 @@ export function apiRouter() {
       await notifyShipperStaff(db, l.shipper_id, { kind: 'quote_lost', title: `Not chosen — ${r0.ref}`, body: `The client booked another quote. Yours was ${diff === 0 ? 'about the same price' : `${Math.abs(diff)}% ${diff > 0 ? 'higher' : 'lower'}`}${Number(l.transit_days) !== Number(q.transit_days) ? ` and ${Math.abs(Number(l.transit_days) - Number(q.transit_days))} days ${Number(l.transit_days) > Number(q.transit_days) ? 'slower' : 'faster'}` : ''}.`, link: '/dashboard/leads?b=lost', dedupe: `lost:${l.id}` }, ['owner', 'dispatcher', 'agent'])
     }
     await afterBooking(db, sid, { delivery: !!r0.delivery }).catch((e) => console.error('[booking] after', e))
+    { const { rows: sx } = await db.query<Row>('select * from shipments where id = $1', [sid]); if (sx[0]) await evaluateExport(db, sx[0]).catch((e) => console.error('[export] eval', e)) }
     await notify(db, { userId: user.id, kind: 'booking_confirmed', title: `Booking confirmed — ${r0.ref}`, body: `${shipper.name} will handle your ${r0.origin} → ${r0.destination} shipment for $${Number(q.price).toLocaleString()}. Track it any time with reference ${r0.ref}.`, link: `/track?ref=${r0.ref}`, dedupe: `ship:${sid}:booked` })
     await notifyShipperStaff(db, q.shipper_id, { kind: 'quote_accepted', title: `${r0.contact_name} accepted your quote — ${r0.ref}`, body: `$${Number(q.price).toLocaleString()} · ${r0.quantity} × ${r0.cargo} · ${r0.origin} → ${r0.destination}. The order is now booked; arrange pickup or drop-off.`, link: '/dashboard/shipments', dedupe: `ship:${sid}:accepted` }, ['owner', 'dispatcher', 'agent'])
     const [shipment] = await loadShipments(db, 'id = $1', [sid])
@@ -724,6 +734,7 @@ export function apiRouter() {
     if (s.cancelled_at) throw new HttpError(409, 'This shipment was cancelled.')
     const next = nextStatus(s.status as ShipmentStatus, s.handover)
     if (!next) throw new HttpError(409, 'Shipment is already delivered.')
+    await assertExportCleared(db, s, next)
     const manualCollect = next === 'delivered' && s.status === 'ready_for_collection'
     if (manualCollect && !['owner', 'dispatcher'].includes(user.staffRole ?? 'owner')) throw new HttpError(409, 'Collections are closed with the recipient’s code — use “Hand over” under Manage.')
     const note = typeof req.body?.note === 'string' ? req.body.note.slice(0, 500) : manualCollect ? `Marked collected by ${user.name} (no code entered).` : null
@@ -792,6 +803,8 @@ export function apiRouter() {
   mountWarehouse(r, { getDb, requireUser, HttpError, wrap })
   mountLanes(r, { getDb, requireUser, HttpError, wrap })
   mountOperations(r, { getDb, requireUser, HttpError, wrap })
+  mountCompliance(r, { getDb, requireUser, HttpError, wrap })
+  mountScreening(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountSupplies(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountReviews(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountBrand(r, { getDb, requireUser, HttpError, wrap })

@@ -7,6 +7,7 @@ import { requestsApi } from '../lib/requests'
 import { MessageThread } from '../components/RequestPanel'
 import { useStore, type Quote, type QuoteRequest, type QuoteSupplyLine } from '../lib/store'
 import { suppliesApi, type PackingItem } from '../lib/supplies'
+import { DeclaredItems } from '../components/Compliance'
 import { usd } from '../lib/payments'
 import { cargoLabel, countries, countryByCode, type CargoType, type Mode } from '../lib/data'
 import { Empty, ModeBadge, Pill, fmtDate, fmtDateTime, money } from '../components/ui'
@@ -100,6 +101,7 @@ function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (ms
           {String(sg.price) !== form.price && <button type="button" onClick={() => setForm({ ...form, price: String(sg.price), transit: String(sg.transitDays), notes: form.notes || sg.notes })} className="btn-ghost !min-h-7 !px-2 text-[11px]">Use suggested</button>}
         </div>
       )}
+      <DeclaredItems includes={r.declaration?.includes} />
       <TemplateBar r={r} form={form} setForm={setForm} />
       {r.mode === 'either' && <div className="flex gap-1.5" role="radiogroup" aria-label="Mode for this quote">{(['ocean', 'air'] as const).map((m) => <button key={m} type="button" role="radio" aria-checked={form.mode === m} onClick={() => setForm({ ...form, mode: m, transit: m === 'air' ? '7' : '30' })} className={`flex-1 rounded-lg border px-2 py-1.5 text-xs capitalize focus-ring ${form.mode === m ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border text-text-muted'}`} data-testid={`qf-mode-${m}`}>{m} freight</button>)}</div>}
       <div className="grid gap-3 sm:grid-cols-3">

@@ -98,7 +98,7 @@ export const paymentOut = (p: Row) => ({
   id: p.id, shipmentId: p.shipment_id ?? null, invoiceId: p.invoice_id ?? null, shipmentRef: p.ref ?? undefined, customer: p.customer ?? undefined, shipperId: p.shipper_id, shipperName: p.shipper_name ?? undefined,
   items: J(p.items ?? '[]') as { description: string; amountUsd: number }[], amountUsd: Number(p.amount_usd), feeUsd: Number(p.fee_usd), netUsd: Number(p.net_usd),
   status: p.status as PaymentStatus, provider: p.provider as 'stripe' | 'manual', method: p.method ?? null, paidAt: ISO(p.paid_at), releasedAt: ISO(p.released_at), releaseReason: p.release_reason ?? null,
-  refundedAt: ISO(p.refunded_at), refundReason: p.refund_reason ?? null, payoutId: p.payout_id ?? null, recordedBy: p.recorded_by ?? null, receiptDocumentId: p.receipt_document_id ?? null, createdAt: ISO(p.created_at),
+  cardDispute: p.card_dispute ? (J(p.card_dispute) as { id: string; reason: string; status: string; amountUsd: number; evidenceDueBy: string | null; openedAt: string }) : null, hold: !!p.hold, refundedAt: ISO(p.refunded_at), refundReason: p.refund_reason ?? null, payoutId: p.payout_id ?? null, recordedBy: p.recorded_by ?? null, receiptDocumentId: p.receipt_document_id ?? null, createdAt: ISO(p.created_at),
 })
 export const payoutOut = (p: Row) => ({
   id: p.id, shipperId: p.shipper_id, shipperName: p.shipper_name ?? undefined, amountUsd: Number(p.amount_usd), status: p.status as 'requested' | 'paid' | 'rejected', method: p.method, details: J(p.details ?? '{}') as PayoutDetails,
@@ -249,6 +249,21 @@ export function stripeWebhook(getDb: () => Promise<Db>) {
       if (obj.payment_status === 'paid') for (const row of rows) await markPaid(db, row, { intent: typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id ?? null, method: obj.payment_method_types?.[0] ?? 'card' })
     } else if (evt.type === 'checkout.session.expired') {
       await db.query(`update escrow_payments set status = 'cancelled' where provider_session_id = $1 and status = 'pending'`, [obj.id ?? ''])
+    } else if (evt.type === 'charge.dispute.created' || evt.type === 'charge.dispute.updated' || evt.type === 'charge.dispute.closed' || evt.type === 'charge.dispute.funds_withdrawn') {
+      // A card chargeback: hold the money (no release/payout), tell Ntemtem and the shipper, track the evidence deadline.
+      const intent = typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id
+      const { rows } = intent ? await db.query<Row>(`${SELECT} where p.provider_payment_intent = $1`, [intent]) : { rows: [] as Row[] }
+      for (const p of rows) {
+        const dispute = { id: obj.id, reason: obj.reason ?? '', status: obj.status ?? '', amountUsd: Number(obj.amount ?? 0) / 100, evidenceDueBy: obj.evidence_details?.due_by ? new Date(Number(obj.evidence_details.due_by) * 1000).toISOString() : null, openedAt: p.card_dispute ? (J(p.card_dispute) as Row).openedAt : new Date().toISOString(), updatedAt: new Date().toISOString() }
+        const closed = evt.type === 'charge.dispute.closed'
+        await db.query('update escrow_payments set card_dispute = $2, hold = $3 where id = $1', [p.id, JSON.stringify(dispute), !closed || dispute.status !== 'won' ? true : false])
+        if (closed && dispute.status === 'lost') await db.query(`update escrow_payments set status = 'refunded', refunded_at = now(), refund_reason = 'Card chargeback lost' where id = $1 and status in ('held','released')`, [p.id])
+        if (evt.type === 'charge.dispute.created') {
+          const { rows: admins } = await db.query<Row>('select id from users where is_admin')
+          for (const a of admins) await notify(db, { userId: a.id, kind: 'payment', title: `Card chargeback on ${p.ref ?? p.id} — $${dispute.amountUsd.toLocaleString()}`, body: `Reason: ${dispute.reason || 'not given'}. Evidence due ${dispute.evidenceDueBy ? dispute.evidenceDueBy.slice(0, 10) : 'soon'} — respond in the Stripe dashboard.`, link: '/admin?view=payments', dedupe: `dispute:${obj.id}:admin` })
+          await notifyShipperStaff(db, p.shipper_id, { kind: 'payment', title: `The customer disputed the card payment on ${p.ref ?? 'a shipment'}`, body: 'The money is on hold until the bank decides. Send Ntemtem your proof (photos, scans, proof of delivery) quickly.', link: '/dashboard/payments', dedupe: `dispute:${obj.id}:office` }, ['owner', 'finance'])
+        }
+      }
     } else if (evt.type === 'charge.refunded') {
       const intent = typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id
       if (intent) await db.query(`update escrow_payments set status = 'refunded', refunded_at = now(), refund_reason = coalesce(refund_reason, 'Refunded in Stripe') where provider_payment_intent = $1 and status in ('held','released')`, [intent])

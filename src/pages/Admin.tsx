@@ -10,6 +10,7 @@ import { Avatar, Pill, Rating, fmtDate, fmtDateTime, VerifiedMark } from '../com
 import { fadeUp, stagger } from '../lib/motion'
 import { AdminInsurance } from '../components/AdminInsurance'
 import { AdminSupplies } from '../components/AdminSupplies'
+import { AdminScreening } from '../components/Compliance'
 import { AdminPayments } from '../components/AdminPayments'
 import { AdminBrokers } from './Brokers'
 import { AdminDisputes } from './Reviews'
@@ -18,7 +19,7 @@ import { AdminSystem } from '../components/AdminSystem'
 import { AdminDestinations } from '../components/AdminDestinations'
 import { AdminAnnouncements, AdminAudit, AdminBilling, AdminFeatures, AdminMarketplace, AdminMessaging, AdminPlatform, AdminRisk, AdminScorecards, AdminSupport } from '../components/AdminConsole'
 
-const VIEWS = [['overview', 'Business'], ['attention', 'Attention'], ['shippers', 'Shippers'], ['disputes', 'Disputes'], ['payments', 'Payments'], ['brokers', 'Brokers'], ['sourcing', 'Sourcing'], ['insurance', 'Insurance'], ['supplies', 'Supplies'], ['destinations', 'Destinations'], ['system', 'System'], ['analytics', 'Platform'], ['marketplace', 'Marketplace'], ['scorecards', 'Scorecards'], ['risk', 'Risk'], ['messaging', 'Messaging'], ['billing', 'Billing'], ['announcements', 'Announcements'], ['audit', 'Audit log'], ['support', 'View as'], ['features', 'Features']] as const
+const VIEWS = [['overview', 'Business'], ['attention', 'Attention'], ['shippers', 'Shippers'], ['disputes', 'Disputes'], ['payments', 'Payments'], ['brokers', 'Brokers'], ['sourcing', 'Sourcing'], ['insurance', 'Insurance'], ['supplies', 'Supplies'], ['screening', 'Screening'], ['destinations', 'Destinations'], ['system', 'System'], ['analytics', 'Platform'], ['marketplace', 'Marketplace'], ['scorecards', 'Scorecards'], ['risk', 'Risk'], ['messaging', 'Messaging'], ['billing', 'Billing'], ['announcements', 'Announcements'], ['audit', 'Audit log'], ['support', 'View as'], ['features', 'Features']] as const
 type View = (typeof VIEWS)[number][0]
 
 /** Ntemtem staff: the business overview, the attention board, and every admin work queue in tabs. */
@@ -105,7 +106,7 @@ export default function Admin() {
     attention: ['What needs a person today', 'Everything stuck or waiting across the platform, most urgent first. Each card opens where you fix it.'],
     shippers: ['Shipper verification', 'Verified shippers get the badge, rank higher in matching and reassure customers. Check licence, insurance and a real office before granting it.'],
     disputes: ['Disputes', 'Customer and shipper disputes on escrow payments.'], payments: ['Money through the platform', 'Escrow, releases, holds and payouts.'], brokers: ['Customs brokers', 'Broker listings and assignments.'],
-    sourcing: ['Sourcing settings', 'Pricing, exchange rates, agents and commissions for the China, UK and USA desks.'], insurance: ['Insurance', 'Cargo cover sold on the platform.'], supplies: ['Supplies', 'Equipment stock, orders and rentals.'], destinations: ['Destinations', 'The countries customers can ship to — ports, airports, transit days and dial codes.'], system: ['Health, errors & backups', 'What is wired up, what broke, and a copy of the database you can download.'],
+    sourcing: ['Sourcing settings', 'Pricing, exchange rates, agents and commissions for the China, UK and USA desks.'], insurance: ['Insurance', 'Cargo cover sold on the platform.'], supplies: ['Supplies', 'Equipment stock, orders and rentals.'], screening: ['Screening', 'Sanctions checks on senders, receivers and shipping companies.'], destinations: ['Destinations', 'The countries customers can ship to — ports, airports, transit days and dial codes.'], system: ['Health, errors & backups', 'What is wired up, what broke, and a copy of the database you can download.'],
     analytics: ['Platform analytics', 'Value booked through Ntemtem, our own revenue, growth and conversion across the marketplace.'],
     marketplace: ['Marketplace health', 'Demand against supply on every lane — where requests go unanswered and which shippers to recruit.'],
     scorecards: ['Shipper scorecards', 'Quality scores that drive directory ranking, warnings, probation and pauses.'],
@@ -141,6 +142,7 @@ export default function Admin() {
           {view === 'sourcing' && <AdminSourcing />}
           {view === 'insurance' && <AdminInsurance />}
           {view === 'supplies' && <AdminSupplies />}
+          {view === 'screening' && <AdminScreening />}
           {view === 'destinations' && <AdminDestinations />}
           {view === 'system' && <AdminSystem />}
           {view === 'analytics' && <AdminPlatform />}

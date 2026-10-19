@@ -13,6 +13,7 @@ import { RequestVehicleFields } from '../components/VehicleCard'
 import { congestionLabel, useCongestion } from '../lib/useCongestion'
 import { hubApi } from '../lib/customerHub'
 import { PackingNeeds } from '../components/PackingSupplies'
+import { DeclarationBox } from '../components/Compliance'
 
 type Form = NewRequest
 const stepsMeta = ['Route', 'Cargo', 'Services', 'Contact']
@@ -35,6 +36,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
     cargo: 'barrels', quantity: 2, weightKg: undefined, description: '', pickup: true, delivery: true, insurance: false,
     readyDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
     contact: { name: user?.name ?? '', email: user?.email ?? '', phone: '' },
+    declaration: { accepted: false, includes: [] },
     password: '',
   })
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }))
@@ -102,6 +104,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
       if (!/^\S+@\S+\.\S+$/.test(form.contact.email)) e.email = 'Enter a valid email.'
       if (form.contact.phone.replace(/\D/g, '').length < 7) e.phone = 'Enter a phone number shippers can reach.'
       if (poRequired && !po.trim()) e.po = 'Your business account needs a purchase order number.'
+      if (!form.declaration?.accepted) e.declaration = 'Please confirm what’s inside before sending.'
       if (!user && form.password && form.password.length < 8) e.password = 'Use at least 8 characters, or leave it blank and we’ll email you a link.'
     }
     setErrors(e)
@@ -203,6 +206,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                 {step === 3 && (
                   <div className="grid gap-5">
                     <h2 className="!text-xl">Where should quotes go?</h2>
+                    <DeclarationBox value={form.declaration} onChange={(v) => set('declaration', v)} error={errors.declaration} />
                     <div><label htmlFor="cname" className="label-dark">Full name</label><input id="cname" className="input-dark" value={form.contact.name} onChange={(e) => set('contact', { ...form.contact, name: e.target.value })} aria-invalid={!!errors.name} autoComplete="name" />{errors.name && <p className="mt-1 text-xs text-danger">{errors.name}</p>}</div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div><label htmlFor="cemail" className="label-dark">Email</label><input id="cemail" type="email" className="input-dark" value={form.contact.email} onChange={(e) => set('contact', { ...form.contact, email: e.target.value })} aria-invalid={!!errors.email} autoComplete="email" />{errors.email && <p className="mt-1 text-xs text-danger">{errors.email}</p>}</div>

@@ -120,6 +120,7 @@ export function mountOnboarding(r: Router, d: Deps) {
     const docsStep = ob.steps.find((s) => s.id === 'docs')!
     if (!docsStep.done) throw new HttpError(409, 'Upload your business registration and insurance certificate first.')
     await db.query('update shippers set verification_requested_at = now(), verification_note = $2 where id = $1', [u.shipperId, ''])
+    { const { rows: sn } = await db.query<Row>('select name from shippers where id = $1', [u.shipperId]); await (await import('./screening')).screenSubject(db, { type: 'shipper', id: u.shipperId!, names: [{ role: 'company', name: sn[0]?.name ?? '' }, { role: 'owner', name: u.name }] }).catch(() => {}) }
     for (const id of await admins(db)) await notify(db, { userId: id, kind: 'system', title: `${ob.companyName} asked to be verified`, body: `${u.name} says their profile and documents are ready. Review them under Admin → Shippers.`, link: '/admin?view=shippers', dedupe: `verify-req:${u.shipperId}:${Date.now().toString().slice(0, -5)}` })
     res.json({ ok: true, requestedAt: new Date().toISOString() })
   }))

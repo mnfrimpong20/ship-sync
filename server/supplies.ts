@@ -81,7 +81,7 @@ const productOut = (p: Row, products: Map<string, Row>) => {
 }
 const orderOut = (o: Row, items: Row[]) => ({
   id: o.id, ref: o.ref, shipperId: o.shipper_id, shipperName: o.shipper_name ?? undefined, placedBy: o.placed_by, kind: (o.kind ?? 'shipper') as 'shipper' | 'customer', shipmentId: o.shipment_id ?? null, shipmentRef: o.shipment_ref ?? null, customerName: o.customer_name ?? '', status: o.status as 'awaiting_payment' | 'paid' | 'packed' | 'shipped' | 'delivered' | 'cancelled',
-  provider: o.provider as 'stripe' | 'manual' | 'included', subtotalUsd: Number(o.subtotal_usd), shippingUsd: Number(o.shipping_usd), totalUsd: Number(o.total_usd), monthlyUsd: Number(o.monthly_usd),
+  provider: o.provider as 'stripe' | 'manual' | 'included', subtotalUsd: Number(o.subtotal_usd), shippingUsd: Number(o.shipping_usd), taxUsd: Number(o.tax_usd ?? 0), totalUsd: Number(o.total_usd), monthlyUsd: Number(o.monthly_usd),
   shipTo: J<Record<string, string>>(o.ship_to, {}), carrier: o.carrier, tracking: o.tracking, note: o.note,
   createdAt: ISO(o.created_at), paidAt: ISO(o.paid_at), shippedAt: ISO(o.shipped_at), deliveredAt: ISO(o.delivered_at), cancelledAt: ISO(o.cancelled_at),
   items: items.filter((i) => i.order_id === o.id).map((i) => ({ productId: i.product_id, name: i.name, qty: Number(i.qty), mode: i.mode as Mode, unitUsd: Number(i.unit_usd) })),
@@ -142,6 +142,22 @@ async function labelOutlook(db: Db, shipperId: string) {
   return { printed30: n30, perWeek, remaining, weeksLeft, reorder: (weeksLeft != null && weeksLeft < 3) || (remaining == null && n30 > 0) }
 }
 
+/* ------------------------------------------------------------------ sales tax */
+/** Sales tax on what Ntemtem itself sells (equipment and its packing supplies), by the US state it ships to.
+ *  Defaults to Texas only (Ntemtem's home state); add states in Admin → Supplies once your accountant confirms. */
+export type TaxSettings = { enabled: boolean; rates: Record<string, number>; taxShipping: boolean; taxRentals: boolean }
+const DEFAULT_TAX: TaxSettings = { enabled: true, rates: { TX: 0.0825 }, taxShipping: true, taxRentals: true }
+export async function getTax(db: Db): Promise<TaxSettings> {
+  const { rows } = await db.query<Row>(`select value from settings where id = 'sales_tax'`)
+  return { ...DEFAULT_TAX, ...J<Partial<TaxSettings>>(rows[0]?.value, {}) }
+}
+export function taxRate(t: TaxSettings, addr: { state?: string; country?: string } | null | undefined) {
+  if (!t.enabled || !addr) return 0
+  const country = String(addr.country ?? 'US').toUpperCase(); if (country && !['US', 'USA', 'UNITED STATES'].includes(country)) return 0
+  return Number(t.rates[String(addr.state ?? '').trim().toUpperCase()] ?? 0)
+}
+const pct = (r: number) => `${Math.round(r * 10000) / 100}%`
+
 /* ------------------------------------------------------------------ webhook */
 /** Called from the Stripe webhook before billing; true when the event belonged to an equipment order. */
 export async function handleSuppliesEvent(db: Db, evt: Row): Promise<boolean> {
@@ -172,6 +188,16 @@ export async function handleSuppliesEvent(db: Db, evt: Row): Promise<boolean> {
 /* ------------------------------------------------------------------ packing supplies on a shipment (used by payments) */
 export async function dueSupplies(db: Db, shipmentId: string) {
   const { rows } = await db.query<Row>(`select * from shipment_supplies where shipment_id = $1 and status = 'due' order by created_at`, [shipmentId])
+  const lines = dueLines(rows)
+  const ntem = r2(rows.filter((l) => l.source === 'ntemtem').reduce((a, l) => a + Number(l.qty) * Number(l.unit_usd), 0))
+  if (ntem > 0) {
+    const { rows: ss } = await db.query<Row>('select supplies_address from shipments where id = $1', [shipmentId])
+    const addr = J<{ state?: string; country?: string } | null>(ss[0]?.supplies_address, null); const rate = taxRate(await getTax(db), addr)
+    if (rate > 0) lines.push({ description: `Sales tax (${String(addr?.state).toUpperCase()} ${pct(rate)}) on Ntemtem supplies`, amountUsd: r2(ntem * rate), kind: 'ntemtem_supplies' as const, ref: '' })
+  }
+  return lines
+}
+const dueLines = (rows: Row[]) => {
   return rows.map((l) => l.source === 'ntemtem'
     ? { description: `${l.qty} × ${l.name} — sent to you by Ntemtem`, amountUsd: r2(Number(l.qty) * Number(l.unit_usd)), kind: 'ntemtem_supplies' as const, ref: l.id as string }
     : { description: `${l.qty} × ${l.name} — brought before pickup`, amountUsd: r2(Number(l.qty) * Number(l.unit_usd)), kind: 'supplies' as const, ref: l.id as string })
@@ -193,10 +219,11 @@ async function customerSupplyOrder(db: Db, shipmentId: string, lineIds: string[]
   if (done.length) return
   const products = await allProducts(db)
   const id = 'eqo_' + uid(), ref = 'PS-' + String(10000 + Math.floor(Math.random() * 89999))
-  const total = r2(lines.reduce((a, l) => a + Number(l.qty) * Number(l.unit_usd), 0))
+  const net = r2(lines.reduce((a, l) => a + Number(l.qty) * Number(l.unit_usd), 0))
   const addr = J<Record<string, string>>(s.supplies_address, {})
-  await db.query(`insert into supply_orders (id,ref,shipper_id,user_id,placed_by,status,provider,subtotal_usd,shipping_usd,total_usd,monthly_usd,ship_to,note,kind,shipment_id,customer_name,paid_at) values ($1,$2,$3,$4,$5,'paid','escrow',$6,0,$6,0,$7,$8,'customer',$9,$10,now())`,
-    [id, ref, s.shipper_id, s.user_id, s.customer, total, JSON.stringify(addr), lineIds.slice().sort().join(','), s.id, s.customer])
+  const taxUsd = r2(net * taxRate(await getTax(db), addr)); const total = r2(net + taxUsd)
+  await db.query(`insert into supply_orders (id,ref,shipper_id,user_id,placed_by,status,provider,subtotal_usd,shipping_usd,total_usd,monthly_usd,ship_to,note,kind,shipment_id,customer_name,paid_at,tax_usd) values ($1,$2,$3,$4,$5,'paid','escrow',$6,0,$7,0,$8,$9,'customer',$10,$11,now(),$12)`,
+    [id, ref, s.shipper_id, s.user_id, s.customer, net, total, JSON.stringify(addr), lineIds.slice().sort().join(','), s.id, s.customer, taxUsd])
   const parts: Parts = new Map()
   for (const l of lines) { await db.query('insert into supply_order_items (id,order_id,product_id,name,qty,mode,unit_usd) values ($1,$2,$3,$4,$5,$6,$7)', ['eqi_' + uid(), id, l.product_id ?? '', l.name, l.qty, 'buy', l.unit_usd]); if (l.product_id && products.has(l.product_id)) partsOf(products, l.product_id, Number(l.qty), parts) }
   await move(db, parts, -1, 'customer order', ref, 'Paid with shipment ' + s.ref)
@@ -365,13 +392,16 @@ export function mountSupplies(r: Router, d: Deps) {
     for (const [pid, n] of parts) if (Number(products.get(pid)?.stock ?? 0) < n) throw new HttpError(409, `Not enough ${products.get(pid)?.name ?? 'stock'} left — ${Math.max(0, Number(products.get(pid)?.stock ?? 0))} available.`)
     const subtotal = r2(lines.filter((l) => l.mode === 'buy').reduce((a, l) => a + l.unit * l.qty, 0))
     const shipping = subtotal > 0 && subtotal < SHIP_FREE_OVER_USD ? SHIP_FLAT_USD : 0
-    const total = r2(subtotal + shipping), monthly = r2(lines.filter((l) => l.mode === 'rent').reduce((a, l) => a + l.unit * l.qty, 0))
+    const tax = await getTax(db); const rate = taxRate(tax, b.shipTo)
+    const taxOnce = r2((subtotal + (tax.taxShipping ? shipping : 0)) * rate)
+    const rentNet = r2(lines.filter((l) => l.mode === 'rent').reduce((a, l) => a + l.unit * l.qty, 0)); const taxMonthly = tax.taxRentals ? r2(rentNet * rate) : 0
+    const total = r2(subtotal + shipping + taxOnce), monthly = r2(rentNet + taxMonthly)
     const free = total === 0 && monthly === 0
     const online = stripeMode() !== 'off'
     const id = 'eqo_' + uid(), ref = 'EQ-' + String(10000 + Math.floor(Math.random() * 89999))
     await move(db, parts, -1, 'order', ref, u.name)
-    await db.query(`insert into supply_orders (id,ref,shipper_id,user_id,placed_by,status,provider,subtotal_usd,shipping_usd,total_usd,monthly_usd,ship_to,note) values ($1,$2,$3,$4,$5,'awaiting_payment',$6,$7,$8,$9,$10,$11,$12)`,
-      [id, ref, u.shipperId, u.id, u.name, free ? 'included' : online ? 'stripe' : 'manual', subtotal, shipping, total, monthly, JSON.stringify(b.shipTo), b.note])
+    await db.query(`insert into supply_orders (id,ref,shipper_id,user_id,placed_by,status,provider,subtotal_usd,shipping_usd,total_usd,monthly_usd,ship_to,note,tax_usd) values ($1,$2,$3,$4,$5,'awaiting_payment',$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [id, ref, u.shipperId, u.id, u.name, free ? 'included' : online ? 'stripe' : 'manual', subtotal, shipping, total, monthly, JSON.stringify(b.shipTo), b.note, taxOnce])
     for (const l of lines) {
       await db.query('insert into supply_order_items (id,order_id,product_id,name,qty,mode,unit_usd) values ($1,$2,$3,$4,$5,$6,$7)', ['eqi_' + uid(), id, l.p.id, l.p.name, l.qty, l.mode, l.unit])
       if (l.mode !== 'buy') await db.query('insert into supply_rentals (id,shipper_id,product_id,order_id,qty,mode,monthly_usd) values ($1,$2,$3,$4,$5,$6,$7)', ['eqr_' + uid(), u.shipperId, l.p.id, id, l.qty, l.mode, l.mode === 'rent' ? l.unit * l.qty : 0])
@@ -382,6 +412,8 @@ export function mountSupplies(r: Router, d: Deps) {
     const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')
     const items: Row[] = lines.filter((l) => l.mode !== 'included').map((l) => ({ quantity: l.qty, price_data: { currency: 'usd', unit_amount: Math.round(l.unit * 100), product_data: { name: l.mode === 'rent' ? `${l.p.name} — monthly rental` : l.p.name }, ...(l.mode === 'rent' ? { recurring: { interval: 'month' } } : {}) } }))
     if (shipping) items.push({ quantity: 1, price_data: { currency: 'usd', unit_amount: shipping * 100, product_data: { name: 'Shipping' } } })
+    if (taxOnce) items.push({ quantity: 1, price_data: { currency: 'usd', unit_amount: Math.round(taxOnce * 100), product_data: { name: `Sales tax (${String(b.shipTo.state).toUpperCase()} ${pct(rate)})` } } })
+    if (taxMonthly) items.push({ quantity: 1, price_data: { currency: 'usd', unit_amount: Math.round(taxMonthly * 100), product_data: { name: `Sales tax on rentals (${pct(rate)})` }, recurring: { interval: 'month' } } })
     try {
       const session = await stripe<Row>('/checkout/sessions', {
         mode: monthly > 0 ? 'subscription' : 'payment', client_reference_id: `eq:${id}`, customer_email: u.email || undefined,
@@ -422,7 +454,7 @@ export function mountSupplies(r: Router, d: Deps) {
     await sweepIncluded(db)
     const products = await allProducts(db)
     const { rows: rent } = await db.query<Row>(`${RENTAL_SELECT} where r.status <> 'cancelled' and (r.status <> 'returned' or r.returned_at > now() - interval '60 days') order by (r.status = 'return_requested') desc, r.created_at desc limit 300`)
-    const { rows: m } = await db.query<Row>(`select coalesce(sum(total_usd) filter (where status = any($1) and paid_at >= date_trunc('month', now())),0)::float as sales from supply_orders`, [LIVE])
+    const { rows: m } = await db.query<Row>(`select coalesce(sum(total_usd) filter (where status = any($1) and paid_at >= date_trunc('month', now())),0)::float as sales, coalesce(sum(tax_usd) filter (where status = any($1) and paid_at >= date_trunc('month', now())),0)::float as tax from supply_orders`, [LIVE])
     const orders = await ordersWithItems(db, '', [])
     const list = [...products.values()].sort((a, b) => Number(a.sort) - Number(b.sort)).map((p) => productOut(p, products))
     const { rows: moves } = await db.query<Row>(`select m.*, p.name from supply_stock_moves m left join supply_products p on p.id = m.product_id order by m.at desc limit 60`)
@@ -430,7 +462,7 @@ export function mountSupplies(r: Router, d: Deps) {
     res.json({
       products: list, orders, rentals: rent.map(rentalOut),
       moves: moves.map((x) => ({ productName: x.name ?? x.product_id, delta: Number(x.delta), reason: x.reason, ref: x.ref, by: x.by_name, at: ISO(x.at) })),
-      stats: { salesMonthUsd: r2(Number(m[0]?.sales ?? 0)), rentalMrrUsd: r2(rent.filter((x) => x.status === 'active' && x.mode === 'rent').reduce((a, x) => a + Number(x.monthly_usd), 0)), openOrders: orders.filter((o) => ['awaiting_payment', 'paid', 'packed'].includes(o.status)).length, lowStock: list.filter((p) => p.active && !p.kit.length && p.low).length, returnsDue: rent.filter((x) => x.status === 'return_requested').length },
+      stats: { taxMonthUsd: r2(Number(m[0]?.tax ?? 0)), salesMonthUsd: r2(Number(m[0]?.sales ?? 0)), rentalMrrUsd: r2(rent.filter((x) => x.status === 'active' && x.mode === 'rent').reduce((a, x) => a + Number(x.monthly_usd), 0)), openOrders: orders.filter((o) => ['awaiting_payment', 'paid', 'packed'].includes(o.status)).length, lowStock: list.filter((p) => p.active && !p.kit.length && p.low).length, returnsDue: rent.filter((x) => x.status === 'return_requested').length },
     })
   }))
   const saveProduct = async (db: Db, id: string, b: z.infer<typeof zProduct>, create: boolean) => {
@@ -439,6 +471,15 @@ export function mountSupplies(r: Router, d: Deps) {
     if (create) await db.query(`insert into supply_products (id,sku,name,category,blurb,specs,price_usd,rent_usd,reorder_level,labels_per_unit,kit,included_with,active,sort,audience,packing_kind) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`, vals)
     else await db.query(`update supply_products set sku=$2,name=$3,category=$4,blurb=$5,specs=$6,price_usd=$7,rent_usd=$8,reorder_level=$9,labels_per_unit=$10,kit=$11,included_with=$12,active=$13,sort=$14,audience=$15,packing_kind=$16,updated_at=now() where id=$1`, vals)
   }
+  r.get('/admin/supplies/tax', wrap(async (req, res) => { const db = await getDb(); await requireAdmin(db, req); res.json({ tax: await getTax(db) }) }))
+  r.put('/admin/supplies/tax', wrap(async (req, res) => {
+    const db = await getDb(); await requireAdmin(db, req)
+    const b = z.object({ enabled: z.boolean(), taxShipping: z.boolean(), taxRentals: z.boolean(), rates: z.record(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/), z.number().min(0).max(0.2)) }).parse(req.body)
+    await db.query(`insert into settings (id,value,updated_at) values ('sales_tax',$1,now()) on conflict (id) do update set value = $1, updated_at = now()`, [JSON.stringify(b)])
+    res.json({ tax: await getTax(db) })
+  }))
+  /** What a customer or shipper pays in tax for a given state (shown in the cart before checkout). */
+  r.get('/supplies/tax-rate', wrap(async (req, res) => { const db = await getDb(); res.json({ rate: taxRate(await getTax(db), { state: String(req.query.state ?? ''), country: String(req.query.country ?? 'US') }), tax: await getTax(db) }) }))
   r.post('/admin/supplies/products', wrap(async (req, res) => {
     const db = await getDb(); await requireAdmin(db, req); const b = zProduct.parse(req.body); const id = 'eq-' + uid()
     await saveProduct(db, id, b, true); res.status(201).json({ id })

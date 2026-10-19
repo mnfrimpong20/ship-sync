@@ -8,6 +8,7 @@ export interface Payment {
   status: PaymentStatus; provider: 'stripe' | 'manual'; method: string | null
   paidAt: string | null; releasedAt: string | null; releaseReason: string | null; refundedAt: string | null; refundReason: string | null
   payoutId: string | null; recordedBy: string | null; receiptDocumentId: string | null; createdAt: string | null
+  cardDispute?: { id: string; reason: string; status: string; amountUsd: number; evidenceDueBy: string | null; openedAt: string } | null; hold?: boolean
 }
 export interface PayoutDetails { bankName: string; accountName: string; accountNumber: string; routing: string; country: string; mobileMoney: string }
 export interface Payout { id: string; shipperId: string; shipperName?: string; amountUsd: number; status: 'requested' | 'paid' | 'rejected'; method: string; details: PayoutDetails; reference: string; note: string; requestedBy: string; requestedAt: string | null; paidAt: string | null; paidBy: string | null; payments: number }

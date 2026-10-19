@@ -1316,6 +1316,16 @@ create table if not exists shipment_supplies (
 );
 create index if not exists idx_shipment_supplies on shipment_supplies(shipment_id);
 alter table requests add column if not exists supplies jsonb;
+alter table requests add column if not exists declaration jsonb;
+alter table supply_orders add column if not exists tax_usd numeric not null default 0;
+alter table escrow_payments add column if not exists card_dispute jsonb;
+create table if not exists sanctions_entries (uid text primary key, name text not null, name_norm text not null, kind text not null default '', program text not null default '');
+create table if not exists screening_hits (
+  id text primary key, subject_type text not null, subject_id text not null, role text not null default '', name text not null, matched_name text not null, matched_uid text not null,
+  program text not null default '', score numeric not null default 0, status text not null default 'open', note text not null default '', reviewed_by text, reviewed_at timestamptz, created_at timestamptz not null default now(),
+  unique (subject_type, subject_id, role, matched_uid)
+);
+alter table shipments add column if not exists export_compliance jsonb;
 alter table requests add column if not exists supplies_address jsonb;
 alter table quotes add column if not exists supplies jsonb not null default '[]';
 alter table shipments add column if not exists supplies_address jsonb;

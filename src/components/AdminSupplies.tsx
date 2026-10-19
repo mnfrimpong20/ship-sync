@@ -4,6 +4,7 @@ import { categoryLabels, orderStatusLabels, planLabel, rentalStatusLabels, suppl
 import { usd } from '../lib/payments'
 import { fmtDate } from './ui'
 import { StatCard, Th, thead, trow } from './board'
+import { SalesTaxCard } from './Compliance'
 
 const tone: Record<Order['status'], string> = { awaiting_payment: 'bg-gold/15 text-gold-deep', paid: 'bg-sky/15 text-sea', packed: 'bg-sky/15 text-sea', shipped: 'bg-sky/15 text-sea', delivered: 'bg-teal/15 text-teal', cancelled: 'bg-surface-2 text-text-muted' }
 const toInput = (p?: Product): ProductInput => p ? { audience: p.audience ?? 'shipper', packingKind: p.packingKind ?? null, name: p.name, sku: p.sku, category: p.category, blurb: p.blurb, specs: p.specs, priceUsd: p.priceUsd, rentUsd: p.rentUsd, reorderLevel: p.reorderLevel, labelsPerUnit: p.labelsPerUnit, kit: p.kit.map(({ productId, qty }) => ({ productId, qty })), includedWith: p.includedWith, active: p.active, sort: p.sort }
@@ -114,6 +115,8 @@ export function AdminSupplies() {
           <ul className="max-h-[360px] divide-y divide-border overflow-y-auto text-xs">{d.moves.map((m, i) => <li key={i} className="flex items-center gap-2 px-4 py-2"><span className={`w-12 text-right font-semibold tabular-nums ${m.delta > 0 ? 'text-teal' : 'text-text'}`}>{m.delta > 0 ? '+' : ''}{m.delta}</span><span className="min-w-0 flex-1 truncate">{m.productName}<span className="text-text-muted"> · {m.reason}{m.ref ? ` ${m.ref}` : ''}</span></span><span className="shrink-0 text-text-muted">{fmtDate(m.at)}</span></li>)}</ul>
         </div>
       </div>
+
+      <div className="mt-6 max-w-xl"><SalesTaxCard /></div>
 
       {ship && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setShip(null)}>

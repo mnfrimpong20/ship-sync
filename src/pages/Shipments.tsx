@@ -17,6 +17,7 @@ import { DutyCard } from '../components/Duty'
 import { InsuranceCard } from '../components/InsuranceCard'
 import { PaymentCard } from '../components/PaymentCard'
 import { PackingSuppliesCard } from '../components/PackingSupplies'
+import { ExportCard } from '../components/Compliance'
 import { VehicleCard } from '../components/VehicleCard'
 import { CustomsCard } from '../components/CustomsCard'
 import { DisputeCard, ReviewCard } from '../components/ReviewCards'
@@ -187,6 +188,7 @@ export default function Shipments() {
                               <div className="space-y-4">
                                 <ShipmentManage s={s} onChanged={async (m) => { await refresh(); setToast(m) }} onDeleted={async (m) => { setOpen(null); await refresh(); setToast(m) }} />
                                 <ReviewCard shipmentId={s.id} /><DisputeCard shipmentId={s.id} />
+                                <ExportCard shipmentId={s.id} />
                                 <PackingSuppliesCard shipmentId={s.id} />
                                 <PaymentCard shipmentId={s.id} />
                                 {s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}

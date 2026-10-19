@@ -39,6 +39,18 @@ export function AdminPayments() {
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-6">
+          {d.payments.some((p) => p.cardDispute) && (
+            <div className="card-dark border-danger/40 p-5" data-testid="admin-card-disputes">
+              <h3 className="!text-base">Card chargebacks</h3>
+              <p className="mt-1 text-xs text-text-muted">The customer’s bank is reversing these payments. The money is held — answer each one with evidence in the Stripe dashboard before the deadline.</p>
+              <ul className="mt-3 divide-y divide-border/70 text-sm">{d.payments.filter((p) => p.cardDispute).map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5" data-testid="card-dispute-row">
+                  <span className="min-w-0"><b>{p.shipmentRef ?? p.id}</b> · {p.customer} → {p.shipperName}<span className="block text-xs text-text-muted">{usd(p.cardDispute!.amountUsd)} · {p.cardDispute!.reason || 'no reason given'} · {p.cardDispute!.status.replace(/_/g, ' ')}{p.cardDispute!.evidenceDueBy ? ` · evidence due ${new Date(p.cardDispute!.evidenceDueBy).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</span></span>
+                  <a href={`https://dashboard.stripe.com/${d.stripe.mode === 'test' ? 'test/' : ''}disputes/${p.cardDispute!.id}`} target="_blank" rel="noreferrer" className="btn-ghost !min-h-8 !px-3 text-xs">Open in Stripe</a>
+                </li>
+              ))}</ul>
+            </div>
+          )}
           {pending.length > 0 && (
             <div className="card-dark p-5" data-testid="admin-payouts">
               <h3 className="!text-base">Payouts to send</h3>

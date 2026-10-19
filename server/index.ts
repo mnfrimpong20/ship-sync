@@ -34,6 +34,7 @@ async function main() {
   startScheduleSweeps(getDb)
   startSourcingSweeps(getDb)
   startFlowSweeps(getDb)
+  ;(await import('./screening')).startScreeningSweeps(getDb)
   startExportSchedule(getDb)
   const app = express()
   app.disable('x-powered-by')

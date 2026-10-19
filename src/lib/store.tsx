@@ -18,6 +18,8 @@ export interface SupplyNeed { kind: PackingKind; qty: number }
 export interface SupplyAddress { name: string; line1: string; line2?: string; city: string; state?: string; zip?: string; country?: string; phone?: string }
 export interface QuoteSupplyLine { kind: PackingKind; qty: number; source: 'shipper' | 'ntemtem' | 'none'; supplyId?: string; productId?: string; name?: string; unitUsd?: number }
 export interface QuoteRequest {
+  /** The sender's declaration: nothing prohibited inside; restricted items flagged for the shipper. */
+  declaration?: { accepted: boolean; includes: string[]; at?: string; version?: string }
   /** Packing supplies the customer needs before pickup. */
   supplies?: SupplyNeed[]
   suppliesAddress?: Partial<SupplyAddress>

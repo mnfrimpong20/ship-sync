@@ -177,3 +177,8 @@ table, dl, .tabular-nums, [data-testid$="card"] { font-variant-numeric: tabular-
 
 /* Screen-reader-only text inside a sideways-scrolling table must not widen the page on phones. */
 .overflow-x-auto:not(.sticky):not(.fixed):not(.absolute) { position: relative; }
+
+/* Road mode (drivers): stronger secondary text and borders for sunlight; prefs.ts also enlarges text and goes dark at night. */
+html.road { --color-text-muted: var(--color-text); }
+html.road .ss-app :is(.card-dark, .border-border) { border-color: color-mix(in srgb, var(--color-text) 28%, transparent); }
+@keyframes ntm-flash { 0% { opacity: 0 } 15% { opacity: 1 } 70% { opacity: 1 } 100% { opacity: 0 } }

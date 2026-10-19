@@ -3,7 +3,7 @@ import { api } from './store'
 
 /** Display preferences: text size, theme and language. Saved on the account (follows the person) and on this device. */
 export type Lang = 'en' | 'fr'
-export interface Display { lang: Lang; textSize: 'normal' | 'large' | 'larger'; theme: 'light' | 'dark' | 'system' }
+export interface Display { lang: Lang; textSize: 'normal' | 'large' | 'larger'; theme: 'light' | 'dark' | 'system'; /** Road mode for drivers: bigger, stronger text and dark after dark. */ road?: boolean }
 const DEFAULT: Display = { lang: 'en', textSize: 'normal', theme: 'light' }
 const KEY = 'ss-display'
 let state: Display = (() => { try { return { ...DEFAULT, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Display>) } } catch { return DEFAULT } })()
@@ -15,13 +15,15 @@ function apply(d: Display) {
   if (typeof document === 'undefined') return
   const html = document.documentElement
   html.lang = d.lang
-  html.style.fontSize = SIZE[d.textSize]
-  const dark = d.theme === 'dark' || (d.theme === 'system' && (mq ??= window.matchMedia('(prefers-color-scheme: dark)')).matches)
+  html.style.fontSize = d.road && d.textSize === 'normal' ? SIZE.large : SIZE[d.textSize]
+  html.classList.toggle('road', !!d.road)
+  const hour = new Date().getHours(); const night = hour >= 19 || hour < 6
+  const dark = d.theme === 'dark' || (d.theme === 'system' && (mq ??= window.matchMedia('(prefers-color-scheme: dark)')).matches) || (!!d.road && night)
   html.classList.toggle('theme-dark', dark)
   html.style.colorScheme = dark ? 'dark' : 'light'
 }
 apply(state)
-if (typeof window !== 'undefined') { mq = window.matchMedia?.('(prefers-color-scheme: dark)') ?? null; mq?.addEventListener?.('change', () => state.theme === 'system' && apply(state)) }
+if (typeof window !== 'undefined') { setInterval(() => state.road && apply(state), 10 * 60_000); mq = window.matchMedia?.('(prefers-color-scheme: dark)') ?? null; mq?.addEventListener?.('change', () => state.theme === 'system' && apply(state)) }
 
 function set(next: Display) { state = next; try { localStorage.setItem(KEY, JSON.stringify(next)) } catch { /* private mode */ } apply(next); subs.forEach((f) => f(next)) }
 /** Called once the account loads: the account's saved choices win over this device's. */

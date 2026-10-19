@@ -13,7 +13,8 @@ import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { countryByCode, statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
 import { distanceKm } from '../src/lib/geo'
-import { notify, notifyShipmentStatus } from './notify'
+import { notify, notifyShipmentStatus, notifyShipperStaff } from './notify'
+import { normalisePhone, sendText, smsProvider } from './sms'
 
 type Row = Record<string, any>
 export type StaffRole = 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'
@@ -34,11 +35,12 @@ const num = (v: unknown) => (v == null ? undefined : Number(v))
 
 export const staffOut = (r: Row) => ({ id: r.id, shipperId: r.shipper_id, userId: r.user_id ?? undefined, name: r.name, email: r.email, phone: r.phone, role: r.role as StaffRole, status: r.status as 'invited' | 'active' | 'inactive', base: r.base as 'origin' | 'destination', city: r.city, inviteToken: r.invite_token ?? undefined, createdAt: ISO(r.created_at), runCount: r.run_count != null ? Number(r.run_count) : undefined, perms: (J(r.perms) ?? {}) as { allow?: string[]; deny?: string[] }, lastActiveAt: ISO(r.last_active_at), activity: r.runs_week != null ? { runsWeek: Number(r.runs_week), stopsWeek: Number(r.stops_week), scansWeek: Number(r.scans_week), quotesWeek: Number(r.quotes_week), quotesWonWeek: Number(r.quotes_won_week), lastScanAt: ISO(r.last_scan_at) } : undefined })
 const vehicleOut = (r: Row) => ({ id: r.id, name: r.name, type: r.type, plate: r.plate, capacityKg: num(r.capacity_kg), capacityNote: r.capacity_note, base: r.base as 'origin' | 'destination', city: r.city, country: r.country, status: r.status as 'available' | 'on_run' | 'maintenance' | 'retired', driverId: r.driver_id ?? undefined, notes: r.notes, createdAt: ISO(r.created_at) })
-const stopOut = (r: Row) => ({ collectUsd: r.collect_usd ?? undefined, collectRule: r.collect_rule ?? undefined, id: r.id, runId: r.run_id, seq: Number(r.seq), shipmentId: r.shipment_id ?? undefined, label: r.label, address: r.address, lat: num(r.lat), lon: num(r.lon), contact: r.contact, phone: r.phone, status: r.status as 'pending' | 'done' | 'skipped', doneAt: r.done_at ? ISO(r.done_at) : undefined, note: r.note, shipmentRef: r.shipment_ref ?? undefined, shipmentStatus: r.shipment_status ?? undefined })
+const podOut = (v: unknown) => { const p = J(v) as { receivedBy?: string; photo?: string; signature?: string; pieces?: number; by?: string } | null; return p ? { receivedBy: p.receivedBy ?? '', pieces: p.pieces ?? undefined, hasPhoto: !!p.photo, hasSignature: !!p.signature, by: p.by ?? '' } : undefined }
+const stopOut = (r: Row) => ({ etaFrom: r.eta_from || undefined, etaTo: r.eta_to || undefined, pod: podOut(r.pod), skipReason: r.skip_reason || undefined, tries: Number(r.tries ?? 0), onWayAt: r.on_way_at ? ISO(r.on_way_at) : undefined, collected: (J(r.collected) as { method: string; amountUsd: number; at: string } | null) ?? undefined, collectUsd: r.collect_usd ?? undefined, collectRule: r.collect_rule ?? undefined, id: r.id, runId: r.run_id, seq: Number(r.seq), shipmentId: r.shipment_id ?? undefined, label: r.label, address: r.address, lat: num(r.lat), lon: num(r.lon), contact: r.contact, phone: r.phone, status: r.status as 'pending' | 'done' | 'skipped', doneAt: r.done_at ? ISO(r.done_at) : undefined, note: r.note, shipmentRef: r.shipment_ref ?? undefined, shipmentStatus: r.shipment_status ?? undefined })
 const runOut = (r: Row, stops: Row[]) => ({
   id: r.id, name: humanizeDates(r.name), kind: r.kind as 'pickup' | 'delivery', date: DATE(r.run_date), driverId: r.driver_id ?? undefined, vehicleId: r.vehicle_id ?? undefined,
   start: r.start_lat != null ? { label: r.start_label, lat: Number(r.start_lat), lon: Number(r.start_lon) } : null,
-  status: r.status as 'planned' | 'in_progress' | 'done' | 'cancelled', distanceKm: num(r.distance_km), notes: r.notes, createdAt: ISO(r.created_at),
+  status: r.status as 'planned' | 'in_progress' | 'done' | 'cancelled', distanceKm: num(r.distance_km), notes: r.notes, createdAt: ISO(r.created_at), summarySentAt: r.summary_sent_at ? ISO(r.summary_sent_at) : undefined,
   stops: stops.map(stopOut), driverName: r.driver_name ?? undefined, vehicleName: r.vehicle_name ?? undefined,
 })
 
@@ -60,7 +62,12 @@ const zRun = z.object({
   start: z.object({ label: z.string().trim().max(120).default(''), lat: z.number(), lon: z.number() }).nullable().optional(), notes: z.string().trim().max(1000).default(''), stops: z.array(zStopIn).max(60).default([]),
 })
 const zRunPatch = z.object({ name: z.string().trim().min(2).max(80).optional(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), driverId: z.string().nullable().optional(), vehicleId: z.string().nullable().optional(), status: z.enum(['planned', 'in_progress', 'done', 'cancelled']).optional(), notes: z.string().trim().max(1000).optional(), start: z.object({ label: z.string().trim().max(120).default(''), lat: z.number(), lon: z.number() }).nullable().optional() })
-const zStopPatch = z.object({ status: z.enum(['pending', 'done', 'skipped']).optional(), note: z.string().trim().max(500).optional(), seq: z.number().int().min(0).optional(), lat: z.number().optional(), lon: z.number().optional(), label: z.string().trim().min(1).max(120).optional(), address: z.string().trim().max(240).optional(), contact: z.string().trim().max(80).optional(), phone: z.string().trim().max(30).optional() })
+export const SKIP_REASONS = { not_home: 'Nobody home', wrong_address: 'Wrong address', refused: 'Refused', no_access: 'Couldn’t get in', other: 'Other' } as const
+const DRIVER_STOP_KEYS = ['status', 'note', 'receivedBy', 'photo', 'signature', 'pieces', 'skipReason', 'retry', 'collected']
+const zStopPatch = z.object({ status: z.enum(['pending', 'done', 'skipped']).optional(), note: z.string().trim().max(500).optional(),
+  receivedBy: z.string().trim().max(80).optional(), photo: z.string().max(600_000).regex(/^data:image\/(jpeg|png|webp);base64,/).optional(), signature: z.string().max(120_000).regex(/^data:image\/png;base64,/).optional(),
+  pieces: z.number().int().min(0).max(999).optional(), skipReason: z.enum(['not_home', 'wrong_address', 'refused', 'no_access', 'other']).optional(), retry: z.boolean().optional(),
+  collected: z.object({ method: z.enum(['cash', 'mobile_money']), amountUsd: z.number().min(0.01).max(1_000_000) }).optional(), seq: z.number().int().min(0).optional(), lat: z.number().optional(), lon: z.number().optional(), label: z.string().trim().min(1).max(120).optional(), address: z.string().trim().max(240).optional(), contact: z.string().trim().max(80).optional(), phone: z.string().trim().max(30).optional() })
 
 /* ---------------- geocoding (OpenStreetMap Nominatim, cached, ≤1 req/s per their policy) ---------------- */
 const NOMINATIM = process.env.NOMINATIM_URL || 'https://nominatim.openstreetmap.org'
@@ -146,7 +153,9 @@ export function mountOps(r: Router, d: Deps) {
 
   // ---- team
   r.get('/team', wrap(async (req, res) => {
-    const db = await getDb(); const { shipperId } = await staffOf(db, req)
+    const db = await getDb(); const { shipperId, role, me } = await staffOf(db, req)
+    // Drivers don't need the office list (emails, phones); they get their own record, and dispatch via /runs/dispatch.
+    if (role === 'driver') { res.json({ team: [staffOut(me)] }); return }
     const { rows } = await db.query<Row>(`select s.*, (select count(*) from runs r where r.driver_id = s.id)::int as run_count,
         (select count(*) from runs r where r.driver_id = s.id and r.run_date >= current_date - 6)::int as runs_week,
         (select count(*) from run_stops rs join runs r on r.id = rs.run_id where r.driver_id = s.id and rs.status = 'done' and rs.done_at >= now() - interval '7 days')::int as stops_week,
@@ -273,7 +282,51 @@ export function mountOps(r: Router, d: Deps) {
     })) })
   }))
   r.get('/runs', wrap(async (req, res) => { const db = await getDb(); const { shipperId } = await staffOf(db, req, 'owner', 'dispatcher', 'agent'); res.json({ runs: await loadRuns(db, 'r.shipper_id = $1', [shipperId]) }) }))
-  r.get('/runs/mine', wrap(async (req, res) => { const db = await getDb(); const { shipperId, me } = await staffOf(db, req); res.json({ runs: await loadRuns(db, `r.shipper_id = $1 and r.driver_id = $2 and r.status in ('planned','in_progress')`, [shipperId, me.id]) }) }))
+  r.get('/runs/mine', wrap(async (req, res) => { const db = await getDb(); const { shipperId, me } = await staffOf(db, req); res.json({ runs: await loadRuns(db, `r.shipper_id = $1 and r.driver_id = $2 and (r.status in ('planned','in_progress') or (r.status = 'done' and r.run_date >= current_date - 1))`, [shipperId, me.id]) }) }))
+  /** Who a driver calls: the company's dispatchers and owners with a phone number. */
+  r.get('/runs/dispatch', wrap(async (req, res) => {
+    const db = await getDb(); const { shipperId } = await staffOf(db, req)
+    const { rows } = await db.query<Row>(`select name, phone, role from staff where shipper_id = $1 and status = 'active' and role in ('dispatcher','owner') order by case role when 'dispatcher' then 0 else 1 end, name`, [shipperId])
+    const { rows: co } = await db.query<Row>('select name, brand from shippers where id = $1', [shipperId]); const br = (J(co[0]?.brand) ?? {}) as { phone?: string; whatsapp?: string }
+    res.json({ people: rows.map((x) => ({ name: x.name, phone: x.phone || '', role: x.role })), office: { name: co[0]?.name ?? '', phone: br.phone || '', whatsapp: br.whatsapp || '' } })
+  }))
+  /** "On my way": tells the customer (notification) and texts the person at the stop. */
+  r.post('/runs/:id/stops/:sid/on-way', wrap(async (req, res) => {
+    const db = await getDb(); const { shipperId, me, role } = await staffOf(db, req)
+    const run = await ownRun(db, shipperId, String(req.params.id)); const st = run.stops.find((s) => s.id === req.params.sid); if (!st) throw new HttpError(404, 'Stop not found.')
+    if (role === 'driver' && run.driverId !== me.id) throw new HttpError(403, 'Not your run.')
+    const { minutes } = z.object({ minutes: z.number().int().min(1).max(600) }).parse(req.body)
+    const { rows: co } = await db.query<Row>('select name from shippers where id = $1', [shipperId])
+    const first = me.name.split(' ')[0]; const company = co[0]?.name ?? 'your shipper'
+    const text = `${first} from ${company} is on the way${run.kind === 'pickup' ? ' to collect your shipment' : ' with your delivery'}${st.shipmentRef ? ` (${st.shipmentRef})` : ''} — about ${minutes} minutes away.`
+    let texted = false
+    const to = st.phone ? normalisePhone(st.phone, 'US') ?? normalisePhone(st.phone, 'GH') : null
+    if (to && smsProvider().id !== 'off') { try { await sendText(to, text); texted = true } catch (e) { console.error('[on-way] text', e) } }
+    let told = false
+    if (st.shipmentId) {
+      const { rows } = await db.query<Row>('select id, ref, status, user_id from shipments where id = $1', [st.shipmentId]); const sh = rows[0]
+      if (sh) {
+        await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sh.id, sh.status, st.label || '', `Driver ${first} is on the way — about ${minutes} minutes.`])
+        if (sh.user_id) { await notify(db, { userId: sh.user_id, kind: 'shipment_status', title: `${sh.ref}: driver on the way — about ${minutes} min`, body: text, link: `/dashboard?tab=shipments&open=${sh.id}`, dedupe: `onway:${st.id}:${Math.floor(Date.now() / 600000)}` }); told = true }
+      }
+    }
+    await db.query('update run_stops set on_way_at = now() where id = $1', [st.id])
+    res.json({ ok: true, texted, told, text })
+  }))
+  /** End of the day: the driver sends dispatch a short summary of the run. */
+  r.post('/runs/:id/summary', wrap(async (req, res) => {
+    const db = await getDb(); const { shipperId, me, role } = await staffOf(db, req)
+    const run = await ownRun(db, shipperId, String(req.params.id))
+    if (role === 'driver' && run.driverId !== me.id) throw new HttpError(403, 'Not your run.')
+    const { note } = z.object({ note: z.string().trim().max(500).default('') }).parse(req.body ?? {})
+    const done = run.stops.filter((s) => s.status === 'done'); const skipped = run.stops.filter((s) => s.status === 'skipped'); const pending = run.stops.filter((s) => s.status === 'pending')
+    const pieces = done.reduce((n, s) => n + (s.pod?.pieces ?? 0), 0)
+    const cash = run.stops.reduce((n, s) => n + (s.collected?.method === 'cash' ? s.collected.amountUsd : 0), 0); const momo = run.stops.reduce((n, s) => n + (s.collected?.method === 'mobile_money' ? s.collected.amountUsd : 0), 0)
+    const body = [`${done.length} done`, skipped.length ? `${skipped.length} skipped (${skipped.map((s) => `${s.label}: ${s.note || 'no reason'}`).join('; ')})` : '', pending.length ? `${pending.length} not reached` : '', pieces ? `${pieces} pieces` : '', cash ? `$${cash.toLocaleString()} cash` : '', momo ? `$${momo.toLocaleString()} mobile money` : '', note].filter(Boolean).join(' · ')
+    await notifyShipperStaff(db, shipperId, { kind: 'shipment_status', title: `${me.name} finished “${run.name}”`, body, link: `/dashboard/routes/${run.id}` }, ['owner', 'dispatcher'])
+    await db.query('update runs set summary_sent_at = now() where id = $1', [run.id])
+    res.json({ ok: true, body })
+  }))
   r.post('/runs', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, me } = await staffOf(db, req, ...MANAGE)
     const b = zRun.parse(req.body); const id = 'run_' + uid()
@@ -325,8 +378,37 @@ export function mountOps(r: Router, d: Deps) {
     const db = await getDb(); const { shipperId, me, role } = await staffOf(db, req)
     const run = await ownRun(db, shipperId, String(req.params.id)); const st = run.stops.find((s) => s.id === req.params.sid); if (!st) throw new HttpError(404, 'Stop not found.')
     const b = zStopPatch.parse(req.body)
-    if (role === 'driver' && (run.driverId !== me.id || Object.keys(b).some((k) => !['status', 'note'].includes(k)))) throw new HttpError(403, 'Drivers can only mark their own stops.')
+    if (role === 'driver' && (run.driverId !== me.id || Object.keys(b).some((k) => !DRIVER_STOP_KEYS.includes(k)))) throw new HttpError(403, 'Drivers can only mark their own stops.')
     if (role === 'agent') throw new HttpError(403, 'Agents cannot edit runs.')
+    // Money taken at the door goes onto the shipment's open invoices (oldest first) before any release check.
+    if (b.collected && st.shipmentId) {
+      let left = b.collected.amountUsd
+      const { rows: invs } = await db.query<Row>(`select i.*, coalesce((select sum(p.amount) from payments p where p.invoice_id = i.id), 0)::numeric as paid from invoices i where i.shipment_id = $1 and i.status in ('draft','sent','partial') order by i.created_at asc`, [st.shipmentId])
+      for (const inv of invs) {
+        if (left <= 0) break
+        const due = Math.max(0, Number(inv.total) - Number(inv.paid)); if (!due) continue
+        const pay = Math.min(due, left); left -= pay
+        await db.query('insert into payments (id,invoice_id,amount,method,at,note) values ($1,$2,$3,$4,current_date,$5)', ['pay_' + uid(), inv.id, Math.round(pay * 100) / 100, b.collected.method, `Collected at the door by ${me.name}`])
+        await db.query(`update invoices set status = $2 where id = $1`, [inv.id, pay >= due ? 'paid' : 'partial'])
+      }
+      await db.query('update run_stops set collected = $2 where id = $1', [st.id, JSON.stringify({ method: b.collected.method, amountUsd: b.collected.amountUsd, at: new Date().toISOString(), by: me.name, unapplied: Math.round(left * 100) / 100 })])
+      await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [st.shipmentId, st.shipmentStatus ?? 'out_for_delivery', st.label || '', `$${b.collected.amountUsd.toLocaleString()} collected ${b.collected.method === 'cash' ? 'in cash' : 'by mobile money'} by ${me.name}.`])
+    }
+    // "Try again later today": the stop goes to the back of the run instead of closing.
+    if (b.status === 'skipped' && b.retry) {
+      const last = Math.max(...run.stops.map((x) => x.seq)) + 1
+      const why = b.skipReason ? SKIP_REASONS[b.skipReason] : 'Skipped'
+      await db.query(`update run_stops set seq = $2, skip_reason = $3, tries = tries + 1, note = $4 where id = $1`, [st.id, last, b.skipReason ?? 'other', `${why}${b.note ? ` — ${b.note}` : ''} · trying again later`])
+      await notifyShipperStaff(db, shipperId, { kind: 'shipment_status', title: `${me.name} will retry ${st.label} later`, body: `${why}${b.note ? ` — ${b.note}` : ''}. Moved to the end of “${run.name}”.`, link: `/dashboard/routes/${run.id}` }, ['owner', 'dispatcher']).catch(() => {})
+      res.json({ run: await ownRun(db, shipperId, run.id) }); return
+    }
+    if (b.status === 'skipped' && st.status !== 'skipped') {
+      const why = b.skipReason ? SKIP_REASONS[b.skipReason] : 'Skipped'
+      await db.query('update run_stops set skip_reason = $2 where id = $1', [st.id, b.skipReason ?? 'other'])
+      b.note = `${why}${b.note ? ` — ${b.note}` : ''}`
+      if (role === 'driver') await notifyShipperStaff(db, shipperId, { kind: 'shipment_status', title: `${me.name} skipped ${st.label}`, body: `${b.note}. On “${run.name}”.`, link: `/dashboard/routes/${run.id}` }, ['owner', 'dispatcher']).catch(() => {})
+    }
+    if (b.status === 'done' && (b.receivedBy || b.photo || b.signature || b.pieces != null)) await db.query('update run_stops set pod = $2 where id = $1', [st.id, JSON.stringify({ receivedBy: b.receivedBy ?? '', photo: b.photo, signature: b.signature, pieces: b.pieces, by: me.name, at: new Date().toISOString() })])
     await db.query('update run_stops set status=$2, note=$3, seq=$4, lat=$5, lon=$6, label=$7, address=$8, contact=$9, phone=$10, done_at = case when $2 = \'done\' then coalesce(done_at, now()) else null end where id = $1',
       [st.id, b.status ?? st.status, b.note ?? st.note, b.seq ?? st.seq, b.lat ?? st.lat ?? null, b.lon ?? st.lon ?? null, b.label ?? st.label, b.address ?? st.address, b.contact ?? st.contact, b.phone ?? st.phone])
     // Completed stops move the shipment along and show up on the customer's tracking page.
@@ -336,8 +418,9 @@ export function mountOps(r: Router, d: Deps) {
       if (sh[0]) await assertRelease(db, sh[0], { by: me.name, byRole: role, override: role !== 'driver' && req.body?.override?.reason ? { reason: String(req.body.override.reason).slice(0, 200) } : null })
     }
     if (b.status === 'done' && st.shipmentId && st.status !== 'done') {
-      if (run.kind === 'pickup') await setShipmentStatus(db, st.shipmentId, 'picked_up', `Collected by ${me.name}${b.note ? ` — ${b.note}` : '.'}`)
-      else await setShipmentStatus(db, st.shipmentId, 'delivered', `Delivered by ${me.name}${b.note ? ` — ${b.note}` : '.'}`)
+      const proof = [b.pieces != null ? `${b.pieces} piece${b.pieces === 1 ? '' : 's'}` : '', b.photo ? 'photo on file' : '', b.signature ? 'signed' : ''].filter(Boolean).join(', ')
+      if (run.kind === 'pickup') await setShipmentStatus(db, st.shipmentId, 'picked_up', `Collected by ${me.name}${proof ? ` (${proof})` : ''}${b.note ? ` — ${b.note}` : '.'}`)
+      else await setShipmentStatus(db, st.shipmentId, 'delivered', `Delivered${b.receivedBy ? ` to ${b.receivedBy}` : ''} by ${me.name}${proof ? ` (${proof})` : ''}${b.note ? ` — ${b.note}` : '.'}`)
     }
     const updated = await ownRun(db, shipperId, run.id)
     if (b.lat != null || b.lon != null || b.seq != null) await db.query('update runs set distance_km = $2 where id = $1', [run.id, runDistance(updated.start, updated.stops)])

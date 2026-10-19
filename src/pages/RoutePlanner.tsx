@@ -6,11 +6,12 @@ import { ArrowDown, ArrowLeft, ArrowUp, Check, Crosshair, Flag, Locate, MapPin, 
 import { useStore } from '../lib/store'
 import { canManageOps, opsApi, runStatusLabels, type Candidate, type Run, type RunKind, type RunStart, type Staff, type StopInput, type Vehicle } from '../lib/ops'
 import RunMap, { type MapStop } from '../components/RunMap'
-import { Pill, fmtDateTime } from '../components/ui'
+import { Pill, fmtDate, fmtDateTime } from '../components/ui'
 import { stopOrQueue, startQueueSync, scanQueue, SCAN_QUEUE_EVENT } from '../lib/scan'
 import { Clock, WifiOff } from 'lucide-react'
 import { statusLabels } from '../lib/data'
 import { runTone } from './Routes'
+import DriverRun from './DriverRun'
 
 type Draft = StopInput & { id: string; geoState?: 'pending' | 'ok' | 'miss' }
 const uid = () => Math.random().toString(36).slice(2, 10)
@@ -119,6 +120,7 @@ export default function RoutePlanner() {
   if (!user) return <Navigate to={`/login?role=shipper&next=/dashboard/routes/${id ?? 'new'}`} replace />
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   if (isNew && !manage) return <Navigate to="/dashboard/routes" replace />
+  if (user.staffRole === 'driver' && !isNew && id) return <DriverRun id={id} />
 
   const create = async () => {
     setBusy(true); setError('')
@@ -141,7 +143,7 @@ export default function RoutePlanner() {
       <div>
         <Link to={user.staffRole === 'driver' ? '/dashboard/runs' : '/dashboard/routes'} className="mb-2 inline-flex items-center gap-1 text-sm text-text-muted hover:text-text focus-ring"><ArrowLeft size={14} aria-hidden="true" /> {user.staffRole === 'driver' ? 'My runs' : 'All runs'}</Link>
         <h1 className="flex flex-wrap items-center gap-3 !text-[clamp(1.5rem,3vw,2.2rem)]">{isNew ? 'Plan a run' : run?.name ?? '…'}{run && <Pill tone={runTone[run.status]}>{runStatusLabels[run.status]}</Pill>}</h1>
-        {run && <p className="mt-1 text-sm text-text-muted">{run.kind === 'pickup' ? 'Pickup run' : 'Delivery run'} · {run.date} · {run.driverName ?? 'No driver yet'}{run.vehicleName ? ` · ${run.vehicleName}` : ''}{run.distanceKm ? ` · ~${run.distanceKm} km` : ''}</p>}
+        {run && <p className="mt-1 text-sm text-text-muted">{run.kind === 'pickup' ? 'Pickup run' : 'Delivery run'} · {fmtDate(run.date + 'T12:00:00Z')} · {run.driverName ?? 'No driver yet'}{run.vehicleName ? ` · ${run.vehicleName}` : ''}{run.distanceKm ? ` · ~${run.distanceKm} km` : ''}</p>}
       </div>
       {run && manage && (
         <div className="flex flex-wrap gap-2">

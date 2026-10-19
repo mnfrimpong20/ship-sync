@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import jsQR from 'jsqr'
-import { AlertTriangle, Camera, Check, CheckCircle2, Container as ContainerIcon, Keyboard, MapPin, Package, QrCode, RefreshCw, ScanLine, Truck, X } from 'lucide-react'
+import { Flashlight, Volume2, VolumeX, AlertTriangle, Camera, Check, CheckCircle2, Container as ContainerIcon, Keyboard, MapPin, Package, QrCode, RefreshCw, ScanLine, Truck, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { countryByCode, statusLabels } from '../lib/data'
 import { containersApi, isOpen, type Container } from '../lib/containers'
@@ -12,6 +12,7 @@ import { SCAN_QUEUE_EVENT, scanApi, scanKindLabels, scanKindShort, scanOrQueue, 
 import { SignaturePad } from '../components/SignaturePad'
 import { pieceStatusLabels } from '../lib/labels'
 import { Pill, fmtDateTime } from '../components/ui'
+import { scanFeedback } from '../lib/feedback'
 
 const KINDS: ScanKind[] = ['loading', 'devanning', 'delivery', 'check']
 const kindIcon: Record<ScanKind, typeof ContainerIcon> = { loading: ContainerIcon, devanning: Package, delivery: Truck, check: ScanLine }
@@ -21,6 +22,7 @@ function Viewfinder({ onCode, paused }: { onCode: (code: string) => void; paused
   const video = useRef<HTMLVideoElement>(null); const canvas = useRef<HTMLCanvasElement>(null)
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
+  const [torch, setTorch] = useState<null | boolean>(null); const track = useRef<MediaStreamTrack | null>(null)
   const last = useRef<{ code: string; at: number }>({ code: '', at: 0 })
   const pausedRef = useRef(paused); pausedRef.current = paused
   const onCodeRef = useRef(onCode); onCodeRef.current = onCode
@@ -46,7 +48,7 @@ function Viewfinder({ onCode, paused }: { onCode: (code: string) => void; paused
       raf = window.setTimeout(tick, detector ? 250 : 180) as unknown as number
     }
     navigator.mediaDevices?.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false })
-      .then((s) => { if (!live) { s.getTracks().forEach((t) => t.stop()); return } stream = s; if (video.current) { video.current.srcObject = s; video.current.play().catch(() => {}) } setReady(true); tick() })
+      .then((s) => { if (!live) { s.getTracks().forEach((t) => t.stop()); return } stream = s; if (video.current) { video.current.srcObject = s; video.current.play().catch(() => {}) } setReady(true); tick(); const tr = s.getVideoTracks()[0]; track.current = tr; const caps = (tr?.getCapabilities?.() ?? {}) as { torch?: boolean }; if (caps.torch) setTorch(false) })
       .catch((e) => setError(e instanceof Error && e.name === 'NotAllowedError' ? 'Camera access was blocked. Allow the camera for this site, or type the code below.' : 'No camera available here — type the code below.'))
     return () => { live = false; clearTimeout(raf); stream?.getTracks().forEach((t) => t.stop()) }
   }, [])
@@ -55,6 +57,7 @@ function Viewfinder({ onCode, paused }: { onCode: (code: string) => void; paused
       <video ref={video} className="h-full w-full object-cover" playsInline muted />
       <canvas ref={canvas} className="hidden" />
       {ready && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><div className={`h-[62%] w-[62%] rounded-2xl border-2 ${paused ? 'border-teal' : 'border-white/70'} shadow-[0_0_0_9999px_rgba(0,0,0,.35)]`} /><div className="absolute bottom-3 rounded-full bg-black/60 px-3 py-1 text-xs text-white">{paused ? 'Scan recorded — point at the next sticker' : 'Point at the QR code'}</div></div>}
+      {torch !== null && <button type="button" onClick={async () => { const on = !torch; try { await track.current?.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] }); setTorch(on) } catch { /* not supported after all */ } }} aria-pressed={torch} className={`absolute right-3 top-3 inline-flex min-h-12 items-center gap-1.5 rounded-full px-4 text-sm font-semibold ${torch ? 'bg-gold text-on-accent' : 'bg-black/60 text-white'}`} data-testid="torch"><Flashlight size={18} aria-hidden="true" /> {torch ? 'Torch on' : 'Torch'}</button>}
       {!ready && !error && <div className="absolute inset-0 grid place-items-center text-sm text-white/80"><span className="inline-flex items-center gap-2"><Camera size={16} /> Starting camera…</span></div>}
       {error && <div className="absolute inset-0 grid place-items-center bg-surface p-6 text-center text-sm text-text-muted"><span><Camera size={22} className="mx-auto mb-2 text-text-muted" aria-hidden="true" />{error}</span></div>}
     </div>
@@ -81,6 +84,9 @@ export default function Scan() {
   const [queued, setQueued] = useState(() => scanQueue.list().length); const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine); const [queuedMsg, setQueuedMsg] = useState('')
   const [manual, setManual] = useState(false)
   const [paused, setPaused] = useState(false)
+  const [flash, setFlash] = useState<null | 'ok' | 'warn' | 'bad'>(null); const [count, setCount] = useState(0)
+  const [sound, setSound] = useState(() => { try { return localStorage.getItem('ss-scan-sound') !== '0' } catch { return true } })
+  const signal = (k: 'ok' | 'warn' | 'bad') => { scanFeedback(k, sound); setFlash(k); setTimeout(() => setFlash(null), 650) }
   const pos = useRef<{ lat: number; lon: number } | null>(null)
   const isDriver = user?.staffRole === 'driver'
 
@@ -98,14 +104,14 @@ export default function Scan() {
     setBusy(true); setError(''); setQueuedMsg('')
     try {
       const out = await scanOrQueue({ code: c, kind: k, containerId: k === 'loading' ? containerId || undefined : undefined, runId: runId || undefined, note: extra?.note, receivedBy: extra?.receivedBy, photo: extra?.photo, signature: extra?.signature || undefined, lat: pos.current?.lat, lon: pos.current?.lon })
-      if (out.queued) { setQueuedMsg(`No signal — ${c} saved on this phone and will go up when you're back online.`); setLook(null); setNote(''); setReceivedBy(''); setPhoto(''); setSignature(''); setCode(''); if (navigator.vibrate) navigator.vibrate(40); setPaused(true); setTimeout(() => setPaused(false), 1800); return }
+      if (out.queued) { setQueuedMsg(`No signal — ${c} saved on this phone and will go up when you're back online.`); setLook(null); setNote(''); setReceivedBy(''); setPhoto(''); setSignature(''); setCode(''); signal('warn'); setCount((n) => n + 1); setPaused(true); setTimeout(() => setPaused(false), 1800); return }
       const r = out.result
       setResult(r); setLook(null); setNote(''); setReceivedBy(''); setPhoto(''); setSignature(''); setCode('')
       scanApi.recent().then(setRecent).catch(() => {})
-      if (navigator.vibrate) navigator.vibrate(r.warnings.length ? [60, 60, 60] : 40)
+      signal(r.warnings.length ? 'warn' : 'ok'); setCount((n) => n + 1)
       setPaused(true); setTimeout(() => setPaused(false), 1800)
-    } catch (e) { setError(e instanceof Error ? e.message : 'Scan failed.'); if (navigator.vibrate) navigator.vibrate([80, 40, 80]) } finally { setBusy(false) }
-  }, [containerId, runId])
+    } catch (e) { setError(e instanceof Error ? e.message : 'Scan failed.'); signal('bad') } finally { setBusy(false) }
+  }, [containerId, runId, sound]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onCode = useCallback(async (c: string) => {
     if (busy) return
@@ -113,8 +119,8 @@ export default function Scan() {
     // Delivery needs the receiver's name (and ideally a photo), so it always stops to confirm. Loading/devanning/check commit at once when auto is on.
     if (auto && kind !== 'delivery' && (kind !== 'loading' || containerId)) { await commit(c, kind); return }
     setBusy(true)
-    try { setLook(await scanApi.lookup(c)) } catch (e) { setError(e instanceof Error ? e.message : 'Unknown label.') } finally { setBusy(false) }
-  }, [auto, kind, containerId, commit, busy])
+    try { setLook(await scanApi.lookup(c)); scanFeedback('ok', sound) } catch (e) { setError(e instanceof Error ? e.message : 'Unknown label.'); signal('bad') } finally { setBusy(false) }
+  }, [auto, kind, containerId, commit, busy, sound]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ready) return <BrandLoader />
   if (!user) return <Navigate to={`/login?role=shipper&next=${encodeURIComponent('/dashboard/scan')}`} replace />
@@ -127,6 +133,7 @@ export default function Scan() {
 
   return (
     <div className="bg-bg text-text">
+      {flash && <div aria-hidden="true" className={`pointer-events-none fixed inset-0 z-[80] grid place-items-center motion-safe:animate-[ntm-flash_.65s_ease-out_forwards] ${flash === 'ok' ? 'bg-teal/35' : flash === 'warn' ? 'bg-gold/40' : 'bg-danger/40'}`} data-testid={`flash-${flash}`}><span className={`grid h-28 w-28 place-items-center rounded-full text-white shadow-2xl ${flash === 'ok' ? 'bg-teal' : flash === 'warn' ? 'bg-gold-deep' : 'bg-danger'}`}>{flash === 'bad' ? <X size={56} /> : flash === 'warn' ? <AlertTriangle size={52} /> : <Check size={56} />}</span></div>}
       <div className="container-x max-w-3xl py-6 md:py-10">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div><p className="eyebrow mb-1">Scanner</p><h1 className="!text-[clamp(1.5rem,3vw,2.1rem)]">Scan a sticker</h1><p className="mt-1 text-sm text-text-muted">Point the camera at the QR code on the piece. Each scan is recorded with who, where and when, and the customer sees it on their tracking page.</p></div>
@@ -158,8 +165,10 @@ export default function Scan() {
               </form>
             )}
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <button onClick={() => setManual((m) => !m)} className="inline-flex items-center gap-1 text-text-muted hover:text-text focus-ring rounded">{manual ? <><Camera size={13} aria-hidden="true" /> Use the camera</> : <><Keyboard size={13} aria-hidden="true" /> Type the code instead</>}</button>
-              {kind !== 'delivery' && <label className="inline-flex items-center gap-1.5 text-text-muted"><input type="checkbox" className="accent-[var(--color-gold)]" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Record each scan straight away</label>}
+              <button onClick={() => setManual((m) => !m)} className="inline-flex min-h-11 items-center gap-1 rounded text-sm text-text-muted hover:text-text focus-ring">{manual ? <><Camera size={13} aria-hidden="true" /> Use the camera</> : <><Keyboard size={13} aria-hidden="true" /> Type the code instead</>}</button>
+              {kind !== 'delivery' && <label className="inline-flex min-h-11 items-center gap-2 text-sm text-text-muted"><input type="checkbox" className="h-5 w-5 accent-[var(--color-gold)]" checked={auto} onChange={(e) => setAuto(e.target.checked)} data-testid="keep-scanning" /> Keep scanning — record each one straight away</label>}
+              <button type="button" onClick={() => setSound((v) => { try { localStorage.setItem('ss-scan-sound', v ? '0' : '1') } catch { /* ignore */ } return !v })} aria-pressed={sound} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm text-text-muted hover:text-text focus-ring" data-testid="scan-sound">{sound ? <Volume2 size={16} aria-hidden="true" /> : <VolumeX size={16} aria-hidden="true" />} {sound ? 'Sound on' : 'Sound off'}</button>
+              {count > 0 && <span className="text-sm font-semibold" aria-live="polite" data-testid="scan-count">{count} scanned</span>}
             </div>
 
             <AnimatePresence mode="wait">

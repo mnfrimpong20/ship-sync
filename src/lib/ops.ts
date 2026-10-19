@@ -12,11 +12,11 @@ export type VehicleType = 'van' | 'truck' | 'box_truck' | 'pickup' | 'trailer' |
 export type VehicleStatus = 'available' | 'on_run' | 'maintenance' | 'retired'
 export interface Vehicle { id: string; name: string; type: VehicleType; plate: string; capacityKg?: number; capacityNote: string; base: StaffBase; city: string; country: string; status: VehicleStatus; driverId?: string; notes: string; createdAt: string }
 export type VehicleInput = Omit<Vehicle, 'id' | 'createdAt' | 'driverId' | 'capacityKg'> & { driverId?: string | null; capacityKg?: number | null }
-export interface RunStop { id: string; runId: string; seq: number; shipmentId?: string; label: string; address: string; lat?: number; lon?: number; contact: string; phone: string; status: 'pending' | 'done' | 'skipped'; doneAt?: string; note: string; collectUsd?: number; collectRule?: 'off' | 'warn' | 'block'; shipmentRef?: string; shipmentStatus?: ShipmentStatus }
+export interface RunStop { id: string; runId: string; seq: number; shipmentId?: string; label: string; address: string; lat?: number; lon?: number; contact: string; phone: string; status: 'pending' | 'done' | 'skipped'; doneAt?: string; note: string; collectUsd?: number; collectRule?: 'off' | 'warn' | 'block'; shipmentRef?: string; shipmentStatus?: ShipmentStatus; etaFrom?: string; etaTo?: string; pod?: { receivedBy: string; pieces?: number; hasPhoto: boolean; hasSignature: boolean; by: string }; skipReason?: string; tries?: number; onWayAt?: string; collected?: { method: 'cash' | 'mobile_money'; amountUsd: number; at: string } }
 export interface RunStart { label: string; lat: number; lon: number }
 export type RunKind = 'pickup' | 'delivery'
 export type RunStatus = 'planned' | 'in_progress' | 'done' | 'cancelled'
-export interface Run { id: string; name: string; kind: RunKind; date: string; driverId?: string; vehicleId?: string; start: RunStart | null; status: RunStatus; distanceKm?: number; notes: string; createdAt: string; stops: RunStop[]; driverName?: string; vehicleName?: string }
+export interface Run { id: string; name: string; kind: RunKind; date: string; driverId?: string; vehicleId?: string; start: RunStart | null; status: RunStatus; distanceKm?: number; notes: string; createdAt: string; stops: RunStop[]; driverName?: string; vehicleName?: string; summarySentAt?: string }
 export interface StopInput { shipmentId?: string; label: string; address?: string; lat?: number; lon?: number; contact?: string; phone?: string }
 export interface RunInput { name: string; kind: RunKind; date: string; driverId?: string | null; vehicleId?: string | null; start?: RunStart | null; notes?: string; stops: StopInput[] }
 export interface Candidate { shipmentId: string; ref: string; mode: Mode; status: ShipmentStatus; description: string; eta: string | null; label: string; address: string; contact: string; phone: string; readyAt?: string | null; city?: string }
@@ -45,7 +45,7 @@ export const ROLE_BASE: Record<StaffRole, Area[] | 'all'> = {
   agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing', 'analytics'],
   finance: ['clients', 'payments', 'collections', 'reviews', 'shipments', 'team', 'analytics'],
   warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team', 'analytics'],
-  driver: ['routes', 'team'],
+  driver: ['routes'],
 }
 const ALWAYS = ['/dashboard/costs', '/dashboard/campaigns', '/dashboard/integrations', '/dashboard/activity', '/dashboard/billing', '/dashboard/shipper', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/documents', '/dashboard/invoices', '/dashboard/runs', '/dashboard/suppliers']
 /** Effective areas for a person: role defaults + allow − deny. */
@@ -83,6 +83,9 @@ export const opsApi = {
   updateRun: (id: string, p: Partial<Omit<RunInput, 'stops' | 'kind'>> & { status?: RunStatus }) => api<{ run: Run }>(`/runs/${id}`, { method: 'PATCH', json: p }).then((r) => r.run),
   optimise: (id: string) => api<{ run: Run }>(`/runs/${id}/optimise`, { method: 'POST' }).then((r) => r.run),
   addStop: (id: string, s: StopInput) => api<{ run: Run }>(`/runs/${id}/stops`, { json: s }).then((r) => r.run),
+  onWay: (id: string, sid: string, minutes: number) => api<{ ok: true; texted: boolean; told: boolean; text: string }>(`/runs/${id}/stops/${sid}/on-way`, { json: { minutes } }),
+  summary: (id: string, note = '') => api<{ ok: true; body: string }>(`/runs/${id}/summary`, { json: { note } }),
+  dispatch: () => api<{ people: { name: string; phone: string; role: string }[]; office: { name: string; phone: string; whatsapp: string } }>('/runs/dispatch'),
   late: (id: string, minutes: number, note = '') => api<{ ok: true; told: number; pending: number }>(`/runs/${id}/late`, { json: { minutes, note } }),
   updateStop: (id: string, sid: string, p: Partial<StopInput> & { status?: RunStop['status']; note?: string; seq?: number }) => api<{ run: Run }>(`/runs/${id}/stops/${sid}`, { method: 'PATCH', json: p }).then((r) => r.run),
   deleteStop: (id: string, sid: string) => api<{ run: Run }>(`/runs/${id}/stops/${sid}`, { method: 'DELETE' }).then((r) => r.run),

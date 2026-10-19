@@ -11,7 +11,7 @@ import Quote from './pages/Quote'
 import Directory from './pages/Directory'
 import Track from './pages/Track'
 import { AboutPage, ContactPage, LegalPage, NotFound } from './pages/Company'
-import { ForgotPassword, Login, ResetPassword, Signup } from './pages/Auth'
+import { ForgotPassword, Login, ResetPassword, SignInLink, Signup } from './pages/Auth'
 import { applyPageMeta } from './lib/site'
 
 /* Everything below loads on demand: the marketing core above is the only code a first-time visitor downloads.
@@ -171,6 +171,7 @@ export default function App() {
               <Route path="/signup" element={<Signup />} />
               <Route path="/forgot" element={<ForgotPassword />} />
               <Route path="/reset" element={<ResetPassword />} />
+              <Route path="/signin" element={<SignInLink />} />
               <Route path="/join" element={<Join />} />
               <Route path="/doc/:token" element={<DocumentView shared />} />
               <Route path="/pay/:token" element={<Pay />} />

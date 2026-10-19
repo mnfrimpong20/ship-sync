@@ -70,7 +70,7 @@ import { mountBrand } from './brand'
 /* ---------------- types (API shapes match the old client store) ---------------- */
 export interface ApiUser { id: string; name: string; email: string; role: 'customer' | 'shipper'; company?: string; shipperId?: string; admin: boolean; staffRole?: 'owner' | 'dispatcher' | 'agent' | 'finance' | 'warehouse' | 'driver'; perms?: StaffPerms; staffId?: string; display?: DisplayPrefs; readOnly?: boolean; viewAsBy?: string; actingBy?: { id: string; name: string; email: string } }
 export interface StaffPerms { allow?: Area[]; deny?: Area[] }
-export interface DisplayPrefs { lang?: 'en' | 'fr'; textSize?: 'normal' | 'large' | 'larger'; theme?: 'light' | 'dark' | 'system' }
+export interface DisplayPrefs { lang?: 'en' | 'fr'; textSize?: 'normal' | 'large' | 'larger'; theme?: 'light' | 'dark' | 'system'; road?: boolean }
 /** Areas a company can grant or withhold per person on top of their role. Mirrors ROLE_AREAS in src/lib/ops.ts. */
 export const AREAS = ['leads', 'rates', 'lanes', 'groupage', 'brand', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'payments', 'collections', 'reviews', 'fleet', 'team', 'verification', 'sourcing', 'analytics'] as const
 export type Area = (typeof AREAS)[number]
@@ -208,10 +208,10 @@ async function currentUser(db: Db, req: Request): Promise<ApiUser | null> {
   return u
 }
 
-async function createSession(db: Db, res: Response, userId: string, req?: Request) {
+async function createSession(db: Db, res: Response, userId: string, req?: Request, days = SESSION_DAYS) {
   const id = randomBytes(32).toString('hex')
-  await db.query('insert into sessions (id,user_id,expires_at,user_agent,last_seen_at) values ($1,$2,$3,$4,now())', [id, userId, new Date(Date.now() + SESSION_DAYS * 86400000), String(req?.headers['user-agent'] ?? '').slice(0, 300)])
-  res.cookie(SESSION_COOKIE, id, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: SESSION_DAYS * 86400000, path: '/' })
+  await db.query('insert into sessions (id,user_id,expires_at,user_agent,last_seen_at) values ($1,$2,$3,$4,now())', [id, userId, new Date(Date.now() + days * 86400000), String(req?.headers['user-agent'] ?? '').slice(0, 300)])
+  res.cookie(SESSION_COOKIE, id, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: days * 86400000, path: '/' })
 }
 
 /** In-memory sliding-window brake for auth endpoints (per process; good enough for one Replit instance). */
@@ -488,6 +488,62 @@ export function apiRouter() {
     await createSession(db, res, rows[0].id, req)
     res.json({ user: await loadUserWithCompany(db, rows[0].id) })
   }))
+  /** Sign-in link (no password): by email, or by text to a team member's phone. Always answers OK. Links work once, for 15 minutes. */
+  r.post('/auth/link', wrap(async (req, res) => {
+    const db = await getDb(); const { who } = z.object({ who: z.string().trim().min(5).max(120) }).parse(req.body)
+    throttle(`link:ip:${clientIp(req)}`, 10, 60 * 60_000, HttpError); throttle(`link:who:${who.toLowerCase()}`, 3, 30 * 60_000, HttpError)
+    const isEmail = who.includes('@'); const digits = who.replace(/\D/g, '')
+    let target: { id: string; name: string; email: string; phone: string } | null = null
+    if (isEmail) { const { rows } = await db.query<Row>('select id, name, email from users where email = $1', [who.toLowerCase()]); if (rows[0]) target = { id: rows[0].id, name: rows[0].name, email: rows[0].email, phone: '' } }
+    else if (digits.length >= 7) {
+      const { rows } = await db.query<Row>(`select u.id, u.name, u.email, st.phone from staff st join users u on u.id = st.user_id where st.status = 'active' and regexp_replace(st.phone, '[^0-9]', '', 'g') like '%' || $1`, [digits.slice(-9)])
+      if (rows.length === 1) target = { id: rows[0].id, name: rows[0].name, email: rows[0].email, phone: rows[0].phone }
+    }
+    if (target) {
+      const token = randomBytes(24).toString('base64url')
+      await db.query(`insert into login_links (token,user_id,expires_at) values ($1,$2,now() + interval '15 minutes')`, [token, target.id])
+      const link = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/signin?token=${token}`
+      if (!isEmail) {
+        const sms = await import('./sms')
+        const to = sms.normalisePhone(target.phone, 'US') ?? sms.normalisePhone(target.phone, 'GH')
+        if (to && sms.smsProvider().id !== 'off') { try { await sms.sendText(to, `Ntemtem: tap to sign in (works once, for 15 minutes): ${link}`) } catch (e) { console.error('[auth] link text', e) } } else console.log('[auth] sign-in link (texts off):', link)
+      } else if (emailProvider().id !== 'off') { try { await sendEmail(target.email, 'Your Ntemtem sign-in link', emailTemplate({ name: target.name, title: 'Sign in to Ntemtem', body: 'Tap the button to sign in. The link works once, for 15 minutes. If you didn’t ask for it, ignore this email.', link, cta: 'Sign in' })) } catch (e) { console.error('[auth] link email', e) } }
+      else console.log('[auth] sign-in link (email off):', link)
+    }
+    res.json({ ok: true })
+  }))
+  r.post('/auth/link/use', wrap(async (req, res) => {
+    const db = await getDb(); const { token } = z.object({ token: z.string().min(10).max(80) }).parse(req.body)
+    throttle(`linkuse:ip:${clientIp(req)}`, 30, 60 * 60_000, HttpError)
+    const { rows } = await db.query<Row>(`update login_links set used_at = now() where token = $1 and used_at is null and expires_at > now() returning user_id`, [token])
+    if (!rows[0]) throw new HttpError(400, 'This sign-in link has expired or was already used. Ask for a new one.')
+    await createSession(db, res, rows[0].user_id, req)
+    res.json({ user: await loadUserWithCompany(db, rows[0].user_id) })
+  }))
+  /** A PIN for this phone: the phone keeps a secret, the person remembers 4–6 digits. Five wrong tries removes it. */
+  r.post('/auth/pin', wrap(async (req, res) => {
+    const db = await getDb(); const u = await requireUser(db, req)
+    const { pin, label } = z.object({ pin: z.string().regex(/^\d{4,6}$/, 'Use 4 to 6 digits.'), label: z.string().trim().max(80).default('') }).parse(req.body)
+    if (/^(\d)\1+$/.test(pin) || '0123456789'.includes(pin) || '9876543210'.includes(pin)) throw new HttpError(400, 'Pick a PIN that isn’t a run like 1234 or 1111.')
+    const id = 'pin_' + uid(); const secret = randomBytes(24).toString('base64url')
+    await db.query('insert into device_pins (id,user_id,secret_hash,pin_hash,label) values ($1,$2,$3,$4,$5)', [id, u.id, await bcrypt.hash(secret, 8), await bcrypt.hash(pin, 10), label || String(req.headers['user-agent'] ?? '').slice(0, 80)])
+    res.status(201).json({ device: { id, secret, name: u.name.split(' ')[0], email: u.email } })
+  }))
+  r.post('/auth/pin/login', wrap(async (req, res) => {
+    const db = await getDb(); const b = z.object({ id: z.string().min(5).max(40), secret: z.string().min(10).max(80), pin: z.string().regex(/^\d{4,6}$/) }).parse(req.body)
+    throttle(`pin:ip:${clientIp(req)}`, 20, 15 * 60_000, HttpError)
+    const { rows } = await db.query<Row>('select * from device_pins where id = $1', [b.id]); const d = rows[0]
+    if (!d || !(await bcrypt.compare(b.secret, d.secret_hash))) throw new HttpError(401, 'This phone’s PIN was removed. Sign in with your email and password.')
+    if (!(await bcrypt.compare(b.pin, d.pin_hash))) {
+      const fails = Number(d.fails) + 1
+      if (fails >= 5) { await db.query('delete from device_pins where id = $1', [d.id]); throw new HttpError(401, 'Too many wrong PINs — the PIN was removed. Sign in with your email and password.') }
+      await db.query('update device_pins set fails = $2 where id = $1', [d.id, fails]); throw new HttpError(401, `Wrong PIN. ${5 - fails} ${5 - fails === 1 ? 'try' : 'tries'} left.`)
+    }
+    await db.query('update device_pins set fails = 0, last_used_at = now() where id = $1', [d.id])
+    await createSession(db, res, d.user_id, req, 90)
+    res.json({ user: await loadUserWithCompany(db, d.user_id) })
+  }))
+  r.delete('/auth/pin/:id', wrap(async (req, res) => { const db = await getDb(); const u = await requireUser(db, req); await db.query('delete from device_pins where id = $1 and user_id = $2', [req.params.id, u.id]); res.json({ ok: true }) }))
   /** Forgot password: always answers OK (no account enumeration); emails a 1-hour link when the account exists. */
   r.post('/auth/forgot', wrap(async (req, res) => {
     const db = await getDb(); const { email } = z.object({ email: z.string().trim().email() }).parse(req.body); const e = email.toLowerCase()
@@ -523,7 +579,7 @@ export function apiRouter() {
   /** Text size, theme and language follow the person to every device. */
   r.put('/me/display', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireUser(db, req)
-    const b = z.object({ lang: z.enum(['en', 'fr']).optional(), textSize: z.enum(['normal', 'large', 'larger']).optional(), theme: z.enum(['light', 'dark', 'system']).optional() }).parse(req.body)
+    const b = z.object({ lang: z.enum(['en', 'fr']).optional(), textSize: z.enum(['normal', 'large', 'larger']).optional(), theme: z.enum(['light', 'dark', 'system']).optional(), road: z.boolean().optional() }).parse(req.body)
     const { rows } = await db.query<Row>('select display from users where id = $1', [u.id])
     const next = { ...((J(rows[0]?.display) ?? {}) as DisplayPrefs), ...b }
     await db.query('update users set display = $2 where id = $1', [u.id, JSON.stringify(next)]); res.json({ display: next })

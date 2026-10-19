@@ -190,6 +190,13 @@ export async function piecesForTracking(db: Db, shipmentId: string) {
 /** Proof of delivery for the public tracking page: the last delivery scan with who received it and the photo, if one was taken. */
 export async function proofOfDelivery(db: Db, shipmentId: string) {
   const { rows } = await db.query<Row>(`select at, place, by_name, received_by, photo, signature from scans where shipment_id = $1 and kind = 'delivery' order by (photo is not null) desc, (signature is not null) desc, at desc limit 1`, [shipmentId])
-  const r = rows[0]; if (!r) return null
+  const r = rows[0]
+  if (!r || (!r.photo && !r.signature)) {
+    // Proof captured at the run stop (Done on the driver's screen) counts too.
+    const { rows: st } = await db.query<Row>(`select st.pod, st.done_at, st.label from run_stops st join runs ru on ru.id = st.run_id where st.shipment_id = $1 and st.status = 'done' and st.pod is not null and ru.kind = 'delivery' order by st.done_at desc limit 1`, [shipmentId])
+    const p = st[0] ? (typeof st[0].pod === 'string' ? JSON.parse(st[0].pod) : st[0].pod) : null
+    if (p) return { at: ISO(st[0].done_at), place: st[0].label || '', by: p.by || '', receivedBy: p.receivedBy || '', photo: p.photo || null, signature: p.signature || null }
+  }
+  if (!r) return null
   return { at: ISO(r.at), place: r.place, by: r.by_name, receivedBy: r.received_by || '', photo: r.photo || null, signature: r.signature || null }
 }

@@ -1420,6 +1420,29 @@ create table if not exists price_adjustments (
 alter table quotes add column if not exists original_price numeric;
 alter table run_stops add column if not exists eta_from text not null default '';
 alter table run_stops add column if not exists eta_to text not null default '';
+alter table run_stops add column if not exists pod jsonb;
+alter table run_stops add column if not exists skip_reason text not null default '';
+alter table run_stops add column if not exists tries int not null default 0;
+alter table run_stops add column if not exists on_way_at timestamptz;
+alter table run_stops add column if not exists collected jsonb;
+alter table runs add column if not exists summary_sent_at timestamptz;
+create table if not exists login_links (
+  token text primary key,
+  user_id text not null references users(id) on delete cascade,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create table if not exists device_pins (
+  id text primary key,
+  user_id text not null references users(id) on delete cascade,
+  secret_hash text not null,
+  pin_hash text not null,
+  label text not null default '',
+  fails int not null default 0,
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz
+);
 create table if not exists qb_connections (
   shipper_id text primary key references shippers(id) on delete cascade, realm_id text, company_name text not null default '', home_currency text not null default 'USD',
   access_token text not null default '', refresh_token text not null default '', access_expires_at timestamptz, refresh_expires_at timestamptz,

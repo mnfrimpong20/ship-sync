@@ -9,13 +9,14 @@ import { Avatar, Logo, Mark } from './ui'
 import { PlatformBanners } from './PlatformBanners'
 import { NotificationBell } from './NotificationBell'
 import { QuickSearch } from './QuickSearch'
+import { telLink, useDispatch, useMyRuns, useQueued } from '../lib/driver'
 import { DisplaySettings } from './DisplaySettings'
 import { useStore } from '../lib/store'
 import { clientsApi } from '../lib/clients'
 import { SOURCING_SHIPPER } from '../lib/sourcing'
 import { roleAllows, roleHome } from '../lib/ops'
 import { scanQueue, startQueueSync, SCAN_QUEUE_EVENT } from '../lib/scan'
-import { MoreHorizontal, PanelLeftClose, PanelLeftOpen, Type, WifiOff, CloudUpload, CalendarDays, MessageSquare, FolderArchive, Repeat, AlertTriangle, CircleUser, Contact, Home } from 'lucide-react'
+import { Navigation, Phone, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Type, WifiOff, CloudUpload, CalendarDays, MessageSquare, FolderArchive, Repeat, AlertTriangle, CircleUser, Contact, Home } from 'lucide-react'
 import { hubApi } from '../lib/customerHub'
 import { refreshSummary, useSummary } from '../lib/account'
 
@@ -74,7 +75,6 @@ export default function AppShell() {
   const items: Item[] = isDriver
     ? [
         { to: '/dashboard/runs', label: 'My runs', icon: MapPinned, end: true },
-        { to: '/dashboard/team', label: 'Team', icon: UsersRound },
       ]
     : isShipper
     ? [
@@ -278,7 +278,7 @@ export default function AppShell() {
         )}</AnimatePresence>
         <PlatformBanners />
         {user?.actingBy && <div data-testid="acting-banner" role="status" className="flex flex-wrap items-center justify-center gap-3 border-b border-gold/40 bg-gold/10 px-4 py-2 text-sm"><span>You’re using <b>{user.name}</b>’s account as {user.actingBy.name}.</span><button data-testid="acting-exit" onClick={() => { hubApi.switchTo(null).finally(() => { window.location.hash = '#/dashboard'; window.location.reload() }) }} className="rounded-md border border-gold/50 px-2.5 py-1 text-xs font-semibold text-gold-deep hover:bg-gold/10 focus-ring">Switch back to my account</button></div>}
-        <main id="main" tabIndex={-1} className={`ss-app flex-1 outline-none ${isShipper ? '' : 'pb-20 lg:pb-0'}`}>
+        <main id="main" tabIndex={-1} className={`ss-app flex-1 outline-none ${isShipper && !isDriver ? '' : 'pb-20 lg:pb-0'}`}>
           <AnimatePresence mode="wait">
             <motion.div key={loc.pathname} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
               <Suspense fallback={<BrandLoader partner={isShipper} />}>{outlet}</Suspense>
@@ -286,6 +286,7 @@ export default function AppShell() {
           </AnimatePresence>
         </main>
         {!isShipper && <BottomBar unread={summary?.unread ?? 0} owe={summary?.owe ?? 0} onMenu={() => setOpen(true)} />}
+        {isDriver && <DriverBar />}
       </div>
     </div>
   )
@@ -310,6 +311,30 @@ function BottomBar({ unread, owe, onMenu }: { unread: number; owe: number; onMen
         </Link>
       ))}
       <button type="button" onClick={onMenu} className="flex min-h-[3.75rem] flex-col items-center justify-center gap-0.5 text-xs text-text-muted focus-ring" data-testid="bb-menu" aria-label={t('Open menu')}><Menu size={20} aria-hidden="true" />{t('More')}</button>
+    </nav>
+  )
+}
+
+/** Thumb-reach bar for drivers: my runs, the next stop, scan, call dispatch. */
+function DriverBar() {
+  const loc = useLocation(); const t = useT()
+  const { runs } = useMyRuns(); const { phone } = useDispatch(); const queued = useQueued()
+  const cur = (runs ?? []).find((r) => r.status === 'in_progress') ?? (runs ?? []).find((r) => r.status === 'planned')
+  const items: { to: string; label: string; icon: typeof Home; on: boolean; badge?: number }[] = [
+    { to: '/dashboard/runs', label: t('My runs'), icon: MapPinned, on: loc.pathname === '/dashboard/runs' },
+    { to: cur ? `/dashboard/routes/${cur.id}` : '/dashboard/runs', label: t('Next stop'), icon: Navigation, on: loc.pathname.startsWith('/dashboard/routes/') },
+    { to: `/dashboard/scan?kind=delivery${cur ? `&run=${cur.id}` : ''}`, label: t('Scan'), icon: ScanLine, on: loc.pathname === '/dashboard/scan', badge: queued || undefined },
+  ]
+  return (
+    <nav className="no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden" aria-label={t('Driver menu')} data-testid="driver-bar">
+      {items.map((it) => (
+        <Link key={it.label} to={it.to} aria-current={it.on ? 'page' : undefined} className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 text-sm focus-ring ${it.on ? 'font-semibold text-gold-deep' : 'text-text-muted'}`}>
+          <it.icon size={22} aria-hidden="true" />{it.label}
+          {it.badge ? <span className="absolute left-[calc(50%+6px)] top-1.5 min-w-5 rounded-full bg-gold px-1 text-center text-xs font-bold leading-5 text-on-accent" aria-label={t('{n} updates waiting', { n: it.badge })}>{it.badge}</span> : null}
+        </Link>
+      ))}
+      {phone ? <a href={telLink(phone)} className="flex min-h-16 flex-col items-center justify-center gap-0.5 text-sm text-text-muted focus-ring" data-testid="db-call"><Phone size={22} aria-hidden="true" />{t('Dispatch')}</a>
+        : <Link to="/dashboard/runs" className="flex min-h-16 flex-col items-center justify-center gap-0.5 text-sm text-text-muted focus-ring"><Phone size={22} aria-hidden="true" />{t('Dispatch')}</Link>}
     </nav>
   )
 }

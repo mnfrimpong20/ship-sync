@@ -1,8 +1,10 @@
 import { roleHome } from '../lib/ops'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Building2, Check, Loader2, MailCheck, User } from 'lucide-react'
+import { Building2, Check, KeyRound, Loader2, MailCheck, MessageSquare, User } from 'lucide-react'
+import { devicePin, saveDevicePin } from '../lib/driver'
+import type { User as ApiUserLite } from '../lib/store'
 import { api, useStore, type Role } from '../lib/store'
 import { fadeUp, stagger } from '../lib/motion'
 import { useSiteConfig } from '../lib/site'
@@ -42,10 +44,62 @@ const DemoNote = ({ role }: { role: Role }) => {
   )
 }
 
+const homeFor = (u: ApiUserLite) => (u.role === 'shipper' ? (u.staffRole ? roleHome[u.staffRole] : '/dashboard/shipper') : '/dashboard')
+
+/** This phone has a PIN: sign in with it (no password). */
+function PinLogin({ onPassword }: { onPassword: () => void }) {
+  const [sp] = useSearchParams(); const nav = useNavigate(); const { refresh } = useStore()
+  const d = devicePin()!
+  const [pin, setPin] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false)
+  const go = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true); setErr('')
+    try { const r = await api<{ user: ApiUserLite }>('/auth/pin/login', { json: { id: d.id, secret: d.secret, pin } }); await refresh(); nav(sp.get('next') || homeFor(r.user)) }
+    catch (er) { const m = er instanceof Error ? er.message : 'Sign in failed.'; setErr(m); setPin(''); if (/removed/i.test(m)) saveDevicePin(null) } finally { setBusy(false) }
+  }
+  return (
+    <form onSubmit={go} className="grid gap-4" data-testid="pin-login">
+      <p className="flex items-center gap-2 text-lg"><KeyRound size={20} className="text-gold-deep" aria-hidden="true" /> Hi {d.name} — enter your PIN</p>
+      <label htmlFor="pin" className="sr-only">PIN</label>
+      <input id="pin" type="password" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={6} className="input-dark !min-h-16 text-center text-3xl tracking-[0.5em]" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} data-testid="pin-input" />
+      {err && <p role="alert" className="text-sm text-danger">{err}</p>}
+      <button className="btn-gold !min-h-14 w-full text-base" disabled={busy || pin.length < 4}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Signing in</> : 'Sign in'}</button>
+      <button type="button" onClick={onPassword} className="min-h-11 text-sm text-text-muted underline">Use email and password instead</button>
+      <button type="button" onClick={() => { saveDevicePin(null); onPassword() }} className="min-h-11 text-sm text-text-muted underline">Not {d.name}? Remove the PIN from this phone</button>
+    </form>
+  )
+}
+
+/** Sign-in link by text or email — for team members who don't want to type a password. */
+function LinkLogin({ onBack }: { onBack: () => void }) {
+  const [who, setWho] = useState(''); const [sent, setSent] = useState(false); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false)
+  const go = async (e: React.FormEvent) => { e.preventDefault(); setBusy(true); setErr(''); try { await api('/auth/link', { json: { who } }); setSent(true) } catch (er) { setErr(er instanceof Error ? er.message : 'Could not send.') } finally { setBusy(false) } }
+  if (sent) return <div className="grid gap-3 text-center" data-testid="link-sent"><MailCheck size={36} className="mx-auto text-teal" aria-hidden="true" /><p className="text-lg font-semibold">Check your {who.includes('@') ? 'email' : 'texts'}</p><p className="text-sm text-text-muted">If {who} belongs to an account, a sign-in link is on its way. It works once, for 15 minutes.</p><button onClick={onBack} className="btn-ghost !min-h-12">Back to sign in</button></div>
+  return (
+    <form onSubmit={go} className="grid gap-4" data-testid="link-login">
+      <p className="text-base">We’ll send you a link — tap it and you’re in.</p>
+      <div><label htmlFor="who" className="label-dark">Your phone number or email</label><input id="who" className="input-dark !min-h-12" autoComplete="tel email" value={who} onChange={(e) => setWho(e.target.value)} placeholder="+1 713 555 0142 or you@company.com" /></div>
+      <p className="text-xs text-text-muted">Texts work for team members whose phone number is saved by their company.</p>
+      {err && <p role="alert" className="text-sm text-danger">{err}</p>}
+      <button className="btn-gold !min-h-12 w-full" disabled={busy || who.trim().length < 5}>{busy ? 'Sending…' : 'Send me a link'}</button>
+      <button type="button" onClick={onBack} className="min-h-11 text-sm text-text-muted underline">Use my password instead</button>
+    </form>
+  )
+}
+
+/** Where the sign-in link lands. */
+export function SignInLink() {
+  const [sp] = useSearchParams(); const nav = useNavigate(); const { refresh } = useStore()
+  const [err, setErr] = useState('')
+  const token = sp.get('token') ?? ''
+  useEffect(() => { if (!token) { setErr('This link is missing its code.'); return } api<{ user: ApiUserLite }>('/auth/link/use', { json: { token } }).then(async (r) => { await refresh(); nav(homeFor(r.user), { replace: true }) }).catch((e) => setErr(e instanceof Error ? e.message : 'Sign in failed.')) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  return <Shell title="Signing you in" sub="One moment…" aside={<Aside />}>{err ? <div className="grid gap-3"><p role="alert" className="text-danger">{err}</p><Link to="/login" className="btn-gold !min-h-12">Go to sign in</Link></div> : <p className="flex items-center gap-2"><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Checking your link…</p>}</Shell>
+}
+
 export function Login() {
   const [sp] = useSearchParams()
   const nav = useNavigate()
   const { login } = useStore()
+  const [mode, setMode] = useState<'password' | 'pin' | 'link'>(() => (devicePin() ? 'pin' : 'password'))
   const [role, setRole] = useState<Role>((sp.get('role') as Role) || 'customer')
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
@@ -63,6 +117,7 @@ export function Login() {
   }
   return (
     <Shell title="Welcome back" sub="Sign in to see your quotes, bookings and tracking." aside={<Aside />}>
+      {mode === 'pin' ? <PinLogin onPassword={() => setMode('password')} /> : mode === 'link' ? <LinkLogin onBack={() => setMode('password')} /> :
       <form onSubmit={submit} className="grid gap-4" noValidate>
         <RoleToggle role={role} setRole={setRole} />
         <div><label htmlFor="email" className="label-dark">Email</label><input id="email" type="email" className="input-dark" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder={role === 'shipper' ? 'ops@yourcompany.com' : 'you@example.com'} /></div>
@@ -70,8 +125,10 @@ export function Login() {
         {err && <p role="alert" className="text-sm text-danger">{err}</p>}
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Signing in</> : 'Sign in'}</motion.button>
         <p className="text-center text-sm text-text-muted">New here? <Link to={`/signup?role=${role}${sp.get('next') ? `&next=${encodeURIComponent(sp.get('next')!)}` : ''}`} className="text-gold-deep hover:underline">Create an account</Link></p>
+        {role === 'shipper' && <button type="button" onClick={() => setMode('link')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border text-sm font-semibold hover:border-gold focus-ring" data-testid="use-link"><MessageSquare size={16} aria-hidden="true" /> Text me a sign-in link instead</button>}
+        {role === 'shipper' && devicePin() && <button type="button" onClick={() => setMode('pin')} className="min-h-11 text-sm text-text-muted underline">Use my PIN</button>}
         <DemoNote role={role} />
-      </form>
+      </form>}
     </Shell>
   )
 }

@@ -74,6 +74,8 @@ export function mountMeasure(r: Router, d: Deps) {
       const t = v.totals
       await db.query('update shipments set measured = $2 where id = $1', [s.id, JSON.stringify({ ...t, at: new Date().toISOString(), by: u.name })])
       await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [s.id, s.status, s.origin, `Weighed and measured: ${t.pieces} piece${t.pieces === 1 ? '' : 's'}, ${t.actualKg} kg actual, ${s.mode === 'air' ? `${t.chargeableKg} kg chargeable` : `${t.cbm} m³`}.`])
+      void import('./autopilot').then((m) => m.onMeasured(db, s, v)).catch((e) => console.error('[autopilot] reprice', e))
+      void import('./rules').then((m) => m.fireRules(db, s.shipper_id, 'shipment.measured', { shipment: s, measure: { diffPct: v.diffPct, chargeableKg: v.totals.chargeableKg } })).catch(() => {})
       if (s.user_id && v.diffPct != null && v.diffPct >= 10) await notify(db, { userId: s.user_id, kind: 'shipment_status', title: `${s.ref} weighed in ${v.diffPct}% above your estimate`, body: `${s.mode === 'air' ? `Chargeable weight ${t.chargeableKg} kg` : `${t.cbm} m³`} against ${v.declared.chargeableKg} kg declared. Your shipper may update the price — check the shipment.`, link: `/dashboard?tab=shipments&open=${s.id}`, dedupe: `measure:${s.id}` })
     }
     res.json({ ...v, canEdit: true })

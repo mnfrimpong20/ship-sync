@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Banknote, Check, Plus, Smartphone, Wallet, X } from 'lucide-react'
 import { recipientApi, type ChargesView } from '../lib/recipient'
+import { api } from '../lib/store'
 import { fmtDateTime } from './ui'
 
 const REASONS = ['Duty and clearing', 'Delivery to the door', 'Storage', 'Balance on freight']
@@ -37,8 +38,9 @@ export function ReceiverChargesCard({ shipmentId }: { shipmentId: string }) {
           {d.charges.map((c) => (
             <li key={c.id} className="flex flex-wrap items-start justify-between gap-2">
               <span className="min-w-0"><strong className="tabular-nums">{c.label}</strong> <span className="text-text-muted">· {c.reason}</span>
-                <span className="block text-[11px] text-text-muted">{c.status === 'paid' ? `Paid${how(c.method) ? ` by ${how(c.method)}` : ''}${c.paidAt ? ` · ${fmtDateTime(c.paidAt)}` : ''}${c.recordedBy ? ` · ${c.recordedBy}` : ''}${c.method === 'paystack' && c.settledTo === 'ntemtem' ? ' · Ntemtem pays this out to you' : ''}` : 'Waiting for the receiver'}</span></span>
-              {c.status === 'paid' ? <span className="inline-flex items-center gap-1 rounded-full bg-teal/15 px-2 py-0.5 text-[11px] font-semibold text-teal"><Check size={11} aria-hidden="true" /> Paid</span>
+                <span className="block text-[11px] text-text-muted">{c.status === 'paid' ? `Paid${how(c.method) ? ` by ${how(c.method)}` : ''}${c.paidAt ? ` · ${fmtDateTime(c.paidAt)}` : ''}${c.recordedBy ? ` · ${c.recordedBy}` : ''}${c.method === 'paystack' && c.settledTo === 'ntemtem' ? ' · Ntemtem pays this out to you' : ''}` : c.status === 'draft' ? `Draft by ${c.createdBy || 'Autopilot'} — check it, then send` : 'Waiting for the receiver'}</span></span>
+              {c.status === 'draft' && d.canEdit ? <span className="flex gap-1"><button onClick={async () => { setBusy(c.id + 'send'); setErr(''); try { await api(`/shipments/${shipmentId}/receiver-charges/${c.id}/send`, { json: {} }); await load() } catch (er) { setErr(er instanceof Error ? er.message : 'Could not send.') } finally { setBusy('') } }} disabled={!!busy} className="btn-gold !min-h-8 !px-2.5 text-[11px]" data-testid="charge-send">Send</button><button onClick={() => settle(c.id, 'cancel')} disabled={!!busy} className="grid h-8 w-8 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-danger" aria-label="Discard draft"><X size={13} /></button></span>
+                : c.status === 'paid' ? <span className="inline-flex items-center gap-1 rounded-full bg-teal/15 px-2 py-0.5 text-[11px] font-semibold text-teal"><Check size={11} aria-hidden="true" /> Paid</span>
                 : d.canEdit && <span className="flex gap-1">
                   <button onClick={() => settle(c.id, 'cash')} disabled={!!busy} className="btn-ghost !min-h-8 !px-2 text-[11px]" title="Received in cash"><Banknote size={12} aria-hidden="true" /> Cash</button>
                   <button onClick={() => settle(c.id, 'momo_direct')} disabled={!!busy} className="btn-ghost !min-h-8 !px-2 text-[11px]" title="Received by MoMo to your own number"><Smartphone size={12} aria-hidden="true" /> MoMo</button>

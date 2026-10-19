@@ -47,8 +47,8 @@ async function paystack<T = Row>(path: string, body?: unknown): Promise<T> {
 }
 
 export const chargeOut = (c: Row, lang: 'en' | 'fr' = 'en') => ({
-  id: c.id, amount: Number(c.amount), currency: c.currency, label: fmtMoney(Number(c.amount), c.currency, lang), reason: c.reason, status: c.status as 'due' | 'paid' | 'cancelled',
-  method: c.method as '' | 'paystack' | 'cash' | 'momo_direct', paidAt: ISO(c.paid_at), paidPhone: c.paid_phone ?? '', recordedBy: c.recorded_by ?? '', settledTo: (c.settled_to ?? '') as '' | 'shipper' | 'ntemtem', payoutDone: !!c.payout_done, createdAt: ISO(c.created_at),
+  id: c.id, amount: Number(c.amount), currency: c.currency, label: fmtMoney(Number(c.amount), c.currency, lang), reason: c.reason, status: c.status as 'draft' | 'due' | 'paid' | 'cancelled',
+  method: c.method as '' | 'paystack' | 'cash' | 'momo_direct', paidAt: ISO(c.paid_at), paidPhone: c.paid_phone ?? '', recordedBy: c.recorded_by ?? '', createdBy: c.created_by ?? '', settledTo: (c.settled_to ?? '') as '' | 'shipper' | 'ntemtem', payoutDone: !!c.payout_done, createdAt: ISO(c.created_at),
 })
 
 /** Mark a charge paid once (webhook, return-verify, or by hand). */
@@ -112,7 +112,7 @@ export function mountMomo(r: Router, d: Deps) {
     const db = await getDb(); const { u, s, isOffice } = await office(db, req); if (!isOffice) throw new HttpError(403, 'Only the shipper can change charges.')
     const b = z.object({ action: z.enum(['cash', 'momo_direct', 'cancel']), phone: z.string().trim().max(30).default('') }).parse(req.body)
     const { rows } = await db.query<Row>(`select * from receiver_charges where id = $1 and shipment_id = $2`, [String(req.params.cid), s.id]); const c = rows[0]
-    if (!c) throw new HttpError(404, 'Charge not found.'); if (c.status !== 'due') throw new HttpError(409, 'This charge is already settled.')
+    if (!c) throw new HttpError(404, 'Charge not found.'); if (c.status !== 'due' && !(c.status === 'draft' && b.action === 'cancel')) throw new HttpError(409, c.status === 'draft' ? 'Send this charge to the receiver first.' : 'This charge is already settled.')
     if (b.action === 'cancel') await db.query(`update receiver_charges set status = 'cancelled', recorded_by = $2 where id = $1`, [c.id, u.name])
     else await markPaid(db, c, { method: b.action, phone: b.phone, by: u.name, settledTo: 'shipper' })
     res.json({ charges: (await list(db, s.id)).map((x) => chargeOut(x)) })
@@ -123,7 +123,7 @@ export function mountMomo(r: Router, d: Deps) {
   r.post('/r/:token/charges/:cid/pay', wrap(async (req, res) => {
     const db = await getDb(); const s = await byToken(db, String(req.params.token))
     const { rows } = await db.query<Row>(`select * from receiver_charges where id = $1 and shipment_id = $2`, [String(req.params.cid), s.id]); const c = rows[0]
-    if (!c) throw new HttpError(404, 'Charge not found.'); if (c.status !== 'due') throw new HttpError(409, 'This has already been paid.')
+    if (!c) throw new HttpError(404, 'Charge not found.'); if (c.status !== 'due') throw new HttpError(409, c.status === 'draft' ? 'Charge not found.' : 'This has already been paid.')
     if (!payableOnline(c.currency)) throw new HttpError(409, 'Online payment isn’t available for this one — please pay at collection.')
     const { rows: sh } = await db.query<Row>('select paystack_subaccount from shippers where id = $1', [s.shipper_id])
     const reference = `NTR-${s.ref}-${c.id.slice(-6)}-${Date.now().toString(36)}`.replace(/[^A-Za-z0-9-]/g, '')
@@ -168,6 +168,6 @@ export function mountMomo(r: Router, d: Deps) {
 
 /** For the receiver page: the charges in the receiver's language. */
 export async function receiverCharges(db: Db, s: Row, lang: 'en' | 'fr') {
-  const { rows } = await db.query<Row>(`select * from receiver_charges where shipment_id = $1 and status <> 'cancelled' order by created_at`, [s.id])
+  const { rows } = await db.query<Row>(`select * from receiver_charges where shipment_id = $1 and status not in ('cancelled','draft') order by created_at`, [s.id])
   return { charges: rows.map((c) => chargeOut(c, lang)), online: payableOnline(localCurrency(s.destination)), methods: LOCAL_CURRENCY[s.destination]?.label ?? '' }
 }

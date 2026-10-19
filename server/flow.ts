@@ -63,6 +63,8 @@ export async function onStatusEntered(db: Db, s: Row, status: ShipmentStatus) {
   if (status === 'delivered') void import('./customerHub').then((m) => m.onDelivered(db, s)).catch(() => {})
   void import('./integrations').then(async (m) => { await m.emitShipment(db, s.id, 'shipment.status'); if (status === 'delivered') await m.emitShipment(db, s.id, 'shipment.delivered') }).catch(() => {})
   if (status === 'ready_for_collection') await openCollection(db, s)
+  if (status === 'arrived') void import('./autopilotOps').then((m) => m.onArrived(db, s)).catch((e) => console.error('[autopilot] arrived', e))
+  void import('./rules').then((m) => m.fireRules(db, s.shipper_id, 'shipment.status', { shipment: { ...s, status } })).catch(() => {})
   if (status === 'delivered') {
     await db.query('update shipments set delivered_at = coalesce(delivered_at, now()) where id = $1', [s.id])
     await billStorage(db, s).catch((e) => console.error('[flow] storage bill', e))

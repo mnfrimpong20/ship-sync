@@ -93,6 +93,7 @@ export async function sweepCollections(db: Db) {
       const log2 = (J((await db.query<Row>('select reminders_sent from invoices where id = $1', [inv.id])).rows[0].reminders_sent) ?? []) as Row[]
       log2[log2.length - 1].step = step
       await db.query('update invoices set reminders_sent = $2 where id = $1', [inv.id, JSON.stringify(log2)])
+      if (kind === 'overdue') void import('./rules').then((m) => m.fireRules(db, inv.shipper_id, 'invoice.overdue', { invoice: { ...inv, days } })).catch(() => {})
       if (kind === 'overdue') await notifyShipperStaff(db, inv.shipper_id, { kind: 'invoice_overdue', title: `Reminder sent — ${inv.number} is ${days} day${days === 1 ? '' : 's'} overdue`, body: `${inv.client_name} · $${Number(inv.total).toLocaleString()}. Automatic reminder #${log.length + 1} went out.`, link: `/dashboard/clients/${inv.client_id}?tab=invoices`, dedupe: `inv:${inv.id}:${step}` }, ['owner', 'dispatcher'])
     } catch (e) { console.error('[collections] sweep', inv.id, e) }
   }

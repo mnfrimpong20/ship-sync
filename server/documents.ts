@@ -27,13 +27,14 @@ interface Deps {
   wrap: (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) => void
 }
 
-export const DOC_KINDS = ['packing_list', 'commercial_invoice', 'bill_of_lading', 'customs', 'proof_of_delivery', 'identity', 'insurance', 'receipt', 'photo', 'other'] as const
+export const DOC_KINDS = ['packing_list', 'commercial_invoice', 'bill_of_lading', 'customs', 'proof_of_delivery', 'identity', 'insurance', 'receipt', 'photo', 'export_instructions', 'other'] as const
 export type DocKind = (typeof DOC_KINDS)[number]
 export const docKindLabels: Record<DocKind, string> = {
   packing_list: 'Packing list', commercial_invoice: 'Commercial invoice', bill_of_lading: 'Bill of lading / AWB', customs: 'Customs form', proof_of_delivery: 'Proof of delivery',
-  identity: 'ID document', insurance: 'Insurance certificate', receipt: 'Payment receipt', photo: 'Photo', other: 'Other',
+  identity: 'ID document', insurance: 'Insurance certificate', receipt: 'Payment receipt', photo: 'Photo', export_instructions: 'Shipper’s letter of instruction', other: 'Other',
 }
-const GENERATED: DocKind[] = ['packing_list', 'commercial_invoice', 'proof_of_delivery']
+const GENERATED: DocKind[] = ['packing_list', 'commercial_invoice', 'bill_of_lading', 'export_instructions', 'proof_of_delivery']
+export type GenKind = 'packing_list' | 'commercial_invoice' | 'bill_of_lading' | 'export_instructions' | 'proof_of_delivery'
 const MAX_BYTES = 6 * 1024 * 1024
 const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v))
 
@@ -77,7 +78,17 @@ async function buildPayload(db: Db, s: Row, kind: DocKind, HttpError: Deps['Http
   const ctx = await shipmentContext(db, s)
   if (kind === 'proof_of_delivery' && !ctx.pod && s.status !== 'delivered') throw new HttpError(409, 'No delivery has been recorded for this shipment yet. Scan the pieces at handover first.')
   const number = (prefix: string) => `${prefix}-${s.ref.replace(/^(SS|NT)-/, '')}`
-  return { ...ctx, generatedAt: new Date().toISOString(), number: kind === 'packing_list' ? number('PL') : kind === 'commercial_invoice' ? number('CI') : number('POD') }
+  const J = (v: unknown) => (v == null ? null : typeof v === 'string' ? JSON.parse(v) : v)
+  let extra: Record<string, unknown> = {}
+  if (kind === 'bill_of_lading' || kind === 'export_instructions') {
+    const { measureView } = await import('./measure'); const m = await measureView(db, s)
+    const { rows: c } = s.container_id ? await db.query<Row>('select ref, number, seal, size, line, booking_ref, vessel_name, voyage, origin_port, destination_port, etd from containers where id = $1', [s.container_id]) : { rows: [] as Row[] }
+    const { rows: rq } = s.request_id ? await db.query<Row>('select declaration, declared_value_usd, description from requests where id = $1', [s.request_id]) : { rows: [] as Row[] }
+    const exp = J(s.export_compliance)
+    if (kind === 'export_instructions' && !exp?.applies) throw new HttpError(409, 'A letter of instruction is only for shipments leaving the United States.')
+    extra = { measured: { totals: m.totals, pieces: m.pieces.map((p) => ({ seq: p.seq, code: p.labelCode, weightKg: p.weightKg, dims: p.lengthCm && p.widthCm && p.heightCm ? `${p.lengthCm}×${p.widthCm}×${p.heightCm} cm` : '' })) }, booking: c[0] ? { containerRef: c[0].ref, number: c[0].number, seal: c[0].seal, size: c[0].size, line: c[0].line, bookingRef: c[0].booking_ref, vesselName: c[0].vessel_name, voyage: c[0].voyage, pol: c[0].origin_port, pod: c[0].destination_port, etd: ISO(c[0].etd)?.slice(0, 10) ?? null } : null, export: exp, declaration: J(rq[0]?.declaration), declaredValueUsd: rq[0]?.declared_value_usd == null ? (exp?.valueUsd ?? null) : Number(rq[0].declared_value_usd) }
+  }
+  return { ...ctx, ...extra, generatedAt: new Date().toISOString(), number: kind === 'packing_list' ? number('PL') : kind === 'commercial_invoice' ? number('CI') : kind === 'bill_of_lading' ? number('HBL') : kind === 'export_instructions' ? number('SLI') : number('POD') }
 }
 
 const zUpload = z.object({
@@ -89,11 +100,11 @@ const zUpload = z.object({
   visibility: z.enum(['shipper', 'shared']).default('shared'),
 })
 const zPatch = z.object({ title: z.string().trim().min(1).max(120).optional(), kind: z.enum(DOC_KINDS).optional(), visibility: z.enum(['shipper', 'shared']).optional() })
-const zGenerate = z.object({ kind: z.enum(['packing_list', 'commercial_invoice', 'proof_of_delivery']), visibility: z.enum(['shipper', 'shared']).default('shared') })
+const zGenerate = z.object({ kind: z.enum(['packing_list', 'commercial_invoice', 'bill_of_lading', 'export_instructions', 'proof_of_delivery']), visibility: z.enum(['shipper', 'shared']).default('shared') })
 const META = `id, shipment_id, kind, title, filename, mime, size, source, visibility, uploaded_by, uploaded_by_role, share_token, created_at, updated_at, (data is not null) as has_file, (payload is not null) as has_payload`
 
 /** Build (or rebuild) a generated document from the shipment's data. Used by the office button and by booking automation. */
-export async function generateDocument(db: Db, s: Row, kind: 'packing_list' | 'commercial_invoice' | 'proof_of_delivery', visibility: 'shipper' | 'shared', by: string, HttpError: Deps['HttpError'] = class extends Error { status: number; constructor(st: number, m: string) { super(m); this.status = st } }) {
+export async function generateDocument(db: Db, s: Row, kind: GenKind, visibility: 'shipper' | 'shared', by: string, HttpError: Deps['HttpError'] = class extends Error { status: number; constructor(st: number, m: string) { super(m); this.status = st } }) {
   const payload = await buildPayload(db, s, kind, HttpError)
   const title = `${docKindLabels[kind]} ${payload.number}`
   // Regenerating replaces the previous generated copy of the same kind.

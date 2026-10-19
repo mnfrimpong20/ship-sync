@@ -1,10 +1,9 @@
 import { api } from './store'
 
-export type DocKind = 'packing_list' | 'commercial_invoice' | 'bill_of_lading' | 'customs' | 'proof_of_delivery' | 'identity' | 'insurance' | 'receipt' | 'photo' | 'other'
+export type DocKind = 'packing_list' | 'commercial_invoice' | 'bill_of_lading' | 'customs' | 'proof_of_delivery' | 'identity' | 'insurance' | 'receipt' | 'photo' | 'export_instructions' | 'other'
 export const docKindLabels: Record<DocKind, string> = {
   packing_list: 'Packing list', commercial_invoice: 'Commercial invoice', bill_of_lading: 'Bill of lading / AWB', customs: 'Customs form', proof_of_delivery: 'Proof of delivery',
-  identity: 'ID document', insurance: 'Insurance certificate', receipt: 'Payment receipt', photo: 'Photo', other: 'Other',
-}
+  identity: 'ID document', insurance: 'Insurance certificate', receipt: 'Payment receipt', photo: 'Photo', other: 'Other', export_instructions: 'Shipper’s letter of instruction' }
 export interface ShipDoc {
   id: string; shipmentId: string; kind: DocKind; title: string; filename: string; mime: string; size: number
   source: 'upload' | 'generated'; visibility: 'shipper' | 'shared'; uploadedBy: string; uploadedByRole: 'shipper' | 'customer' | ''
@@ -12,6 +11,11 @@ export interface ShipDoc {
 }
 export interface DocPayload {
   number: string; generatedAt: string
+  measured?: { totals: { pieces: number; measured: number; actualKg: number; cbm: number; chargeableKg: number }; pieces: { seq: number; code: string; weightKg: number | null; dims: string }[] }
+  booking?: { containerRef: string; number: string; seal: string; size: string; line: string; bookingRef: string; vesselName: string; voyage: string; pol: string; pod: string; etd: string | null } | null
+  export?: { applies: boolean; required: boolean; itn: string; exemption: string; valueUsd: number | null; vehicle: boolean } | null
+  declaration?: { accepted: boolean; includes: string[]; at: string } | null
+  declaredValueUsd?: number | null
   shipment: { ref: string; mode: 'air' | 'ocean'; origin: string; destination: string; destinationName: string; cargo: string; cargoLabel: string; description: string; status: string; eta: string | null; createdAt: string | null; vesselName: string; customer: string }
   shipper: { name: string; hq: string; tagline: string }
   sender: { name: string; company: string; email: string; phone: string; city: string }

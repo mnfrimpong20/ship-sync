@@ -114,7 +114,53 @@ function Receipt({ p }: { p: DocPayload & { receipt?: { id: string; number: stri
   )
 }
 
+function HouseBL({ p }: { p: DocPayload }) {
+  const b = p.booking; const m = p.measured; const kg = m?.totals.actualKg || p.request?.weightKg || null
+  return (
+    <Sheet title="House bill of lading" number={p.number} p={p} foot={<>DRAFT — for checking before release. Not negotiable until signed and issued by {p.shipper.name}. Carriage under the carrier’s terms; goods said to contain the items listed, shipper’s load, count and seal.</>}>
+      <p className="mt-4 inline-block rounded bg-amber-100 px-2 py-1 text-xs font-bold uppercase tracking-wider text-amber-800">Draft</p>
+      <section className="mt-4 grid gap-6 sm:grid-cols-3">
+        <Party label="Shipper" lines={[p.sender.name, p.sender.company, p.sender.city, p.sender.phone]} />
+        <Party label="Consignee" lines={p.receiver ? [p.receiver.name, p.receiver.address, [p.receiver.city, p.receiver.country].filter(Boolean).join(', '), p.receiver.phone] : ['To be confirmed']} />
+        <Party label="Notify party" lines={p.receiver ? ['Same as consignee'] : ['—']} />
+      </section>
+      <section className="mt-6 rounded-lg bg-slate-50 p-4"><Facts rows={[['Port of loading', b?.pol || p.shipment.origin], ['Port of discharge', b?.pod || p.shipment.destinationName], ['Vessel / voyage', b?.vesselName ? `${b.vesselName} ${b.voyage}` : '—'], ['Ocean carrier', b?.line || '—'], ['Carrier booking', b?.bookingRef || '—'], ['Container / seal', b?.number ? `${b.number}${b.seal ? ` / ${b.seal}` : ''}` : b?.containerRef ?? '—'], ['Sailing', b?.etd ? fmtDate(b.etd + 'T12:00:00Z') : '—'], ['Freight', 'Prepaid'], ['Our reference', p.shipment.ref]]} /></section>
+      <table className="mt-6 w-full text-sm">
+        <thead><tr className="border-b border-slate-300 text-left text-xs uppercase tracking-wider text-slate-500"><th className="pb-2 font-semibold">Marks &amp; numbers</th><th className="pb-2 font-semibold">Packages · description</th><th className="pb-2 text-right font-semibold">Gross kg</th><th className="pb-2 text-right font-semibold">m³</th></tr></thead>
+        <tbody><tr className="border-b border-slate-100 align-top"><td className="py-2.5 font-mono text-xs">{(m?.pieces.length ? m.pieces.map((x) => x.code) : [p.shipment.ref]).slice(0, 12).join(', ')}{(m?.pieces.length ?? 0) > 12 ? ' …' : ''}</td><td className="py-2.5">{m?.totals.pieces || p.pieces.length || p.request?.quantity || 1} × {p.shipment.cargoLabel.toLowerCase()} — {p.shipment.description || 'personal effects and used household goods'}</td><td className="py-2.5 text-right tabular-nums">{kg ? kg.toLocaleString() : '—'}</td><td className="py-2.5 text-right tabular-nums">{m?.totals.cbm ? m.totals.cbm : '—'}</td></tr></tbody>
+      </table>
+      {p.export?.itn && <p className="mt-4 text-sm"><b>AES ITN:</b> {p.export.itn}</p>}
+      {p.export?.exemption && <p className="mt-4 text-sm"><b>EEI exemption:</b> {p.export.exemption}</p>}
+      <div className="mt-10 grid gap-8 text-xs text-slate-600 sm:grid-cols-2"><div className="border-t border-slate-400 pt-2">Place and date of issue</div><div className="border-t border-slate-400 pt-2">Signed for {p.shipper.name} as carrier / agent</div></div>
+    </Sheet>
+  )
+}
+
+function LetterOfInstruction({ p }: { p: DocPayload }) {
+  const e = p.export; const m = p.measured
+  const restricted: Record<string, string> = { batteries: 'Lithium batteries', aerosols: 'Aerosols / flammable liquids', food: 'Food', medicine: 'Medicines', electronics: 'Used electronics', cash: 'Cash / valuables' }
+  return (
+    <Sheet title="Shipper’s letter of instruction" number={p.number} p={p} foot={<>The exporter authorises {p.shipper.name} to act as forwarding agent for export control and customs purposes and to file the Electronic Export Information (EEI) in AES where required. The exporter certifies the statements above are true and correct.</>}>
+      <section className="mt-6 grid gap-6 sm:grid-cols-2">
+        <Party label="U.S. principal party in interest (exporter)" lines={[p.sender.name, p.sender.company, p.sender.city, p.sender.phone, p.sender.email]} />
+        <Party label="Ultimate consignee" lines={p.receiver ? [p.receiver.name, p.receiver.address, [p.receiver.city, p.receiver.country].filter(Boolean).join(', '), p.receiver.phone] : ['To be confirmed']} />
+      </section>
+      <section className="mt-6 rounded-lg bg-slate-50 p-4"><Facts rows={[['Forwarding agent', p.shipper.name], ['Country of ultimate destination', p.shipment.destinationName], ['Port of export', p.booking?.pol || p.shipment.origin], ['Mode', p.shipment.mode === 'air' ? 'Air' : 'Vessel, containerised'], ['Routed export', 'No'], ['Related parties', 'Non-related'], ['Value (USD)', p.declaredValueUsd != null ? `$${Number(p.declaredValueUsd).toLocaleString()}` : '—'], ['Gross weight', m?.totals.actualKg ? `${m.totals.actualKg.toLocaleString()} kg` : p.request?.weightKg ? `${p.request.weightKg} kg` : '—'], ['Pieces', m?.totals.pieces || p.pieces.length || '—']]} /></section>
+      <section className="mt-6 text-sm">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Commodity</p>
+        <p className="mt-1">{p.shipment.cargoLabel} — {p.shipment.description || 'personal effects and used household goods'}</p>
+        <p className="mt-2 text-xs text-slate-600">Schedule B number(s) and export licence status to be confirmed by the exporter. {e?.vehicle ? 'Used vehicle: title and VIN presented to CBP 72 hours before export.' : ''}</p>
+        {p.declaration?.includes?.length ? <p className="mt-2 text-xs"><b>Declared restricted items:</b> {p.declaration.includes.map((k) => restricted[k] ?? k).join(', ')}</p> : null}
+      </section>
+      <section className="mt-6 rounded-lg border border-slate-300 p-4 text-sm"><Facts rows={[['EEI filing', e?.required ? 'Required' : 'Not required'], ['ITN', e?.itn || (e?.required ? 'pending' : '—')], ['Exemption', e?.exemption || '—']]} /></section>
+      <div className="mt-10 grid gap-8 text-xs text-slate-600 sm:grid-cols-2"><div className="border-t border-slate-400 pt-2">Exporter signature / date</div><div className="border-t border-slate-400 pt-2">Printed name and title</div></div>
+    </Sheet>
+  )
+}
+
 export function GeneratedDoc({ kind, p }: { kind: string; p: DocPayload }) {
+  if (kind === 'bill_of_lading') return <HouseBL p={p} />
+  if (kind === 'export_instructions') return <LetterOfInstruction p={p} />
   if (kind === 'insurance' && (p as { policy?: unknown }).policy) return <InsuranceCertificate p={p} />
   if (kind === 'receipt' && (p as { receipt?: unknown }).receipt) return <Receipt p={p} />
   if (kind === 'packing_list') return <PackingList p={p} />

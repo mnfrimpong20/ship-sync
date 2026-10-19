@@ -18,7 +18,7 @@ export interface ReceiverPage {
   lang: 'en' | 'fr'; charges: ReceiverCharge[]; online: boolean; methods: string
   deliverTo: { city: string; address: string; gps: string; mapUrl: string } | null
 }
-export interface ReceiverCharge { id: string; amount: number; currency: string; label: string; reason: string; status: 'due' | 'paid' | 'cancelled'; method: '' | 'paystack' | 'cash' | 'momo_direct'; paidAt: string | null; paidPhone: string; recordedBy: string; settledTo: '' | 'shipper' | 'ntemtem'; payoutDone: boolean; createdAt: string | null }
+export interface ReceiverCharge { id: string; amount: number; currency: string; label: string; reason: string; status: 'draft' | 'due' | 'paid' | 'cancelled'; createdBy?: string; method: '' | 'paystack' | 'cash' | 'momo_direct'; paidAt: string | null; paidPhone: string; recordedBy: string; settledTo: '' | 'shipper' | 'ntemtem'; payoutDone: boolean; createdAt: string | null }
 export interface ChargesView { charges: ReceiverCharge[]; currency: string; online: boolean; methods: string; canEdit: boolean }
 
 export const recipientApi = {

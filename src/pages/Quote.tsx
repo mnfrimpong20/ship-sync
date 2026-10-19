@@ -33,9 +33,9 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
   const [matching, setMatching] = useState(true)
   const [form, setForm] = useState<Form>({
     origin: sp.get('origin') || 'New York, NY', destination: sp.get('destination') || 'GH', mode: (sp.get('mode') as Mode | 'either') || 'either',
-    cargo: 'barrels', quantity: 2, weightKg: undefined, description: '', pickup: true, delivery: true, insurance: false,
+    cargo: (['barrels', 'boxes', 'pallets', 'vehicle', 'container20', 'container40', 'commercial'].includes(sp.get('cargo') ?? '') ? sp.get('cargo') : 'barrels') as Form['cargo'], quantity: Math.min(200, Math.max(1, Number(sp.get('qty')) || 2)), weightKg: undefined, description: (sp.get('note') ?? '').slice(0, 300), pickup: true, delivery: true, insurance: false,
     readyDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
-    contact: { name: user?.name ?? '', email: user?.email ?? '', phone: '' },
+    contact: { name: user?.name ?? '', email: user?.email ?? '', phone: (sp.get('phone') ?? '').slice(0, 30) },
     declaration: { accepted: false, includes: [] },
     password: '',
   })

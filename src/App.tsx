@@ -57,6 +57,7 @@ const CampaignsPage = lazy(() => import('./pages/Campaigns'))
 const IntegrationsPage = lazy(() => import('./pages/Integrations'))
 const BillingPage = lazy(() => import('./pages/Billing'))
 const SuppliesPage = lazy(() => import('./pages/Supplies'))
+const AutopilotPage = lazy(() => import('./pages/Autopilot'))
 const HelpPage = L(() => import('./pages/Help'), 'HelpPage')
 const SupportPage = L(() => import('./pages/Help'), 'SupportPage')
 const ActivityPage = lazy(() => import('./pages/Activity'))
@@ -200,6 +201,7 @@ export default function App() {
               <Route path="/dashboard/integrations" element={<IntegrationsPage />} />
               <Route path="/dashboard/billing" element={<BillingPage />} />
               <Route path="/dashboard/supplies" element={<SuppliesPage />} />
+              <Route path="/dashboard/autopilot" element={<AutopilotPage />} />
               <Route path="/dashboard/activity" element={<ActivityPage />} />
               <Route path="/dashboard/reviews" element={<ReviewsPage />} />
               <Route path="/dashboard/brand" element={<BrandEditor />} />

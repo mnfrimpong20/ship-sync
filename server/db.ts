@@ -1404,6 +1404,21 @@ create table if not exists container_bookings (
   last_polled_at timestamptz, created_at timestamptz not null default now()
 );
 create index if not exists container_bookings_container on container_bookings (container_id);
+create table if not exists autopilot_settings (shipper_id text primary key references shippers(id) on delete cascade, value jsonb not null default '{}');
+create table if not exists autopilot_log (id text primary key, shipper_id text not null, kind text not null, title text not null, body text not null default '', link text not null default '', ref text not null default '', created_at timestamptz not null default now());
+create index if not exists autopilot_log_shipper on autopilot_log (shipper_id, created_at desc);
+create table if not exists shipper_rules (id text primary key, shipper_id text not null references shippers(id) on delete cascade, name text not null, trigger text not null, status text not null default '', conditions jsonb not null default '[]', actions jsonb not null default '[]', active boolean not null default true, runs int not null default 0, last_run_at timestamptz, created_by text not null default '', created_at timestamptz not null default now());
+create table if not exists assistant_conversations (id text primary key, phone text unique not null, name text not null default '', shipper_id text, last_intent text, handed_off_at timestamptz, unread int not null default 0, last_at timestamptz not null default now(), created_at timestamptz not null default now());
+create table if not exists assistant_messages (id text primary key, conversation_id text not null references assistant_conversations(id) on delete cascade, direction text not null, body text not null, intent text, via text, by_name text, created_at timestamptz not null default now());
+create index if not exists assistant_messages_conv on assistant_messages (conversation_id, created_at);
+create table if not exists autopilot_marks (key text primary key, at timestamptz not null default now());
+create table if not exists price_adjustments (
+  id text primary key, shipment_id text not null references shipments(id) on delete cascade, shipper_id text not null, old_usd numeric not null, new_usd numeric not null, reason text not null default '',
+  status text not null default 'proposed', token text, sent_at timestamptz, decided_at timestamptz, decided_by text not null default '', created_at timestamptz not null default now()
+);
+alter table quotes add column if not exists original_price numeric;
+alter table run_stops add column if not exists eta_from text not null default '';
+alter table run_stops add column if not exists eta_to text not null default '';
 create table if not exists qb_connections (
   shipper_id text primary key references shippers(id) on delete cascade, realm_id text, company_name text not null default '', home_currency text not null default 'USD',
   access_token text not null default '', refresh_token text not null default '', access_expires_at timestamptz, refresh_expires_at timestamptz,

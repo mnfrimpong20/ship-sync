@@ -58,6 +58,10 @@ import { mountPush } from './push'
 import { mountPartners } from './partners'
 import { mountLineBooking } from './lineBooking'
 import { mountQuickBooks } from './quickbooks'
+import { mountAutopilot } from './autopilot'
+import { mountAutopilotOps } from './autopilotOps'
+import { mountRules } from './rules'
+import { mountAssistant } from './assistant'
 import { mountCompliance, evaluateExport, assertExportCleared, zDeclaration, DECLARATION_VERSION } from './compliance'
 import { mountSupplies, attachDefaultSupplies, defaultQuoteSupplies, resolveQuoteSupplies, suppliesFromQuote, suppliesTotal, type QuoteSupplyLine, type SupplyNeed } from './supplies'
 import { mountReviews } from './reviews'
@@ -338,6 +342,7 @@ async function notifyNewLead(db: Db, req: Row) {
   const done = new Set(quoted.map((q) => q.shipper_id))
   const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })).filter((m) => !done.has(m.shipper.id) && leadFit(m.shipper, req as never).local)
   for (const m of matches) {
+    void import('./rules').then((x) => x.fireRules(db, m.shipper.id, 'request.received', { request: req })).catch(() => {})
     void import('./integrations').then((x) => x.emitWebhook(db, m.shipper.id, 'request.received', { request: { id: req.id, ref: req.ref, origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo, quantity: req.quantity, readyDate: String(req.ready_date ?? '').slice(0, 10) } })).catch(() => {})
     await notifyShipperStaff(db, m.shipper.id, { kind: 'new_lead', title: `New client request: ${req.quantity} × ${req.cargo} to ${req.destination}`, body: `${req.contact_name} wants to ship from ${req.origin} (${req.mode === 'either' ? 'air or ocean' : req.mode}), ready ${String(req.ready_date).slice(0, 10)}. Send a quote before the competition does.`, link: '/dashboard/leads', dedupe: `lead:${req.id}` }, ['owner', 'dispatcher', 'agent'])
   }
@@ -717,7 +722,7 @@ export function apiRouter() {
       await notifyShipperStaff(db, l.shipper_id, { kind: 'quote_lost', title: `Not chosen — ${r0.ref}`, body: `The client booked another quote. Yours was ${diff === 0 ? 'about the same price' : `${Math.abs(diff)}% ${diff > 0 ? 'higher' : 'lower'}`}${Number(l.transit_days) !== Number(q.transit_days) ? ` and ${Math.abs(Number(l.transit_days) - Number(q.transit_days))} days ${Number(l.transit_days) > Number(q.transit_days) ? 'slower' : 'faster'}` : ''}.`, link: '/dashboard/leads?b=lost', dedupe: `lost:${l.id}` }, ['owner', 'dispatcher', 'agent'])
     }
     await afterBooking(db, sid, { delivery: !!r0.delivery }).catch((e) => console.error('[booking] after', e))
-    { const { rows: sx } = await db.query<Row>('select * from shipments where id = $1', [sid]); if (sx[0]) await evaluateExport(db, sx[0]).catch((e) => console.error('[export] eval', e)) }
+    { const { rows: sx } = await db.query<Row>('select * from shipments where id = $1', [sid]); if (sx[0]) { await evaluateExport(db, sx[0]).catch((e) => console.error('[export] eval', e)); const { rows: sy } = await db.query<Row>('select * from shipments where id = $1', [sid]); void import('./autopilotOps').then((m) => m.onBookedPaperwork(db, sy[0])).catch(() => {}) } }
     await notify(db, { userId: user.id, kind: 'booking_confirmed', title: `Booking confirmed — ${r0.ref}`, body: `${shipper.name} will handle your ${r0.origin} → ${r0.destination} shipment for $${Number(q.price).toLocaleString()}. Track it any time with reference ${r0.ref}.`, link: `/track?ref=${r0.ref}`, dedupe: `ship:${sid}:booked` })
     await notifyShipperStaff(db, q.shipper_id, { kind: 'quote_accepted', title: `${r0.contact_name} accepted your quote — ${r0.ref}`, body: `$${Number(q.price).toLocaleString()} · ${r0.quantity} × ${r0.cargo} · ${r0.origin} → ${r0.destination}. The order is now booked; arrange pickup or drop-off.`, link: '/dashboard/shipments', dedupe: `ship:${sid}:accepted` }, ['owner', 'dispatcher', 'agent'])
     const [shipment] = await loadShipments(db, 'id = $1', [sid])
@@ -819,6 +824,10 @@ export function apiRouter() {
   mountPartners(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountLineBooking(r, { getDb, requireUser, HttpError, wrap })
   mountQuickBooks(r, { getDb, requireUser, HttpError, wrap })
+  mountAutopilot(r, { getDb, requireUser, HttpError, wrap })
+  mountAutopilotOps(r, { getDb, requireUser, HttpError, wrap })
+  mountRules(r, { getDb, requireUser, HttpError, wrap })
+  mountAssistant(r, { getDb, requireUser, HttpError, wrap })
   mountSupplies(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountReviews(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountBrand(r, { getDb, requireUser, HttpError, wrap })

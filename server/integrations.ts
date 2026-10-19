@@ -61,6 +61,7 @@ export async function emitWebhook(db: Db, shipperId: string, event: string, data
   } catch (e) { console.error('[webhooks] emit', e) }
 }
 export async function emitShipment(db: Db, shipmentId: string, event: 'shipment.booked' | 'shipment.status' | 'shipment.delivered', extra: Row = {}) {
+  if (event === 'shipment.booked') { const { rows: [full] } = await db.query<Row>('select * from shipments where id = $1', [shipmentId]); if (full) void import('./rules').then((m) => m.fireRules(db, full.shipper_id, 'shipment.booked', { shipment: full })).catch(() => {}) }
   const { rows: [s] } = await db.query<Row>('select id, ref, shipper_id, status, mode, origin, destination, cargo, customer, eta, container_id, created_at from shipments where id = $1', [shipmentId]); if (!s) return
   await emitWebhook(db, s.shipper_id, event, { shipment: { id: s.id, ref: s.ref, status: s.status, statusLabel: statusLabels[s.status as ShipmentStatus] ?? s.status, mode: s.mode, origin: s.origin, destination: s.destination, cargo: s.cargo, customer: s.customer, eta: D(s.eta), containerId: s.container_id, createdAt: ISO(s.created_at) }, ...extra })
 }

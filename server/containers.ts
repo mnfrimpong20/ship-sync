@@ -64,6 +64,8 @@ async function raise(db: Db, s: Row, target: ShipmentStatus, place: string, note
 export async function advanceContainer(db: Db, c: Row, status: ContainerStatus, o: { at?: Date; place?: string; note?: string; by: string; source?: 'manual' | 'carrier'; code?: string }) {
   const to = CONTAINER_STAGES.indexOf(status)
   await db.query('update containers set status = $2 where id = $1', [c.id, status])
+  void import('./autopilotOps').then((m) => m.onContainerStage(db, { ...c, status }, status)).catch((e) => console.error('[autopilot] docs', e))
+  void import('./rules').then((m) => m.fireRules(db, c.shipper_id, 'container.stage', { container: { ...c, status } })).catch(() => {})
   await db.query('insert into container_events (container_id,status,at,place,note,by_name,source,code) values ($1,$2,$3,$4,$5,$6,$7,$8)', [c.id, status, o.at ?? new Date(), o.place ?? '', o.note ?? '', o.by, o.source ?? 'manual', o.code ?? ''])
   const target = CASCADE[status]
   const { rows } = await db.query<Row>('select * from shipments where container_id = $1 and cancelled_at is null', [c.id])
@@ -152,6 +154,21 @@ export function startCarrierSync(getDb: () => Promise<Db>) {
   console.log(`[carriers] ${carrierAdapter()!.label} — polling every ${every / 60_000} min`)
 }
 
+/** Load shipments into a container (office button and Autopilot). */
+export async function loadIntoContainer(db: Db, c: Row, ids: string[], by: string, err: (status: number, msg: string) => Error) {
+    const { rows } = await db.query<Row>('select * from shipments where id = any($1::text[]) and shipper_id = $2', [ids, c.shipper_id])
+    if (rows.length !== ids.length) throw err(400, 'One of those shipments isn’t yours.')
+    for (const s of rows) {
+      if (s.mode !== 'ocean') throw err(400, `${s.ref} is an air shipment.`)
+      if (s.status === 'delivered') throw err(400, `${s.ref} is already delivered.`)
+      if (s.container_id && s.container_id !== c.id) { const { rows: other } = await db.query<Row>('select ref, status from containers where id = $1', [s.container_id]); if (other[0] && OPEN.includes(other[0].status)) throw err(409, `${s.ref} is already loaded in ${other[0].ref}.`) }
+      await db.query('update shipments set container_id = $2 where id = $1', [s.id, c.id])
+      const target = CASCADE[c.status as ContainerStatus] ?? 'picked_up' // loading a box means the shipment has been collected
+      await raise(db, s, target, c.origin_port || 'Origin yard', `Loaded into container ${c.ref}${c.number ? ` (${c.number})` : ''} by ${by}.`)
+    }
+    if (c.status === 'booked') { await db.query(`update containers set status = 'loading' where id = $1`, [c.id]); await db.query('insert into container_events (container_id,status,place,note,by_name) values ($1,\'loading\',$2,$3,$4)', [c.id, c.origin_port || '', 'First shipments loaded.', by]) }
+}
+
 export function mountContainers(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap, loadShipments } = d
   /** Shipper staff except drivers can work containers. */
@@ -218,17 +235,7 @@ export function mountContainers(r: Router, d: Deps) {
     const db = await getDb(); const { sid, u } = await access(db, req)
     const c = await own(db, sid, String(req.params.id)); const b = zLoad.parse(req.body)
     if (!OPEN.includes(c.status) || ['sailed', 'arrived', 'customs'].includes(c.status)) throw new HttpError(409, `You can’t load shipments once the container has ${stageLabels[c.status as ContainerStatus].toLowerCase()}.`)
-    const { rows } = await db.query<Row>('select * from shipments where id = any($1::text[]) and shipper_id = $2', [b.shipmentIds, sid])
-    if (rows.length !== b.shipmentIds.length) throw new HttpError(400, 'One of those shipments isn’t yours.')
-    for (const s of rows) {
-      if (s.mode !== 'ocean') throw new HttpError(400, `${s.ref} is an air shipment.`)
-      if (s.status === 'delivered') throw new HttpError(400, `${s.ref} is already delivered.`)
-      if (s.container_id && s.container_id !== c.id) { const { rows: other } = await db.query<Row>('select ref, status from containers where id = $1', [s.container_id]); if (other[0] && OPEN.includes(other[0].status)) throw new HttpError(409, `${s.ref} is already loaded in ${other[0].ref}.`) }
-      await db.query('update shipments set container_id = $2 where id = $1', [s.id, c.id])
-      const target = CASCADE[c.status as ContainerStatus] ?? 'picked_up' // loading a box means the shipment has been collected
-      await raise(db, s, target, c.origin_port || 'Origin yard', `Loaded into container ${c.ref}${c.number ? ` (${c.number})` : ''} by ${u.name}.`)
-    }
-    if (c.status === 'booked') { await db.query(`update containers set status = 'loading' where id = $1`, [c.id]); await db.query('insert into container_events (container_id,status,place,note,by_name) values ($1,\'loading\',$2,$3,$4)', [c.id, c.origin_port || '', 'First shipments loaded.', u.name]) }
+    await loadIntoContainer(db, c, b.shipmentIds, u.name, (st, m) => new HttpError(st, m))
     res.json(await detail(db, sid, c.id))
   }))
   r.post('/containers/:id/unload', wrap(async (req, res) => {

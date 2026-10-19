@@ -25,6 +25,7 @@ const ClientDetailPage = lazy(() => import('./pages/ClientDetail'))
 const InvoiceView = lazy(() => import('./pages/InvoiceView'))
 const Team = lazy(() => import('./pages/Team'))
 const Fleet = lazy(() => import('./pages/Fleet'))
+const Drivers = lazy(() => import('./pages/Drivers'))
 const RunsList = lazy(() => import('./pages/Routes'))
 const RoutePlanner = lazy(() => import('./pages/RoutePlanner'))
 const MyRuns = lazy(() => import('./pages/MyRuns'))
@@ -226,6 +227,7 @@ export default function App() {
               <Route path="/dashboard/team" element={<Team />} />
               <Route path="/dashboard/verification" element={<Verification />} />
               <Route path="/dashboard/fleet" element={<Fleet />} />
+              <Route path="/dashboard/drivers" element={<Drivers />} />
               <Route path="/dashboard/routes" element={<RunsList />} />
               <Route path="/dashboard/routes/:id" element={<RoutePlanner />} />
               <Route path="/dashboard/runs" element={<MyRuns />} />

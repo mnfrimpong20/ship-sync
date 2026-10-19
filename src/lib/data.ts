@@ -139,6 +139,8 @@ export interface Shipment {
   pieces?: { seq: number; status: 'labelled' | 'loaded' | 'devanned' | 'delivered'; lastScanAt: string | null; lastScanKind: string; lastScanPlace: string }[]
   /** Proof of delivery (from /track) once the last piece has been handed over. */
   pod?: { at: string | null; place: string; by: string; receivedBy: string; photo: string | null; signature?: string | null } | null
+  /** On the public tracking page while a driver has this stop on a live run (never the exact position). */
+  driver?: { driver: string; kind: string; stopsAway: number; near: boolean; km: number | null; lastSeen: string | null } | null
   containerId?: string
   groupageId?: string
   /** Number of documents in the vault (customers: shared ones only). */

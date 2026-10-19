@@ -123,7 +123,7 @@ async function sendAdjustment(db: Db, s: Row, id: string) {
   if (s.user_id) await notify(db, { userId: s.user_id, kind: 'payment', title: `Please approve the updated price for ${s.ref}`, body: `${a.reason} New price ${money(Number(a.new_usd))} (was ${money(Number(a.old_usd))}).`, link: `/dashboard?tab=shipments&open=${s.id}&view=pay`, dedupe: `adj:${a.id}:c` })
 }
 /** Approved → the money owed goes up in the right place: open invoice, else the accepted quote, else a new invoice for the difference. */
-async function applyAdjustment(db: Db, s: Row, a: Row, by: string) {
+export async function applyAdjustment(db: Db, s: Row, a: Row, by: string) {
   const diff = Math.round(Number(a.new_usd) - Number(a.old_usd)); const base = await freightPrice(db, s); const paid = await paidUsd(db, s.id)
   const line = { description: `Weight adjustment — ${String(a.reason).slice(0, 120)}`, qty: 1, unit: diff }
   if (base?.source === 'invoice' && base.invoice.status !== 'paid') {

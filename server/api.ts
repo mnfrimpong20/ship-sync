@@ -8,6 +8,7 @@ import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } fro
 import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion, type Position } from './live'
 import { attachShipmentToClient, logShipmentActivity, mountClients } from './clients'
 import { mountOps } from './ops'
+import { mountDriverOps, driverForShipment } from './driverOps'
 import { mountDirectory } from './directory'
 import { mountInsights } from './insights'
 import { mountAnalytics } from './analytics'
@@ -846,6 +847,7 @@ export function apiRouter() {
     res.json({ position: await resolvePosition(rows[0], events) })
   }))
   mountClients(r, { getDb, requireUser, HttpError, wrap, loadShipments })
+  mountDriverOps(r, { getDb, requireUser, HttpError, wrap })
   mountOps(r, { getDb, requireUser, createSession, loadUserWithCompany, HttpError, wrap, loadShipments })
   mountInsights(r, { getDb, requireUser, HttpError, wrap })
   mountAnalytics(r, { getDb, requireUser, HttpError, wrap })
@@ -946,7 +948,7 @@ export function apiRouter() {
     const db = await getDb()
     const [shipment] = await loadShipments(db, 'upper(ref) = upper($1)', [req.params.ref], { includeCancelled: true })
     if (!shipment) throw new HttpError(404, 'We couldn’t find a shipment with that reference.')
-    res.json({ shipment, pieces: await piecesForTracking(db, shipment.id), pod: shipment.status === 'delivered' ? await proofOfDelivery(db, shipment.id) : null })
+    res.json({ shipment, pieces: await piecesForTracking(db, shipment.id), pod: shipment.status === 'delivered' ? await proofOfDelivery(db, shipment.id) : null, driver: shipment.status === 'delivered' ? null : await driverForShipment(db, shipment.id).catch(() => null) })
   }))
 
   // errors

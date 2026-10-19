@@ -177,6 +177,7 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
           </div>
 
           {s.pieces && s.pieces.length > 0 && <PiecesStrip pieces={s.pieces} />}
+          {s.driver && <p className={`mt-6 rounded-xl border p-4 text-sm ${s.driver.near ? 'border-gold/60 bg-gold/10' : 'border-border bg-surface'}`} role="status" data-testid="track-driver"><strong>{s.driver.near ? `${s.driver.driver || 'Your driver'} is a few minutes away.` : s.driver.stopsAway === 0 ? `${s.driver.driver || 'Your driver'} is heading to you next.` : `${s.driver.driver || 'Your driver'} is on the way — ${s.driver.stopsAway} stop${s.driver.stopsAway === 1 ? '' : 's'} before yours.`}</strong>{s.driver.km != null && !s.driver.near ? <span className="text-text-muted"> About {Math.max(1, Math.round(s.driver.km))} km away.</span> : null}</p>}
           {s.pod && <ProofOfDelivery pod={s.pod} />}
 
           <LivePanel s={s} />

@@ -18,6 +18,8 @@ interface Props {
   onClickMap?: (lat: number, lon: number) => void
   focusId?: string | null
   className?: string
+  /** Drivers' live positions (truck markers, not part of the route line). */
+  trucks?: { id: string; label: string; lat: number; lon: number }[]
 }
 
 function pinEl(text: string, tone: 'start' | 'pending' | 'done' | 'skipped') {
@@ -31,7 +33,7 @@ function pinEl(text: string, tone: 'start' | 'pending' | 'done' | 'skipped') {
 }
 
 /** A small planning map: start pin, numbered stop pins in run order, and straight legs between them. */
-export default function RunMap({ start, stops, draggable = false, onMove, onClickMap, focusId, className = '' }: Props) {
+export default function RunMap({ start, stops, draggable = false, onMove, onClickMap, focusId, className = '', trucks }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const markers = useRef<Map<string, maplibregl.Marker>>(new Map())
@@ -39,6 +41,7 @@ export default function RunMap({ start, stops, draggable = false, onMove, onClic
   const pending = useRef<(() => void) | null>(null)
   const fitKey = useRef('')
   const cb = useRef({ onMove, onClickMap }); cb.current = { onMove, onClickMap }
+  const truckMk = useRef<Map<string, maplibregl.Marker>>(new Map())
 
   useEffect(() => {
     if (!box.current || map.current) return
@@ -49,7 +52,7 @@ export default function RunMap({ start, stops, draggable = false, onMove, onClic
     m.on('click', (e) => cb.current.onClickMap?.(e.lngLat.lat, e.lngLat.lng))
     map.current = m
     if (import.meta.env.DEV) (window as unknown as { __ssrunmap?: maplibregl.Map }).__ssrunmap = m
-    return () => { m.remove(); map.current = null; markers.current.clear(); styled.current = false }
+    return () => { m.remove(); map.current = null; markers.current.clear(); truckMk.current.clear(); styled.current = false }
   }, [])
 
   // Markers + legs
@@ -96,6 +99,28 @@ export default function RunMap({ start, stops, draggable = false, onMove, onClic
     }
     frame()
   }, [start, stops, draggable])
+
+  // Live trucks
+  useEffect(() => {
+    const m = map.current; if (!m) return
+    const want = new Map((trucks ?? []).map((x) => [x.id, x]))
+    for (const [id, mk] of truckMk.current) if (!want.has(id)) { mk.remove(); truckMk.current.delete(id) }
+    for (const [id, x] of want) {
+      let mk = truckMk.current.get(id)
+      if (!mk) {
+        const el = document.createElement('div'); el.className = 'ss-truck'; el.setAttribute('role', 'img'); el.setAttribute('aria-label', x.label)
+        el.style.cssText = 'width:34px;height:34px;border-radius:50%;background:#6CC3DD;border:3px solid #0D1424;box-shadow:0 0 0 6px rgba(108,195,221,.25);display:grid;place-items:center'
+        el.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0D1424" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>'
+        mk = new maplibregl.Marker({ element: el }).setLngLat([x.lon, x.lat]).setPopup(new maplibregl.Popup({ offset: 20, closeButton: false }).setText(x.label)).addTo(m)
+        truckMk.current.set(id, mk)
+      } else { mk.setLngLat([x.lon, x.lat]); mk.getPopup()?.setText(x.label) }
+    }
+    if (!stops.length && !start && want.size) {
+      const pts = [...want.values()].map((x) => [x.lon, x.lat] as [number, number])
+      const go = () => { m.resize(); if (pts.length === 1) m.jumpTo({ center: pts[0], zoom: 11 }); else m.fitBounds(pts.reduce((b, p) => b.extend(p), new maplibregl.LngLatBounds(pts[0], pts[0])), { padding: 60, maxZoom: 12, duration: 0 }) }
+      go(); if (!styled.current) m.once('load', go)
+    }
+  }, [trucks, stops.length, start])
 
   useEffect(() => {
     const m = map.current; if (!m || !focusId) return

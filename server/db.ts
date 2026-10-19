@@ -1426,6 +1426,26 @@ alter table run_stops add column if not exists tries int not null default 0;
 alter table run_stops add column if not exists on_way_at timestamptz;
 alter table run_stops add column if not exists collected jsonb;
 alter table runs add column if not exists summary_sent_at timestamptz;
+alter table run_stops add column if not exists near_at timestamptz;
+alter table pieces add column if not exists sticker text;
+create index if not exists idx_pieces_sticker on pieces (upper(sticker));
+alter table run_stops add column if not exists code text;
+alter table run_stops add column if not exists code_ok boolean not null default false;
+alter table run_stops add column if not exists id_check jsonb;
+alter table run_stops add column if not exists vehicle_report jsonb;
+alter table run_stops add column if not exists supplies_drop jsonb;
+alter table run_stops add column if not exists handed_over_id text;
+alter table runs add column if not exists vehicle_check jsonb;
+alter table staff add column if not exists pay jsonb;
+create table if not exists vehicle_checks (id text primary key, shipper_id text not null, staff_id text not null, run_id text, vehicle_id text, items jsonb not null, notes text not null default '', odometer int, photo text, safe boolean not null default true, at timestamptz not null default now());
+create table if not exists driver_positions (staff_id text primary key, shipper_id text not null, run_id text, lat double precision not null, lon double precision not null, accuracy double precision, at timestamptz not null default now());
+create table if not exists run_piece_scans (id text primary key, run_id text not null references runs(id) on delete cascade, piece_id text not null, kind text not null, by_name text not null default '', at timestamptz not null default now(), unique (run_id, piece_id, kind));
+create table if not exists incidents (id text primary key, shipper_id text not null, run_id text, stop_id text, shipment_id text, staff_id text, by_name text not null default '', kind text not null, description text not null, photos jsonb not null default '[]', claim boolean not null default false, status text not null default 'open', at timestamptz not null default now());
+create table if not exists run_messages (id text primary key, run_id text not null references runs(id) on delete cascade, stop_id text, shipper_id text not null, from_name text not null, from_side text not null, body text not null default '', audio text, read_by_office boolean not null default false, read_by_driver boolean not null default false, at timestamptz not null default now());
+create table if not exists cash_handovers (id text primary key, shipper_id text not null, staff_id text not null, expected numeric not null, received numeric not null, stops jsonb not null default '[]', by_name text not null default '', note text not null default '', at timestamptz not null default now());
+create table if not exists driver_expenses (id text primary key, shipper_id text not null, staff_id text not null, run_id text, kind text not null, amount numeric not null, currency text not null default 'USD', amount_usd numeric, photo text, note text not null default '', cost_id text, at timestamptz not null default now());
+create table if not exists shifts (id text primary key, shipper_id text not null, staff_id text not null, start_at timestamptz not null default now(), end_at timestamptz, breaks jsonb not null default '[]', note text not null default '');
+create index if not exists idx_shifts_staff on shifts(staff_id, start_at);
 -- One driver role became two (2026-10-19): origin-side drivers collect, destination-side drivers deliver.
 update staff set role = case when base = 'destination' then 'delivery_driver' else 'pickup_driver' end where role = 'driver';
 create table if not exists login_links (

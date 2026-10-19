@@ -19,7 +19,7 @@ const KINDS: ScanKind[] = ['loading', 'devanning', 'delivery', 'check']
 const kindIcon: Record<ScanKind, typeof ContainerIcon> = { loading: ContainerIcon, devanning: Package, delivery: Truck, check: ScanLine }
 
 /** Camera viewfinder that decodes QR codes. Uses the browser's BarcodeDetector when it exists (Android Chrome), else jsQR on canvas frames. */
-function Viewfinder({ onCode, paused }: { onCode: (code: string) => void; paused: boolean }) {
+export function Viewfinder({ onCode, paused }: { onCode: (code: string) => void; paused: boolean }) {
   const video = useRef<HTMLVideoElement>(null); const canvas = useRef<HTMLCanvasElement>(null)
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)

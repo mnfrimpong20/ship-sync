@@ -60,7 +60,13 @@ export function mountScans(r: Router, d: Deps) {
     return u
   }
   const find = async (db: Db, sid: string, raw: string) => {
-    const p = parseCode(raw); if (!p) throw new HttpError(400, 'That doesn’t look like a Ntemtem label. Codes look like SS-9KD4LM-P2.')
+    let p = parseCode(raw)
+    // A pre-printed sticker the driver linked to a piece at the door.
+    if (!p || !(await db.query('select 1 from shipments where upper(ref) = $1 and shipper_id = $2', [p.ref, sid])).rows[0]) {
+      const { rows: st } = await db.query<Row>('select p.seq, s.ref from pieces p join shipments s on s.id = p.shipment_id where upper(p.sticker) = upper($1) and s.shipper_id = $2 limit 1', [raw.trim(), sid])
+      if (st[0]) p = { ref: String(st[0].ref).toUpperCase(), seq: Number(st[0].seq) }
+    }
+    if (!p) throw new HttpError(400, 'That doesn’t look like a Ntemtem label. Codes look like SS-9KD4LM-P2.')
     const { rows: ships } = await db.query<Row>('select * from shipments where upper(ref) = $1 and shipper_id = $2', [p.ref, sid])
     const s = ships[0]; if (!s) throw new HttpError(404, `${p.ref} isn’t one of your shipments.`)
     const { rows: pieces } = await db.query<Row>('select * from pieces where shipment_id = $1 order by seq', [s.id])

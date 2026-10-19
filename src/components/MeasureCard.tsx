@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Plug, Ruler, Scale } from 'lucide-react'
+import { Bluetooth, Check, Plug, Ruler, Scale } from 'lucide-react'
 import { api } from '../lib/store'
 import { CM_PER_IN, kgToLb, lbToKg, parseScaleLine, type Totals } from '../lib/weights'
 
@@ -28,11 +28,36 @@ async function readScale(timeoutMs = 6000): Promise<number> {
   } finally { reader.releaseLock() }
 }
 
+/* Bluetooth scales (standard Weight Scale service). Web Bluetooth: Chrome on Android, desktop Chrome/Edge — not iPhone. */
+type BleChar = { startNotifications: () => Promise<unknown>; addEventListener: (t: string, f: (e: Event) => void) => void; removeEventListener: (t: string, f: (e: Event) => void) => void }
+const ble = () => (navigator as unknown as { bluetooth?: { requestDevice: (o: unknown) => Promise<{ gatt?: { connected: boolean; connect: () => Promise<{ getPrimaryService: (s: string) => Promise<{ getCharacteristic: (c: string) => Promise<BleChar> }> }> } }> } }).bluetooth
+let bleChar: BleChar | null = null
+export const hasBluetooth = () => !!ble()
+export async function readBleScale(timeoutMs = 15000): Promise<number> {
+  const b = ble(); if (!b) throw new Error('Bluetooth scales work in Chrome on Android. On iPhone, type the weight in.')
+  if (!bleChar) {
+    const dev = await b.requestDevice({ filters: [{ services: ['weight_scale'] }] })
+    const srv = await (await dev.gatt!.connect()).getPrimaryService('weight_scale')
+    bleChar = await srv.getCharacteristic('weight_measurement'); await bleChar.startNotifications()
+  }
+  const ch = bleChar
+  return new Promise<number>((resolve, reject) => {
+    const done = (fn: () => void) => { clearTimeout(timer); ch.removeEventListener('characteristicvaluechanged', on); fn() }
+    const on = (e: Event) => {
+      const dv = (e.target as unknown as { value: DataView }).value; const flags = dv.getUint8(0); const raw = dv.getUint16(1, true)
+      const kg = flags & 1 ? raw * 0.01 * 0.45359237 : raw * 0.005
+      if (kg > 0) done(() => resolve(Math.round(kg * 100) / 100))
+    }
+    const timer = setTimeout(() => done(() => reject(new Error('No reading from the scale — step it on and try again.'))), timeoutMs)
+    ch.addEventListener('characteristicvaluechanged', on)
+  })
+}
+
 const n = (v: string) => (v.trim() === '' ? null : Number(v))
 const show = (v: number | null, k = 1) => (v == null ? '' : String(Math.round(v * k * 10) / 10))
 
 /** Per-piece weight and size → actual, volume and chargeable weight, against what was declared. */
-export function MeasureCard({ shipmentId }: { shipmentId: string }) {
+export function MeasureCard({ shipmentId, big = false, onSaved }: { shipmentId: string; big?: boolean; onSaved?: () => void }) {
   const [d, setD] = useState<MView | null>(null)
   const [imperial, setImperial] = useState(() => { try { return localStorage.getItem('ss-units') === 'imperial' } catch { return false } })
   const [rows, setRows] = useState<Record<string, { w: string; l: string; wd: string; h: string }>>({})
@@ -48,16 +73,17 @@ export function MeasureCard({ shipmentId }: { shipmentId: string }) {
     const r = { ...rows[p.id], ...(override ?? {}) }
     const toKg = (v: number | null) => (v == null ? null : imperial ? lbToKg(v) : v); const toCm = (v: number | null) => (v == null ? null : imperial ? Math.round(v * CM_PER_IN * 10) / 10 : v)
     setBusy(p.id); setErr('')
-    try { const v = await api<MView>(`/shipments/${shipmentId}/pieces/${p.id}/measure`, { method: 'PUT', json: { weightKg: toKg(n(r.w)), lengthCm: toCm(n(r.l)), widthCm: toCm(n(r.wd)), heightCm: toCm(n(r.h)), source } }); setD(v); setSaved(p.id); setTimeout(() => setSaved(''), 1500) } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save.') } finally { setBusy('') }
+    try { const v = await api<MView>(`/shipments/${shipmentId}/pieces/${p.id}/measure`, { method: 'PUT', json: { weightKg: toKg(n(r.w)), lengthCm: toCm(n(r.l)), widthCm: toCm(n(r.wd)), heightCm: toCm(n(r.h)), source } }); setD(v); setSaved(p.id); setTimeout(() => setSaved(''), 1500); onSaved?.() } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save.') } finally { setBusy('') }
   }
-  const fromScale = async (p: MPiece) => {
-    setBusy('scale' + p.id); setErr('')
-    try { const kg = await readScale(); const w = show(kg, imperial ? kgToLb(1) : 1); setRows((x) => ({ ...x, [p.id]: { ...x[p.id], w } })); await save(p, 'scale', { w }) } catch (e) { if ((e as Error)?.name !== 'NotFoundError') setErr(e instanceof Error ? e.message : 'Scale error.') } finally { setBusy('') }
+  const fromScale = async (p: MPiece, how: 'usb' | 'ble' = 'usb') => {
+    setBusy((how === 'ble' ? 'ble' : 'scale') + p.id); setErr('')
+    try { const kg = how === 'ble' ? await readBleScale() : await readScale(); const w = show(kg, imperial ? kgToLb(1) : 1); setRows((x) => ({ ...x, [p.id]: { ...x[p.id], w } })); await save(p, 'scale', { w }) } catch (e) { if ((e as Error)?.name !== 'NotFoundError') setErr(e instanceof Error ? e.message : 'Scale error.') } finally { setBusy('') }
   }
   const t = d.totals; const W = imperial ? 'lb' : 'kg'; const L = imperial ? 'in' : 'cm'
   const wt = (kg: number) => (imperial ? `${kgToLb(kg).toLocaleString()} lb` : `${kg.toLocaleString()} kg`)
   const set = (id: string, k: 'w' | 'l' | 'wd' | 'h', v: string) => setRows((x) => ({ ...x, [id]: { ...x[id], [k]: v.replace(/[^\d.]/g, '') } }))
-  const hasSerial = !!serial()
+  const hasSerial = !!serial(); const hasBle = hasBluetooth()
+  const inp = big ? '!min-h-12 text-base' : '!min-h-8 text-xs'; const btn = big ? 'h-12 text-sm' : 'h-8 text-xs'
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface p-4" data-testid="measure-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -80,13 +106,14 @@ export function MeasureCard({ shipmentId }: { shipmentId: string }) {
             <li key={p.id} className="grid grid-cols-[34px_1fr] items-start gap-2 py-2" data-testid="measure-row">
               <span className="pt-2 font-mono text-xs">P{p.seq}{p.measuredAt && <Check size={11} className="ml-0.5 inline text-teal" aria-label="Measured" />}</span>
               <span className="grid gap-1.5">
-                <span className="flex items-center gap-1.5"><input aria-label={`Piece ${p.seq} weight`} inputMode="decimal" placeholder={W} className="input-dark !min-h-8 min-w-0 flex-1 !px-2 text-xs tabular-nums" value={r.w} onChange={(e) => set(p.id, 'w', e.target.value)} onBlur={() => save(p)} />
-                  <button type="button" onClick={() => fromScale(p)} disabled={!!busy} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-xs text-text-muted hover:text-gold-deep disabled:opacity-50" title={hasSerial ? 'Read from USB scale' : 'USB scales need Chrome or Edge'} aria-label={`Read piece ${p.seq} from scale`}>{busy === 'scale' + p.id ? '…' : <><Plug size={12} aria-hidden="true" /> Scale</>}</button>
+                <span className="flex items-center gap-1.5"><input aria-label={`Piece ${p.seq} weight`} inputMode="decimal" placeholder={W} className={`input-dark ${inp} min-w-0 flex-1 !px-2 tabular-nums`} value={r.w} onChange={(e) => set(p.id, 'w', e.target.value)} onBlur={() => save(p)} />
+                  {hasBle && <button type="button" onClick={() => fromScale(p, 'ble')} disabled={!!busy} className={`inline-flex ${btn} shrink-0 items-center gap-1 rounded-md border border-border px-2 text-text-muted hover:text-gold-deep disabled:opacity-50`} aria-label={`Read piece ${p.seq} from Bluetooth scale`} data-testid="ble-scale">{busy === 'ble' + p.id ? '…' : <><Bluetooth size={12} aria-hidden="true" /> BT</>}</button>}
+                  {(hasSerial || !big) && <button type="button" onClick={() => fromScale(p)} disabled={!!busy} className={`inline-flex ${btn} shrink-0 items-center gap-1 rounded-md border border-border px-2 text-text-muted hover:text-gold-deep disabled:opacity-50`} title={hasSerial ? 'Read from USB scale' : 'USB scales need Chrome or Edge'} aria-label={`Read piece ${p.seq} from scale`}>{busy === 'scale' + p.id ? '…' : <><Plug size={12} aria-hidden="true" /> Scale</>}</button>}
                   <span className="w-4 shrink-0 text-teal">{saved === p.id ? <Check size={13} aria-label="Saved" /> : busy === p.id ? '…' : ''}</span></span>
-                <span className="grid grid-cols-3 gap-1.5">{(['l', 'wd', 'h'] as const).map((k, i) => <input key={k} aria-label={`Piece ${p.seq} ${['length', 'width', 'height'][i]}`} placeholder={['L', 'W', 'H'][i]} inputMode="decimal" className="input-dark !min-h-8 min-w-0 !px-2 text-xs tabular-nums" value={r[k]} onChange={(e) => set(p.id, k, e.target.value)} onBlur={() => save(p)} />)}</span>
+                <span className="grid grid-cols-3 gap-1.5">{(['l', 'wd', 'h'] as const).map((k, i) => <input key={k} aria-label={`Piece ${p.seq} ${['length', 'width', 'height'][i]}`} placeholder={['L', 'W', 'H'][i]} inputMode="decimal" className={`input-dark ${inp} min-w-0 !px-2 tabular-nums`} value={r[k]} onChange={(e) => set(p.id, k, e.target.value)} onBlur={() => save(p)} />)}</span>
               </span>
             </li>) })}</ul>
-          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-text-muted"><Ruler size={12} aria-hidden="true" /> Saves as you leave each box. {hasSerial ? 'The plug button reads a USB scale (first time, pick it from the list).' : 'Scales that type into the box work in any browser.'}</p>
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-text-muted"><Ruler size={12} aria-hidden="true" /> Saves as you leave each box. {hasBle ? 'BT reads a Bluetooth scale (pick it the first time). ' : ''}{hasSerial ? 'The plug button reads a USB scale (first time, pick it from the list).' : 'Scales that type into the box work in any browser.'}</p>
         </div>
       )}
     </div>

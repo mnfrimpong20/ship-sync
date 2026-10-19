@@ -121,14 +121,20 @@ export function mountDocuments(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
 
   /** The shipment, and whether this user may see / manage its documents. Customers see only shared ones and may upload their own. */
-  const access = async (db: Db, req: Request, shipmentId: string) => {
+  const access = async (db: Db, req: Request, shipmentId: string, read = false) => {
     const u = await requireUser(db, req)
     const { rows } = await db.query<Row>('select * from shipments where id = $1', [shipmentId])
     const s = rows[0]; if (!s) throw new HttpError(404, 'Shipment not found.')
     const office = u.role === 'shipper' && s.shipper_id === u.shipperId && !isDriverRole(u.staffRole)
     const owner = u.role === 'customer' && s.user_id === u.id
-    if (!office && !owner) throw new HttpError(403, 'You do not have access to this shipment.')
-    return { u, s, office }
+    // Drivers may read (never change) the papers of shipments on a run they drive — customs at the door.
+    let driver = false
+    if (read && !office && !owner && u.role === 'shipper' && s.shipper_id === u.shipperId && isDriverRole(u.staffRole)) {
+      const { rows: on } = await db.query('select 1 from run_stops st join runs r on r.id = st.run_id join staff sf on sf.id = r.driver_id where st.shipment_id = $1 and sf.user_id = $2 and r.status <> $3 limit 1', [s.id, u.id, 'cancelled'])
+      driver = !!on[0]
+    }
+    if (!office && !owner && !driver) throw new HttpError(403, 'You do not have access to this shipment.')
+    return { u, s, office, driver }
   }
   const docById = async (db: Db, id: string) => {
     const { rows } = await db.query<Row>(`select ${META} from documents where id = $1`, [id])
@@ -170,8 +176,8 @@ export function mountDocuments(r: Router, d: Deps) {
     const db = await getDb()
     const { rows } = await db.query<Row>('select * from documents where id = $1', [req.params.id])
     const doc = rows[0]; if (!doc) throw new HttpError(404, 'Document not found.')
-    const { office } = await access(db, req, doc.shipment_id)
-    if (!office && doc.visibility !== 'shared') throw new HttpError(403, 'This document is not shared with you.')
+    const { office, driver } = await access(db, req, doc.shipment_id, true)
+    if (!office && !driver && doc.visibility !== 'shared') throw new HttpError(403, 'This document is not shared with you.')
     res.set('Cache-Control', 'private, no-store')
     res.json({ document: docOut({ ...doc, has_file: doc.data != null, has_payload: doc.payload != null }), dataUrl: doc.data ? `data:${doc.mime};base64,${doc.data}` : null, payload: doc.payload ? (typeof doc.payload === 'string' ? JSON.parse(doc.payload) : doc.payload) : null, canManage: office })
   }))

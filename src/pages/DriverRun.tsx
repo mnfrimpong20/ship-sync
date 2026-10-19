@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Banknote, Camera, Check, CheckCircle2, ChevronDown, Clock, Flag, Map as MapIcon, MessageCircle, Minus, Navigation, Package, Phone, Play, Plus, Route, Send, SkipForward, Smartphone, Sun, Undo2, WifiOff, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Banknote, Check, CheckCircle2, ChevronDown, Clock, CreditCard, Flag, Fuel, KeyRound, LocateFixed, Map as MapIcon, MessageCircle, MessageSquare, Minus, Navigation, Package, PackageCheck, Phone, Play, Plus, Route, Send, ShieldCheck, SkipForward, Smartphone, Sun, Undo2, Volume2, Warehouse, WifiOff } from 'lucide-react'
 import { opsApi, type Run, type RunStop } from '../lib/ops'
-import { shrinkPhoto, stopOrQueue, startQueueSync, type StopPatch } from '../lib/scan'
+import { stopOrQueue, startQueueSync, type StopPatch } from '../lib/scan'
 import { daySummary, routeLink, stopLink, telLink, useDispatch, useMyRuns, useOnline, useQueued, useWakeLock, waLink } from '../lib/driver'
 import { setDisplay, useDisplay } from '../lib/prefs'
 import { useT } from '../lib/i18n'
@@ -12,48 +11,65 @@ import { BrandLoader } from '../components/BrandLoader'
 import { SignaturePad } from '../components/SignaturePad'
 import RunMap from '../components/RunMap'
 import { fmtDateTime } from '../components/ui'
+import { Big, Choice, PhotoField, Sheet } from '../components/driver/DriverUi'
+import { ExpenseSheet, IncidentSheet, MessagesSheet, PieceScanSheet, VehicleCheckSheet, useLiveLocation, useRunWatch } from '../components/driver/DriverTools'
+import { PayQr, StopTools, useStopDetails } from '../components/driver/StopTools'
+import { speak, type StopDetails } from '../lib/driverApi'
 
 const money = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
 const SKIPS = [['not_home', 'Nobody home'], ['wrong_address', 'Wrong address'], ['refused', 'Refused'], ['no_access', 'Couldn’t get in']] as const
 
-/** Full-screen sheet for one task at a stop (proof, skip, on my way). Escape or Back closes it. */
-function Sheet({ title, onClose, children, testid }: { title: string; onClose: () => void; children: ReactNode; testid?: string }) {
-  const back = useRef<HTMLButtonElement>(null); const t = useT()
-  useEffect(() => { const prev = document.body.style.overflow; document.body.style.overflow = 'hidden'; setTimeout(() => back.current?.focus(), 30); const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', k); return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', k) } }, [onClose])
-  return createPortal(
-    <div role="dialog" aria-modal="true" aria-labelledby="sheet-title" className="ss-app fixed inset-0 z-[70] flex flex-col overflow-y-auto bg-bg text-text" data-testid={testid}>
-      <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-bg/95 px-3 py-2 backdrop-blur-xl">
-        <button ref={back} onClick={onClose} className="inline-flex min-h-12 items-center gap-1.5 rounded-lg px-2 text-base font-semibold focus-ring"><ArrowLeft size={20} aria-hidden="true" /> {t('Back')}</button>
-        <h2 id="sheet-title" className="ml-1 truncate !text-lg">{title}</h2>
-      </div>
-      <div className="mx-auto w-full max-w-xl flex-1 px-4 pb-32 pt-4">{children}</div>
-    </div>, document.body)
-}
-
-/** Big, full-width action button for gloves and sunlight. */
-const Big = ({ children, onClick, tone = 'ghost', disabled, testid, type = 'button' }: { children: ReactNode; onClick?: () => void; tone?: 'gold' | 'ghost' | 'danger'; disabled?: boolean; testid?: string; type?: 'button' | 'submit' }) => (
-  <button type={type} onClick={onClick} disabled={disabled} data-testid={testid} className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl px-4 text-base font-semibold focus-ring disabled:opacity-50 ${tone === 'gold' ? 'bg-gold text-on-accent hover:brightness-105' : tone === 'danger' ? 'border-2 border-danger text-danger' : 'border-2 border-border bg-surface hover:border-gold'}`}>{children}</button>
-)
-
 /** Proof at the stop: who took it, pieces, a photo, a signature — and any money taken at the door. */
-function ProofSheet({ run, stop, onClose, onSubmit }: { run: Run; stop: RunStop; onClose: () => void; onSubmit: (p: StopPatch) => Promise<void> }) {
+const ID_TYPES = [['ghana_card', 'Ghana Card'], ['passport', 'Passport'], ['drivers_license', 'Driver’s licence'], ['voter_id', 'Voter ID'], ['other', 'Other ID']] as const
+const LEFT = [['neighbour', 'A neighbour'], ['gate', 'Gate / security'], ['reception', 'Reception'], ['family', 'A family member'], ['other', 'Someone else']] as const
+function ProofSheet({ run, stop, d, onClose, onSubmit }: { run: Run; stop: RunStop; d: StopDetails | null; onClose: () => void; onSubmit: (p: StopPatch) => Promise<void> }) {
   const t = useT(); const delivery = run.kind === 'delivery'
+  const needCode = delivery && !!stop.codeRequired && !stop.codeOk
+  const [how, setHow] = useState<'code' | 'id' | 'left'>('code'); const [code, setCode] = useState(''); const [idType, setIdType] = useState<NonNullable<StopPatch['idCheck']>['type']>('ghana_card'); const [last4, setLast4] = useState('')
+  const [leftKind, setLeftKind] = useState<NonNullable<StopPatch['leftWith']>['kind'] | ''>(''); const [leftName, setLeftName] = useState('')
   const [receivedBy, setReceivedBy] = useState(stop.contact || ''); const [pieces, setPieces] = useState<number | ''>(''); const [photo, setPhoto] = useState(''); const [signature, setSignature] = useState(''); const [note, setNote] = useState('')
   const owe = stop.collectUsd ?? 0
-  const [paid, setPaid] = useState<'' | 'cash' | 'mobile_money' | 'none'>(owe ? '' : 'none'); const [amount, setAmount] = useState(String(owe || ''))
+  const [paid, setPaid] = useState<'' | 'cash' | 'mobile_money' | 'zelle' | 'card' | 'none'>(owe && stop.collectRule !== 'off' ? '' : 'none'); const [amount, setAmount] = useState(String(owe || ''))
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   const blocked = owe > 0 && stop.collectRule === 'block' && (paid === 'none' || paid === '')
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); if (owe && !paid) { setErr(t('Say whether you collected the money.')); return }
+    if (needCode && how === 'code' && !/^\d{4}$/.test(code)) { setErr(t('Enter the 4-digit code.')); return }
+    if (needCode && how === 'id' && !/^[A-Za-z0-9]{2,4}$/.test(last4)) { setErr(t('Type only the last 4 characters of the ID.')); return }
+    if (delivery && how === 'left' && (!leftKind || !photo)) { setErr(t('Say who has it and take a photo of where you left it.')); return }
     setBusy(true); setErr('')
-    try { await onSubmit({ status: 'done', note: note.trim() || undefined, receivedBy: delivery ? receivedBy.trim() || undefined : undefined, pieces: pieces === '' ? undefined : pieces, photo: photo || undefined, signature: signature || undefined, collected: paid === 'cash' || paid === 'mobile_money' ? { method: paid, amountUsd: Number(amount) || owe } : undefined }) }
+    const proof: Partial<StopPatch> = needCode ? (how === 'code' ? { code } : how === 'id' ? { idCheck: { type: idType, last4 } } : {}) : {}
+    try { await onSubmit({ status: 'done', ...proof, leftWith: delivery && how === 'left' && leftKind ? { kind: leftKind, name: leftName.trim() } : undefined, note: note.trim() || undefined, receivedBy: delivery && how !== 'left' ? receivedBy.trim() || undefined : undefined, pieces: pieces === '' ? undefined : pieces, photo: photo || undefined, signature: signature || undefined, collected: paid && paid !== 'none' ? { method: paid, amountUsd: Number(amount) || owe } : undefined }) }
     catch (er) { setErr(er instanceof Error ? er.message : t('Could not save.')); setBusy(false) }
   }
   return (
     <Sheet title={delivery ? t('Proof of delivery') : t('Pickup done')} onClose={onClose} testid="proof-sheet">
       <p className="text-sm text-text-muted">{stop.label}{stop.shipmentRef ? ` · ${stop.shipmentRef}` : ''}</p>
       <form onSubmit={submit} className="mt-4 space-y-5">
-        {delivery && <div><label htmlFor="pod-name" className="label-dark">{t('Who received it?')}</label><input id="pod-name" className="input-dark !min-h-14 text-lg" autoComplete="off" value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} placeholder={t('Their name')} required data-testid="pod-name" /></div>}
+        {delivery && (
+          <div className="grid gap-2" role="radiogroup" aria-label={t('How are you handing it over?')}>
+            <Choice on={how !== 'left'} onClick={() => setHow(needCode ? 'code' : 'id')} testid="hand-person">{t('To the receiver')}</Choice>
+            <Choice on={how === 'left'} onClick={() => setHow('left')} testid="hand-left">{t('Left with someone / at the gate')}</Choice>
+          </div>
+        )}
+        {delivery && how !== 'left' && <div><label htmlFor="pod-name" className="label-dark">{t('Who received it?')}</label><input id="pod-name" className="input-dark !min-h-14 text-lg" autoComplete="off" value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} placeholder={t('Their name')} required data-testid="pod-name" /></div>}
+        {needCode && how !== 'left' && (
+          <fieldset className="rounded-2xl border-2 border-gold/60 p-4" data-testid="code-box">
+            <legend className="px-1 text-base font-bold"><KeyRound size={16} className="mr-1 inline" aria-hidden="true" />{t('Check it’s them')}</legend>
+            <div className="grid grid-cols-2 gap-2"><button type="button" aria-pressed={how === 'code'} onClick={() => setHow('code')} className={`min-h-12 rounded-xl border-2 text-base font-semibold focus-ring ${how === 'code' ? 'border-gold bg-gold/15' : 'border-border'}`}>{t('Delivery code')}</button><button type="button" aria-pressed={how === 'id'} onClick={() => setHow('id')} className={`min-h-12 rounded-xl border-2 text-base font-semibold focus-ring ${how === 'id' ? 'border-gold bg-gold/15' : 'border-border'}`} data-testid="use-id">{t('Check ID')}</button></div>
+            {how === 'code' ? <><label htmlFor="pod-code" className="label-dark mt-3">{t('The 4 digits they got by text')}</label><input id="pod-code" inputMode="numeric" autoComplete="one-time-code" maxLength={4} className="input-dark !min-h-14 w-40 text-center font-mono text-3xl tracking-[0.4em]" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))} data-testid="pod-code" /></>
+              : <div className="mt-3 grid grid-cols-[1fr_7rem] gap-2"><div><label htmlFor="pod-idtype" className="label-dark">{t('ID type')}</label><select id="pod-idtype" className="input-dark !min-h-12" value={idType} onChange={(e) => setIdType(e.target.value as typeof idType)}>{ID_TYPES.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}</select></div><div><label htmlFor="pod-last4" className="label-dark">{t('Last 4')}</label><input id="pod-last4" maxLength={4} className="input-dark !min-h-12 text-center font-mono text-lg uppercase" value={last4} onChange={(e) => setLast4(e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 4))} data-testid="pod-last4" /></div><p className="col-span-2 text-sm text-text-muted">{t('Only the last 4 characters are kept — never the full number.')}</p></div>}
+          </fieldset>
+        )}
+        {delivery && how === 'left' && (
+          <fieldset className="rounded-2xl border-2 border-border p-4" data-testid="left-box">
+            <legend className="px-1 text-base font-bold">{t('Who has it?')}</legend>
+            <div className="grid gap-2" role="radiogroup" aria-label={t('Who has it?')}>{LEFT.map(([k, l]) => <Choice key={k} on={leftKind === k} onClick={() => setLeftKind(k)} testid={`left-${k}`}>{t(l)}</Choice>)}</div>
+            <label htmlFor="left-name" className="label-dark mt-3">{t('Their name or where exactly')} <span className="font-normal text-text-muted">({t('optional')})</span></label>
+            <input id="left-name" className="input-dark !min-h-12" value={leftName} onChange={(e) => setLeftName(e.target.value)} placeholder={t('e.g. Auntie Ama, blue gate next door')} />
+            <p className="mt-2 text-sm text-text-muted">{t('The receiver gets a text saying where it is. A photo is required.')}</p>
+          </fieldset>
+        )}
         <div>
           <p className="label-dark" id="pieces-l">{delivery ? t('Pieces handed over') : t('Pieces collected')}</p>
           <div className="flex items-center gap-3" role="group" aria-labelledby="pieces-l">
@@ -64,26 +80,28 @@ function ProofSheet({ run, stop, onClose, onSubmit }: { run: Run; stop: RunStop;
         </div>
         <div>
           <p className="label-dark">{t('Photo')} <span className="font-normal text-text-muted">({delivery ? t('the goods at the door') : t('the goods in the truck')})</span></p>
-          {photo ? <div className="relative"><img src={photo} alt={t('Proof photo')} className="max-h-64 w-full rounded-2xl object-cover" /><button type="button" onClick={() => setPhoto('')} className="absolute right-2 top-2 grid h-11 w-11 place-items-center rounded-full bg-black/60 text-white" aria-label={t('Remove photo')}><X size={18} /></button></div>
-            : <label className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface text-base font-semibold focus-within:ring-2 focus-within:ring-gold"><Camera size={20} aria-hidden="true" /> {t('Take a photo')}<input type="file" accept="image/*" capture="environment" className="sr-only" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setPhoto(await shrinkPhoto(f)) }} data-testid="pod-photo" /></label>}
+          <PhotoField value={photo} onChange={setPhoto} label={t('Take a photo')} testid="pod-photo" />
         </div>
-        {delivery && <div><p className="label-dark">{t('Signature')} <span className="font-normal text-text-muted">({t('optional')})</span></p><SignaturePad value={signature} onChange={setSignature} height={170} /></div>}
+        {delivery && how !== 'left' && <div><p className="label-dark">{t('Signature')} <span className="font-normal text-text-muted">({t('optional')})</span></p><SignaturePad value={signature} onChange={setSignature} height={170} /></div>}
         {owe > 0 && (
           <fieldset className={`rounded-2xl border-2 p-4 ${stop.collectRule === 'block' ? 'border-danger/60' : 'border-gold/60'}`} data-testid="collect-box">
-            <legend className="px-1 text-base font-bold">{t('Collect {amount}', { amount: money(owe) })}</legend>
-            <p className="text-sm text-text-muted">{stop.collectRule === 'block' ? t('The office asked for this to be paid before handing over.') : t('Still owed on this shipment.')}</p>
+            <legend className="px-1 text-base font-bold">{stop.collectRule === 'off' ? t('Take payment? {amount} owed', { amount: money(owe) }) : t('Collect {amount}', { amount: money(owe) })}</legend>
+            <p className="text-sm text-text-muted">{stop.collectRule === 'block' ? t('The office asked for this to be paid before handing over.') : stop.collectRule === 'off' ? t('A deposit or the full amount — optional. It goes on their invoice.') : t('Still owed on this shipment.')}</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button type="button" aria-pressed={paid === 'cash'} onClick={() => setPaid('cash')} className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 text-base font-semibold focus-ring ${paid === 'cash' ? 'border-gold bg-gold/15' : 'border-border'}`} data-testid="paid-cash"><Banknote size={20} aria-hidden="true" /> {t('Paid cash')}</button>
               <button type="button" aria-pressed={paid === 'mobile_money'} onClick={() => setPaid('mobile_money')} className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 text-base font-semibold focus-ring ${paid === 'mobile_money' ? 'border-gold bg-gold/15' : 'border-border'}`} data-testid="paid-momo"><Smartphone size={20} aria-hidden="true" /> {t('Paid MoMo')}</button>
+              <button type="button" aria-pressed={paid === 'zelle'} onClick={() => setPaid('zelle')} className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 text-base font-semibold focus-ring ${paid === 'zelle' ? 'border-gold bg-gold/15' : 'border-border'}`} data-testid="paid-zelle"><Send size={20} aria-hidden="true" /> {t('Paid Zelle')}</button>
+              <button type="button" aria-pressed={paid === 'card'} onClick={() => setPaid('card')} className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 text-base font-semibold focus-ring ${paid === 'card' ? 'border-gold bg-gold/15' : 'border-border'}`} data-testid="paid-card"><CreditCard size={20} aria-hidden="true" /> {t('Card')}</button>
               <button type="button" aria-pressed={paid === 'none'} onClick={() => setPaid('none')} className={`col-span-2 min-h-12 rounded-2xl border-2 text-base focus-ring ${paid === 'none' ? 'border-text bg-surface-2' : 'border-border'}`}>{t('Not paid')}</button>
             </div>
-            {(paid === 'cash' || paid === 'mobile_money') && <div className="mt-3"><label htmlFor="paid-amt" className="label-dark">{t('Amount taken (USD)')}</label><input id="paid-amt" inputMode="decimal" className="input-dark !min-h-12 text-lg tabular-nums" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} /></div>}
+            {paid === 'card' && (d?.payLink ? <PayQr url={d.payLink} /> : <p className="mt-3 text-sm text-text-muted">{t('No card link for this shipment yet — ask the office to send the invoice, or take cash, MoMo or Zelle.')}</p>)}
+            {paid && paid !== 'none' && <div className="mt-3"><label htmlFor="paid-amt" className="label-dark">{paid === 'card' ? t('Amount they paid (USD)') : t('Amount taken (USD)')}</label><input id="paid-amt" inputMode="decimal" className="input-dark !min-h-12 text-lg tabular-nums" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} /></div>}
             {blocked && paid === 'none' && <p className="mt-3 text-sm font-semibold text-danger" role="alert">{t('Don’t hand it over yet — call dispatch to release it.')}</p>}
           </fieldset>
         )}
-        <div><label htmlFor="pod-note" className="label-dark">{t('Note')} <span className="font-normal text-text-muted">({t('optional')})</span></label><input id="pod-note" className="input-dark !min-h-12" value={note} onChange={(e) => setNote(e.target.value)} placeholder={delivery ? t('e.g. left with the neighbour') : t('e.g. one barrel taped again')} /></div>
+        <div><label htmlFor="pod-note" className="label-dark">{t('Note')} <span className="font-normal text-text-muted">({t('optional')})</span></label><input id="pod-note" className="input-dark !min-h-12" value={note} onChange={(e) => setNote(e.target.value)} placeholder={delivery ? t('e.g. receiver checked the seal') : t('e.g. one barrel taped again')} /></div>
         {err && <p role="alert" className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{err}</p>}
-        <div className="fixed inset-x-0 bottom-0 border-t border-border bg-bg/95 p-3 backdrop-blur-xl"><div className="mx-auto max-w-xl"><Big type="submit" tone="gold" disabled={busy || blocked} testid="pod-save"><Check size={22} aria-hidden="true" /> {busy ? t('Saving…') : delivery ? t('Mark delivered') : t('Mark collected')}</Big></div></div>
+        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-bg/95 p-3 backdrop-blur-xl"><div className="mx-auto max-w-xl"><Big type="submit" tone="gold" disabled={busy || blocked} testid="pod-save"><Check size={22} aria-hidden="true" /> {busy ? t('Saving…') : delivery ? t('Mark delivered') : t('Mark collected')}</Big></div></div>
       </form>
     </Sheet>
   )
@@ -142,6 +160,10 @@ export default function DriverRun({ id }: { id: string }) {
   const ordered = useMemo(() => [...(run?.stops ?? [])].sort((a, b) => a.seq - b.seq), [run])
   const pending = ordered.filter((s) => s.status === 'pending'); const finished = ordered.filter((s) => s.status !== 'pending')
   const next = pending.find((s) => s.id === pick) ?? pending[0]
+  const [tool, setTool] = useState<null | { kind: 'vcheck' | 'load' | 'drop' | 'incident' | 'msg' | 'expense'; stopId?: string; start?: boolean }>(null)
+  const { d, reload: reloadDetails } = useStopDetails(run?.id, next?.id, !offline, run?.status)
+  const loc = useLiveLocation(run, (labels) => setInfo(t('Arriving soon — {names} told you’re a few minutes away.', { names: labels.join(', ') })))
+  useRunWatch(run, reload, (n) => { setInfo(t('{n} new stops added by dispatch.', { n })); if (navigator.vibrate) navigator.vibrate([60, 40, 60]) })
   if (!runs && !offline) return <BrandLoader partner />
   if (!run) return <div className="container-x py-10"><p className="text-text-muted">{error || t('This run isn’t on your list any more.')}</p><Link to="/dashboard/runs" className="btn-gold mt-4 !min-h-12">{t('Back to my runs')}</Link></div>
 
@@ -156,6 +178,8 @@ export default function DriverRun({ id }: { id: string }) {
     if (navigator.vibrate) navigator.vibrate(40)
   }
   const act = async (fn: () => Promise<Run>) => { setBusy(true); setErr(''); try { setRun(await fn()) } catch (e) { setErr(e instanceof Error ? e.message : t('Something went wrong.')) } finally { setBusy(false) } }
+  const readAloud = (s: RunStop) => { const parts = [t('Next stop'), s.contact || s.label, s.address, s.etaFrom ? t('between {a} and {b}', { a: s.etaFrom, b: s.etaTo ?? '' }) : '', s.note, s.collectUsd ? t('Collect {amount}', { amount: money(s.collectUsd) }) : '']; if (!speak(parts.filter(Boolean).join('. '), disp.lang)) setErr(t('This phone can’t read aloud.')) }
+  const start = () => { if (!run.vehicleCheck) setTool({ kind: 'vcheck', start: true }); else void act(() => opsApi.updateRun(run.id, { status: 'in_progress' })) }
   const all = routeLink(pending)
   const sum = daySummary([run])
 
@@ -176,7 +200,12 @@ export default function DriverRun({ id }: { id: string }) {
         {err && <p role="alert" className="mt-3 rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3 text-base text-danger">{err}</p>}
         {run.notes && <details className="mt-3 rounded-2xl border border-border bg-surface px-4 py-3"><summary className="min-h-8 cursor-pointer text-base font-semibold">{t('Notes from dispatch')}</summary><p className="mt-2 whitespace-pre-line text-base">{run.notes}</p></details>}
 
-        {run.status === 'planned' && <div className="mt-5"><Big tone="gold" onClick={() => act(() => opsApi.updateRun(run.id, { status: 'in_progress' }))} disabled={busy || offline} testid="start-run"><Play size={22} aria-hidden="true" /> {t('Start run')}</Big></div>}
+        {run.status === 'planned' && <div className="mt-5 grid gap-2">
+          {run.kind === 'delivery' && <Big onClick={() => setTool({ kind: 'load' })} disabled={offline} testid="load-truck"><PackageCheck size={22} aria-hidden="true" /> {t('Load the truck')}</Big>}
+          <Big tone="gold" onClick={start} disabled={busy || offline} testid="start-run"><Play size={22} aria-hidden="true" /> {run.vehicleCheck ? t('Start run') : t('Vehicle check & start')}</Big>
+        </div>}
+        {run.vehicleCheck && run.vehicleCheck.issues.length > 0 && <p className="mt-3 flex items-center gap-2 rounded-2xl border border-gold/50 bg-gold/10 px-4 py-3 text-base"><AlertTriangle size={18} aria-hidden="true" /> {t('Vehicle: {issues}', { issues: run.vehicleCheck.issues.join(', ') })}</p>}
+        {run.status === 'in_progress' && loc !== 'off' && <p className="mt-2 flex items-center gap-1.5 text-sm text-text-muted" data-testid="loc-state"><LocateFixed size={14} aria-hidden="true" /> {loc === 'on' ? t('Sharing your location with dispatch while the app is open') : t('Location is off — customers won’t get “arriving soon” texts')}</p>}
 
         {/* ---- next stop ---- */}
         {next && (
@@ -187,13 +216,16 @@ export default function DriverRun({ id }: { id: string }) {
             <p className="mt-2 text-lg leading-snug">{next.address || <span className="italic text-text-muted">{t('No address — call them')}</span>}</p>
             <p className="mt-1 flex flex-wrap gap-x-3 text-base text-text-muted">{next.shipmentRef && <span className="font-mono">{next.shipmentRef}</span>}{next.etaFrom && <span><Clock size={14} className="inline" aria-hidden="true" /> {next.etaFrom}{next.etaTo ? `–${next.etaTo}` : ''}</span>}{next.onWayAt && <span className="text-teal">{t('Told them you’re coming')}</span>}</p>
             {next.note && <p className="mt-2 rounded-xl bg-surface-2 px-3 py-2 text-base">“{next.note}”</p>}
-            {next.collectUsd ? <p className={`mt-3 rounded-xl px-3 py-2 text-base font-bold ${next.collectRule === 'block' ? 'bg-danger/15 text-danger' : 'bg-gold/15 text-gold-deep'}`} data-testid="next-collect">{t('Collect {amount}', { amount: money(next.collectUsd) })}{next.collectRule === 'block' ? ` · ${t('before handing over')}` : ''}</p> : null}
+            <button onClick={() => readAloud(next)} className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-xl px-1 text-base font-semibold text-gold-deep focus-ring" data-testid="read-aloud"><Volume2 size={18} aria-hidden="true" /> {t('Read aloud')}</button>
+            {next.collectUsd ? <p className={`mt-3 rounded-xl px-3 py-2 text-base font-bold ${next.collectRule === 'block' ? 'bg-danger/15 text-danger' : next.collectRule === 'off' ? 'bg-surface-2 text-text' : 'bg-gold/15 text-gold-deep'}`} data-testid="next-collect">{next.collectRule === 'off' ? t('{amount} owed — take a deposit if they want to pay now', { amount: money(next.collectUsd) }) : t('Collect {amount}', { amount: money(next.collectUsd) })}{next.collectRule === 'block' ? ` · ${t('before handing over')}` : ''}</p> : null}
             <div className="mt-4 grid grid-cols-2 gap-2">
               {(next.lat != null || next.address) && <a href={stopLink(next)} target="_blank" rel="noreferrer" className="col-span-2 flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-gold text-base font-semibold text-on-accent focus-ring" data-testid="nav-next"><Navigation size={20} aria-hidden="true" /> {t('Navigate')}</a>}
               {next.phone && <a href={telLink(next.phone)} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring"><Phone size={20} aria-hidden="true" /> {t('Call')}</a>}
               {next.phone && <a href={waLink(next.phone)} target="_blank" rel="noreferrer" className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring"><MessageCircle size={20} aria-hidden="true" /> WhatsApp</a>}
+              <button onClick={() => setTool({ kind: 'msg', stopId: next.id })} disabled={offline} className="col-span-2 flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring disabled:opacity-50" data-testid="msg-stop"><MessageSquare size={20} aria-hidden="true" /> {t('Message dispatch about this stop')}</button>
               {run.status === 'in_progress' && <button onClick={() => setSheet({ kind: 'onway', stop: next })} disabled={offline} className="col-span-2 flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring disabled:opacity-50" data-testid="onway"><Send size={20} aria-hidden="true" /> {t('On my way')}</button>}
             </div>
+            {run.status === 'in_progress' && <StopTools run={run} stop={next} d={d} reload={() => { reloadDetails(); void reload() }} onInfo={setInfo} />}
             {run.status === 'in_progress' && <div className="mt-3 grid gap-2">
               <Big tone="gold" onClick={() => setSheet({ kind: 'proof', stop: next })} testid="stop-done"><CheckCircle2 size={22} aria-hidden="true" /> {run.kind === 'pickup' ? t('Mark collected') : t('Mark delivered')}</Big>
               <Big onClick={() => setSheet({ kind: 'skip', stop: next })} testid="stop-skip"><SkipForward size={20} aria-hidden="true" /> {t('Can’t do it')}</Big>
@@ -222,7 +254,7 @@ export default function DriverRun({ id }: { id: string }) {
         {finished.length > 0 && (
           <section className="mt-6">
             <button onClick={() => setShowDone((v) => !v)} aria-expanded={showDone} className="flex min-h-12 w-full items-center justify-between rounded-2xl px-1 text-left text-lg font-semibold focus-ring" data-testid="done-toggle"><span>{t('Finished')} <span className="font-normal text-text-muted">· {finished.length}</span></span><ChevronDown size={20} className={`transition-transform ${showDone ? 'rotate-180' : ''}`} aria-hidden="true" /></button>
-            {showDone && <ul className="mt-1 divide-y divide-border rounded-2xl border border-border bg-surface">{finished.map((s) => <li key={s.id} className="flex items-center gap-3 px-4 py-3 text-base">{s.status === 'done' ? <Check size={18} className="shrink-0 text-teal" aria-label={t('Done')} /> : <SkipForward size={18} className="shrink-0 text-text-muted" aria-label={t('Skipped')} />}<span className="min-w-0 flex-1"><span className="block truncate">{s.contact || s.label}</span><span className="block truncate text-sm text-text-muted">{s.status === 'done' ? [s.pod?.receivedBy && t('to {name}', { name: s.pod.receivedBy }), s.pod?.pieces != null && t('{n} pieces', { n: s.pod.pieces }), s.pod?.hasPhoto && t('photo'), s.collected && `${money(s.collected.amountUsd)} ${s.collected.method === 'cash' ? t('cash') : 'MoMo'}`].filter(Boolean).join(' · ') : s.note}</span></span>{s.doneAt && <span className="shrink-0 text-sm text-text-muted">{fmtDateTime(s.doneAt).split(', ').pop()}</span>}</li>)}</ul>}
+            {showDone && <ul className="mt-1 divide-y divide-border rounded-2xl border border-border bg-surface">{finished.map((s) => <li key={s.id} className="flex items-center gap-3 px-4 py-3 text-base">{s.status === 'done' ? <Check size={18} className="shrink-0 text-teal" aria-label={t('Done')} /> : <SkipForward size={18} className="shrink-0 text-text-muted" aria-label={t('Skipped')} />}<span className="min-w-0 flex-1"><span className="block truncate">{s.contact || s.label}</span><span className="block truncate text-sm text-text-muted">{s.status === 'done' ? [s.pod?.receivedBy && t('to {name}', { name: s.pod.receivedBy }), s.pod?.pieces != null && t('{n} pieces', { n: s.pod.pieces }), s.pod?.hasPhoto && t('photo'), s.pod?.leftWith && t('left with {who}', { who: s.pod.leftWith.name || s.pod.leftWith.kind }), s.collected && `${money(s.collected.amountUsd)} ${({ cash: t('cash'), mobile_money: 'MoMo', zelle: 'Zelle', card: t('card') } as Record<string, string>)[s.collected.method]}`].filter(Boolean).join(' · ') : s.note}</span></span>{s.doneAt && <span className="shrink-0 text-sm text-text-muted">{fmtDateTime(s.doneAt).split(', ').pop()}</span>}</li>)}</ul>}
           </section>
         )}
 
@@ -246,7 +278,15 @@ export default function DriverRun({ id }: { id: string }) {
         )}
 
         {/* ---- tools ---- */}
-        <section className="mt-8 grid gap-2">
+        <section className="mt-8 grid gap-2" aria-label={t('Tools')}>
+          {run.kind === 'delivery' && run.status === 'in_progress' && <Big onClick={() => setTool({ kind: 'load' })} disabled={offline} testid="load-truck"><PackageCheck size={20} aria-hidden="true" /> {t('Load the truck')}</Big>}
+          {run.kind === 'pickup' && finished.some((s) => s.status === 'done') && <Big tone={pending.length ? 'ghost' : 'gold'} onClick={() => setTool({ kind: 'drop' })} disabled={offline} testid="drop-warehouse"><Warehouse size={20} aria-hidden="true" /> {t('Drop at the warehouse')}</Big>}
+          <div className="grid grid-cols-2 gap-2">
+            <Big onClick={() => setTool({ kind: 'msg' })} disabled={offline} testid="msg-dispatch"><MessageSquare size={20} aria-hidden="true" /> {t('Message')}</Big>
+            <Big onClick={() => setTool({ kind: 'incident' })} disabled={offline} testid="report-incident"><AlertTriangle size={20} aria-hidden="true" /> {t('Report')}</Big>
+            <Big onClick={() => setTool({ kind: 'expense' })} disabled={offline} testid="add-expense"><Fuel size={20} aria-hidden="true" /> {t('Expense')}</Big>
+            <Big onClick={() => setTool({ kind: 'vcheck' })} disabled={offline} testid="vehicle-check"><ShieldCheck size={20} aria-hidden="true" /> {run.vehicleCheck ? t('Checked') : t('Vehicle')}</Big>
+          </div>
           {run.status === 'in_progress' && (late
             ? <div className="rounded-2xl border border-border bg-surface p-4" data-testid="late-form"><p className="text-base font-semibold">{t('About how late?')}</p><div className="mt-2 grid grid-cols-4 gap-2">{[15, 30, 60, 120].map((m) => <button key={m} disabled={busy} onClick={async () => { setBusy(true); try { const r = await opsApi.late(run.id, m); setLate(false); setInfo(r.told ? t('Told {n} customers.', { n: r.told }) : t('Noted on the run.')) } catch (e) { setErr(e instanceof Error ? e.message : t('Could not send.')) } finally { setBusy(false) } }} className="min-h-12 rounded-xl border-2 border-border text-base font-semibold focus-ring">{m >= 60 ? `${m / 60} h` : `${m}′`}</button>)}</div><button onClick={() => setLate(false)} className="mt-2 min-h-11 text-base text-text-muted">{t('Cancel')}</button></div>
             : <Big onClick={() => setLate(true)} disabled={offline} testid="running-late"><Clock size={20} aria-hidden="true" /> {t('Running late')}</Big>)}
@@ -259,7 +299,12 @@ export default function DriverRun({ id }: { id: string }) {
         {queued > 0 && <p className="mt-3 text-center text-sm text-text-muted"><Package size={14} className="inline" aria-hidden="true" /> {t('{n} updates waiting', { n: queued })}</p>}
       </div>
 
-      {sheet?.kind === 'proof' && <ProofSheet run={run} stop={sheet.stop} onClose={() => setSheet(null)} onSubmit={(p) => closeStop(sheet.stop, p)} />}
+      {tool?.kind === 'vcheck' && <VehicleCheckSheet run={run} onClose={() => setTool(null)} onDone={(issues, safe) => { const wasStart = tool.start; setTool(null); if (!safe) { void reload(); setErr(t('Vehicle not safe — the office has been told. Don’t start the run in it.')); return } setInfo(issues.length ? t('Check saved — the office was told about: {issues}.', { issues: issues.join(', ') }) : t('Vehicle check saved.')); if (wasStart) void act(() => opsApi.updateRun(run.id, { status: 'in_progress' })); else void reload() }} />}
+      {(tool?.kind === 'load' || tool?.kind === 'drop') && <PieceScanSheet run={run} kind={tool.kind} onClose={() => setTool(null)} />}
+      {tool?.kind === 'incident' && <IncidentSheet run={run} stopId={tool.stopId ?? next?.id} onClose={() => setTool(null)} onDone={(claim) => { setTool(null); setInfo(claim ? t('Sent. An insurance claim was opened.') : t('Sent to the office.')) }} />}
+      {tool?.kind === 'msg' && <MessagesSheet run={run} stopId={tool.stopId} onClose={() => setTool(null)} />}
+      {tool?.kind === 'expense' && <ExpenseSheet run={run} defaultCurrency={run.kind === 'delivery' ? 'GHS' : 'USD'} onClose={() => setTool(null)} onDone={(usd) => { setTool(null); setInfo(t('Expense saved ({amount}).', { amount: money(usd) })) }} />}
+      {sheet?.kind === 'proof' && <ProofSheet run={run} stop={sheet.stop} d={sheet.stop.id === next?.id ? d : null} onClose={() => setSheet(null)} onSubmit={(p) => closeStop(sheet.stop, p)} />}
       {sheet?.kind === 'skip' && <SkipSheet stop={sheet.stop} onClose={() => setSheet(null)} onSubmit={(p) => closeStop(sheet.stop, p)} />}
       {sheet?.kind === 'onway' && <OnWaySheet stop={sheet.stop} onClose={() => setSheet(null)} onSend={async (m) => { const r = await opsApi.onWay(run.id, sheet.stop.id, m); void reload(); return r.texted || r.told ? t('Sent: “{text}”', { text: r.text }) : t('Noted on their tracking page. Texts go out once the text-message service is connected.') }} />}
     </div>

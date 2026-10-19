@@ -13,11 +13,11 @@ export type VehicleType = 'van' | 'truck' | 'box_truck' | 'pickup' | 'trailer' |
 export type VehicleStatus = 'available' | 'on_run' | 'maintenance' | 'retired'
 export interface Vehicle { id: string; name: string; type: VehicleType; plate: string; capacityKg?: number; capacityNote: string; base: StaffBase; city: string; country: string; status: VehicleStatus; driverId?: string; notes: string; createdAt: string }
 export type VehicleInput = Omit<Vehicle, 'id' | 'createdAt' | 'driverId' | 'capacityKg'> & { driverId?: string | null; capacityKg?: number | null }
-export interface RunStop { id: string; runId: string; seq: number; shipmentId?: string; label: string; address: string; lat?: number; lon?: number; contact: string; phone: string; status: 'pending' | 'done' | 'skipped'; doneAt?: string; note: string; collectUsd?: number; collectRule?: 'off' | 'warn' | 'block'; shipmentRef?: string; shipmentStatus?: ShipmentStatus; etaFrom?: string; etaTo?: string; pod?: { receivedBy: string; pieces?: number; hasPhoto: boolean; hasSignature: boolean; by: string }; skipReason?: string; tries?: number; onWayAt?: string; collected?: { method: 'cash' | 'mobile_money'; amountUsd: number; at: string } }
+export interface RunStop { id: string; runId: string; seq: number; shipmentId?: string; label: string; address: string; lat?: number; lon?: number; contact: string; phone: string; status: 'pending' | 'done' | 'skipped'; doneAt?: string; note: string; collectUsd?: number; collectRule?: 'off' | 'warn' | 'block'; shipmentRef?: string; shipmentStatus?: ShipmentStatus; etaFrom?: string; etaTo?: string; pod?: { receivedBy: string; pieces?: number; hasPhoto: boolean; hasSignature: boolean; by: string; leftWith?: { kind: string; name: string } }; skipReason?: string; tries?: number; onWayAt?: string; collected?: { method: 'cash' | 'mobile_money' | 'zelle' | 'card'; amountUsd: number; at: string }; codeRequired?: boolean; codeOk?: boolean; idChecked?: boolean; nearAt?: string; vehicleReport?: boolean; suppliesDropped?: boolean; handedOver?: boolean }
 export interface RunStart { label: string; lat: number; lon: number }
 export type RunKind = 'pickup' | 'delivery'
 export type RunStatus = 'planned' | 'in_progress' | 'done' | 'cancelled'
-export interface Run { id: string; name: string; kind: RunKind; date: string; driverId?: string; vehicleId?: string; start: RunStart | null; status: RunStatus; distanceKm?: number; notes: string; createdAt: string; stops: RunStop[]; driverName?: string; vehicleName?: string; summarySentAt?: string }
+export interface Run { id: string; name: string; kind: RunKind; date: string; driverId?: string; vehicleId?: string; start: RunStart | null; status: RunStatus; distanceKm?: number; notes: string; createdAt: string; stops: RunStop[]; driverName?: string; vehicleName?: string; summarySentAt?: string; vehicleCheck?: { at: string; by: string; issues: string[]; safe: boolean; odometer: number | null } }
 export interface StopInput { shipmentId?: string; label: string; address?: string; lat?: number; lon?: number; contact?: string; phone?: string }
 export interface RunInput { name: string; kind: RunKind; date: string; driverId?: string | null; vehicleId?: string | null; start?: RunStart | null; notes?: string; stops: StopInput[] }
 export interface Candidate { shipmentId: string; ref: string; mode: Mode; status: ShipmentStatus; description: string; eta: string | null; label: string; address: string; contact: string; phone: string; readyAt?: string | null; city?: string }
@@ -52,7 +52,7 @@ export const ROLE_BASE: Record<StaffRole, Area[] | 'all'> = {
   delivery_driver: ['routes'],
   driver: ['routes'],
 }
-const ALWAYS = ['/dashboard/costs', '/dashboard/campaigns', '/dashboard/integrations', '/dashboard/activity', '/dashboard/billing', '/dashboard/shipper', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/documents', '/dashboard/invoices', '/dashboard/runs', '/dashboard/suppliers']
+const ALWAYS = ['/dashboard/costs', '/dashboard/campaigns', '/dashboard/integrations', '/dashboard/activity', '/dashboard/billing', '/dashboard/shipper', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/documents', '/dashboard/invoices', '/dashboard/runs', '/dashboard/suppliers', '/dashboard/drivers']
 /** Effective areas for a person: role defaults + allow − deny. */
 export function areasFor(role: StaffRole | undefined, perms?: StaffPerms): Area[] | 'all' {
   const base = ROLE_BASE[role ?? 'owner']
@@ -63,7 +63,7 @@ export function areasFor(role: StaffRole | undefined, perms?: StaffPerms): Area[
 export const roleHome: Record<StaffRole, string> = { owner: '/dashboard/shipper', dispatcher: '/dashboard/shipper', agent: '/dashboard/shipper', finance: '/dashboard/shipper', warehouse: '/dashboard/warehouse', pickup_driver: '/dashboard/runs', delivery_driver: '/dashboard/runs', driver: '/dashboard/runs' }
 export const roleAllows = (role: StaffRole | undefined, pathname: string, perms?: StaffPerms) => {
   const hit = (p: string) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p + '?')
-  if (isDriverRole(role) && hit('/dashboard/shipper')) return false
+  if (isDriverRole(role) && (hit('/dashboard/shipper') || hit('/dashboard/drivers'))) return false
   if (ALWAYS.some(hit)) return true
   const a = areasFor(role, perms); if (a === 'all') return true
   return a.some((x) => hit(AREA_PATHS[x]))

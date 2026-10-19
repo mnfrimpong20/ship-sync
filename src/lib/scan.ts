@@ -39,7 +39,7 @@ export async function shrinkPhoto(file: File, max = 1100, quality = 0.72): Promi
  * when the phone is back online (or on the next visit). The original scan time travels with them. */
 const QUEUE_KEY = 'ss-scan-queue'
 /** What a driver sends when closing a stop: status, note, proof and money taken at the door. */
-export interface StopPatch { status?: 'done' | 'skipped' | 'pending'; note?: string; receivedBy?: string; photo?: string; signature?: string; pieces?: number; skipReason?: 'not_home' | 'wrong_address' | 'refused' | 'no_access' | 'other'; retry?: boolean; collected?: { method: 'cash' | 'mobile_money'; amountUsd: number } }
+export interface StopPatch { status?: 'done' | 'skipped' | 'pending'; note?: string; receivedBy?: string; photo?: string; signature?: string; pieces?: number; skipReason?: 'not_home' | 'wrong_address' | 'refused' | 'no_access' | 'other'; retry?: boolean; collected?: { method: 'cash' | 'mobile_money' | 'zelle' | 'card'; amountUsd: number }; code?: string; idCheck?: { type: 'ghana_card' | 'passport' | 'drivers_license' | 'voter_id' | 'other'; last4: string }; leftWith?: { kind: 'neighbour' | 'gate' | 'reception' | 'family' | 'other'; name: string } }
 export interface QueuedScan { id: string; input: ScanInput; at: string; tries: number; error?: string; stop?: { runId: string; stopId: string; patch: StopPatch } }
 export const SCAN_QUEUE_EVENT = 'ss:scan-queue'
 const readQueue = (): QueuedScan[] => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]') } catch { return [] } }

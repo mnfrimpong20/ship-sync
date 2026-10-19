@@ -13,6 +13,7 @@ import { Clock, WifiOff } from 'lucide-react'
 import { statusLabels } from '../lib/data'
 import { runTone } from './Routes'
 import DriverRun from './DriverRun'
+import { RunOffice, useRunTruck } from '../components/driver/RunOffice'
 
 type Draft = StopInput & { id: string; geoState?: 'pending' | 'ok' | 'miss' }
 const uid = () => Math.random().toString(36).slice(2, 10)
@@ -54,6 +55,7 @@ export default function RoutePlanner() {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [late, setLate] = useState<null | { minutes: number; note: string }>(null)
+  const truck = useRunTruck(run, manage)
   const [queued, setQueued] = useState(0)
   useEffect(() => { startQueueSync(); const on = () => setQueued(scanQueue.list().filter((q) => q.stop).length); on(); window.addEventListener(SCAN_QUEUE_EVENT, on); return () => window.removeEventListener(SCAN_QUEUE_EVENT, on) }, [])
   useEffect(() => { if (!info) return; const t = setTimeout(() => setInfo(''), 5000); return () => clearTimeout(t) }, [info])
@@ -225,6 +227,7 @@ export default function RoutePlanner() {
                 </section>
               )}
               {!isNew && run && (!manage || run.status !== 'planned') && run.notes && <section className="card-dark p-5"><h2 className="!text-base">Notes</h2><p className="mt-2 text-sm text-text-muted">{run.notes}</p></section>}
+              {!isNew && run && manage && <RunOffice run={run} pos={truck} />}
 
               {/* stops */}
               <section className="card-dark p-5" aria-label="Stops">
@@ -314,7 +317,7 @@ export default function RoutePlanner() {
 
             {/* ---- right: map ---- */}
             <div className="lg:sticky lg:top-20 lg:self-start">
-              <RunMap start={mapStart} stops={mapStops} draggable={!!editable} onMove={onMove} onClickMap={onClickMap} focusId={focus} className={`h-[420px] lg:h-[calc(100vh-7rem)] ${pickMode ? 'cursor-crosshair ring-2 ring-gold' : ''}`} />
+              <RunMap start={mapStart} stops={mapStops} draggable={!!editable} onMove={onMove} onClickMap={onClickMap} focusId={focus} trucks={truck ? [{ id: truck.staffId, label: `${truck.name} · seen ${new Date(truck.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, lat: truck.lat, lon: truck.lon }] : undefined} className={`h-[420px] lg:h-[calc(100vh-7rem)] ${pickMode ? 'cursor-crosshair ring-2 ring-gold' : ''}`} />
               <p className="mt-2 text-xs text-text-muted">{editable ? 'Drag any pin to correct its position. ' : ''}Numbers show the driving order; the dashed line joins stops as the crow flies.</p>
             </div>
           </div>

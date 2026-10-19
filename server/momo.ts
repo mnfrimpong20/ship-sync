@@ -53,7 +53,7 @@ export const chargeOut = (c: Row, lang: 'en' | 'fr' = 'en') => ({
 })
 
 /** Mark a charge paid once (webhook, return-verify, or by hand). */
-async function markPaid(db: Db, c: Row, how: { method: string; ref?: string | null; phone?: string; by?: string; settledTo?: string }) {
+export async function markPaid(db: Db, c: Row, how: { method: string; ref?: string | null; phone?: string; by?: string; settledTo?: string }) {
   const { rows } = await db.query<Row>(`update receiver_charges set status = 'paid', method = $2, provider_ref = coalesce($3, provider_ref), paid_phone = $4, recorded_by = $5, paid_at = now(), settled_to = $6 where id = $1 and status = 'due' returning *`, [c.id, how.method, how.ref ?? null, how.phone ?? '', how.by ?? '', how.settledTo ?? (how.method === 'paystack' ? 'ntemtem' : 'shipper')])
   const p = rows[0]; if (!p) return false
   const { rows: ss } = await db.query<Row>('select * from shipments where id = $1', [p.shipment_id]); const s = ss[0]; if (!s) return true

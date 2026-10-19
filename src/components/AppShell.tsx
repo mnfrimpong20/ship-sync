@@ -94,6 +94,7 @@ export default function AppShell() {
         { to: '/dashboard/sailings', label: 'Book a sailing', icon: Anchor, group: 'Operate' },
         { to: '/dashboard/pickups', label: 'Pickups', icon: CalendarCheck, group: 'Operate' },
         { to: '/dashboard/routes', label: 'Routes', icon: MapPinned, group: 'Operate' },
+        ...(['owner', 'dispatcher', 'finance'].includes(staffRole) ? [{ to: '/dashboard/drivers', label: 'Drivers', icon: Truck, group: 'Operate' } as Item] : []),
         { to: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, group: 'Operate' },
         ...(!isDriverRole(staffRole) ? [{ to: '/dashboard/supplies', label: 'Equipment & supplies', icon: Printer, group: 'Operate' } as Item] : []),
         { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders, group: 'Money' },

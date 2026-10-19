@@ -36,12 +36,13 @@ const num = (v: unknown) => (v == null ? undefined : Number(v))
 
 export const staffOut = (r: Row) => ({ id: r.id, shipperId: r.shipper_id, userId: r.user_id ?? undefined, name: r.name, email: r.email, phone: r.phone, role: r.role as StaffRole, status: r.status as 'invited' | 'active' | 'inactive', base: r.base as 'origin' | 'destination', city: r.city, inviteToken: r.invite_token ?? undefined, createdAt: ISO(r.created_at), runCount: r.run_count != null ? Number(r.run_count) : undefined, perms: (J(r.perms) ?? {}) as { allow?: string[]; deny?: string[] }, lastActiveAt: ISO(r.last_active_at), activity: r.runs_week != null ? { runsWeek: Number(r.runs_week), stopsWeek: Number(r.stops_week), scansWeek: Number(r.scans_week), quotesWeek: Number(r.quotes_week), quotesWonWeek: Number(r.quotes_won_week), lastScanAt: ISO(r.last_scan_at) } : undefined })
 const vehicleOut = (r: Row) => ({ id: r.id, name: r.name, type: r.type, plate: r.plate, capacityKg: num(r.capacity_kg), capacityNote: r.capacity_note, base: r.base as 'origin' | 'destination', city: r.city, country: r.country, status: r.status as 'available' | 'on_run' | 'maintenance' | 'retired', driverId: r.driver_id ?? undefined, notes: r.notes, createdAt: ISO(r.created_at) })
-const podOut = (v: unknown) => { const p = J(v) as { receivedBy?: string; photo?: string; signature?: string; pieces?: number; by?: string } | null; return p ? { receivedBy: p.receivedBy ?? '', pieces: p.pieces ?? undefined, hasPhoto: !!p.photo, hasSignature: !!p.signature, by: p.by ?? '' } : undefined }
-const stopOut = (r: Row) => ({ etaFrom: r.eta_from || undefined, etaTo: r.eta_to || undefined, pod: podOut(r.pod), skipReason: r.skip_reason || undefined, tries: Number(r.tries ?? 0), onWayAt: r.on_way_at ? ISO(r.on_way_at) : undefined, collected: (J(r.collected) as { method: string; amountUsd: number; at: string } | null) ?? undefined, collectUsd: r.collect_usd ?? undefined, collectRule: r.collect_rule ?? undefined, id: r.id, runId: r.run_id, seq: Number(r.seq), shipmentId: r.shipment_id ?? undefined, label: r.label, address: r.address, lat: num(r.lat), lon: num(r.lon), contact: r.contact, phone: r.phone, status: r.status as 'pending' | 'done' | 'skipped', doneAt: r.done_at ? ISO(r.done_at) : undefined, note: r.note, shipmentRef: r.shipment_ref ?? undefined, shipmentStatus: r.shipment_status ?? undefined })
+const podOut = (v: unknown) => { const p = J(v) as { receivedBy?: string; photo?: string; signature?: string; pieces?: number; by?: string; leftWith?: { kind: string; name: string } } | null; return p ? { receivedBy: p.receivedBy ?? '', pieces: p.pieces ?? undefined, hasPhoto: !!p.photo, hasSignature: !!p.signature, by: p.by ?? '', leftWith: p.leftWith ?? undefined } : undefined }
+const stopOut = (r: Row) => ({ codeRequired: !!r.code || undefined, codeOk: r.code_ok ? true : undefined, idChecked: r.id_check ? true : undefined, nearAt: r.near_at ? ISO(r.near_at) : undefined, vehicleReport: r.vehicle_report ? true : undefined, suppliesDropped: r.supplies_drop ? true : undefined, handedOver: r.handed_over_id ? true : undefined, etaFrom: r.eta_from || undefined, etaTo: r.eta_to || undefined, pod: podOut(r.pod), skipReason: r.skip_reason || undefined, tries: Number(r.tries ?? 0), onWayAt: r.on_way_at ? ISO(r.on_way_at) : undefined, collected: (J(r.collected) as { method: string; amountUsd: number; at: string } | null) ?? undefined, collectUsd: r.collect_usd ?? undefined, collectRule: r.collect_rule ?? undefined, id: r.id, runId: r.run_id, seq: Number(r.seq), shipmentId: r.shipment_id ?? undefined, label: r.label, address: r.address, lat: num(r.lat), lon: num(r.lon), contact: r.contact, phone: r.phone, status: r.status as 'pending' | 'done' | 'skipped', doneAt: r.done_at ? ISO(r.done_at) : undefined, note: r.note, shipmentRef: r.shipment_ref ?? undefined, shipmentStatus: r.shipment_status ?? undefined })
 const runOut = (r: Row, stops: Row[]) => ({
   id: r.id, name: humanizeDates(r.name), kind: r.kind as 'pickup' | 'delivery', date: DATE(r.run_date), driverId: r.driver_id ?? undefined, vehicleId: r.vehicle_id ?? undefined,
   start: r.start_lat != null ? { label: r.start_label, lat: Number(r.start_lat), lon: Number(r.start_lon) } : null,
   status: r.status as 'planned' | 'in_progress' | 'done' | 'cancelled', distanceKm: num(r.distance_km), notes: r.notes, createdAt: ISO(r.created_at), summarySentAt: r.summary_sent_at ? ISO(r.summary_sent_at) : undefined,
+  vehicleCheck: (J(r.vehicle_check) as { at: string; by: string; issues: string[]; safe: boolean; odometer: number | null } | null) ?? undefined,
   stops: stops.map(stopOut), driverName: r.driver_name ?? undefined, vehicleName: r.vehicle_name ?? undefined,
 })
 
@@ -64,11 +65,15 @@ const zRun = z.object({
 })
 const zRunPatch = z.object({ name: z.string().trim().min(2).max(80).optional(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), driverId: z.string().nullable().optional(), vehicleId: z.string().nullable().optional(), status: z.enum(['planned', 'in_progress', 'done', 'cancelled']).optional(), notes: z.string().trim().max(1000).optional(), start: z.object({ label: z.string().trim().max(120).default(''), lat: z.number(), lon: z.number() }).nullable().optional() })
 export const SKIP_REASONS = { not_home: 'Nobody home', wrong_address: 'Wrong address', refused: 'Refused', no_access: 'Couldn’t get in', other: 'Other' } as const
-const DRIVER_STOP_KEYS = ['status', 'note', 'receivedBy', 'photo', 'signature', 'pieces', 'skipReason', 'retry', 'collected']
+const DRIVER_STOP_KEYS = ['status', 'note', 'receivedBy', 'photo', 'signature', 'pieces', 'skipReason', 'retry', 'collected', 'code', 'idCheck', 'leftWith']
+export const ID_TYPES = { ghana_card: 'Ghana Card', passport: 'Passport', drivers_license: 'Driver’s licence', voter_id: 'Voter ID', other: 'Other ID' } as const
+export const LEFT_WITH = { neighbour: 'a neighbour', gate: 'the gate / security', reception: 'reception', family: 'a family member', other: 'someone else' } as const
 const zStopPatch = z.object({ status: z.enum(['pending', 'done', 'skipped']).optional(), note: z.string().trim().max(500).optional(),
   receivedBy: z.string().trim().max(80).optional(), photo: z.string().max(600_000).regex(/^data:image\/(jpeg|png|webp);base64,/).optional(), signature: z.string().max(120_000).regex(/^data:image\/png;base64,/).optional(),
   pieces: z.number().int().min(0).max(999).optional(), skipReason: z.enum(['not_home', 'wrong_address', 'refused', 'no_access', 'other']).optional(), retry: z.boolean().optional(),
-  collected: z.object({ method: z.enum(['cash', 'mobile_money']), amountUsd: z.number().min(0.01).max(1_000_000) }).optional(), seq: z.number().int().min(0).optional(), lat: z.number().optional(), lon: z.number().optional(), label: z.string().trim().min(1).max(120).optional(), address: z.string().trim().max(240).optional(), contact: z.string().trim().max(80).optional(), phone: z.string().trim().max(30).optional() })
+  code: z.string().trim().regex(/^\d{4}$/, 'The code is 4 digits.').optional(), idCheck: z.object({ type: z.enum(['ghana_card', 'passport', 'drivers_license', 'voter_id', 'other']), last4: z.string().trim().regex(/^[A-Za-z0-9]{2,4}$/, 'Only the last 4 characters of the ID.') }).optional(),
+  leftWith: z.object({ kind: z.enum(['neighbour', 'gate', 'reception', 'family', 'other']), name: z.string().trim().max(80).default('') }).optional(),
+  collected: z.object({ method: z.enum(['cash', 'mobile_money', 'zelle', 'card']), amountUsd: z.number().min(0.01).max(1_000_000) }).optional(), seq: z.number().int().min(0).optional(), lat: z.number().optional(), lon: z.number().optional(), label: z.string().trim().min(1).max(120).optional(), address: z.string().trim().max(240).optional(), contact: z.string().trim().max(80).optional(), phone: z.string().trim().max(30).optional() })
 
 /* ---------------- geocoding (OpenStreetMap Nominatim, cached, ≤1 req/s per their policy) ---------------- */
 const NOMINATIM = process.env.NOMINATIM_URL || 'https://nominatim.openstreetmap.org'
@@ -148,9 +153,11 @@ export function mountOps(r: Router, d: Deps) {
     // What the driver has to collect at each delivery stop.
     const kinds = new Map(rows.map((x) => [x.id, x.kind]))
     const holds = new Map<string, string>()
-    for (const st of stops) if (st.shipment_id && kinds.get(st.run_id) !== 'pickup' && st.status === 'pending') {
+    for (const st of stops) if (st.shipment_id && st.status === 'pending') {
       const o = await owedFor(db, { id: st.shipment_id, storage_due: st.storage_due, storage_billed: st.storage_billed })
-      if (o.totalUsd > 0) { st.collect_usd = o.totalUsd; if (!holds.has(st.sh_shipper)) holds.set(st.sh_shipper, (await prefsOf(db, st.sh_shipper)).holdUnpaid); st.collect_rule = holds.get(st.sh_shipper) }
+      // Pickups: a deposit or full payment can be taken at the door, never required.
+      if (o.totalUsd > 0 && kinds.get(st.run_id) === 'pickup') { st.collect_usd = o.totalUsd; st.collect_rule = 'off' }
+      else if (o.totalUsd > 0) { st.collect_usd = o.totalUsd; if (!holds.has(st.sh_shipper)) holds.set(st.sh_shipper, (await prefsOf(db, st.sh_shipper)).holdUnpaid); st.collect_rule = holds.get(st.sh_shipper) }
     }
     return rows.map((x) => runOut(x, stops.filter((s) => s.run_id === x.id)))
   }
@@ -361,6 +368,7 @@ export function mountOps(r: Router, d: Deps) {
       if (run.vehicleId) await db.query(`update vehicles set status = 'on_run' where id = $1 and status = 'available'`, [run.vehicleId])
       // Delivery run starting → shipments are out for delivery.
       if (run.kind === 'delivery') for (const st of run.stops) if (st.shipmentId && st.shipmentStatus && ['arrived', 'customs', 'ready_for_collection'].includes(st.shipmentStatus)) await setShipmentStatus(db, st.shipmentId, 'out_for_delivery', `Out for delivery on run “${run.name}”.`)
+      if (run.kind === 'delivery' && run.status !== 'in_progress') { const { issueDeliveryCodes } = await import('./driverOps'); await issueDeliveryCodes(db, run.id).catch((e) => console.error('[codes]', e)) }
     }
     if (b.status === 'done' || b.status === 'cancelled') { if (run.vehicleId) await db.query(`update vehicles set status = 'available' where id = $1 and status = 'on_run'`, [run.vehicleId]) }
     res.json({ run: await ownRun(db, shipperId, run.id) })
@@ -374,6 +382,7 @@ export function mountOps(r: Router, d: Deps) {
     for (const s of done) await db.query('update run_stops set seq = $2 where id = $1', [s.id, seq++])
     for (const i of order) await db.query('update run_stops set seq = $2 where id = $1', [pending[i].id, seq++])
     await db.query('update runs set distance_km = $2 where id = $1', [run.id, runDistance(run.start, [...done, ...order.map((i) => pending[i])])])
+    if (run.status === 'in_progress') { const { notifyDriver } = await import('./driverOps'); await notifyDriver(db, run.id, `Your stops on “${run.name}” were reordered`, 'Open your run for the new order.').catch(() => {}) }
     res.json({ run: await ownRun(db, shipperId, run.id) })
   }))
   r.post('/runs/:id/stops', wrap(async (req, res) => {
@@ -382,6 +391,7 @@ export function mountOps(r: Router, d: Deps) {
     await db.query('insert into run_stops (id,run_id,seq,shipment_id,label,address,lat,lon,contact,phone) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', ['stp_' + uid(), run.id, run.stops.length, b.shipmentId ?? null, b.label, b.address, b.lat ?? null, b.lon ?? null, b.contact, b.phone])
     const updated = await ownRun(db, shipperId, run.id)
     await db.query('update runs set distance_km = $2 where id = $1', [run.id, runDistance(updated.start, updated.stops)])
+    if (run.status === 'in_progress' || run.status === 'planned') { const { notifyDriver, issueDeliveryCodes } = await import('./driverOps'); if (run.status === 'in_progress' && run.kind === 'delivery') await issueDeliveryCodes(db, run.id).catch(() => {}); await notifyDriver(db, run.id, `New stop on “${run.name}”: ${b.label}`, b.address || 'Open your run to see it.').catch(() => {}) }
     res.status(201).json({ run: await ownRun(db, shipperId, run.id) })
   }))
   r.patch('/runs/:id/stops/:sid', wrap(async (req, res) => {
@@ -390,6 +400,14 @@ export function mountOps(r: Router, d: Deps) {
     const b = zStopPatch.parse(req.body)
     if (isDriverRole(role) && (run.driverId !== me.id || Object.keys(b).some((k) => !DRIVER_STOP_KEYS.includes(k)))) throw new HttpError(403, 'Drivers can only mark their own stops.')
     if (role === 'agent') throw new HttpError(403, 'Agents cannot edit runs.')
+    // Delivery code: the receiver got 4 digits by text. Closing the stop needs the code, an ID check, or a "left with" + photo.
+    const { rows: raw } = await db.query<Row>('select code, code_ok, phone from run_stops where id = $1', [st.id])
+    if (b.status === 'done' && st.status !== 'done' && run.kind === 'delivery' && raw[0]?.code && !raw[0].code_ok && isDriverRole(role)) {
+      if (b.code) { if (b.code !== raw[0].code) throw new HttpError(400, 'That code doesn’t match. Ask the receiver to check their texts, or check their ID instead.'); await db.query('update run_stops set code_ok = true where id = $1', [st.id]) }
+      else if (b.idCheck) await db.query('update run_stops set id_check = $2 where id = $1', [st.id, JSON.stringify({ ...b.idCheck, last4: b.idCheck.last4.toUpperCase(), by: me.name, at: new Date().toISOString() })])
+      else if (b.leftWith) { if (!b.photo) throw new HttpError(400, 'Take a photo of where you left it.') }
+      else throw new HttpError(400, 'Enter the 4-digit delivery code the receiver got by text, or check their ID.')
+    } else if (b.idCheck) await db.query('update run_stops set id_check = $2 where id = $1', [st.id, JSON.stringify({ ...b.idCheck, last4: b.idCheck.last4.toUpperCase(), by: me.name, at: new Date().toISOString() })])
     // Money taken at the door goes onto the shipment's open invoices (oldest first) before any release check.
     if (b.collected && st.shipmentId) {
       let left = b.collected.amountUsd
@@ -402,7 +420,7 @@ export function mountOps(r: Router, d: Deps) {
         await db.query(`update invoices set status = $2 where id = $1`, [inv.id, pay >= due ? 'paid' : 'partial'])
       }
       await db.query('update run_stops set collected = $2 where id = $1', [st.id, JSON.stringify({ method: b.collected.method, amountUsd: b.collected.amountUsd, at: new Date().toISOString(), by: me.name, unapplied: Math.round(left * 100) / 100 })])
-      await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [st.shipmentId, st.shipmentStatus ?? 'out_for_delivery', st.label || '', `$${b.collected.amountUsd.toLocaleString()} collected ${b.collected.method === 'cash' ? 'in cash' : 'by mobile money'} by ${me.name}.`])
+      await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [st.shipmentId, st.shipmentStatus ?? 'out_for_delivery', st.label || '', `$${b.collected.amountUsd.toLocaleString()} collected ${({ cash: 'in cash', mobile_money: 'by mobile money', zelle: 'by Zelle', card: 'by card' } as Record<string, string>)[b.collected.method]} by ${me.name}.`])
     }
     // "Try again later today": the stop goes to the back of the run instead of closing.
     if (b.status === 'skipped' && b.retry) {
@@ -418,7 +436,12 @@ export function mountOps(r: Router, d: Deps) {
       b.note = `${why}${b.note ? ` — ${b.note}` : ''}`
       if (isDriverRole(role)) await notifyShipperStaff(db, shipperId, { kind: 'shipment_status', title: `${me.name} skipped ${st.label}`, body: `${b.note}. On “${run.name}”.`, link: `/dashboard/routes/${run.id}` }, ['owner', 'dispatcher']).catch(() => {})
     }
-    if (b.status === 'done' && (b.receivedBy || b.photo || b.signature || b.pieces != null)) await db.query('update run_stops set pod = $2 where id = $1', [st.id, JSON.stringify({ receivedBy: b.receivedBy ?? '', photo: b.photo, signature: b.signature, pieces: b.pieces, by: me.name, at: new Date().toISOString() })])
+    if (b.status === 'done' && (b.receivedBy || b.photo || b.signature || b.pieces != null || b.leftWith)) await db.query('update run_stops set pod = $2 where id = $1', [st.id, JSON.stringify({ receivedBy: b.receivedBy ?? '', photo: b.photo, signature: b.signature, pieces: b.pieces, by: me.name, at: new Date().toISOString(), leftWith: b.leftWith })])
+    // Left with a neighbour / the gate: tell the receiver where it is.
+    if (b.status === 'done' && b.leftWith && st.status !== 'done' && raw[0]?.phone) {
+      const n = normalisePhone(raw[0].phone, 'GH') ?? normalisePhone(raw[0].phone, 'US')
+      if (n && smsProvider().id !== 'off') await sendText(n, `Your delivery${st.shipmentRef ? ` ${st.shipmentRef}` : ''} was left with ${LEFT_WITH[b.leftWith.kind]}${b.leftWith.name ? ` (${b.leftWith.name})` : ''} by ${me.name.split(' ')[0]}. A photo is on file. Call us if anything is wrong.`).catch((e) => console.error('[leftWith] text', e))
+    }
     await db.query('update run_stops set status=$2, note=$3, seq=$4, lat=$5, lon=$6, label=$7, address=$8, contact=$9, phone=$10, done_at = case when $2 = \'done\' then coalesce(done_at, now()) else null end where id = $1',
       [st.id, b.status ?? st.status, b.note ?? st.note, b.seq ?? st.seq, b.lat ?? st.lat ?? null, b.lon ?? st.lon ?? null, b.label ?? st.label, b.address ?? st.address, b.contact ?? st.contact, b.phone ?? st.phone])
     // Completed stops move the shipment along and show up on the customer's tracking page.
@@ -430,7 +453,7 @@ export function mountOps(r: Router, d: Deps) {
     if (b.status === 'done' && st.shipmentId && st.status !== 'done') {
       const proof = [b.pieces != null ? `${b.pieces} piece${b.pieces === 1 ? '' : 's'}` : '', b.photo ? 'photo on file' : '', b.signature ? 'signed' : ''].filter(Boolean).join(', ')
       if (run.kind === 'pickup') await setShipmentStatus(db, st.shipmentId, 'picked_up', `Collected by ${me.name}${proof ? ` (${proof})` : ''}${b.note ? ` — ${b.note}` : '.'}`)
-      else await setShipmentStatus(db, st.shipmentId, 'delivered', `Delivered${b.receivedBy ? ` to ${b.receivedBy}` : ''} by ${me.name}${proof ? ` (${proof})` : ''}${b.note ? ` — ${b.note}` : '.'}`)
+      else await setShipmentStatus(db, st.shipmentId, 'delivered', `Delivered${b.leftWith ? ` — left with ${LEFT_WITH[b.leftWith.kind]}${b.leftWith.name ? ` (${b.leftWith.name})` : ''}` : b.receivedBy ? ` to ${b.receivedBy}` : ''}${b.idCheck ? ` (${ID_TYPES[b.idCheck.type]} checked)` : b.code ? ' (delivery code matched)' : ''} by ${me.name}${proof ? ` (${proof})` : ''}${b.note ? ` — ${b.note}` : '.'}`)
     }
     const updated = await ownRun(db, shipperId, run.id)
     if (b.lat != null || b.lon != null || b.seq != null) await db.query('update runs set distance_km = $2 where id = $1', [run.id, runDistance(updated.start, updated.stops)])

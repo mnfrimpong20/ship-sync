@@ -11,6 +11,7 @@ import { setDisplay, useDisplay } from '../lib/prefs'
 import { useT } from '../lib/i18n'
 import { niceDay } from '../lib/dates'
 import { roleLabels, type StaffRole } from '../lib/ops'
+import { CashCard, ShiftCard, WeekCard } from '../components/driver/HomeCards'
 
 /** A PIN for this phone, so the driver doesn't type a password every morning. */
 function PinCard() {
@@ -67,6 +68,7 @@ export default function MyRuns() {
           {(offline || queued > 0) && <p role="status" className="mt-3 flex items-center gap-2 rounded-2xl border border-gold/50 bg-gold/10 px-4 py-3 text-base"><WifiOff size={18} aria-hidden="true" /> {offline ? t('Offline — showing your saved runs') : ''}{queued ? `${offline ? ' · ' : ''}${t('{n} updates waiting', { n: queued })}` : ''}</p>}
           {error && <p role="alert" className="mt-3 text-base text-danger">{error}</p>}
 
+          <motion.div variants={fadeUp}><ShiftCard /></motion.div>
           {cur && (
             <motion.section variants={fadeUp} className="mt-5 rounded-3xl border-2 border-gold bg-surface p-5" aria-labelledby="cur-h" data-testid="continue-run">
               <p className="text-sm font-bold uppercase tracking-wider text-gold-deep">{t('In progress')} · {cur.stops.filter((s) => s.status !== 'pending').length}/{cur.stops.length}</p>
@@ -94,6 +96,8 @@ export default function MyRuns() {
               <ul className="mt-2 space-y-1">{finishedToday.map((r) => <li key={r.id}><Link to={`/dashboard/routes/${r.id}`} className="inline-flex min-h-11 items-center gap-1 text-base font-semibold text-gold-deep focus-ring">{r.name} · {niceDay(r.date, { lang: disp.lang })}{r.summarySentAt ? ` · ${t('sent')}` : ` · ${t('summary not sent')}`} <ChevronRight size={16} aria-hidden="true" /></Link></li>)}</ul>
             </motion.section>
           )}
+
+          <motion.div variants={fadeUp}><CashCard /><WeekCard /></motion.div>
 
           <motion.section variants={fadeUp} className="mt-7 rounded-3xl border border-border bg-surface p-5" aria-labelledby="disp-h" data-testid="dispatch-card">
             <h2 id="disp-h" className="!text-lg">{t('My dispatcher')}</h2>

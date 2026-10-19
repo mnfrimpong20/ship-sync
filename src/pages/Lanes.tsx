@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { BarChart3, Lightbulb, TrendingDown, TrendingUp } from 'lucide-react'
@@ -111,8 +111,8 @@ export function ShipperLanes() {
                 {d === null && !error && <tr><td colSpan={8} className="px-3 py-8 text-center text-text-muted">Loading…</td></tr>}
                 {d && d.lanes.length === 0 && <tr><td colSpan={8} className="px-3 py-8"><Empty title="No quotes in the last six months" body="Quote a few leads and your lanes show up here against the market." /></td></tr>}
                 {d?.lanes.map((l: MyLane, i) => (
-                  <>
-                    <tr key={i} className={trow(open === i)} onClick={() => setOpen(open === i ? null : i)} style={{ cursor: 'pointer' }} data-testid="lane-row">
+                  <Fragment key={l.origin + l.destination + l.cargo + i}>
+                    <tr className={trow(open === i)} onClick={() => setOpen(open === i ? null : i)} style={{ cursor: 'pointer' }} data-testid="lane-row">
                       <td className="px-3 py-3"><p className="font-semibold">{l.origin} → {l.destinationName}</p><p className="text-xs text-text-muted">{l.cargoLabel}</p></td>
                       <td className="px-3 py-3 text-right tabular-nums">{l.quotes}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{l.myWinRate != null ? `${l.myWinRate}%` : '—'}</td>
@@ -123,7 +123,7 @@ export function ShipperLanes() {
                       <td className="px-3 py-3 text-right tabular-nums text-text-muted">{l.responseHours != null ? `${l.responseHours}h` : '—'}</td>
                     </tr>
                     {open === i && <tr key={`${i}-x`}><td colSpan={8} className="bg-surface-2/40 px-3 py-4"><BenchmarkPanel b={l.market} title={`Market: ${l.origin} → ${l.destinationName} · ${l.cargoLabel}`} /></td></tr>}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table></div>

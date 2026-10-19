@@ -56,7 +56,7 @@ function MyPay() {
     <Shell title={t('My pay')}>
       {sum && <section className="mt-4 grid grid-cols-2 gap-2" aria-label={t('Pay day')} data-testid="pay-summary">
         <div className="rounded-2xl border-2 border-gold bg-gold/10 p-4"><p className="text-sm text-text-muted">{t('Pay day')}</p><p className="text-xl font-bold">{niceDay(sum.payDay, { lang: disp.lang })}</p><p className="text-sm">{sum.closesIn === 0 ? t('Period closes today') : t('Period closes in {n} days', { n: sum.closesIn })}</p></div>
-        <div className="rounded-2xl border-2 border-border bg-surface p-4"><p className="text-sm text-text-muted">{t('Earned today')}</p><p className="text-xl font-bold tabular-nums" data-testid="earned-today">{money(sum.today.earned, curr)}</p><p className="text-sm">{t('{n} stops', { n: sum.today.stops })} · {sum.today.hours} h</p></div>
+        <div className="rounded-2xl border-2 border-border bg-surface p-4"><p className="text-sm text-text-muted">{t('Earned today')}</p><p className="text-xl font-bold tabular-nums" data-testid="earned-today">{money(sum.today.earned, curr)}</p><p className="text-sm">{(sum.today.stops === 1 ? t('1 stop') : t('{n} stops', { n: sum.today.stops }))} · {sum.today.hours} h</p></div>
       </section>}
       {d.owed > 0 && <p className="mt-4 rounded-2xl border-2 border-teal/50 bg-teal/10 p-4 text-base font-semibold" data-testid="owed">{t('{amount} approved and on its way to you.', { amount: money(d.owed, d.payslips[0]?.currency) })}</p>}
       {rank?.show && rank.rank && <p className="mt-4 flex items-center gap-2 rounded-2xl bg-surface-2 p-4 text-base"><Award size={20} className="text-gold-deep" aria-hidden="true" /> {t('You’re number {n} of {of} drivers this month.', { n: rank.rank, of: rank.of ?? 0 })}</p>}

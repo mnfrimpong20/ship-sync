@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Bell, CheckCheck, Settings2 } from 'lucide-react'
 import { useT } from '../lib/i18n'
@@ -26,7 +27,10 @@ export function NotificationBell() {
   // Newest first; later updates on the same shipment fold under the newest one.
   const groups = useMemo(() => { const m = new Map<string, Notification[]>(); for (const n of items) { const k = notifGroupKey(n); m.set(k, [...(m.get(k) ?? []), n]) } return [...m.values()] }, [items])
   const loc = useLocation()
-  const box = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLDivElement>(null); const panel = useRef<HTMLDivElement>(null)
+  // The panel lives at the page root and is placed under the bell, kept inside the screen on narrow phones.
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const place = useCallback(() => { const b = box.current?.getBoundingClientRect(); if (!b) return; const vw = document.documentElement.clientWidth; const width = Math.min(380, vw - 16); setPos({ top: b.bottom + 8, left: Math.max(8, Math.min(b.right - width, vw - width - 8)), width }) }, [])
 
   const refresh = useCallback(async () => {
     try { const r = await notificationsApi.list(30); setItems(r.notifications); setUnread(r.unread) } catch { /* signed out or offline — keep what we have */ }
@@ -44,10 +48,11 @@ export function NotificationBell() {
   useEffect(() => {
     if (!open) return
     void refresh()
-    const onDoc = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false) }
+    const onDoc = (e: MouseEvent) => { const n = e.target as Node; if (box.current && !box.current.contains(n) && !panel.current?.contains(n)) setOpen(false) }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    place(); window.addEventListener('resize', place); window.addEventListener('scroll', place, true)
     document.addEventListener('mousedown', onDoc); document.addEventListener('keydown', onKey)
-    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey) }
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey) }
   }, [open, refresh])
 
   const openItem = async (n: Notification, group: Notification[] = [n]) => {
@@ -67,9 +72,9 @@ export function NotificationBell() {
         <Bell size={18} />
         {unread > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-gold px-1 text-[11px] font-bold leading-none text-on-accent" data-testid="notification-count">{unread > 99 ? '99+' : unread}</span>}
       </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} role="dialog" aria-label="Notifications" className="card-dark absolute right-0 mt-2 w-[min(92vw,380px)] overflow-hidden p-0">
+      {createPortal(<AnimatePresence>
+        {open && pos && (
+          <motion.div ref={panel} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} role="dialog" aria-label="Notifications" className="ss-app card-dark fixed z-[80] overflow-hidden p-0 shadow-xl" style={{ top: pos.top, left: pos.left, width: pos.width }} data-testid="notification-panel">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <p className="text-sm font-semibold">{t('Notifications')}{unread > 0 && <span className="ml-2 rounded-full bg-gold/15 px-2 py-0.5 text-xs font-semibold text-gold-deep">{unread} new</span>}</p>
               <div className="flex items-center gap-1">
@@ -77,7 +82,7 @@ export function NotificationBell() {
                 <Link to="/dashboard/notifications" className="grid h-10 w-10 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text focus-ring" aria-label="Notification settings"><Settings2 size={15} /></Link>
               </div>
             </div>
-            <ul className="max-h-[70vh] overflow-y-auto">
+            <ul className="max-h-[min(70vh,calc(100dvh-11rem))] overflow-y-auto">
               {items.length === 0 && <li className="px-4 py-8 text-center text-sm text-text-muted">You're all caught up.</li>}
               {groups.map((g) => { const n = g[0]; const fresh = g.filter((x) => !x.readAt).length; return (
                 <li key={n.id} data-testid="notif-group">
@@ -95,7 +100,7 @@ export function NotificationBell() {
             <Link to="/dashboard/notifications" className="block border-t border-border px-4 py-2.5 text-center text-xs font-semibold text-gold-deep hover:bg-surface-2 focus-ring">{t('See all')}</Link>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>, document.body)}
     </div>
   )
 }

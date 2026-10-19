@@ -91,7 +91,7 @@ export function PayDayCard() {
   if (!s) return null
   return (
     <Link to="/dashboard/runs/pay" className="mt-5 grid grid-cols-2 gap-3 rounded-3xl border border-border bg-surface p-5 focus-ring" data-testid="payday-card">
-      <span><span className="block text-sm text-text-muted">{t('Earned today')}</span><span className="block text-2xl font-bold tabular-nums">{money(s.today.earned, s.currency)}</span><span className="block text-sm">{t('{n} stops', { n: s.today.stops })}</span></span>
+      <span><span className="block text-sm text-text-muted">{t('Earned today')}</span><span className="block text-2xl font-bold tabular-nums">{money(s.today.earned, s.currency)}</span><span className="block text-sm">{(s.today.stops === 1 ? t('1 stop') : t('{n} stops', { n: s.today.stops }))}</span></span>
       <span><span className="block text-sm text-text-muted">{t('Pay day')}</span><span className="block text-lg font-bold">{niceDay(s.payDay, { lang: disp.lang })}</span><span className="block text-sm">{s.closesIn === 0 ? t('Period closes today') : t('Period closes in {n} days', { n: s.closesIn })}</span></span>
     </Link>
   )

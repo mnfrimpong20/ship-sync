@@ -48,14 +48,69 @@ export const errMsg = (e: unknown, f = 'Something went wrong.') => (e instanceof
 export function useToast() { const [t, setT] = useState(''); useEffect(() => { if (!t) return; const x = setTimeout(() => setT(''), 4000); return () => clearTimeout(x) }, [t]); return [t, setT] as const }
 
 /* ---------------- sign-in screens ---------------- */
-function AuthFrame({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
+/** Line-art port scene: gantry cranes, container stacks and a ship on the water. Decorative only. */
+function PortScene({ className = '' }: { className?: string }) {
+  const stack = (x: number, rows: number, cols: number, hue: string) => Array.from({ length: rows * cols }, (_, k) => { const c = k % cols, r = Math.floor(k / cols); const X = x + c * 46, Y = 236 - (r + 1) * 20; return <g key={`${x}-${k}`}><rect x={X} y={Y} width={44} height={18} rx={1.5} fill={hue} fillOpacity={0.14} stroke={hue} strokeOpacity={0.55} />{[10, 18, 26, 34].map((d) => <line key={d} x1={X + d} y1={Y + 3} x2={X + d} y2={Y + 15} stroke={hue} strokeOpacity={0.35} />)}</g> })
+  const crane = (x: number) => <g stroke="#F5B82E" strokeOpacity={0.7} fill="none" strokeWidth={1.5}><path d={`M${x} 236 V96 M${x + 52} 236 V96 M${x} 120 H${x + 52} M${x} 160 L${x + 52} 120 M${x + 52} 160 L${x} 120`} /><path d={`M${x - 70} 96 H${x + 120} M${x - 70} 96 L${x + 26} 64 L${x + 120} 96 M${x + 26} 64 V96`} /><path d={`M${x - 40} 96 V128`} strokeDasharray="3 3" /><rect x={x - 54} y={128} width={30} height={14} rx={1.5} fill="#F5B82E" fillOpacity={0.25} /></g>
   return (
-    <div className="ss-app grid min-h-screen place-items-center bg-bg px-4 py-10 text-text">
-      <div className="w-full max-w-md">
-        <Link to="/" className="mb-6 inline-flex items-center gap-2" aria-label="Ntemtem home"><Logo /></Link>
-        <div className="card-dark p-6 sm:p-8"><h1 className="!text-2xl">{title}</h1>{sub && <p className="mt-1 text-text-muted">{sub}</p>}<div className="mt-6">{children}</div></div>
-        <p className="mt-4 text-center text-sm text-text-muted">Not a broker yet? <Link to="/contact?topic=broker" className="font-semibold text-gold-deep underline">Apply to join the network</Link></p>
-      </div>
+    <svg viewBox="0 0 600 300" className={className} aria-hidden="true" focusable="false">
+      <defs><linearGradient id="bp-water" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#1B5E78" stopOpacity="0.5" /><stop offset="1" stopColor="#1B5E78" stopOpacity="0" /></linearGradient></defs>
+      {crane(70)}{crane(250)}
+      {stack(150, 4, 2, '#6CC3DD')}{stack(330, 3, 3, '#F5B82E')}{stack(480, 5, 2, '#34D399')}
+      <line x1="0" y1="236" x2="600" y2="236" stroke="#F5EEE0" strokeOpacity={0.35} />
+      <rect x="0" y="237" width="600" height="63" fill="url(#bp-water)" />
+      <g fill="none" stroke="#F5EEE0" strokeOpacity={0.4}><path d="M398 262 h170 l-16 18 h-140 z" /><path d="M430 262 v-12 h40 v12 M480 262 v-8 h30 v8" /></g>
+      {[252, 268, 284].map((y, k) => <path key={y} d={`M${20 + k * 30} ${y} q 20 -5 40 0 t 40 0 t 40 0`} fill="none" stroke="#6CC3DD" strokeOpacity={0.25 - k * 0.06} />)}
+    </svg>
+  )
+}
+const BRAND_POINTS: [typeof Briefcase, string, string][] = [
+  [Briefcase, 'Every job, every step', 'Requests, papers, duty and release in one board.'],
+  [Wallet, 'Bill on time', 'Fees and disbursements become invoices in two clicks.'],
+  [MessageSquare, 'One thread per shipment', 'The shipping office and the customer, in one place.'],
+]
+function AuthFrame({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
+  const grid = { backgroundImage: 'linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px)', backgroundSize: '44px 44px' }
+  return (
+    <div className="ss-app min-h-screen bg-bg text-text lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+      {/* brand panel — full height on desktop, a short band on phones */}
+      <aside className="relative isolate overflow-hidden bg-[#0D1424] text-white" aria-label="About the broker dashboard">
+        <div className="absolute inset-0 -z-10" style={grid} />
+        <div className="absolute -left-32 -top-32 -z-10 h-96 w-96 rounded-full bg-[#F5B82E]/20 blur-3xl" />
+        <div className="absolute -bottom-40 right-0 -z-10 h-[28rem] w-[28rem] rounded-full bg-[#1B5E78]/40 blur-3xl" />
+        <div className="flex h-full flex-col px-6 pb-16 pt-6 sm:px-10 lg:px-14 lg:pb-0 lg:pt-12">
+          <Link to="/" className="inline-flex w-fit rounded focus-ring" aria-label="Ntemtem home"><Logo dark /></Link>
+          <div className="mt-8 max-w-lg lg:mt-[clamp(2.5rem,9vh,7rem)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F5B82E]">Ntemtem broker network</p>
+            <p className="mt-3 font-heading text-[clamp(1.6rem,3.2vw,2.6rem)] font-bold leading-[1.1]">Clear faster. Bill on time. <span className="text-[#F5B82E]">Every job in one place.</span></p>
+            <ul className="mt-8 hidden gap-5 lg:grid">
+              {BRAND_POINTS.map(([I, t, d]) => <li key={t} className="flex gap-3.5"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-[#F5B82E]"><I size={18} aria-hidden="true" /></span><span><b className="block text-[0.95rem]">{t}</b><span className="text-sm text-white/65">{d}</span></span></li>)}
+            </ul>
+            <ul className="mt-8 hidden flex-wrap gap-2 lg:flex" aria-label="Ports on the network">{['Tema', 'Takoradi', 'Lagos · Apapa', 'Tin Can', 'Onne'].map((p) => <li key={p} className="rounded-full border border-white/15 px-3 py-1 text-xs text-white/75">{p}</li>)}</ul>
+          </div>
+          <div className="relative -mx-14 mt-auto hidden lg:block">
+            <PortScene className="block w-full translate-y-px" />
+            {/* example of what a job looks like inside — decorative */}
+            <div aria-hidden="true" className="absolute right-6 top-0 hidden w-60 -translate-y-1/4 rounded-2xl border border-white/10 bg-white/[0.07] p-4 shadow-2xl backdrop-blur-md xl:block">
+              <div className="flex items-center justify-between text-xs"><span className="font-mono font-semibold">SS-R0021</span><span className="rounded-full bg-[#6CC3DD]/20 px-2 py-0.5 text-[#9ADCF0]">Documents lodged</span></div>
+              <p className="mt-1 text-xs text-white/60">Barrels · Tema · for Gold Coast Freight</p>
+              <div className="mt-3 flex gap-1">{[1, 1, 1, 0, 0, 0, 0].map((on, k) => <span key={k} className={`h-1.5 flex-1 rounded-full ${on ? 'bg-[#F5B82E]' : 'bg-white/15'}`} />)}</div>
+              <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3 text-xs"><span className="text-white/60">Invoice BRK-0005</span><span className="font-semibold text-[#34D399]">Paid $628.18</span></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* form side */}
+      <main className="relative flex min-h-[70vh] flex-col items-center px-4 pb-8 lg:min-h-screen lg:justify-center lg:px-10 lg:py-12" style={{ backgroundImage: 'radial-gradient(color-mix(in oklab, var(--color-text) 9%, transparent) 1px, transparent 1px)', backgroundSize: '22px 22px' }}>
+        <div className="-mt-10 w-full max-w-md lg:mt-0">
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-[0_30px_80px_-40px_rgba(13,20,36,.45)] sm:p-8">
+            <h1 className="!text-[1.7rem] leading-tight">{title}</h1>{sub && <p className="mt-1.5 text-text-muted">{sub}</p>}
+            <div className="mt-6">{children}</div>
+          </div>
+          <p className="mt-5 flex items-center justify-center gap-1.5 text-xs text-text-muted"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg> Secure sign-in · <Link to="/help" className="underline">Help</Link> · <Link to="/" className="underline">ntemtem.com</Link></p>
+        </div>
+      </main>
     </div>
   )
 }

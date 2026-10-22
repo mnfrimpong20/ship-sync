@@ -4,7 +4,7 @@ import type { Mode, ShipmentStatus } from './data'
 export type PieceStatus = 'labelled' | 'loaded' | 'devanned' | 'delivered'
 export interface Piece { id: string; shipmentId: string; seq: number; labelCode: string; status: PieceStatus; printedAt: string | null; lastScanAt: string | null; lastScanKind: string; lastScanPlace: string; lastScanBy: string }
 export interface LabelData {
-  shipment: { id: string; ref: string; mode: Mode; origin: string; destination: string; cargo: string; description: string; status: ShipmentStatus; customer: string; createdAt: string | null }
+  shipment: { id: string; ref: string; mode: Mode; origin: string; destination: string; cargo: string; description: string; status: ShipmentStatus; customer: string; createdAt: string | null; clientId: string | null; weightKg: number | null }
   sender: { name: string; company: string; phone: string; city: string }
   receiver: { name: string; phone: string; address: string; city: string; country: string } | null
   container: { ref: string; number: string; seal: string; vesselName: string; destinationPort: string } | null

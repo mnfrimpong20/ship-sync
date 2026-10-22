@@ -51,15 +51,16 @@ export function mountLabels(r: Router, d: Deps) {
     const { rows: shipper } = await db.query<Row>('select name, hq from shippers where id = $1', [u.shipperId])
     const { rows: clients } = await db.query<Row>('select * from clients where shipper_id = $1', [u.shipperId])
     const { rows: consignees } = await db.query<Row>('select * from client_consignees where client_id = any($1::text[])', [clients.map((c) => c.id)])
+    const { rows: reqs } = await db.query<Row>('select id, weight_kg, quantity from requests where id = any($1::text[])', [ships.map((x) => x.request_id).filter(Boolean)])
     const { rows: containers } = await db.query<Row>('select id, ref, number, seal, vessel_name, destination_port from containers where shipper_id = $1', [u.shipperId])
     const labels = []
     for (const s of ships.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id))) {
       const pieces = await ensurePieces(db, s)
       const client = clients.find((c) => c.id === s.client_id)
-      const consignee = consignees.find((c) => c.id === s.consignee_id) ?? (client ? consignees.find((c) => c.client_id === client.id && c.is_default) : undefined)
+      const consignee = consignees.find((c) => c.id === s.consignee_id) ?? (client ? (consignees.find((c) => c.client_id === client.id && c.is_default) ?? consignees.find((c) => c.client_id === client.id)) : undefined)
       const container = containers.find((c) => c.id === s.container_id)
       labels.push({
-        shipment: { id: s.id, ref: s.ref, mode: s.mode, origin: s.origin, destination: s.destination, cargo: s.cargo, description: s.description, status: s.status, customer: s.customer, createdAt: ISO(s.created_at) },
+        shipment: { id: s.id, ref: s.ref, mode: s.mode, origin: s.origin, destination: s.destination, cargo: s.cargo, description: s.description, status: s.status, customer: s.customer, createdAt: ISO(s.created_at), clientId: s.client_id ?? null, weightKg: (() => { const q = reqs.find((x) => x.id === s.request_id); return q?.weight_kg != null ? Number(q.weight_kg) : null })() },
         sender: client ? { name: client.name, company: client.company, phone: client.phone || client.whatsapp, city: client.city } : { name: s.customer, company: '', phone: '', city: s.origin },
         receiver: consignee ? { name: consignee.name, phone: consignee.phone, address: consignee.address, city: consignee.city, country: consignee.country } : null,
         container: container ? { ref: container.ref, number: container.number, seal: container.seal, vesselName: container.vessel_name, destinationPort: container.destination_port } : null,

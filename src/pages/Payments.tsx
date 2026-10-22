@@ -103,15 +103,15 @@ export default function Payments() {
               <motion.div variants={fadeUp} className="card-dark mt-4 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[560px] text-sm">
-                    <thead><tr className={thead}><Th>Paid</Th><Th>Shipment</Th><Th>What</Th><Th className="text-right">Amount</Th><Th className="text-right">Fee</Th><Th className="text-right">Yours</Th><Th>Status</Th></tr></thead>
+                    <thead><tr className={thead}><Th>Paid</Th><Th>Shipment</Th><Th className="hidden 2xl:table-cell">What</Th><Th className="text-right">Amount</Th><Th className="text-right">Fee</Th><Th className="text-right">Yours</Th><Th>Status</Th></tr></thead>
                     <tbody>
                       {data === null && !error && <tr><td colSpan={7}><BrandLoader full={false} /></td></tr>}
                       {data && pg.rows.length === 0 && <tr><td colSpan={7} className="px-3 py-10"><Empty title={all.length ? 'No payments match' : 'No payments yet'} body={all.length ? 'Try another filter.' : 'When a customer pays for a booked shipment it shows up here, held in escrow until the goods are on their way.'} /></td></tr>}
                       {pg.rows.map((p) => (
                         <tr key={p.id} className={trow(false, p.status === 'refunded' || p.status === 'cancelled')} data-testid="payment-row">
                           <td className="whitespace-nowrap px-3 py-3 text-xs">{fmt(p.paidAt)}<p className="text-text-muted">{p.method ? methodLabels[p.method] ?? p.method : ''}</p></td>
-                          <td className="px-3 py-3"><Link to={`/dashboard/shipments?q=${p.shipmentRef}&b=all`} className="whitespace-nowrap font-mono text-xs text-gold-deep hover:underline">{p.shipmentRef}</Link><p className="text-xs text-text-muted">{p.customer}</p></td>
-                          <td className="px-3 py-3 text-xs text-text-muted"><p className="max-w-[170px] truncate" title={p.items.map((i) => i.description).join(', ')}>{p.items.map((i) => i.description).join(', ')}</p>{p.recordedBy && <p>Recorded by {p.recordedBy}</p>}</td>
+                          <td className="px-3 py-3"><Link to={`/dashboard/shipments?q=${p.shipmentRef}&b=all`} className="whitespace-nowrap font-mono text-xs text-gold-deep hover:underline">{p.shipmentRef}</Link><p className="text-xs text-text-muted">{p.customer}</p>{p.recordedBy && <p className="text-xs text-text-muted 2xl:hidden">Recorded by {p.recordedBy}</p>}</td>
+                          <td className="hidden px-3 py-3 text-xs text-text-muted 2xl:table-cell"><p className="max-w-[170px] truncate" title={p.items.map((i) => i.description).join(', ')}>{p.items.map((i) => i.description).join(', ')}</p>{p.recordedBy && <p>Recorded by {p.recordedBy}</p>}</td>
                           <td className="px-3 py-3 text-right tabular-nums">{usd(p.amountUsd)}</td>
                           <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-text-muted">{p.feeUsd ? `−${usd(p.feeUsd)}` : "—"}</td>
                           <td className="px-3 py-3 text-right font-semibold tabular-nums">{p.status === 'refunded' ? '—' : usd(p.provider === 'manual' ? p.amountUsd : p.netUsd)}</td>

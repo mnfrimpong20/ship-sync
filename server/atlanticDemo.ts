@@ -204,3 +204,58 @@ export async function seedAtlanticBridgeDemo(db: Db) {
     on conflict (id) do nothing`, [at(-0.1), at(-7)])
   console.log(`[demo] Atlantic Bridge: ${SHIPS.length} shipments, ${CONTAINERS.length} containers, ${CLIENTS.length} clients, ${STAFF.length} staff logins`)
 }
+
+/**
+ * Payments & payouts for the Atlantic Bridge demo: card payments in escrow (held, released, paid out,
+ * refunded, one still at checkout), payments recorded as paid directly, two paid payouts, one payout
+ * waiting for Ntemtem, and a payout bank account. Runs once (marker: esc_ab_01), after the shipments.
+ */
+export async function seedAtlanticPaymentsDemo(db: Db) {
+  if (process.env.DEMO_ATLANTIC === 'false') return
+  const { rows: ok } = await db.query(`select 1 from shipments where id = 'ab_s_01'`); if (!ok[0]) return
+  const { rows: done } = await db.query(`select 1 from escrow_payments where id = 'esc_ab_01'`); if (done[0]) return
+  const { getSettings } = await import('./payments'); const cfg = await getSettings(db)
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  const { rows: ships } = await db.query<Row>(`select id, ref, origin, destination, mode, user_id, description from shipments where shipper_id = $1 and id like 'ab_s_%'`, [SID])
+  const S = new Map(ships.map((s) => [s.id, s]))
+  // n, shipment, amount, status, paid (days ago), released (days ago), payout, method, extra
+  const P: [number, string, number, string, number, number | null, string | null, string, Record<string, string>?][] = [
+    [1, 'ab_s_21', 1600, 'paid_out', 74, 70, 'po_ab_1', 'card'],
+    [2, 'ab_s_22', 650, 'paid_out', 66, 62, 'po_ab_1', 'card'],
+    [3, 'ab_s_24', 420, 'paid_out', 86, 82, 'po_ab_1', 'card'],
+    [4, 'ab_s_19', 980, 'paid_out', 52, 47, 'po_ab_2', 'card'],
+    [5, 'ab_s_17', 520, 'paid_out', 50, 44, 'po_ab_2', 'card'],
+    [6, 'ab_s_23', 260, 'paid_out', 20, 18, 'po_ab_2', 'card'],
+    [7, 'ab_s_15', 1280, 'released', 42, 36, 'po_ab_3', 'card'],
+    [8, 'ab_s_20', 330, 'released', 7, 5.5, 'po_ab_3', 'card'],
+    [9, 'ab_s_09', 780, 'released', 19, 12, null, 'card'],
+    [10, 'ab_s_26', 290, 'released', 17, 12, null, 'card'],
+    [11, 'ab_s_11', 310, 'released', 3, 1.5, null, 'card'],
+    [12, 'ab_s_07', 1350, 'held', 11, null, null, 'card'],
+    [13, 'ab_s_27', 140, 'held', 0.1, null, null, 'card'],
+    [14, 'ab_s_06', 360, 'held', 4, null, null, 'card'],
+    [15, 'ab_s_10', 2050, 'direct', 18, null, null, 'bank', { recorded_by: 'Samuel Ansah', note: 'Deposit by wire — Mensah Motors' }],
+    [16, 'ab_s_05', 195, 'direct', 5, null, null, 'cash', { recorded_by: 'Peter Danquah', note: 'Cash at the warehouse on drop-off' }],
+    [17, 'ab_s_14', 875, 'direct', 47, null, null, 'mobile_money', { recorded_by: 'Samuel Ansah', note: 'MoMo from Ama Mensah in Accra' }],
+    [18, 'ab_s_25', 300, 'refunded', 15, null, null, 'card', { refund_reason: 'Customer sold the car before pickup — booking deposit refunded in full.' }],
+    [19, 'ab_s_03', 420, 'pending', 0.3, null, null, 'card'],
+  ]
+  const ago = (d: number) => new Date(Date.now() - d * DAY)
+  for (const [n, sid, amount, status, paid, rel, po, method, x] of P) {
+    const s = S.get(sid); if (!s) continue
+    const direct = status === 'direct'; const fee = direct || status === 'pending' || status === 'refunded' ? 0 : r2(amount * cfg.takeRatePct)
+    const items = [{ description: `${s.mode === 'air' ? 'Air' : 'Ocean'} freight ${s.origin} → ${s.destination} — ${s.ref}`, amountUsd: amount, kind: 'freight' }]
+    await db.query(`insert into escrow_payments (id,shipment_id,shipper_id,user_id,items,amount_usd,fee_usd,net_usd,status,provider,method,paid_at,released_at,release_reason,refunded_at,refund_reason,payout_id,recorded_by,created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) on conflict (id) do nothing`,
+      [`esc_ab_${String(n).padStart(2, '0')}`, sid, SID, s.user_id, JSON.stringify(direct && x?.note ? [{ ...items[0], description: `${items[0].description} · ${x.note}` }] : items), amount, fee, r2(amount - fee), status, direct ? 'manual' : 'stripe', status === 'pending' ? null : method,
+        status === 'pending' ? null : ago(paid), rel != null ? ago(rel) : null, rel != null ? 'status:in_transit' : null, status === 'refunded' ? ago(paid - 2) : null, x?.refund_reason ?? null, po, x?.recorded_by ?? null, ago(paid + 0.02)])
+  }
+  const net = (po: string) => r2(P.filter((p) => p[6] === po).reduce((t, p) => t + p[2] - r2(p[2] * cfg.takeRatePct), 0))
+  const bank = { bankName: 'TD Bank', accountName: 'Atlantic Bridge Logistics LLC', accountNumber: '····8203', routing: '····0260', country: 'US', mobileMoney: '' }
+  await db.query(`update shippers set payout_details = $2 where id = $1 and (payout_details is null or payout_details = '{}'::jsonb)`, [SID, JSON.stringify({ ...bank, accountNumber: '4471028203', routing: '031201360' })])
+  await db.query(`insert into payouts (id,shipper_id,amount_usd,status,method,details,reference,note,requested_by,requested_at,paid_at,paid_by) values
+    ('po_ab_1',$1,$2,'paid','bank',$5,'ACH 55102-AB','','Kwame Asante',$6,$7,'Ntemtem'),
+    ('po_ab_2',$1,$3,'paid','bank',$5,'ACH 61877-AB','','Samuel Ansah',$8,$9,'Ntemtem'),
+    ('po_ab_3',$1,$4,'requested','bank',$5,'','Before the Friday container payment, please.','Kwame Asante',$10,null,null)
+    on conflict (id) do nothing`, [SID, net('po_ab_1'), net('po_ab_2'), net('po_ab_3'), JSON.stringify(bank), ago(60), ago(58), ago(16), ago(14), ago(0.6)])
+  console.log('[demo] Atlantic Bridge: payments and payouts added')
+}

@@ -40,7 +40,7 @@ async function main() {
   ;(await import('./autopilot')).startAutopilotSweeps(getDb)
   ;(await import('./driverHr')).startDriverHrSweeps(getDb)
   // Atlantic Bridge demo runs after the broker demo so that seed doesn't pick up its shipments.
-  void getDb().then(async (db) => { await (await import('./brokerPortal')).seedBrokerPortalDemo(db).catch((e) => console.error('[broker] demo seed', e)); await (await import('./atlanticDemo')).seedAtlanticBridgeDemo(db) }).catch((e) => console.error('[atlantic] demo seed', e))
+  void getDb().then(async (db) => { await (await import('./brokerPortal')).seedBrokerPortalDemo(db).catch((e) => console.error('[broker] demo seed', e)); const ab = await import('./atlanticDemo'); await ab.seedAtlanticBridgeDemo(db); await ab.seedAtlanticPaymentsDemo(db) }).catch((e) => console.error('[atlantic] demo seed', e))
   void getDb().then(async (db) => (await import('./driverHr2')).seedDriverHrDemo(db)).catch((e) => console.error('[driver-hr] demo seed', e))
   startExportSchedule(getDb)
   const app = express()

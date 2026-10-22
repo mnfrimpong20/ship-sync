@@ -20,7 +20,7 @@ interface Opts { contents: boolean; senderPhone: boolean; receiverPhone: boolean
 const InkMark = () => <svg viewBox="0 0 96 96" className="mark" aria-hidden="true"><rect width="96" height="96" rx="22" fill="currentColor" /><path d="M17,28 L35,48 L17,68 M39,28 L57,48 L39,68" fill="none" stroke="#fff" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" /><rect x="64" y="38" width="20" height="20" rx="5" fill="#fff" /></svg>
 
 /** One sticker. Black on white only, so it prints the same on any thermal or laser printer. */
-function Sticker({ d, piece, qr, shipper, opts }: { d: LabelData; piece: Piece; qr: string; shipper: LabelsResponse['shipper']; opts: Opts }) {
+function Sticker({ d, piece, qr, shipper, opts, site }: { d: LabelData; piece: Piece; qr: string; shipper: LabelsResponse['shipper']; opts: Opts; site: string }) {
   const s = d.shipment; const dest = countryByCode(s.destination); const air = s.mode === 'air'
   const port = d.container?.destinationPort || (air ? dest?.airports?.[0] : dest?.ports?.[0]) || ''
   const r = d.receiver
@@ -58,7 +58,7 @@ function Sticker({ d, piece, qr, shipper, opts }: { d: LabelData; piece: Piece; 
         <div><div className="k">{d.container?.vesselName ? 'VESSEL' : 'LOAD REF'}</div><div className="v">{d.container?.vesselName || d.container?.ref || ''}</div></div>
       </div>
       <div className="bc" dangerouslySetInnerHTML={{ __html: code128Svg(piece.labelCode) }} />
-      <div className="ft"><b>{piece.labelCode}</b><span>Scan the QR to track · {location.host}</span></div>
+      <div className="ft"><b>{piece.labelCode}</b><span>Scan the QR or track at <b>{site}/track</b></span></div>
     </div>
   )
 }
@@ -100,8 +100,8 @@ const css = `
 .sticker .cn.blank .v{border-bottom:1px solid #999}
 .sticker .bc{height:.42in;margin-top:8px}.sticker .bc svg{width:100%;height:100%}
 .sticker .ft{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:4px;font-size:8px}
-.sticker .ft b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;letter-spacing:1px}
-.sticker .ft span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#3a3a3a}
+.sticker .ft>b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;letter-spacing:1px;white-space:nowrap;flex:none}.sticker .ft span b{font-weight:700;color:#000}
+.sticker .ft span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#3a3a3a}
 .preview-grid{display:grid;gap:28px;grid-template-columns:repeat(auto-fill,minmax(calc(var(--lw) * var(--z)),1fr));justify-items:center}
 .preview-item .frame{width:calc(var(--lw) * var(--z));height:calc(var(--lh) * var(--z));overflow:hidden;border-radius:6px;box-shadow:0 1px 2px rgba(20,33,61,.12),0 12px 30px -16px rgba(20,33,61,.35);background:#fff}
 .preview-item .frame>.sticker{transform:scale(var(--z));transform-origin:top left}
@@ -145,7 +145,7 @@ export default function Labels() {
   useEffect(() => {
     if (!data) return
     let live = true
-    const all = data.labels.flatMap((l) => l.pieces.map((p) => ({ key: p.id, url: trackUrl(l.shipment.ref, p.seq) })))
+    const all = data.labels.flatMap((l) => l.pieces.map((p) => ({ key: p.id, url: trackUrl(l.shipment.ref, p.seq, data.publicUrl) })))
     Promise.all(all.map(async ({ key, url }) => [key, await QRCode.toDataURL(url, { errorCorrectionLevel: 'M', margin: 0, width: 400, color: { dark: '#000000', light: '#FFFFFF' } })] as const)).then((pairs) => live && setQr(Object.fromEntries(pairs)))
     return () => { live = false }
   }, [data])
@@ -155,6 +155,7 @@ export default function Labels() {
   if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
 
   const S = SIZES.find((x) => x.id === size)!
+  const site = (data?.publicUrl ?? location.origin).replace(/^https?:\/\/(www\.)?/, '')
   const setSize = (v: Size) => { const n = new URLSearchParams(sp); n.set('size', v); setSp(n, { replace: true }) }
   const labels = data?.labels ?? []
   const allPieces = labels.flatMap((l) => l.pieces.map((p) => ({ l, p })))
@@ -179,7 +180,7 @@ export default function Labels() {
     if (justOne) { setOnly(justOne); setTimeout(() => window.print(), 50) } else window.print()
   }
   const opt = (k: keyof Opts, label: string, hint: string) => <label className="flex cursor-pointer items-start gap-3 py-1.5"><input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--color-gold)]" checked={opts[k]} onChange={(e) => setOpts({ ...opts, [k]: e.target.checked })} /><span className="text-sm"><span className="font-medium">{label}</span><span className="block text-xs text-text-muted">{hint}</span></span></label>
-  const stickerFor = ({ l, p }: { l: LabelData; p: Piece }) => <Sticker d={l} piece={p} qr={qr[p.id] ?? ''} shipper={data!.shipper} opts={opts} />
+  const stickerFor = ({ l, p }: { l: LabelData; p: Piece }) => <Sticker d={l} piece={p} qr={qr[p.id] ?? ''} shipper={data!.shipper} opts={opts} site={site} />
 
   return (
     <div className={`labels-sheet min-h-screen bg-bg text-text size-${size}`} style={{ ['--lw' as string]: S.w, ['--lh' as string]: S.h, ['--z' as string]: zoom }}>
@@ -281,8 +282,8 @@ export default function Labels() {
 
       {/* what actually goes to the printer */}
       <div className="print-only">{size === 'sheet'
-        ? Array.from({ length: Math.ceil(chosen.length / 2) }, (_, k) => <div key={k} className="sheet-page">{chosen.slice(k * 2, k * 2 + 2).map((x) => <Sticker key={x.p.id} d={x.l} piece={x.p} qr={qr[x.p.id] ?? ''} shipper={data!.shipper} opts={opts} />)}</div>)
-        : chosen.map((x) => <Sticker key={x.p.id} d={x.l} piece={x.p} qr={qr[x.p.id] ?? ''} shipper={data!.shipper} opts={opts} />)}</div>
+        ? Array.from({ length: Math.ceil(chosen.length / 2) }, (_, k) => <div key={k} className="sheet-page">{chosen.slice(k * 2, k * 2 + 2).map((x) => <Sticker key={x.p.id} d={x.l} piece={x.p} qr={qr[x.p.id] ?? ''} shipper={data!.shipper} opts={opts} site={site} />)}</div>)
+        : chosen.map((x) => <Sticker key={x.p.id} d={x.l} piece={x.p} qr={qr[x.p.id] ?? ''} shipper={data!.shipper} opts={opts} site={site} />)}</div>
     </div>
   )
 }

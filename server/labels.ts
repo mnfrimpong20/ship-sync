@@ -67,7 +67,9 @@ export function mountLabels(r: Router, d: Deps) {
         pieces: pieces.map(pieceOut),
       })
     }
-    res.json({ shipper: { name: shipper[0]?.name ?? '', hq: shipper[0]?.hq ?? '' }, labels })
+    // Labels last weeks in transit, so the QR and printed address use the site's official address (APP_URL), not whatever host the page was opened on.
+    const publicUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')
+    res.json({ shipper: { name: shipper[0]?.name ?? '', hq: shipper[0]?.hq ?? '' }, labels, publicUrl })
   }))
 
   r.get('/shipments/:id/pieces', wrap(async (req, res) => {

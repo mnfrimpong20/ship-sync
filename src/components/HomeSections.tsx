@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowRight, Check, ChevronDown, ClipboardList, FileCheck2, Handshake, Minus, Plane, Radar, Scale, Ship, Truck } from 'lucide-react'
 import { fadeUp, stagger, viewport } from '../lib/motion'
-import { countries, faqs, shippers, testimonials } from '../lib/data'
-import { Section, SectionHeader, ShipperCard, Avatar, VerifiedMark, Flag, Mark } from './ui'
+import { countries, faqs, shippers } from '../lib/data'
+import { Section, SectionHeader, ShipperCard, VerifiedMark, Flag, Mark } from './ui'
 import { congestionLabel, useCongestion } from '../lib/useCongestion'
 import { useStore } from '../lib/store'
 
@@ -201,19 +201,20 @@ export function FeaturedShippers() {
 }
 
 /* ---------- Testimonials ---------- */
+/** Real reviews only: the latest published ones from customers who booked through Ntemtem. Nothing shows until there are some. */
 export function Testimonials() {
-  const hues = ['#F5B82E', '#6CC3DD', '#7DD3FC']
+  const [list, setList] = useState<{ id: string; author: string; rating: number; body: string; shipperName?: string; shipperId: string; lane?: string; createdAt: string }[] | null>(null)
+  useEffect(() => { fetch('/api/reviews/recent').then((r) => (r.ok ? r.json() : { reviews: [] })).then((d) => setList(d.reviews ?? [])).catch(() => setList([])) }, [])
+  if (!list?.length) return null
   return (
     <Section id="testimonials">
-      <SectionHeader eyebrow="Customer stories" title="Trusted by families and businesses shipping home" />
+      <SectionHeader eyebrow="Recent reviews" title="What customers said after delivery" body="Real reviews from people who booked and received their shipment through Ntemtem." />
       <div className="grid gap-6 md:grid-cols-3">
-        {testimonials.map((t, i) => (
-          <motion.figure key={t.name} variants={fadeUp} className="card-dark flex flex-col p-7">
-            <blockquote className="flex-1 text-[17px] leading-relaxed text-text">“{t.quote}”</blockquote>
-            <figcaption className="mt-6 flex items-center gap-3">
-              <Avatar initials={t.initials} hue={hues[i]} size={44} />
-              <div><p className="font-semibold text-text">{t.name}</p><p className="text-xs text-text-muted">{t.role}</p></div>
-            </figcaption>
+        {list.map((t) => (
+          <motion.figure key={t.id} variants={fadeUp} className="card-dark flex flex-col p-7" data-testid="home-review">
+            <p className="text-gold-deep" aria-label={`${t.rating} out of 5 stars`}>{'★'.repeat(t.rating)}<span className="text-border">{'★'.repeat(5 - t.rating)}</span></p>
+            <blockquote className="mt-3 flex-1 text-[17px] leading-relaxed text-text">“{t.body}”</blockquote>
+            <figcaption className="mt-6 text-sm"><p className="font-semibold text-text">{t.author}</p><p className="text-xs text-text-muted">{[t.lane, t.shipperName && <span key="s">shipped with <Link to={`/shippers/${t.shipperId}`} className="underline">{t.shipperName}</Link></span>].filter(Boolean).map((x, k) => <span key={k}>{k > 0 && ' · '}{x}</span>)}</p></figcaption>
           </motion.figure>
         ))}
       </div>

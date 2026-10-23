@@ -262,6 +262,11 @@ export function mountCustomerHub(r: Router, d: Deps) {
   r.get('/me/spending', wrap(async (req, res) => {
     const db = await getDb(); const u = await customer(db, req)
     const inv = await myInvoices(db, u.id)
+    // Money paid through Ntemtem checkout counts too, for shipments the shipper never raised an invoice on.
+    const invoiced = new Set(inv.map((i) => i.shipment_id).filter(Boolean))
+    const { rows: paid } = await db.query<Row>(`select p.shipment_id, p.amount_usd as total, coalesce(p.paid_at, p.created_at) as issued_at, sh.name as shipper_name, s.destination, s.cargo from escrow_payments p join shippers sh on sh.id = p.shipper_id left join shipments s on s.id = p.shipment_id
+      where p.user_id = $1 and p.status in ('held','released','paid_out','direct')`, [u.id])
+    for (const p of paid) if (!p.shipment_id || !invoiced.has(p.shipment_id)) inv.push({ ...p, balance: 0 })
     const years = [...new Set(inv.map((i) => Number(D(i.issued_at)!.slice(0, 4))))].sort((a, b) => b - a)
     const year = Number(req.query.year) || years[0] || new Date().getFullYear()
     const yr = inv.filter((i) => D(i.issued_at)!.startsWith(String(year)))
@@ -279,7 +284,7 @@ export function mountCustomerHub(r: Router, d: Deps) {
     let saved = 0, compared = 0
     for (const x of rq) { if (!D(x.created_at)!.startsWith(String(year)) || x.won == null) continue; const o = (Array.isArray(x.others) ? x.others : []).map(num).filter((v: number) => v > 0); const m = median(o); if (m != null && m > num(x.won)) { saved += m - num(x.won); compared++ } }
     res.json({
-      year, years: years.length ? years : [year], total: sum(yr), prevTotal: sum(prev), shipments: new Set(yr.map((i) => i.shipment_id).filter(Boolean)).size, invoices: yr.length,
+      year, years: years.length ? years : [year], total: sum(yr), prevTotal: sum(prev), shipments: new Set(yr.map((i) => i.shipment_id).filter(Boolean)).size, invoices: yr.filter((i) => i.id).length,
       outstanding: Math.round(inv.reduce((a, i) => a + i.balance, 0)), saved: Math.round(saved), comparedBookings: compared,
       byDestination: group((i) => i.destination ?? 'other', (k) => (k === 'other' ? 'Other' : dest(k))), byShipper: group((i) => i.shipper_name, (k) => k), months,
       perUnit: [...units].map(([cargo, x]) => ({ cargo, avg: Math.round(x.spent / Math.max(1, x.units)), units: x.units, shipments: x.n })).sort((a, b) => b.units - a.units),

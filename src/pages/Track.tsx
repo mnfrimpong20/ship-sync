@@ -21,6 +21,9 @@ export default function Track() {
   const [error, setError] = useState('')
   const [current, setCurrent] = useState<Shipment | undefined>()
   const samples = ['SS-4F7K2Q', 'SS-9B3MX1', 'SS-2LR8TD']
+  // Sample numbers only while the demo data is on — real customers shouldn't be sent to someone else's demo shipment.
+  const [demo, setDemo] = useState(false)
+  useEffect(() => { fetch('/api/site').then((r) => (r.ok ? r.json() : { demo: false })).then((d) => setDemo(!!d.demo)).catch(() => {}) }, [])
 
   useEffect(() => {
     const r = sp.get('ref')
@@ -56,7 +59,7 @@ export default function Track() {
           </motion.form>
           {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
           {error && error !== 'Enter a shipment reference.' && <div className="mt-3 rounded-xl border border-border bg-surface p-4 text-left" data-testid="track-help"><p className="text-sm font-semibold">Can’t find it?</p><ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-text-muted"><li>The reference is on your booking email and the text from your shipper — it starts with NT- (or SS- for older bookings).</li><li>Receivers: open the link in the text message you were sent — no reference needed.</li><li>New bookings can take a few minutes to appear.</li></ul><HelpLine className="mt-3" text="Still stuck?" topic="tracking" waText="Hi Ntemtem, I can’t find my shipment. My reference is " /></div>}
-          <motion.p variants={fadeUp} className="mt-3 text-xs text-text-muted">Try a sample: {samples.map((r) => <button key={r} onClick={() => { setRef(r); setSp({ ref: r }) }} className="ml-2 font-mono text-gold-deep hover:underline focus-ring rounded">{r}</button>)}</motion.p>
+          {demo && !ref && <motion.p variants={fadeUp} className="mt-3 text-xs text-text-muted">Try a sample: {samples.map((r) => <button key={r} onClick={() => { setRef(r); setSp({ ref: r }) }} className="ml-2 font-mono text-gold-deep hover:underline focus-ring rounded">{r}</button>)}</motion.p>}
         </motion.div>
 
         <AnimatePresence mode="wait">
@@ -141,19 +144,35 @@ function ProofOfDelivery({ pod, rateRef }: { pod: NonNullable<Shipment['pod']>; 
   )
 }
 
+/** Several updates logged together for the same step (booking + invoice, say) read as one event. */
+function mergeEvents(evs: Shipment['events']): Shipment['events'] {
+  const out: Shipment['events'] = []
+  for (const ev of evs) {
+    const last = out[out.length - 1]
+    if (last && last.status === ev.status && last.place === ev.place && Math.abs(new Date(ev.at).getTime() - new Date(last.at).getTime()) < 30 * 60000) {
+      out[out.length - 1] = { ...last, note: [last.note, ev.note].filter(Boolean).join('\n') }
+    } else out.push(ev)
+  }
+  return out
+}
+
 function PiecesStrip({ pieces }: { pieces: NonNullable<Shipment['pieces']> }) {
   const [sp] = useSearchParams()
   const hi = Number(sp.get('p') ?? 0)
   const label = { labelled: 'At the yard', loaded: 'In the container', devanned: 'At the destination warehouse', delivered: 'Delivered' } as const
   const tone = { labelled: 'bg-surface-2 text-text-muted', loaded: 'bg-gold/30 text-text', devanned: 'bg-sky/30 text-text', delivered: 'bg-teal text-white' } as const
   const n = (st: keyof typeof label) => pieces.filter((p) => p.status === st).length
-  const summary = [n('delivered') ? `${n('delivered')} delivered` : '', n('devanned') ? `${n('devanned')} at the warehouse` : '', n('loaded') ? `${n('loaded')} in the container` : '', n('labelled') ? `${n('labelled')} at the yard` : ''].filter(Boolean).join(' · ')
+  // A label is printed at booking; until the piece is scanned it is still with the customer.
+  const waiting = (p: (typeof pieces)[number]) => p.status === 'labelled' && !p.lastScanAt
+  const word = (p: (typeof pieces)[number]) => waiting(p) ? 'Waiting for pickup' : label[p.status]
+  const nWait = pieces.filter(waiting).length
+  const summary = [n('delivered') ? `${n('delivered')} delivered` : '', n('devanned') ? `${n('devanned')} at the warehouse` : '', n('loaded') ? `${n('loaded')} in the container` : '', n('labelled') - nWait ? `${n('labelled') - nWait} at the yard` : '', nWait ? `${nWait} waiting for pickup` : ''].filter(Boolean).join(' · ')
   const focus = pieces.find((p) => p.seq === hi)
   return (
     <div className="mt-6 rounded-xl border border-border bg-surface-2/40 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wider text-text-muted">{pieces.length} piece{pieces.length === 1 ? '' : 's'} in this shipment</p><p className="text-xs text-text-muted">{summary}</p></div>
-      <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Pieces">{pieces.map((p) => <li key={p.seq} title={`Piece ${p.seq}: ${label[p.status]}${p.lastScanPlace ? ` · ${p.lastScanPlace}` : ''}`} className={`grid h-8 min-w-8 place-items-center rounded-lg px-2 text-xs font-semibold ${tone[p.status]} ${p.seq === hi ? 'ring-2 ring-gold ring-offset-2 ring-offset-bg' : ''}`}>{p.seq}</li>)}</ul>
-      {focus && <p className="mt-2 text-sm">You scanned <strong>piece {focus.seq}</strong> — {label[focus.status].toLowerCase()}{focus.lastScanPlace ? ` at ${focus.lastScanPlace}` : ''}{focus.lastScanAt ? `, last seen ${fmtDateTime(focus.lastScanAt)}` : ''}.</p>}
+      <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Pieces">{pieces.map((p) => <li key={p.seq} title={`Piece ${p.seq}: ${word(p)}${p.lastScanPlace ? ` · ${p.lastScanPlace}` : ''}`} className={`grid h-8 min-w-8 place-items-center rounded-lg px-2 text-xs font-semibold ${tone[p.status]} ${p.seq === hi ? 'ring-2 ring-gold ring-offset-2 ring-offset-bg' : ''}`}>{p.seq}</li>)}</ul>
+      {focus && <p className="mt-2 text-sm">You scanned <strong>piece {focus.seq}</strong> — {word(focus).toLowerCase()}{focus.lastScanPlace ? ` at ${focus.lastScanPlace}` : ''}{focus.lastScanAt ? `, last seen ${fmtDateTime(focus.lastScanAt)}` : ''}.</p>}
     </div>
   )
 }
@@ -201,14 +220,14 @@ export function ShipmentDetail({ s, compact = false }: { s: Shipment; compact?: 
           <LivePanel s={s} />
 
           <ol className="mt-8 space-y-0" aria-label="Tracking history">
-            {[...s.events].reverse().map((ev, i, arr) => (
-              <motion.li key={ev.status + ev.at} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="relative flex gap-4 pb-6 last:pb-0">
+            {mergeEvents(s.events).reverse().map((ev, i, arr) => (
+              <motion.li key={ev.status + ev.at + i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="relative flex gap-4 pb-6 last:pb-0">
                 {i < arr.length - 1 && <span className="absolute left-[11px] top-6 h-full w-px bg-border" aria-hidden="true" />}
                 <span className={`relative z-10 grid h-6 w-6 shrink-0 place-items-center rounded-full ${i === 0 ? 'bg-gold text-on-accent' : 'bg-surface-2 text-text-muted'}`}><Check size={13} aria-hidden="true" /></span>
                 <div>
                   <p className={`text-sm font-semibold ${i === 0 ? 'text-text' : 'text-text-muted'}`}>{statusLabels[ev.status]} <span className="font-normal text-text-muted">· {ev.place}</span></p>
                   <p className="text-xs text-text-muted">{fmtDateTime(ev.at)}</p>
-                  {ev.note && <p className="mt-1 text-sm text-text">{ev.note}</p>}
+                  {ev.note && ev.note.split('\n').map((l) => <p key={l} className="mt-1 text-sm text-text">{l}</p>)}
                 </div>
               </motion.li>
             ))}

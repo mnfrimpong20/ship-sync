@@ -8,6 +8,7 @@
  */
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
+import { defaultShipsOn } from './shipDate'
 import { uid, type Db } from './db'
 import { can, type ApiUser } from './api'
 import { cargoLabel, countryByCode, type CargoType } from '../src/lib/data'
@@ -77,8 +78,8 @@ export async function autoQuoteFromRates(db: Db, req: Row, shipperIds: string[])
   for (const [shipperId, cards] of byShipper) {
     const best = bestCard(cards, input); if (!best) continue
     const q = best.quote
-    const { rows: ins } = await db.query<Row>('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes) values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict do nothing returning id',
-      [uid(), req.id, shipperId, q.price, q.transitDays, q.validUntil, q.notes || 'Instant quote from our published rates.', JSON.stringify(q.includes)])
+    const { rows: ins } = await db.query<Row>('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes,ships_on) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict do nothing returning id',
+      [uid(), req.id, shipperId, q.price, q.transitDays, q.validUntil, q.notes || 'Instant quote from our published rates.', JSON.stringify(q.includes), defaultShipsOn(req.ready_date, best.card.mode === 'air')])
     if (ins[0]) out.push({ shipperId, price: q.price })
   }
   return out

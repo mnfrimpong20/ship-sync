@@ -3,7 +3,7 @@ import { isDriverRole } from '../lib/roles'
 import { useT } from '../lib/i18n'
 import { adoptAccountDisplay } from '../lib/prefs'
 import { Suspense, useEffect, useState } from 'react'
-import { Link, NavLink, Navigate, useLocation, useNavigate, useOutlet } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { IdCard, Bot, LifeBuoy, Anchor, BarChart3, LineChart, Calculator, Megaphone, Plug, CreditCard, History, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X, Printer } from 'lucide-react'
 import { Avatar, Logo, Mark } from './ui'
@@ -173,13 +173,15 @@ export default function AppShell() {
     ...(user.admin ? [{ to: '/admin', label: 'Business', icon: BarChart3, end: true } as Item, { to: '/admin?view=attention', label: 'Attention', icon: BellRing } as Item, { to: '/admin?view=shippers', label: 'Verification', icon: ShieldCheck } as Item, { to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2 } as Item] : []),
   ]
 
+  // Old customer links (?request= / ?open=) open Quote requests, and ?s= opens a shipment, without a tab= in the URL.
+  const search = loc.pathname === '/dashboard' && !loc.search.includes('tab=') ? (/[?&](request|open)=/.test(loc.search) ? `?tab=requests&${loc.search.slice(1)}` : /[?&]s=/.test(loc.search) ? `?tab=shipments&${loc.search.slice(1)}` : loc.search) : loc.search
   const isActive = (it: Item) => {
     const [path, qs] = it.to.split('?')
     if (path === '/') return loc.pathname === '/'
     if (loc.pathname !== path && !(path !== '/dashboard' && path !== '/dashboard/shipper' && loc.pathname.startsWith(path))) return false
-    if (qs) return loc.search.includes(qs)
+    if (qs) return search.includes(qs)
     if (it.end && loc.pathname !== path) return false
-    if (it.end) return loc.search === '' || (!loc.search.includes('view=') && !loc.search.includes('tab='))
+    if (it.end) return search === '' || (!search.includes('view=') && !search.includes('tab='))
     return true
   }
   const showTip = (label: string) => (e: React.SyntheticEvent<HTMLElement>) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ label, top: r.top + r.height / 2 }) }
@@ -189,13 +191,13 @@ export default function AppShell() {
         const act = isActive(it); const label = t(it.label)
         return (
           <li key={it.to}>
-            <NavLink to={it.to} className={`relative flex min-h-10 items-center rounded-lg text-sm transition-colors focus-ring ${compact ? 'mx-auto w-11 justify-center' : 'gap-3 px-3'} ${act ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} aria-current={act ? 'page' : undefined}
+            <Link to={it.to} className={`relative flex min-h-10 items-center rounded-lg text-sm transition-colors focus-ring ${compact ? 'mx-auto w-11 justify-center' : 'gap-3 px-3'} ${act ? 'bg-gold/15 font-semibold text-gold-deep' : 'text-text-muted hover:bg-surface-2 hover:text-text'}`} aria-current={act ? 'page' : undefined}
               {...(compact ? { 'aria-label': it.badge ? `${label} (${it.badge})` : label, onMouseEnter: showTip(label), onFocus: showTip(label), onMouseLeave: () => setTip(null), onBlur: () => setTip(null) } : {})}>
               <it.icon size={compact ? 19 : 17} aria-hidden="true" />
               {compact
                 ? (it.badge ? <span className={`absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full px-1 text-[11px] font-bold leading-none ${act ? 'bg-gold text-on-accent' : 'bg-gold/90 text-on-accent'}`} aria-hidden="true">{typeof it.badge === 'number' && it.badge > 99 ? '99+' : typeof it.badge === 'string' ? '•' : it.badge}</span> : null)
                 : <><span className="flex-1">{label}</span>{it.badge ? <span className={`rounded-full px-1.5 text-xs font-bold ${act ? 'bg-gold text-on-accent' : 'bg-surface-2 text-text'}`}>{it.badge}</span> : null}</>}
-            </NavLink>
+            </Link>
           </li>
         )
       })}

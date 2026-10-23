@@ -1448,6 +1448,8 @@ create table if not exists price_adjustments (
 );
 alter table quotes add column if not exists original_price numeric;
 alter table quotes add column if not exists ships_on date;
+-- Open quotes priced automatically before ship dates existed: give them one so customers can compare by date
+update quotes q set ships_on = greatest(r.ready_date, q.sent_at::date + 3) from requests r where r.id = q.request_id and q.ships_on is null and q.status = 'sent';
 alter table run_stops add column if not exists eta_from text not null default '';
 alter table run_stops add column if not exists eta_to text not null default '';
 alter table run_stops add column if not exists pod jsonb;

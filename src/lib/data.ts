@@ -82,12 +82,6 @@ export const shippers: Shipper[] = [
   { id: 'pacific-west-africa', name: 'Pacific–West Africa Lines', tagline: 'From Asia to the Gulf of Guinea', hq: 'Guangzhou, CN', founded: 2010, modes: ['ocean', 'air'], destinations: ['NG', 'GH', 'CI', 'SN'], origins: ['Guangzhou, CN', 'Shanghai, CN', 'Dubai, AE'], cargo: ['container20', 'container40', 'commercial', 'pallets'], rating: 4.4, reviews: 220, verified: true, responseHours: 5, onTime: 90, services: ['Supplier pickup', 'Consolidation', 'Quality inspection', 'Customs brokerage'], about: 'Commercial importers’ partner for Asia-to-Africa trade. Supplier consolidation in Guangzhou with FCL and LCL sailings to Lagos, Tema and Abidjan.', priceIndex: 1, plan: 'enterprise', initials: 'PW', hue: '#38BDF8' },
 ]
 
-export interface Testimonial { quote: string; name: string; role: string; initials: string }
-export const testimonials: Testimonial[] = [
-  { quote: 'I shipped a 2019 Highlander to Tema and three barrels for my mother. Four quotes in a day, picked Gold Coast, and it cleared in nine days. No surprises on duty.', name: 'Abena Owusu', role: 'Customer · Houston → Accra', initials: 'AO' },
-  { quote: 'Our clinic in Monrovia needed a pallet of supplies fast. Ntemtem matched us with an air forwarder that had it there in five days, with the paperwork done.', name: 'Dr. James Kollie', role: 'NGO logistics lead · Philadelphia → Monrovia', initials: 'JK' },
-  { quote: 'Listing on Ntemtem replaced our Facebook-group lead hunting. We book 30–40 new customers a month and the verification badge closes deals for us.', name: 'Kwame Asante', role: 'Operations Director, Atlantic Bridge Logistics', initials: 'KA' },
-]
 
 export const faqs = [
   { q: 'How do I know a shipper is legitimate?', a: 'Every “Verified” shipper has passed a document check: business registration, NVOCC/IATA or forwarder licence, insurance certificate, and a physical warehouse address confirmed by our team. Reviews come only from customers who booked through Ntemtem.' },

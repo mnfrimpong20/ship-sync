@@ -4,10 +4,12 @@ import { AlertTriangle, ArrowRight, Ban, Clock, Globe2, Lock, MessageSquare, Pen
 import { useStore, type Quote, type QuoteRequest } from '../lib/store'
 import { missingServices, requestsApi, type RequestMessage } from '../lib/requests'
 import { refreshShipments } from '../lib/flowEvents'
-import { Avatar, Pill, ProtectedNote, Rating, VerifiedBadge, fmtDate, fmtDateTime, money } from './ui'
+import { Avatar, PROTECTED_LINE, Pill, ProtectedNote, Rating, VerifiedBadge, fmtDate, fmtDateTime, money } from './ui'
+import { Confirm } from './board'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const live = (q: Quote) => q.status === 'sent' && !q.expired
+const PAY_HELD = `Nothing is charged now — you pay from the shipment page. ${PROTECTED_LINE}`
 
 /** One conversation between the client and one shipper about one request. Contact details are stripped until booking. */
 export function MessageThread({ requestId, shipperId, onClose, compact }: { requestId: string; shipperId?: string; onClose?: () => void; compact?: boolean }) {
@@ -51,6 +53,7 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
   const { shipperById } = useStore()
   const [thread, setThread] = useState<string | null>(threadFor ?? null)
   const [sort, setSort] = useState<QuoteSort>('price')
+  const [ask, setAsk] = useState<Quote | null>(null)
   const quotes = r.quotes
   const tags = useMemo(() => {
     const ls = quotes.filter(live); const t = new Map<string, string[]>()
@@ -70,8 +73,18 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
   const by = { price: (a: Quote, b: Quote) => totalOf(a) - totalOf(b), ships: (a: Quote, b: Quote) => dayKey(a.shipsOn).localeCompare(dayKey(b.shipsOn)), arrives: (a: Quote, b: Quote) => dayKey(a.arrivesOn).localeCompare(dayKey(b.arrivesOn)), transit: (a: Quote, b: Quote) => a.transitDays - b.transitDays }[sort]
   const order = (a: Quote, b: Quote) => Number(live(b)) - Number(live(a)) || by(a, b) || totalOf(a) - totalOf(b)
   const liveCount = quotes.filter(live).length
+  const askShipper = ask ? shipperById(ask.shipperId)?.name ?? 'this shipper' : ''
+  const others = ask ? quotes.filter((q) => q.id !== ask.id && live(q)).length : 0
   return (
     <div className="mt-4 space-y-4">
+      {ask && <Confirm danger={false} title={`Book with ${askShipper}?`} confirmLabel={`Book for ${money(totalOf(ask))}`} busy={busyQuote !== null} onClose={() => setAsk(null)} onConfirm={() => { const id = ask.id; setAsk(null); accept(r, id) }} body={<div className="space-y-2" data-testid="book-confirm">
+        <p><b className="text-text">{money(totalOf(ask))}</b> {ask.kind === 'estimate' ? 'estimate — confirmed when your pieces are weighed' : 'all in'}{ask.suppliesUsd ? ` (${money(ask.price)} freight + ${money(ask.suppliesUsd)} supplies)` : ''}.</p>
+        <p>Ships {ask.shipsOn ? shortDay(ask.shipsOn) : 'on a date the shipper confirms'}{ask.arrivesOn ? `, arrives about ${shortDay(ask.arrivesOn)}` : ''} · {ask.transitDays} days in transit.</p>
+        {ask.includes.length > 0 && <p>Includes {ask.includes.join(', ')}.</p>}
+        <p>{PAY_HELD}</p>
+        {others > 0 && <p>Your {others} other quote{others === 1 ? '' : 's'} will be declined.</p>}
+      </div>} />}
+      {liveCount > 0 && r.status === 'open' && <ProtectedNote />}
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         {liveCount > 1 ? <div className="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Sort quotes"><span className="text-text-muted">Sort by</span>{SORTS.map(([k, l]) => <button key={k} onClick={() => setSort(k)} aria-pressed={sort === k} className={`rounded-full border px-2.5 py-1 focus-ring ${sort === k ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border text-text-muted hover:border-gold'}`} data-testid={`quote-sort-${k}`}>{l}</button>)}</div> : <span />}
         <button onClick={() => window.print()} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="print-quotes">Print / save quotes as PDF</button>
@@ -115,11 +128,10 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
                     <div className="flex gap-1.5">
                       {r.status !== 'cancelled' && r.status !== 'expired' && q.status !== 'withdrawn' && <button onClick={() => setThread(thread === q.shipperId ? null : q.shipperId)} className="btn-ghost !min-h-10 !px-3 text-xs" data-testid="quote-message"><MessageSquare size={13} aria-hidden="true" /> Ask</button>}
                       {q.status === 'accepted' ? <Pill tone="green">Accepted</Pill> : q.status === 'declined' ? <Pill tone="muted">Declined</Pill> : dead ? <Pill tone="muted">{q.status === 'withdrawn' ? 'Withdrawn' : 'Expired'}</Pill> : r.status === 'open' && (
-                        <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => accept(r, q.id)} disabled={busyQuote !== null} className="btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60" data-testid="accept-quote">{busyQuote === q.id ? 'Booking…' : 'Accept & book'}</motion.button>
+                        <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => setAsk(q)} disabled={busyQuote !== null} className="btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60" data-testid="accept-quote">{busyQuote === q.id ? 'Booking…' : 'Accept & book'}</motion.button>
                       )}
                     </div>
                   </div>
-                  {live(q) && q.status !== 'accepted' && q.status !== 'declined' && r.status === 'open' && <ProtectedNote className="mt-3" />}
                   {thread === q.shipperId && <div className="mt-3"><MessageThread requestId={r.id} shipperId={q.shipperId} compact onClose={() => setThread(null)} /></div>}
                 </div>
               )

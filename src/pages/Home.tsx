@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Hero from '../components/Hero'
-import { Destinations, FamilyUpdates, FAQ, FeaturedShippers, Features, FinalCTA, ForShippers, HowItWorks, Pricing, Testimonials } from '../components/HomeSections'
+import { Destinations, FamilyUpdates, FAQ, FeaturedShippers, Features, FinalCTA, HowItWorks, Pricing, Testimonials } from '../components/HomeSections'
 
 export default function Home() {
   const [sp] = useSearchParams(); const s = sp.get('s')
@@ -14,7 +14,6 @@ export default function Home() {
       <HowItWorks />
       <FamilyUpdates />
       <Features />
-      <ForShippers />
       <FeaturedShippers />
       <Testimonials />
       <Pricing />

@@ -10,7 +10,7 @@
 import type { Request, Response, NextFunction, Router } from 'express'
 import { isDriverRole } from '../src/lib/roles'
 import { z } from 'zod'
-import { uid, type Db } from './db'
+import { publicShipperSql, uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { notify, notifyShipperStaff } from './notify'
 import { refundPayment, releasePayment } from './payments'
@@ -80,6 +80,13 @@ export function mountReviews(r: Router, d: Deps) {
     const tags: Record<string, number> = {}; for (const x of rows) for (const t of (J(x.tags) ?? []) as string[]) tags[t] = (tags[t] ?? 0) + 1
     res.set('Cache-Control', 'no-store')
     res.json({ reviews: rows.map((x) => reviewOut(x)), summary: { count: rows.length, average: rows.length ? Math.round((rows.reduce((n, x) => n + Number(x.rating), 0) / rows.length) * 10) / 10 : null, distribution: dist, tags: Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([tag, count]) => ({ tag, count })) } })
+  }))
+  /** Home page: the latest real reviews (verified bookings, published, with something to say) — never sample text. */
+  r.get('/reviews/recent', wrap(async (_req, res) => {
+    const db = await getDb()
+    const { rows } = await db.query<Row>(`${REVIEW_SELECT} where r.status = 'published' and r.rating >= 4 and length(r.body) >= 40 and ${publicShipperSql('sh.')} order by r.created_at desc limit 3`)
+    res.set('Cache-Control', 'public, max-age=300')
+    res.json({ reviews: rows.map((x) => reviewOut(x)) })
   }))
   r.get('/shipments/:id/review', wrap(async (req, res) => {
     const db = await getDb(); const { s, office, owner } = await access(db, req, String(req.params.id)); const rv = await reviewFor(db, s.id)

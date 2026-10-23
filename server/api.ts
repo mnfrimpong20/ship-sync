@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { createHash, randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
+import { defaultShipsOn } from './shipDate'
 import { publicShipperSql, getDb, makeRef, uid, type Db } from './db'
 import { nextStatus, statusLabels, statusOrder, type CargoType, type ShipmentStatus } from '../src/lib/data'
 import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } from '../src/lib/geo'
@@ -103,7 +104,7 @@ const DEMO_AUTO_QUOTES = (process.env.DEMO_AUTO_QUOTES ?? 'true') !== 'false'
 
 /* ---------------- helpers ---------------- */
 const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : typeof v === 'string' ? v : String(v))
-const DATE = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10))
+const DATE = (v: unknown) => (v == null ? null : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10))
 const J = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : v)
 
 /** A shipper's uploaded logo, served as its own cacheable image (never inlined into lists — logos can be 250 KB). */
@@ -120,7 +121,7 @@ const quoteMode = (r: Row) => (r.mode === 'air' || r.mode === 'ocean' ? r.mode :
 const arrivalDate = (shipsOn: string, days: number) => new Date(new Date(shipsOn + 'T12:00:00Z').getTime() + days * 86400000).toISOString().slice(0, 10)
 const niceDay = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
 const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.shipper_id, price: r.price, currency: r.currency, transitDays: r.transit_days, shipsOn: DATE(r.ships_on), arrivesOn: r.ships_on ? arrivalDate(DATE(r.ships_on)!, Number(r.transit_days)) : null, validUntil: DATE(r.valid_until), notes: r.notes, includes: J(r.includes), status: r.status, sentAt: ISO(r.sent_at), updatedAt: r.updated_at ? ISO(r.updated_at) : undefined,
-  kind: (r.kind ?? 'firm') as 'firm' | 'estimate', mode: quoteMode(r) as 'air' | 'ocean', supplies: J(r.supplies ?? '[]') as QuoteSupplyLine[], suppliesUsd: suppliesTotal(J(r.supplies ?? '[]') as QuoteSupplyLine[]), expired: r.status === 'sent' && DATE(r.valid_until) < new Date().toISOString().slice(0, 10) })
+  kind: (r.kind ?? 'firm') as 'firm' | 'estimate', mode: quoteMode(r) as 'air' | 'ocean', supplies: J(r.supplies ?? '[]') as QuoteSupplyLine[], suppliesUsd: suppliesTotal(J(r.supplies ?? '[]') as QuoteSupplyLine[]), expired: r.status === 'sent' && (DATE(r.valid_until) ?? '9999') < new Date().toISOString().slice(0, 10) })
 /** Shippers see only the town of the supplies address until the job is theirs (same rule as the contact details). */
 const maskSupAddr = (a: unknown, full: boolean) => (!a ? undefined : full ? a : { city: (a as Row).city, state: (a as Row).state, country: (a as Row).country })
 const requestOut = (r: Row, quotes: Row[]) => ({
@@ -341,8 +342,8 @@ async function demoAutoQuotes(db: Db, req: Row) {
     const isAir = m.shipper.modes.includes('air') && req.mode !== 'ocean' && (req.mode === 'air' || !m.shipper.modes.includes('ocean'))
     const transit = isAir ? 4 + i : 30 + i * 2 + (m.shipper.priceIndex === 1 ? 3 : 0)
     const includes = [req.pickup ? 'Pickup' : 'Drop-off at warehouse', isAir ? 'Air freight' : 'Ocean freight', req.delivery ? 'Door delivery' : 'Port handling', ...(req.insurance ? ['All-risk insurance'] : [])]
-    await db.query('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes) values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict do nothing',
-      [uid(), req.id, m.shipper.id, price, transit, new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), `${m.shipper.tagline}. ${req.delivery ? 'Door delivery included.' : 'Consignee collects at port/airport.'} Duty and destination taxes payable by consignee.`, JSON.stringify(includes)])
+    await db.query('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes,ships_on) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict do nothing',
+      [uid(), req.id, m.shipper.id, price, transit, new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), `${m.shipper.tagline}. ${req.delivery ? 'Door delivery included.' : 'Consignee collects at port/airport.'} Duty and destination taxes payable by consignee.`, JSON.stringify(includes), defaultShipsOn(req.ready_date, isAir)])
   }
   if (matches.length) await notify(db, { userId: req.user_id, kind: 'quote_received', title: `${matches.length} quote${matches.length === 1 ? '' : 's'} for ${req.ref}`, body: `${matches.map((m) => m.shipper.name).join(', ')} ${matches.length === 1 ? 'has' : 'have'} priced your ${req.origin} → ${req.destination} request. Compare and accept the one you like.`, link: '/dashboard', dedupe: `rq:${req.id}:demo-quotes` })
 }
@@ -783,7 +784,7 @@ export function apiRouter() {
     if (q.owner !== user.id) throw new HttpError(403, 'You can only accept quotes on your own requests.')
     if (q.status === 'withdrawn') throw new HttpError(409, 'The shipper withdrew this quote.')
     if (q.status !== 'sent') throw new HttpError(409, 'This quote is no longer available.')
-    if (DATE(q.valid_until) < new Date().toISOString().slice(0, 10)) throw new HttpError(409, `This quote expired on ${DATE(q.valid_until)}. Message the shipper for an updated price.`)
+    if ((DATE(q.valid_until) ?? '9999') < new Date().toISOString().slice(0, 10)) throw new HttpError(409, `This quote expired on ${DATE(q.valid_until)}. Message the shipper for an updated price.`)
     const { rows: rs } = await db.query<Row>('select * from requests where id = $1', [q.request_id])
     const r0 = rs[0]
     if (r0.status !== 'open') throw new HttpError(409, r0.status === 'booked' ? 'This request has already been booked.' : `This request is ${r0.status}.`)

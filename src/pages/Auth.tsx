@@ -181,7 +181,7 @@ function Aside({ shipper = false }: { shipper?: boolean }) {
     <div className="card-dark p-7">
       <p className="eyebrow">{shipper ? 'Why list on Ntemtem' : 'What you get'}</p>
       <ul className="mt-4 space-y-3">{items.map((i) => <li key={i} className="flex gap-3 text-text"><span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gold/15 text-gold-deep"><Check size={14} aria-hidden="true" /></span>{i}</li>)}</ul>
-      <blockquote className="mt-6 border-t border-border pt-5 text-sm text-text-muted">“{shipper ? 'Listing on Ntemtem replaced our Facebook-group lead hunting.' : 'Four quotes in a day, picked one, cleared Tema in nine days.'}”<footer className="mt-2 text-xs">— {shipper ? 'Kwame Asante, Atlantic Bridge Logistics' : 'Abena Owusu, Houston → Accra'}</footer></blockquote>
+      <p className="mt-6 border-t border-border pt-5 text-sm text-text-muted">{shipper ? 'Free to list on Starter. Customers pay through Ntemtem, the money is held until the goods move, and your clients stay yours.' : 'Free for senders. Compare itemised quotes, then pay only through Ntemtem — the money is held until your goods are on their way.'}</p>
     </div>
   )
 }

@@ -36,7 +36,7 @@ export function HelpLine({ text = 'Questions?', topic, waText, className = '' }:
 }
 
 /** Floating "Chat with us" on public pages, when Ntemtem's WhatsApp number is set. Dismissable for the session. */
-const HIDE_ON = ['/dashboard', '/admin', '/r/', '/p/', '/s/', '/pay', '/doc', '/order', '/add-recipient', '/broker', '/embed', '/login', '/signup', '/join', '/forgot', '/reset', '/signin', '/support', '/scan']
+const HIDE_ON = ['/dashboard', '/admin', '/r/', '/p/', '/s/', '/pay', '/doc', '/order', '/add-recipient', '/broker', '/embed', '/login', '/signup', '/join', '/forgot', '/reset', '/signin', '/support', '/scan', '/quote']
 export function WhatsAppBubble() {
   const cfg = useSiteConfig(); const loc = useLocation()
   const [closed, setClosed] = useState(() => { try { return sessionStorage.getItem('ss-wa-closed') === '1' } catch { return false } })

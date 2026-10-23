@@ -78,13 +78,12 @@ export function CustomerDashboard() {
   // Old links that open a request (?request= / ?open=) land on Quote requests.
   const asTab = (q: URLSearchParams): Tab => { const t = q.get('tab'); if (t && (TABS as readonly string[]).includes(t)) return t as Tab; return q.get('request') || q.get('open') ? 'requests' : 'overview' }
   const [tab, setTabState] = useState<Tab>(asTab(sp))
-  const setTab = (t: Tab) => { setTabState(t); setSp(t === 'overview' ? {} : { tab: t }, { replace: true }) }
   useEffect(() => { setTabState(asTab(sp)) }, [sp])
   const [openReq, setOpenReq] = useState<string | null>(sp.get('request') ?? (sp.get('tab') ? null : sp.get('open')))
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
   const [busyQuote, setBusyQuote] = useState<string | null>(null)
-  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 6000); return () => clearTimeout(t) } }, [toast])
   if (!ready) return <div className="bg-bg text-text"><BrandLoader label="Loading your dashboard…" /></div>
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/dashboard${sp.toString() ? `?${sp}` : ''}`)}`} replace />
   if (user.role === 'shipper') return <Navigate to="/dashboard/shipper" replace />
@@ -95,8 +94,8 @@ export function CustomerDashboard() {
     setBusyQuote(qid); setError('')
     try {
       const sh = await acceptQuote(r.id, qid)
-      setToast(`Booked with ${shipperById(sh.shipperId)?.name ?? 'your shipper'}. Reference ${sh.ref}.`)
-      setOpenReq(null); setTab('shipments'); setSp({})
+      setToast(`Booked with ${shipperById(sh.shipperId)?.name ?? 'your shipper'}. Reference ${sh.ref}. Pay from the Pay tab when you're ready.`)
+      setOpenReq(null); setTabState('shipments'); setSp({ tab: 'shipments', s: sh.id }, { replace: true }); window.scrollTo({ top: 0 })
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not accept this quote.') }
     finally { setBusyQuote(null) }
   }
@@ -285,7 +284,7 @@ function ShipmentsTab() {
           <div className="space-y-4" data-testid={`ship-view-${view}`}>
             {view === 'tracking' && <><ShipmentDetail s={s} compact /><Link to={`/track?ref=${s.ref}`} className="inline-flex items-center gap-1 text-sm text-gold-deep hover:underline focus-ring rounded">Open public tracking page <ArrowRight size={14} aria-hidden="true" /></Link><NextStep shipmentId={s.id} /><CollectionNotice s={s} /><OffersCard s={s} /></>}
             {view === 'inside' && <><PackingList shipmentId={s.id} destination={s.destination} /><DutyEarly shipmentId={s.id} />{s.cargo === 'vehicle' && <VehicleCard shipmentId={s.id} destination={s.destination} />}</>}
-            {view === 'pay' && <><PriceAdjustmentCard shipmentId={s.id} /><ExportCard shipmentId={s.id} /><ReceiverChargesCard shipmentId={s.id} /><PackingSuppliesCard shipmentId={s.id} /><PaymentCard shipmentId={s.id} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><p className="text-sm text-text-muted">Paying several shipments? <Link to="/dashboard?tab=money" className="text-gold-deep hover:underline">Pay everything you owe in one checkout</Link>.</p></>}
+            {view === 'pay' && <><PriceAdjustmentCard shipmentId={s.id} /><PaymentCard shipmentId={s.id} /><ExportCard shipmentId={s.id} /><ReceiverChargesCard shipmentId={s.id} /><PackingSuppliesCard shipmentId={s.id} /><InsuranceCard shipmentId={s.id} cargo={s.cargo} /><p className="text-sm text-text-muted">Paying several shipments? <Link to="/dashboard?tab=money" className="text-gold-deep hover:underline">Pay everything you owe in one checkout</Link>.</p></>}
             {view === 'customs' && <><CustomsCard shipmentId={s.id} destination={s.destination} /><DutyCard shipmentId={s.id} destination={s.destination} cargo={s.cargo} /></>}
             {view === 'people' && <><RecipientPanel shipmentId={s.id} shipmentRef={s.ref} status={s.status} /><FamilyShare shipmentId={s.id} /><PickupCard shipmentId={s.id} shipmentRef={s.ref} origin={s.origin} status={s.status} /></>}
             {view === 'chat' && <ShipmentChat shipmentId={s.id} />}
@@ -346,7 +345,7 @@ export function ShipperDashboard() {
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) } }, [toast])
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 6000); return () => clearTimeout(t) } }, [toast])
   if (!ready) return <div className="bg-bg text-text"><BrandLoader label="Loading your dashboard…" /></div>
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/shipper" replace />
   if (user.role !== 'shipper' || !user.shipperId) return <Navigate to="/dashboard" replace />

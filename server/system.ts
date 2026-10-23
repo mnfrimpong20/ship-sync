@@ -147,6 +147,8 @@ export function mountSystem(r: Router, d: Deps) {
     res.download(path.resolve(EXPORT_DIR, name), name)
   }))
 
+  /** Public: whether the demo companies and sample data are on (sample tracking numbers etc. only show then). */
+  r.get('/site', wrap(async (_req, res) => { res.set('Cache-Control', 'public, max-age=300'); res.json({ demo: !hideDemoShippers() }) }))
   /** One screen of "is everything wired up?" facts for the admin. No secrets — only whether each is set. */
   r.get('/admin/system', wrap(async (req, res) => {
     const db = await getDb(); await requireAdmin(db, req)

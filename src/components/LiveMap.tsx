@@ -122,6 +122,8 @@ export default function LiveMap({ data, className = '' }: { data: PositionPayloa
         markers.current.push(mk.addTo(m)); pts.push(at)
         markers.current.push(new maplibregl.Marker({ element: tag(`Estimated · ${Math.round(data.progress * 100)}% of the way`, '#6CC3DD'), anchor: 'left', offset: [24, 0] }).setLngLat(at).addTo(m))
       }
+      // maplibre labels every marker "Map marker" but only gives a role to ones with a popup — name the rest as images.
+      markers.current.forEach((k) => { const e = k.getElement(); if (!e.getAttribute('role')) { e.setAttribute('role', 'img'); e.setAttribute('aria-label', e.textContent?.trim() || 'Map marker') } })
       if (pts.length >= 2) {
         const b = pts.reduce((bb, p) => bb.extend(p), new maplibregl.LngLatBounds(pts[0], pts[0]))
         m.fitBounds(b, { padding: { top: 40, bottom: 40, left: 60, right: 140 }, maxZoom: 6, duration: 600 })

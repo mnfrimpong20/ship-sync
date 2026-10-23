@@ -259,3 +259,79 @@ export async function seedAtlanticPaymentsDemo(db: Db) {
     on conflict (id) do nothing`, [SID, net('po_ab_1'), net('po_ab_2'), net('po_ab_3'), JSON.stringify(bank), ago(60), ago(58), ago(16), ago(14), ago(0.6)])
   console.log('[demo] Atlantic Bridge: payments and payouts added')
 }
+
+/**
+ * Makes the Atlantic Bridge demo hang together end to end: a Newark warehouse and a Tema yard with bins, weekly
+ * pickup hours and two customer pickup bookings, published rate cards, and piece labels whose scans match where
+ * each shipment is (loaded in its container, or sitting in the Tema yard after devanning). Runs once (marker: site ab_site_nwk).
+ */
+export async function seedAtlanticOpsDemo(db: Db) {
+  if (process.env.DEMO_ATLANTIC === 'false') return
+  const { rows: sh } = await db.query(`select 1 from shipments where id = 'ab_s_01'`); if (!sh[0]) return
+  await db.query(`update containers set origin_port = 'Port Newark' where shipper_id = $1 and origin_port = ''`, [SID])
+  await db.query(`update containers set destination_port = 'Tema' where shipper_id = $1 and destination_port = '' and destination = 'GH'`, [SID])
+  const { rows: done } = await db.query(`select 1 from sites where id = 'ab_site_nwk'`); if (done[0]) return
+  const { ensurePieces } = await import('./labels')
+
+  /* warehouse + yard */
+  await db.query(`insert into sites (id,shipper_id,name,kind,address,city,country,free_days,rate_usd,vehicle_rate_usd,hours) values
+    ('ab_site_nwk',$1,'Atlantic Bridge warehouse','origin','118 Ferry St','Newark, NJ','US',14,1.5,15,'Mon–Fri 8am–6pm · Sat 9am–1pm'),
+    ('ab_site_tema',$1,'Tema yard','destination','Community 2, off Harbour Rd','Tema','GH',7,2,20,'Mon–Sat 8am–5pm') on conflict (id) do nothing`, [SID])
+  const bins: [string, string, string, string][] = [['ab_b_a1', 'ab_site_nwk', 'A1', 'Barrels'], ['ab_b_a2', 'ab_site_nwk', 'A2', 'Barrels'], ['ab_b_a3', 'ab_site_nwk', 'A3', 'Barrels'], ['ab_b_b1', 'ab_site_nwk', 'B1', 'Boxes'], ['ab_b_b2', 'ab_site_nwk', 'B2', 'Boxes'], ['ab_b_p1', 'ab_site_nwk', 'P1', 'Pallets'],
+    ['ab_b_y1', 'ab_site_tema', 'Y1', 'Collection'], ['ab_b_y2', 'ab_site_tema', 'Y2', 'Collection'], ['ab_b_y3', 'ab_site_tema', 'Y3', 'Delivery'], ['ab_b_y4', 'ab_site_tema', 'Y4', 'Delivery'], ['ab_b_v1', 'ab_site_tema', 'V1', 'Vehicles']]
+  for (const [id, site, code, zone] of bins) await db.query(`insert into bins (id,site_id,code,zone,capacity) values ($1,$2,$3,$4,$5) on conflict do nothing`, [id, site, code, zone, zone === 'Vehicles' ? 2 : 8])
+
+  /* pickup hours: weekday mornings and afternoons around Newark, Saturday morning */
+  const { rows: pw } = await db.query<{ n: number }>(`select count(*)::int as n from pickup_windows where shipper_id = $1`, [SID])
+  if (!pw[0].n) {
+    for (const wd of [1, 2, 3, 4, 5]) for (const [a, b] of [['09:00', '12:00'], ['13:00', '17:00']]) await db.query(`insert into pickup_windows (id,shipper_id,weekday,start_time,end_time,area,capacity,active) values ($1,$2,$3,$4,$5,'Newark, NJ',5,true)`, ['pw_' + randomBytes(5).toString('hex'), SID, wd, a, b])
+    await db.query(`insert into pickup_windows (id,shipper_id,weekday,start_time,end_time,area,capacity,active) values ($1,$2,6,'09:00','13:00','',4,true)`, ['pw_' + randomBytes(5).toString('hex'), SID])
+    await db.query(`update shippers set pickup_lead_days = 1 where id = $1`, [SID]).catch(() => {})
+  }
+
+  /* rate cards */
+  const { rows: rc } = await db.query<{ n: number }>(`select count(*)::int as n from rate_cards where shipper_id = $1`, [SID])
+  if (!rc[0].n) {
+    const cards: [string, string, string, string, number, number, number, number, number, number, boolean, string][] = [
+      ['Newark, NJ', 'GH', 'ocean', 'barrels', 165, 165, 50, 85, 40, 34, true, 'Weekly Friday consolidation from Newark. Tema clearance included; duty paid by the receiver.'],
+      ['Newark, NJ', 'GH', 'ocean', 'boxes', 90, 110, 50, 85, 25, 34, true, 'Boxes and suitcases in shared containers. Minimum charge for a single small box.'],
+      ['Newark, NJ', 'GH', 'ocean', 'vehicle', 1650, 1650, 0, 0, 120, 38, false, 'Containerised with pre-shipment inspection. Title must be clean and in hand.'],
+      ['Newark, NJ', 'GH', 'ocean', 'container40', 5400, 5400, 0, 0, 0, 30, false, 'Full 40ft, Port Newark → Tema, port to port.'],
+      ['Newark, NJ', 'NG', 'ocean', 'barrels', 185, 185, 50, 110, 45, 36, false, 'Lagos (Tin Can). Clearing through our Lagos partner.'],
+      ['', 'GH', 'air', 'boxes', 7, 120, 40, 60, 0, 7, false, 'Per kg, weekly flights JFK → Accra. Medicines need a prescription copy.'],
+    ]
+    for (const c of cards) await db.query(`insert into rate_cards (id,shipper_id,origin,destination,mode,cargo,price,unit,min_charge,pickup_fee,delivery_fee,insurance_fee,transit_days,valid_days,notes,auto_send,active) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,10,$14,$15,true) on conflict do nothing`,
+      ['rc_' + randomBytes(5).toString('hex'), SID, c[0], c[1], c[2], c[3], c[4], c[2] === 'air' ? 'kg' : 'unit', c[5], c[6], c[7], c[8], c[9], c[11], c[10]])
+  }
+
+  /* piece labels that match where each shipment is */
+  const { rows: ships } = await db.query<Row>(`select s.*, c.status as c_status from shipments s left join containers c on c.id = s.container_id where s.shipper_id = $1 and s.cancelled_at is null`, [SID])
+  const yardBins = ['ab_b_y1', 'ab_b_y2', 'ab_b_y3', 'ab_b_y4']; let yb = 0
+  for (const s of ships) {
+    const ps = await ensurePieces(db, s)
+    const cs = s.c_status as string | null
+    let status: string | null = null; let kind = ''; let place = ''; let site: string | null = null; let bin: string | null = null; let ago = 1
+    if (s.status === 'delivered') { status = 'delivered'; kind = 'delivery'; place = 'Delivered' }
+    else if (cs && ['gated_in', 'sailed', 'arrived', 'customs'].includes(cs)) { status = 'loaded'; kind = 'loading'; place = 'Atlantic Bridge warehouse, Newark'; ago = cs === 'gated_in' ? 3 : cs === 'sailed' ? 14 : 44 }
+    else if (cs === 'loading' && s.status !== 'booked') { status = 'loaded'; kind = 'loading'; place = 'Atlantic Bridge warehouse, Newark'; ago = 1 }
+    else if (['arrived', 'customs', 'ready_for_collection', 'out_for_delivery'].includes(s.status) && s.mode === 'ocean') { status = 'devanned'; kind = 'devanning'; place = 'Tema yard'; site = 'ab_site_tema'; bin = s.cargo === 'vehicle' ? 'ab_b_v1' : yardBins[yb++ % yardBins.length]; ago = s.status === 'ready_for_collection' ? 9 : 3 }
+    if (!status) continue
+    for (const p of ps) {
+      if (p.status !== 'labelled' && p.last_scan_at) continue
+      await db.query(`update pieces set status = $2, printed_at = coalesce(printed_at, $3), last_scan_at = $3, last_scan_kind = $4, last_scan_place = $5, last_scan_by = $6, site_id = $7, bin_id = $8, received_at = case when $7::text is null then received_at else $3 end where id = $1`,
+        [p.id, status, at(-ago), kind, place, kind === 'devanning' ? 'Yaw Owusu' : kind === 'delivery' ? 'Yaw Owusu' : 'Peter Danquah', site, bin])
+      await db.query(`insert into scans (id,piece_id,shipment_id,kind,place,by_name,at) values ($1,$2,$3,$4,$5,$6,$7) on conflict do nothing`, ['sc_' + randomBytes(6).toString('hex'), p.id, s.id, kind, place, kind === 'loading' ? 'Peter Danquah' : 'Yaw Owusu', at(-ago)]).catch((e) => console.error('[atlantic] scan', e))
+      if (site) await db.query(`insert into stock_moves (id,site_id,piece_id,shipment_id,kind,bin_id,at,by_name,note) values ($1,$2,$3,$4,'receive',$5,$6,'Yaw Owusu','Devanned from the container') on conflict do nothing`, ['sm_' + randomBytes(6).toString('hex'), site, p.id, s.id, bin, at(-ago)]).catch((e) => console.error('[atlantic] stock move', e))
+    }
+  }
+
+  /* two customer pickup bookings waiting to be confirmed */
+  const { rows: pr } = await db.query<{ n: number }>(`select count(*)::int as n from pickup_requests where shipper_id = $1`, [SID])
+  if (!pr[0].n) {
+    const { rows: booked } = await db.query<Row>(`select s.id, s.ref, s.user_id, c.name, c.phone, c.city from shipments s left join clients c on c.id = s.client_id where s.shipper_id = $1 and s.status = 'booked' and s.mode = 'ocean' and s.cancelled_at is null order by s.created_at desc limit 2`, [SID])
+    const street: Record<string, string> = { 'Bronx, NY': '880 Grand Concourse', 'Newark, NJ': '214 Ferry St', 'Brooklyn, NY': '455 Eastern Pkwy', 'Philadelphia, PA': '1200 Chestnut St', 'Jersey City, NJ': '30 Montgomery St', 'New York, NY': '310 Lenox Ave' }
+    for (const [i, b] of booked.entries()) await db.query(`insert into pickup_requests (id,shipment_id,shipper_id,user_id,pickup_date,window_start,window_end,address,city,contact_name,contact_phone,notes,status,by_role) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'requested','customer')`,
+      ['pr_' + randomBytes(5).toString('hex'), b.id, SID, b.user_id ?? null, day(i + 2), i ? '13:00' : '09:00', i ? '17:00' : '12:00', street[b.city] ?? '214 Ferry St', b.city || 'Newark, NJ', b.name ?? '', b.phone ?? '', i ? 'Ring the bell twice — the barrels are in the garage.' : 'Call when 10 minutes away.']).catch((e) => console.error('[atlantic] pickup request', e))
+  }
+  console.log('[demo] Atlantic Bridge: warehouse, pickup hours, rate cards and piece scans added')
+}

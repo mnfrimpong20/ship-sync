@@ -28,7 +28,7 @@ export function Pager({ p, noun, note }: { p: ReturnType<typeof usePaged<unknown
 }
 
 export function StatCard({ label, value, hint, icon: I, active, warn, onClick }: { label: string; value: ReactNode; hint?: string; icon: LucideIcon; active?: boolean; warn?: boolean; onClick?: () => void }) {
-  const cls = `card-dark min-w-0 p-3.5 sm:p-4 text-left transition-colors focus-ring ${onClick ? 'hover:border-gold/40' : ''} ${active ? '!border-gold' : ''} ${warn ? 'border-l-4 border-l-danger' : ''}`
+  const cls = `stat-card card-dark min-w-0 p-3.5 sm:p-4 text-left transition-colors focus-ring ${onClick ? 'hover:border-gold/40' : ''} ${active ? '!border-gold' : ''} ${warn ? 'border-l-4 border-l-danger' : ''}`
   const body = <><div className="flex items-center justify-between"><p className="text-xs text-text-muted">{label}</p><I size={15} className={warn ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" /></div><p className="mt-1 break-words font-heading text-xl font-bold tabular-nums sm:text-2xl">{value}</p>{hint && <p className="line-clamp-2 text-xs text-text-muted">{hint}</p>}</>
   return onClick ? <button onClick={onClick} aria-pressed={!!active} className={cls}>{body}</button> : <div className={cls}>{body}</div>
 }

@@ -33,6 +33,24 @@ export default function AppShell() {
   const loc = useLocation()
   const outlet = useOutlet()
   const nav = useNavigate()
+  // After each page change: keep the current page visible in the sidebar, and on phones fold the page's intro paragraph
+  // to two lines (tap to read it all) so the work starts higher up the screen.
+  useEffect(() => {
+    const timers = [120, 600, 1600].map((ms) => setTimeout(() => {
+      document.querySelector('.nav-scroll [aria-current="page"]')?.scrollIntoView({ block: 'nearest' })
+      // The summary cards scroll sideways on phones — make that row reachable by keyboard and named for screen readers.
+      if (window.matchMedia('(max-width: 767px)').matches) document.querySelectorAll<HTMLElement>('#main div:has(> .stat-card)').forEach((r) => { if (!r.hasAttribute('tabindex')) { r.tabIndex = 0; r.setAttribute('role', 'region'); r.setAttribute('aria-label', 'Summary') } })
+      const h = document.querySelector('#main h1'); const p = h?.nextElementSibling as HTMLElement | null
+      if (!p || p.tagName !== 'P' || !p.classList.contains('text-text-muted') || p.classList.contains('page-intro') || (p.textContent ?? '').length < 90) return
+      p.classList.add('page-intro')
+      if (!window.matchMedia('(max-width: 767px)').matches || p.scrollHeight <= p.clientHeight + 2) return
+      if (!p.id) p.id = 'page-intro'
+      const more = document.createElement('button'); more.type = 'button'; more.className = 'page-intro-more'; more.textContent = 'More'; more.setAttribute('aria-expanded', 'false'); more.setAttribute('aria-controls', p.id)
+      more.addEventListener('click', () => { const o = p.classList.toggle('open'); more.setAttribute('aria-expanded', String(o)); more.textContent = o ? 'Less' : 'More' })
+      p.after(more)
+    }, ms))
+    return () => timers.forEach(clearTimeout)
+  }, [loc.pathname])
   const [open, setOpen] = useState(false)
   // Desktop sidebar can shrink to an icon strip; remembered on this device.
   const [rail, setRail] = useState(() => { try { return localStorage.getItem('ss-nav-rail') === '1' } catch { return false } })

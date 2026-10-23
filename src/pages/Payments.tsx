@@ -17,10 +17,11 @@ const COUNTRIES = [['US', 'United States'], ['GB', 'United Kingdom'], ['CA', 'Ca
 
 function PayoutDetailsCard({ details, canEdit, onSaved }: { details: PayoutDetails; canEdit: boolean; onSaved: (d: PayoutDetails, msg: string) => void }) {
   const [edit, setEdit] = useState(false)
-  const [f, setF] = useState<PayoutDetails>(details)
+  const [f, setF] = useState<PayoutDetails>({ ...details, accountNumber: '', routing: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  useEffect(() => { setF(details) }, [details])
+  const blankNums = (d: PayoutDetails) => ({ ...d, accountNumber: '', routing: '' })
+  useEffect(() => { setF(blankNums(details)) }, [details]) // eslint-disable-line react-hooks/exhaustive-deps
   const has = details.accountNumber || details.mobileMoney
   const save = async () => { setBusy(true); setError(''); try { const d = await paymentsApi.savePayoutDetails(f); onSaved(d, 'Payout details saved.'); setEdit(false) } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.') } finally { setBusy(false) } }
   return (
@@ -35,10 +36,11 @@ function PayoutDetailsCard({ details, canEdit, onSaved }: { details: PayoutDetai
           <label className="text-xs text-text-muted">Bank name<input className="input-dark mt-1 !min-h-9 text-sm" value={f.bankName} onChange={(e) => setF({ ...f, bankName: e.target.value })} /></label>
           <label className="text-xs text-text-muted">Country<select className="input-dark mt-1 !min-h-9 text-sm" value={f.country} onChange={(e) => setF({ ...f, country: e.target.value })}><option value="">—</option>{COUNTRIES.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></label>
           <label className="text-xs text-text-muted sm:col-span-2">Account holder name<input className="input-dark mt-1 !min-h-9 text-sm" value={f.accountName} onChange={(e) => setF({ ...f, accountName: e.target.value })} /></label>
-          <label className="text-xs text-text-muted">Account number / IBAN<input className="input-dark mt-1 !min-h-9 font-mono text-sm" value={f.accountNumber} onChange={(e) => setF({ ...f, accountNumber: e.target.value })} /></label>
-          <label className="text-xs text-text-muted">Routing / sort code / SWIFT<input className="input-dark mt-1 !min-h-9 font-mono text-sm" value={f.routing} onChange={(e) => setF({ ...f, routing: e.target.value })} /></label>
+          <label className="text-xs text-text-muted">Account number / IBAN<input className="input-dark mt-1 !min-h-9 font-mono text-sm" autoComplete="off" placeholder={details.accountNumber ? `${details.accountNumber} — leave blank to keep` : ''} value={f.accountNumber} onChange={(e) => setF({ ...f, accountNumber: e.target.value })} data-testid="payout-account" /></label>
+          <label className="text-xs text-text-muted">Routing / sort code / SWIFT<input className="input-dark mt-1 !min-h-9 font-mono text-sm" autoComplete="off" placeholder={details.routing ? `${details.routing} — leave blank to keep` : ''} value={f.routing} onChange={(e) => setF({ ...f, routing: e.target.value })} /></label>
+          <p className="text-xs text-text-muted sm:col-span-2">For your security only the last 4 digits are ever shown here.</p>
           <label className="text-xs text-text-muted sm:col-span-2">Mobile money (MTN MoMo, Telecel Cash, AT Money…) — number and network<input className="input-dark mt-1 !min-h-9 text-sm" placeholder="e.g. 024 555 0190 · MTN" value={f.mobileMoney} onChange={(e) => setF({ ...f, mobileMoney: e.target.value })} /></label>
-          <div className="flex justify-end gap-2 sm:col-span-2"><button type="button" onClick={() => { setEdit(false); setF(details) }} className="btn-ghost !min-h-9 !px-3 text-xs">Cancel</button><button disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60"><Save size={13} aria-hidden="true" /> {busy ? 'Saving…' : 'Save'}</button></div>
+          <div className="flex justify-end gap-2 sm:col-span-2"><button type="button" onClick={() => { setEdit(false); setF(blankNums(details)) }} className="btn-ghost !min-h-9 !px-3 text-xs">Cancel</button><button disabled={busy} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60"><Save size={13} aria-hidden="true" /> {busy ? 'Saving…' : 'Save'}</button></div>
         </form>
       )}
     </div>
@@ -75,7 +77,7 @@ export default function Payments() {
       <div className="container-x py-10 md:py-14">
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Payments</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{b && b.availableUsd > 0 ? `${usd(b.availableUsd)} ready to pay out` : 'Payments & payouts'}</motion.h1><motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Customers pay Ntemtem; the money is held in escrow and released to your balance once the shipment is {data?.config.releaseOn === 'delivered' ? 'delivered' : 'in transit'}, less the {Math.round((data?.config.takeRatePct ?? 0) * 100)}% platform fee. Request a payout whenever you like.</motion.p></div>
+            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Payments</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{b && b.availableUsd > 0 ? `${usd(b.availableUsd)} ready to pay out` : 'Payments & payouts'}</motion.h1><motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Every card payment lands here — a customer paying a Ntemtem booking, or a client paying one of your <Link to="/dashboard/collections" className="underline">invoices</Link> by its pay link. Ntemtem holds it until the shipment is {data?.config.releaseOn === 'delivered' ? 'delivered' : 'in transit'}, then releases it to your balance less the {Math.round((data?.config.takeRatePct ?? 0) * 100)}% platform fee. Cash, MoMo and Zelle you record yourself show as “Paid directly” with no fee.</motion.p></div>
             {data?.canPayout && <motion.div variants={fadeUp}><button onClick={() => setRequesting(true)} disabled={!b || b.availableUsd <= 0} className="btn-gold disabled:opacity-60" data-testid="request-payout"><Banknote size={16} aria-hidden="true" /> Request payout</button></motion.div>}
           </div>
           {toast && <p role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</p>}

@@ -44,8 +44,8 @@ export default function TeamHr() {
       <div className="container-x py-10 md:py-14">
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <motion.p variants={fadeUp} className="eyebrow mb-1">Team &amp; HR</motion.p>
-          <motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{people ? `${active.length} ${active.length === 1 ? 'person' : 'people'} on the team` : 'Your team'}</motion.h1>
-          <motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">HR files and papers, hours, rota and time off, and payroll for everyone — {drivers} driver{drivers === 1 ? '' : 's'} and {active.length - drivers} in the office and warehouse. Invite people and set what they can see on <Link to="/dashboard/team" className="underline">Team</Link>.</motion.p>
+          <motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{people ? `${active.length} ${active.length === 1 ? 'person' : 'people'} on staff` : 'Your staff'}</motion.h1>
+          <motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">HR files and papers, hours, rota and time off, and payroll for your staff — {drivers} driver{drivers === 1 ? '' : 's'} and {active.length - drivers} in the office and warehouse. The owner isn’t counted here. Invite people and set what they can see on <Link to="/dashboard/team" className="underline">Team</Link>.</motion.p>
           {toast && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</p>}
           {role === 'dispatcher' && <p className="mt-4 rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-text-muted">As a dispatcher you see drivers’ pay. Office salaries are visible to the owner and finance only.</p>}
 

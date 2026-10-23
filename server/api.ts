@@ -268,7 +268,7 @@ async function signupUser(db: Db, input: { name: string; email: string; password
     await db.query(
       `insert into shippers (id,name,tagline,hq,founded,modes,destinations,origins,cargo,verified,response_hours,services,about,price_index,plan,initials,hue,demo,trial_ends_at)
        values ($1,$2,$3,$4,$5,'["ocean","air"]','[]','[]','[]',false,24,'[]',$6,2,'starter',$7,$8,false,now() + interval '14 days')`,
-      [shipperId, company, 'New on Ntemtem', '', new Date().getFullYear(), `${company} is a new shipping company on Ntemtem. Profile details coming soon.`, initials, '#F5B82E'],
+      [shipperId, company, '', '', new Date().getFullYear(), '', initials, '#F5B82E'],
     )
   }
   const hash = await bcrypt.hash(input.password, 10)

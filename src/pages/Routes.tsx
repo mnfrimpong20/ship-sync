@@ -37,7 +37,7 @@ export function RunRow({ r, to }: { r: Run; to: string }) {
 type Bucket = 'open' | 'today' | 'active' | 'unassigned' | 'done' | 'all'
 type Sort = 'date' | 'newest' | 'progress' | 'name'
 const PAGE = 10
-const inBucket = (r: Run, b: Bucket) => b === 'all' ? true : b === 'open' ? r.status === 'planned' || r.status === 'in_progress' : b === 'today' ? r.date === today() && r.status !== 'cancelled' : b === 'active' ? r.status === 'in_progress' : b === 'unassigned' ? r.status === 'planned' && !r.driverId : r.status === 'done' || r.status === 'cancelled'
+const inBucket = (r: Run, b: Bucket) => b === 'all' ? true : b === 'open' ? r.status === 'planned' || r.status === 'in_progress' : b === 'today' ? r.date === today() && r.status !== 'cancelled' : b === 'active' ? r.status === 'in_progress' : b === 'unassigned' ? r.status === 'planned' && (!r.driverId || r.date < today()) : r.status === 'done' || r.status === 'cancelled'
 
 /** Delivery stops waiting for a run, grouped by town — unloaded ones first. One click turns a group into a planned run. */
 function SuggestedRuns({ drivers, onCreated }: { drivers: Staff[]; onCreated: (r: Run) => void }) {
@@ -135,7 +135,7 @@ export default function Routes() {
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><motion.p variants={fadeUp} className="eyebrow mb-1">Route planning</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{counts.open === 0 ? 'No runs on the board' : `${counts.open} run${counts.open === 1 ? '' : 's'} on the board`}</motion.h1><motion.p variants={fadeUp} className="mt-1 text-text-muted">Group shipments into a day’s run, put the stops in the best order, and hand it to a driver. Drivers tick stops off from their phone.</motion.p></div>
-            {manage && <motion.div variants={fadeUp}><Link to="/dashboard/routes/new" className="btn-gold"><Plus size={16} aria-hidden="true" /> Plan a run</Link></motion.div>}
+            {manage && <motion.div variants={fadeUp} className="flex flex-wrap gap-2"><Link to="/dashboard/pickups" className="btn-ghost" title="Customer pickup bookings — confirmed ones go onto pickup runs">Pickup bookings</Link><Link to="/dashboard/routes/new" className="btn-gold"><Plus size={16} aria-hidden="true" /> Plan a run</Link></motion.div>}
           </div>
 
           <AnimatePresence>{toast && <motion.p initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</motion.p>}</AnimatePresence>
@@ -144,7 +144,7 @@ export default function Routes() {
           <motion.div variants={fadeUp} className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             <StatCard label="Runs today" value={counts.today} hint={counts.today ? 'Scheduled for today' : 'Nothing scheduled today'} icon={CalendarDays} active={bucket === 'today'} onClick={() => set({ b: 'today' })} />
             <StatCard label="On the road now" value={counts.active} hint="Started, not yet finished" icon={Truck} active={bucket === 'active'} onClick={() => set({ b: 'active' })} />
-            <StatCard label="Needs a driver" value={counts.unassigned} hint={counts.overdue ? `${counts.overdue} planned run${counts.overdue === 1 ? '' : 's'} past its date` : 'Planned runs without a driver'} icon={UserX} warn={counts.overdue > 0 || counts.unassigned > 0} active={bucket === 'unassigned'} onClick={() => set({ b: 'unassigned' })} />
+            <StatCard label="Needs attention" value={counts.unassigned} hint={[all.filter((r) => r.status === 'planned' && !r.driverId).length ? `${all.filter((r) => r.status === 'planned' && !r.driverId).length} without a driver` : '', counts.overdue ? `${counts.overdue} past its date` : ''].filter(Boolean).join(' · ') || 'Every planned run has a driver and a date ahead'} icon={UserX} warn={counts.unassigned > 0} active={bucket === 'unassigned'} onClick={() => set({ b: 'unassigned' })} />
             <StatCard label="Stops still to do" value={counts.stops} hint="Across all open runs" icon={RouteIcon} />
           </motion.div>
           {manage && <SuggestedRuns drivers={drivers} onCreated={(r) => { setRuns((x) => [r, ...(x ?? [])]); setToast(`${r.name} planned with ${r.stops.length} stop${r.stops.length === 1 ? '' : 's'}.`) }} />}

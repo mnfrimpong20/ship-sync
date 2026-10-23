@@ -47,17 +47,17 @@ export function ShipperProfile() {
                 <Avatar initials={s.initials} hue={s.hue} logo={s.logo} size={72} />
                 <div className="flex-1">
                   <h1 className="flex flex-wrap items-center gap-2 !text-3xl">{s.name}{s.verified && <VerifiedBadge large />}</h1>
-                  <p className="mt-1 text-text-muted">{s.tagline}</p>
+                  {s.tagline && <p className="mt-1 text-text-muted">{s.tagline}</p>}
                   <div className="mt-3 flex flex-wrap items-center gap-2">{s.modes.map((m) => <ModeBadge key={m} mode={m} />)}<Rating value={s.rating} count={s.reviews} /><FavButton shipperId={s.id} /></div>
                   <ul className="mt-4 grid gap-2 text-sm text-text-muted sm:grid-cols-2">
-                    <li className="flex items-center gap-2"><Building2 size={15} aria-hidden="true" /> HQ {s.hq}</li>
+                    {s.hq && <li className="flex items-center gap-2"><Building2 size={15} aria-hidden="true" /> HQ {s.hq}</li>}
                     <li className="flex items-center gap-2"><CalendarDays size={15} aria-hidden="true" /> Operating since {s.founded}</li>
                     <li className="flex items-center gap-2"><Clock size={15} aria-hidden="true" /> Replies in ~{s.responseHours}h</li>
-                    <li className="flex items-center gap-2"><Star size={15} aria-hidden="true" /> {s.onTime}% on-time deliveries</li>
+                    {s.onTime > 0 && <li className="flex items-center gap-2"><Star size={15} aria-hidden="true" /> {s.onTime}% on-time deliveries</li>}
                   </ul>
                 </div>
               </div>
-              <p className="mt-6 border-t border-border pt-6 text-text">{s.about}</p>
+              {s.about && <p className="mt-6 border-t border-border pt-6 text-text">{s.about}</p>}
             </motion.div>
 
             <motion.div variants={fadeUp} className="mt-6 grid gap-6 md:grid-cols-2">

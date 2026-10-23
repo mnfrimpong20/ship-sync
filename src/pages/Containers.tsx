@@ -143,7 +143,7 @@ export default function Containers() {
                     </div>
                     <div className="mt-4"><StageStepper status={c.status} compact /></div>
                     <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm sm:grid-cols-4">
-                      <div><dt className="text-xs text-text-muted">Lane</dt><dd className="truncate">{c.originPort || '—'} → {c.destinationPort || d?.name || c.destination}</dd></div>
+                      <div><dt className="text-xs text-text-muted">Lane</dt><dd className="truncate" title={`${c.originPort || 'Origin port not set'} → ${c.destinationPort || d?.name || c.destination}`}>{c.originPort ? `${c.originPort} → ` : ''}{c.destinationPort || d?.name || c.destination}{!c.originPort && <span className="text-text-muted"> · origin port not set</span>}</dd></div>
                       <div><dt className="text-xs text-text-muted">Shipments loaded</dt><dd className="tabular-nums">{c.loaded ?? 0}</dd></div>
                       <div><dt className="text-xs text-text-muted">{c.status === 'booked' || c.status === 'loading' ? 'Cut-off' : c.status === 'gated_in' ? 'ETD' : 'ETA'}</dt><dd className="tabular-nums">{(() => { const v = c.status === 'booked' || c.status === 'loading' ? c.cutoffDate : c.status === 'gated_in' ? c.etd : c.eta; return v ? fmtDate(v + 'T12:00:00Z') : '—' })()}</dd></div>
                       <div><dt className="text-xs text-text-muted">Vessel</dt><dd className="truncate">{c.vesselName || <span className="text-text-muted">Not yet</span>}</dd></div>

@@ -145,6 +145,9 @@ function QuotesOverview({ firstName }: { firstName: string }) {
   const k = o.kpis
   const stageTotal = o.byStatus.reduce((a, s) => a + s.n, 0)
   const critical = o.attention.filter((a) => a.severity === 'critical').length
+  // A brand-new company: nothing to chart yet, so the first screen is just the setup checklist and what needs doing.
+  const fresh = !(k.quotes.value ?? 0) && !(k.active.value ?? 0) && !(k.clients.value ?? 0) && !(k.delivered.value ?? 0) && stageTotal === 0 && o.activity.length === 0 && o.pipeline.won === 0
+  const att = fresh ? o.attention.filter((a) => a.kind !== 'profile') : o.attention
   const summary = critical ? t(critical === 1 ? '1 thing needs attention today.' : '{n} things need attention today.', { n: critical }) : o.attention.length ? t('{n} to look at, nothing urgent.', { n: o.attention.length }) : t('Everything is on track.')
 
   return (
@@ -153,9 +156,23 @@ function QuotesOverview({ firstName }: { firstName: string }) {
       <OnboardingChecklist canDismiss={user?.staffRole === 'owner' || user?.staffRole === 'dispatcher'} />
       {/* attention */}
       <motion.section variants={fadeUp} aria-labelledby="att-h">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="att-h" className="!text-lg">{greet}, {firstName}.</h2><p className="text-sm text-text-muted">{summary}</p></div>{o.attention.length > 4 && <span className="text-xs text-text-muted">+{o.attention.length - 4} more below</span>}</div>
-        <Attention items={o.attention} />
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h2 id="att-h" className="!text-lg">{greet}, {firstName}.</h2><p className="text-sm text-text-muted">{fresh && !att.length ? t('Work through the steps above — your first requests and numbers will show up here.') : summary}</p></div>{att.length > 4 && <span className="text-xs text-text-muted">+{att.length - 4} more below</span>}</div>
+        {att.length > 0 && <Attention items={att} />}
       </motion.section>
+
+      {fresh && (
+        <div className="grid gap-6 xl:grid-cols-12" data-testid="first-day">
+          <motion.section variants={fadeUp} className="card-dark p-5 xl:col-span-7" aria-labelledby="fd-h">
+            <h2 id="fd-h" className="!text-base">{t('Your numbers start with your first quote')}</h2>
+            <p className="mt-1 text-sm text-text-muted">{t('Quotes sent, win rate, reply time, shipments and money collected appear here once you start trading. Until then:')}</p>
+            <ul className="mt-4 space-y-2 text-sm">
+              {[{ to: '/dashboard/leads', l: t('Open client requests on your lanes'), i: Inbox, n: o.leads.length }, { to: '/dashboard/rates', l: t('Add a rate card so quotes fill themselves'), i: Wallet }, { to: '/dashboard/clients?new=1', l: t('Bring your existing clients across'), i: UserPlus }, { to: '/dashboard/team', l: t('Invite your dispatcher, drivers and warehouse'), i: Users }].map((a) => <li key={a.to}><Link to={a.to} className="flex min-h-11 items-center gap-3 rounded-lg border border-border px-3 hover:border-gold/40 hover:bg-surface-2 focus-ring"><a.i size={15} className="text-gold-deep" aria-hidden="true" /><span className="flex-1">{a.l}</span>{a.n ? <span className="rounded-full bg-gold px-2 text-xs font-bold text-on-accent">{a.n}</span> : null}<ArrowRight size={14} className="text-text-muted" aria-hidden="true" /></Link></li>)}
+            </ul>
+          </motion.section>
+          <motion.section variants={fadeUp} aria-label="Order link" className="xl:col-span-5"><OrderLinkCard /></motion.section>
+        </div>
+      )}
+      {!fresh && <>
 
       {/* today — first thing on a phone, a side column on desktop */}
       <motion.section variants={fadeUp} aria-labelledby="today-h" className="xl:hidden"><TodayCard t={o.today} /></motion.section>
@@ -244,6 +261,7 @@ function QuotesOverview({ firstName }: { firstName: string }) {
         </motion.section>
       </div>
       <motion.p variants={fadeUp} className="flex items-center gap-1.5 text-xs text-text-muted"><CalendarDays size={12} aria-hidden="true" /> 30-day figures compare with the previous 30 days. Win rate and response time use the last 90 days.</motion.p>
+      </>}
     </motion.div>
   )
 }

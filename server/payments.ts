@@ -109,7 +109,8 @@ export interface PayoutDetails { bankName: string; accountName: string; accountN
 const zDetails = z.object({ bankName: z.string().trim().max(80).default(''), accountName: z.string().trim().max(80).default(''), accountNumber: z.string().trim().max(40).default(''), routing: z.string().trim().max(40).default(''), country: z.string().trim().max(2).default(''), mobileMoney: z.string().trim().max(40).default('') })
 const maskDetails = (d: Partial<PayoutDetails> | null | undefined, full: boolean): PayoutDetails => {
   const x = { bankName: '', accountName: '', accountNumber: '', routing: '', country: '', mobileMoney: '', ...(d ?? {}) }
-  return full ? x : { ...x, accountNumber: x.accountNumber ? `····${x.accountNumber.slice(-4)}` : '', routing: x.routing ? `····${x.routing.slice(-3)}` : '' }
+  // Shown masked to everyone in the app (owner included) — the full numbers only go to Ntemtem staff on a payout request.
+  return full ? x : { ...x, accountNumber: x.accountNumber ? `····${x.accountNumber.slice(-4)}` : '', routing: x.routing ? `····${x.routing.slice(-4)}` : '' }
 }
 const SELECT = `select p.*, s.ref, s.customer, sh.name as shipper_name from escrow_payments p left join shipments s on s.id = p.shipment_id join shippers sh on sh.id = p.shipper_id`
 const PAYOUT_SELECT = `select o.*, sh.name as shipper_name, (select count(*) from escrow_payments e where e.payout_id = o.id)::int as n_payments from payouts o join shippers sh on sh.id = o.shipper_id`
@@ -372,13 +373,17 @@ export function mountPayments(r: Router, d: Deps) {
     const { rows: pos } = await db.query<Row>(`${PAYOUT_SELECT} where o.shipper_id = $1 order by o.requested_at desc limit 100`, [u.shipperId])
     const { rows: sh } = await db.query<Row>('select payout_details from shippers where id = $1', [u.shipperId])
     res.set('Cache-Control', 'no-store')
-    res.json({ payments: rows.map(paymentOut), payouts: pos.map(payoutOut), balance: await balanceFor(db, u.shipperId!), payoutDetails: maskDetails(J(sh[0]?.payout_details ?? '{}'), u.staffRole === 'owner'), canPayout: u.staffRole === 'owner', config: { ...publicCfg(cfg), payoutNote: cfg.payoutNote } })
+    res.json({ payments: rows.map(paymentOut), payouts: pos.map((p) => ({ ...payoutOut(p), details: maskDetails(J(p.details ?? '{}'), false) })), balance: await balanceFor(db, u.shipperId!), payoutDetails: maskDetails(J(sh[0]?.payout_details ?? '{}'), false), canPayout: u.staffRole === 'owner', config: { ...publicCfg(cfg), payoutNote: cfg.payoutNote } })
   }))
   r.put('/payments/payout-details', wrap(async (req, res) => {
     const db = await getDb(); const u = await office(db, req); if (u.staffRole !== 'owner') throw new HttpError(403, 'Only the owner can change payout details.')
     const b = zDetails.parse(req.body)
-    await db.query('update shippers set payout_details = $2 where id = $1', [u.shipperId, JSON.stringify(b)])
-    res.json({ payoutDetails: maskDetails(b, true) })
+    // Blank or still-masked numbers mean "keep what's on file" — the app never sends the full numbers back.
+    const { rows: cur } = await db.query<Row>('select payout_details from shippers where id = $1', [u.shipperId]); const old = (J(cur[0]?.payout_details ?? '{}') ?? {}) as Partial<PayoutDetails>
+    const keep = (v: string, was?: string) => (!v || v.startsWith('····') ? was ?? '' : v)
+    const next = { ...b, accountNumber: keep(b.accountNumber, old.accountNumber), routing: keep(b.routing, old.routing) }
+    await db.query('update shippers set payout_details = $2 where id = $1', [u.shipperId, JSON.stringify(next)])
+    res.json({ payoutDetails: maskDetails(next, false) })
   }))
   r.post('/payouts', wrap(async (req, res) => {
     const db = await getDb(); const u = await office(db, req); if (u.staffRole !== 'owner') throw new HttpError(403, 'Only the owner can request a payout.')

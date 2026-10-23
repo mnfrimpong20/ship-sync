@@ -124,7 +124,7 @@ function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (ms
       <DeclaredItems includes={r.declaration?.includes} />
       <TemplateBar r={r} form={form} setForm={setForm} />
       {r.mode === 'either' && <div className="flex gap-1.5" role="radiogroup" aria-label="Mode for this quote">{(['ocean', 'air'] as const).map((m) => <button key={m} type="button" role="radio" aria-checked={form.mode === m} onClick={() => setForm({ ...form, mode: m, transit: m === 'air' ? '7' : '30' })} className={`flex-1 rounded-lg border px-2 py-1.5 text-xs capitalize focus-ring ${form.mode === m ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border text-text-muted'}`} data-testid={`qf-mode-${m}`}>{m} freight</button>)}</div>}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2">
         <div><label htmlFor={`p-${r.id}`} className="label-dark">{r.supplies?.length ? 'Freight price (USD)' : 'Total price (USD)'}</label><input id={`p-${r.id}`} type="number" min={1} required autoFocus className="input-dark !min-h-10 tabular-nums" placeholder="590" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
         <div><label htmlFor={`t-${r.id}`} className="label-dark">Transit (days)</label><input id={`t-${r.id}`} type="number" min={1} required className="input-dark !min-h-10 tabular-nums" value={form.transit} onChange={(e) => setForm({ ...form, transit: e.target.value })} /></div>
         <div><label htmlFor={`v-${r.id}`} className="label-dark">Valid for (days)</label><input id={`v-${r.id}`} type="number" min={1} max={60} className="input-dark !min-h-10 tabular-nums" value={form.valid} onChange={(e) => setForm({ ...form, valid: e.target.value })} data-testid="qf-valid" /></div>
@@ -249,7 +249,7 @@ export default function Leads() {
 
           <motion.div variants={fadeUp} className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {cards.map(({ b, l, n, h, I, warn }) => (
-              <button key={b} onClick={() => set({ b: b === 'open' ? undefined : b })} aria-pressed={bucket === b} className={`card-dark p-4 text-left transition-colors hover:border-gold/40 focus-ring ${bucket === b ? '!border-gold' : ''} ${warn ? 'border-l-4 border-l-danger' : ''}`}>
+              <button key={b} onClick={() => set({ b: b === 'open' ? undefined : b })} aria-pressed={bucket === b} className={`stat-card card-dark p-4 text-left transition-colors hover:border-gold/40 focus-ring ${bucket === b ? '!border-gold' : ''} ${warn ? 'border-l-4 border-l-danger' : ''}`}>
                 <div className="flex items-center justify-between"><p className="text-xs text-text-muted">{l}</p><I size={15} className={warn ? 'text-danger' : 'text-gold-deep'} aria-hidden="true" /></div>
                 <p className="mt-1 font-heading text-2xl font-bold tabular-nums">{n}</p><p className="text-xs text-text-muted">{h}</p>
               </button>
@@ -268,10 +268,11 @@ export default function Leads() {
 
           <motion.div variants={fadeUp} className="card-dark mt-4 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[960px] text-sm">
-                <thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-text-muted"><th className="w-8 px-3 py-3"><span className="sr-only">Details</span></th><th className="px-3 py-3">Reference</th><th className="px-3 py-3">Route</th><th className="px-3 py-3">Cargo</th><th className="px-3 py-3">Customer</th><th className="px-3 py-3">Ready</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Competition</th><th className="px-3 py-3 text-right">Actions</th></tr></thead>
+              <table className="w-full min-w-[880px] table-fixed text-sm">
+                <colgroup><col className="w-10" /><col className="w-[124px]" /><col className="w-[150px]" /><col /><col className="w-[140px]" /><col className="w-[104px]" /><col className="w-[160px]" /><col className="w-[178px]" /></colgroup>
+                <thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-text-muted"><th className="w-8 px-3 py-3"><span className="sr-only">Details</span></th><th className="px-3 py-3">Reference</th><th className="px-3 py-3">Route</th><th className="px-3 py-3">Cargo</th><th className="px-3 py-3">Customer</th><th className="px-3 py-3">Ready</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Actions</th></tr></thead>
                 <tbody>
-                  {rows.length === 0 && <tr><td colSpan={9} className="px-3 py-10"><Empty title={rows0.length ? 'No requests match' : 'No requests yet'} body={rows0.length ? 'Try another filter or search.' : 'Requests matching your origins, destinations and cargo types land here and by email. Widen your lanes on the company profile to see more.'} /></td></tr>}
+                  {rows.length === 0 && <tr><td colSpan={8} className="px-3 py-10"><Empty title={rows0.length ? 'No requests match' : 'No requests yet'} body={rows0.length ? 'Try another filter or search.' : 'Requests matching your origins, destinations and cargo types land here and by email. Widen your lanes on the company profile to see more.'} /></td></tr>}
                   {rows.map(({ r, st, mine }) => {
                     const d = countryByCode(r.destination); const isOpen = open === r.id; const days = daysUntil(r.readyDate); const sh = shipmentFor(r); const competing = r.competingQuotes ?? 0
                     return (
@@ -279,13 +280,12 @@ export default function Leads() {
                         <tr className={`border-b border-border/70 align-top transition-colors hover:bg-surface-2/60 ${isOpen ? 'bg-surface-2/40' : ''} ${st === 'lost' ? 'dimmed' : ''}`}>
                           <td className="px-3 py-3"><button onClick={() => setOpen(isOpen ? null : r.id)} className="grid h-7 w-7 place-items-center rounded-md text-text-muted hover:bg-surface-2 hover:text-text focus-ring" aria-expanded={isOpen} aria-label={`${isOpen ? 'Hide' : 'Show'} details for ${r.ref}`}><ChevronDown size={15} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} /></button></td>
                           <td className="px-3 py-3"><span className="font-mono text-xs text-gold-deep">{r.ref}</span><div className="mt-1 flex items-center gap-1.5">{r.mode === 'either' ? <Pill tone="muted">Air or ocean</Pill> : <ModeBadge mode={r.mode} />}</div><p className="mt-1 text-xs text-text-muted">{age(r.createdAt)}</p></td>
-                          <td className="whitespace-nowrap px-3 py-3"><p className="font-semibold">{r.origin}</p><p className="text-xs text-text-muted">→ {d?.name ?? r.destination}</p></td>
-                          <td className="max-w-[280px] px-3 py-3"><p className="font-medium">{r.quantity} × {cargoLabel(r.cargo as CargoType)}{r.weightKg ? <span className="font-normal text-text-muted"> · ~{r.weightKg} kg</span> : null}</p><p className="truncate text-xs text-text-muted" title={r.description}>{r.description || '—'}</p></td>
-                          <td className="px-3 py-3"><p>{r.contact.name}</p>{r.contact.hidden ? <p className="inline-flex items-center gap-1 text-xs text-text-muted" data-testid="contact-hidden"><Lock size={10} aria-hidden="true" /> Contact after booking</p> : <p className="truncate text-xs text-text-muted" title={r.contact.email}>{r.contact.email}</p>}{r.outsideArea && <p className="mt-0.5 text-xs text-gold-deep" data-testid="outside-area">Outside your pickup area</p>}</td>
+                          <td className="px-3 py-3"><p className="truncate font-semibold" title={r.origin}>{r.origin}</p><p className="text-xs text-text-muted">→ {d?.name ?? r.destination}</p></td>
+                          <td className="px-3 py-3"><p className="truncate font-medium">{r.quantity} × {cargoLabel(r.cargo as CargoType)}{r.weightKg ? <span className="font-normal text-text-muted"> · ~{r.weightKg} kg</span> : null}</p><p className="truncate text-xs text-text-muted" title={r.description}>{r.description || '—'}</p></td>
+                          <td className="px-3 py-3"><p className="flex items-center gap-1.5 truncate">{r.contact.hidden && <Lock size={11} className="shrink-0 text-text-muted" aria-label="Contact details shared after booking" data-testid="contact-hidden" />}<span className="truncate" title={r.contact.hidden ? 'Phone and email are shared once they book' : r.contact.email}>{r.contact.name}</span></p>{!r.contact.hidden && <p className="truncate text-xs text-text-muted" title={r.contact.email}>{r.contact.email}</p>}{r.outsideArea && <p className="mt-1"><span className="rounded-full bg-gold/15 px-2 py-0.5 text-xs text-gold-deep" data-testid="outside-area" title="Outside the pickup cities on your profile">Outside your area</span></p>}</td>
                           <td className="whitespace-nowrap px-3 py-3 tabular-nums"><p>{fmtDate(r.readyDate + 'T12:00:00Z')}</p><p className={`text-xs ${days < 0 ? 'text-danger' : 'text-text-muted'}`}>{days < 0 ? `${-days}d overdue` : days === 0 ? 'today' : `in ${days}d`}</p></td>
-                          <td className="whitespace-nowrap px-3 py-3"><Pill tone={stageTone[st]}>{stageLabel[st]}</Pill>{mine && <p className="mt-1.5 text-xs tabular-nums text-text-muted">{money(mine.price)} · {mine.transitDays}d</p>}</td>
-                          <td className="whitespace-nowrap px-3 py-3 text-xs">{r.source === 'link' ? <Pill tone="gold">Via your link</Pill> : r.source === 'branded' ? <Pill tone="gold">Branded page</Pill> : r.source === 'picked' ? <Pill tone="teal">Chose you</Pill> : competing === 0 ? <span className="text-teal">No other quotes yet</span> : <span className="text-text-muted">{competing} competing quote{competing === 1 ? '' : 's'}</span>}</td>
-                          <td className="px-3 py-3 text-right"><div className="inline-flex gap-1.5">
+                          <td className="px-3 py-3"><Pill tone={stageTone[st]}>{stageLabel[st]}</Pill>{mine && <p className="mt-1.5 text-xs tabular-nums text-text-muted">{money(mine.price)} · {mine.transitDays}d</p>}<p className="mt-1.5 text-xs" data-testid="lead-competition">{r.source === 'link' ? <Pill tone="gold">Via your link</Pill> : r.source === 'branded' ? <Pill tone="gold">Branded page</Pill> : r.source === 'picked' ? <Pill tone="teal">Chose you</Pill> : competing === 0 ? <span className="text-teal">No other quotes yet</span> : <span className="text-text-muted">{competing} competing quote{competing === 1 ? '' : 's'}</span>}</p></td>
+                          <td className="px-3 py-3 text-right"><div className="inline-flex justify-end gap-1.5">
                             {st === 'new' && <button onClick={() => { setOpen(r.id); setQuoting(r.id) }} className="btn-gold !min-h-8 whitespace-nowrap !px-2.5 text-xs"><Send size={12} aria-hidden="true" /> Send quote</button>}
                             {st === 'won' && sh && <Link to={`/dashboard/shipments?q=${sh.ref}&b=all`} className="btn-ghost !min-h-8 whitespace-nowrap !px-2.5 text-xs">Shipment {sh.ref} <ChevronRight size={12} aria-hidden="true" /></Link>}
                             {(st === 'quoted' || st === 'lost' || (st === 'won' && !sh)) && <button onClick={() => setOpen(isOpen ? null : r.id)} className="btn-ghost !min-h-8 whitespace-nowrap !px-2.5 text-xs">{isOpen ? 'Hide' : 'Details'}</button>}
@@ -293,8 +293,8 @@ export default function Leads() {
                           </div></td>
                         </tr>
                         {isOpen && (
-                          <tr className="border-b border-border/70 bg-surface-2/30"><td /><td colSpan={8} className="px-3 pb-5 pt-2">
-                            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+                          <tr className="border-b border-border/70 bg-surface-2/30"><td colSpan={8} className="px-4 pb-5 pt-2">
+                            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
                               <div className="rounded-xl border border-border bg-surface p-4">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div><p className="font-semibold">{r.quantity} × {cargoLabel(r.cargo as CargoType)} · {r.origin} → {d?.name ?? r.destination}</p><p className="mt-0.5 text-xs text-text-muted">Received {fmtDateTime(r.createdAt)} · ready {fmtDate(r.readyDate + 'T12:00:00Z')}{r.weightKg ? ` · ~${r.weightKg} kg` : ''}{r.dims ? ` · ${r.dims}` : ''}{r.declaredValueUsd ? ` · value $${r.declaredValueUsd.toLocaleString()}` : ''}{r.expiresAt && r.status === 'open' ? ` · open until ${fmtDate(r.expiresAt)}` : ''}</p></div>
@@ -307,12 +307,12 @@ export default function Leads() {
                                   <div><p className="font-semibold uppercase tracking-wider text-text-muted">Competition</p><p className="mt-1">{competing === 0 ? 'You would be the first to quote.' : `${competing} other shipper${competing === 1 ? ' has' : 's have'} quoted. Prices are hidden from competitors.`}</p></div>
                                   <div><p className="font-semibold uppercase tracking-wider text-text-muted">Outcome</p><p className="mt-1">{st === 'won' ? (sh ? <>Booked as <Link to={`/dashboard/shipments?q=${sh.ref}&b=all`} className="text-gold-deep hover:underline">{sh.ref}</Link>.</> : 'Quote accepted — shipment being created.') : st === 'lost' ? 'The customer went with another quote or closed the request.' : st === 'quoted' ? 'Waiting for the customer to compare and accept.' : 'Open — send a quote to be considered.'}</p></div>
                                 </div>
+                                {r.status === 'open' && <div className="mt-4 border-t border-border pt-4"><MessageThread requestId={r.id} compact /></div>}
                               </div>
-                              <div className="rounded-xl border border-border bg-surface p-4">
+                              <div className="min-w-0 rounded-xl border border-border bg-surface p-4">
                                 <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-text-muted">{mine ? 'Your quote' : 'Send a quote'}</p>
                                 {quoting === r.id && r.status === 'open' ? <QuoteForm r={r} prev={mine} onDone={(m) => { setQuoting(null); setToast(m) }} onCancel={() => setQuoting(null)} /> : mine ? <MyQuote q={mine} r={r} onRequote={() => setQuoting(r.id)} onDone={setToast} /> : st === 'new' && <button onClick={() => setQuoting(r.id)} className="btn-gold !min-h-10 w-full text-sm" data-testid="quote-lead"><Send size={14} aria-hidden="true" /> Quote this lead</button>}
                                 {!mine && st !== 'new' && <p className="text-sm text-text-muted">This request {r.status === 'cancelled' ? 'was cancelled by the client' : r.status === 'expired' ? 'expired' : 'closed'} before you quoted.</p>}
-                                {r.status === 'open' && <div className="mt-4"><MessageThread requestId={r.id} compact /></div>}
                                 {sh && <div className="mt-4 border-t border-border pt-3 text-xs"><Link to={`/track?ref=${sh.ref}`} className="inline-flex items-center gap-1 text-gold-deep hover:underline">Customer tracking page <ExternalLink size={11} aria-hidden="true" /></Link></div>}
                               </div>
                             </div>

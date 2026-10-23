@@ -55,12 +55,12 @@ export function RecipientEditor({ s, consignees: given, onSaved }: { s: Shipment
 }
 
 /** Shown instead of a "Next step" button when something other than a click will move the status. */
-export function AutoTag({ s, onOverride }: { s: Shipment; onOverride?: () => void }) {
+export function AutoTag({ s, onOverride, compact = false }: { s: Shipment; onOverride?: () => void; compact?: boolean }) {
   if (!s.autoBy) return null
   const why = s.autoBy.kind === 'container' ? `Status follows container ${s.autoBy.label.replace('follows ', '')} through Customs` : s.autoBy.kind === 'run' ? `Moves when the driver works the ${s.autoBy.label}` : 'Moves to Picked up when a piece label is scanned'
   return (
     <button type="button" onClick={onOverride} title={`${why}. Open Manage to override by hand.`} className="inline-flex max-w-[210px] items-center gap-1 whitespace-nowrap rounded-full border border-teal/40 bg-teal/10 px-2.5 py-1 text-xs font-medium text-teal focus-ring" data-testid="auto-tag">
-      <Bot size={12} className="shrink-0" aria-hidden="true" /> <span className="truncate">Auto · {s.autoBy.label}</span>
+      <Bot size={12} className="shrink-0" aria-hidden="true" /> <span className="truncate">{compact ? <>Auto<span className="sr-only"> · {s.autoBy.label}</span></> : <>Auto · {s.autoBy.label}</>}</span>
     </button>
   )
 }

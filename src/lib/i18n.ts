@@ -299,6 +299,15 @@ const FR: Record<string, string> = {
   'Told: outside': 'Prévenu : devant',
   'I’m outside': 'Je suis devant',
   'They were already told you’re outside.': 'Ils savent déjà que vous êtes devant.',
+  'Add a rate card so quotes fill themselves': 'Ajoutez une grille tarifaire pour pré-remplir vos devis',
+  'Add tracking': 'Ajouter le suivi',
+  'Bring your existing clients across': 'Importez vos clients existants',
+  'Invite your dispatcher, drivers and warehouse': 'Invitez votre dispatcheur, vos chauffeurs et l’entrepôt',
+  'Open client requests on your lanes': 'Demandes ouvertes sur vos lignes',
+  'Quotes sent, win rate, reply time, shipments and money collected appear here once you start trading. Until then:': 'Devis envoyés, taux de réussite, délai de réponse, expéditions et encaissements apparaissent ici dès vos premières affaires. En attendant :',
+  'Work through the steps above — your first requests and numbers will show up here.': 'Suivez les étapes ci-dessus — vos premières demandes et vos chiffres apparaîtront ici.',
+  'Your numbers start with your first quote': 'Vos chiffres commencent avec votre premier devis',
+  'past ETA': 'ETA dépassée',
 }
 export function translate(lang: Lang, s: string, vars?: Record<string, string | number>) {
   let out = lang === 'fr' ? FR[s] ?? s : s

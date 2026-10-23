@@ -188,3 +188,17 @@ html.road .ss-app :is(.card-dark, .border-border) { border-color: color-mix(in s
 .nav-scroll::-webkit-scrollbar { width: 6px; }
 .nav-scroll::-webkit-scrollbar-thumb { background: color-mix(in oklab, currentColor 25%, transparent); border-radius: 999px; }
 .nav-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* Dashboard page tops: less padding and a smaller intro, so the list or form starts higher up the screen. */
+#main .container-x.py-10 { padding-top: 1.5rem; }
+@media (min-width: 768px) { #main .container-x.md\:py-14 { padding-top: 2rem; padding-bottom: 2.5rem; } }
+#main .page-intro-more { display: none; }
+#main .page-intro { font-size: 0.9375rem; line-height: 1.5; max-width: 76ch; }
+@media (max-width: 767px) {
+  #main .page-intro:not(.open) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #main .page-intro-more { display: inline-flex; min-height: 2.25rem; align-items: center; font-size: 0.875rem; font-weight: 600; color: var(--color-gold-deep); text-decoration: underline; }
+  /* Summary cards become one swipeable row on phones instead of a wall of tiles above the list. */
+  #main div:has(> .stat-card) { display: flex !important; overflow-x: auto; gap: 0.5rem; margin-left: -1.25rem; margin-right: -1.25rem; padding: 0 1.25rem 0.25rem; scroll-padding-left: 1.25rem; scroll-snap-type: x proximity; scrollbar-width: none; }
+  #main div:has(> .stat-card)::-webkit-scrollbar { display: none; }
+  #main div:has(> .stat-card) > .stat-card { flex: 0 0 44%; scroll-snap-align: start; }
+}

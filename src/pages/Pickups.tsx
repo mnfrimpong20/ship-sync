@@ -102,6 +102,10 @@ export default function Pickups() {
             <StatCard label="Collected" value={count('done')} hint="Picked up by a driver" icon={Check} active={filter === 'done'} onClick={() => setFilter(filter === 'done' ? 'open' : 'done')} />
           </motion.div>
 
+          <motion.ol variants={fadeUp} className="mt-5 grid gap-2 text-sm md:grid-cols-3" aria-label="How collections work" data-testid="pickup-howto">
+            {[['1', 'Set your pickup hours', 'Customers with a booked shipment pick a slot inside them.'], ['2', 'Confirm the booking', 'It’s added to that day’s pickup run for the area.'], ['3', 'The driver collects', 'They work the run from their phone and scan the labels.']].map(([n, h, b]) => <li key={n} className="flex gap-3 rounded-xl border border-border bg-surface px-3.5 py-3"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gold/20 text-xs font-bold text-gold-deep">{n}</span><span><b className="block">{h}</b><span className="text-text-muted">{b}{n === '3' ? <> <Link to="/dashboard/routes?kind=pickup" className="text-gold-deep underline">Pickup runs →</Link></> : null}</span></span></li>)}
+          </motion.ol>
+
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
             <div className="min-w-0">
               <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2">
@@ -113,7 +117,7 @@ export default function Pickups() {
                 <SearchBox value={q} onChange={setQ} label="Search pickups" placeholder="Search ref, customer, address…" />
               </motion.div>
               <motion.div variants={fadeUp} className="card-dark mt-4 overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Pickup bookings">
                   <table className="w-full min-w-[820px] text-sm">
                     <thead><tr className={thead}><Th>When</Th><Th>Shipment</Th><Th>Address</Th><Th>Contact</Th><Th>Status</Th><Th className="text-right">Actions</Th></tr></thead>
                     <tbody>

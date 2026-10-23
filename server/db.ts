@@ -623,6 +623,9 @@ create table if not exists stripe_events (
   received_at timestamptz not null default now()
 );
 alter table shippers add column if not exists payout_details jsonb not null default '{}';
+-- Old sign-ups were given filler text that customers could see, so clear it
+update shippers set tagline = '' where tagline = 'New on Ntemtem';
+update shippers set about = '' where about like '% is a new shipping company on Ntemtem. Profile details coming soon.';
 
 create table if not exists groupages (
   id text primary key,

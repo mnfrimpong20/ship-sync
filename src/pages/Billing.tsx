@@ -1,6 +1,6 @@
 import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Check, CreditCard, Sparkles, Users } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { platformApi, type Billing } from '../lib/platform'
@@ -43,6 +43,9 @@ export default function BillingPage() {
               <p className="mt-1 font-heading text-3xl font-bold">{p.priceUsd ? money(p.priceUsd) : 'Free'}<span className="text-sm font-normal text-text-muted">{p.priceUsd ? ' / month' : ''}</span></p>
               <p className="mt-2 text-sm text-text-muted">{p.blurb}</p>
               <ul className="mt-3 flex-1 space-y-1 text-sm">{p.perks.map((k) => <li key={k} className="flex gap-1.5"><Check size={15} className="mt-0.5 text-teal" aria-hidden="true" />{k}</li>)}<li className="flex gap-1.5"><Check size={15} className="mt-0.5 text-teal" aria-hidden="true" />{p.team ? `Up to ${p.team} team members` : 'Unlimited team'}</li></ul>
+              {p.key === 'starter' && !mine && !b.trial && (b.subscription && !b.subscription.cancelAtPeriodEnd
+                ? <button type="button" className="btn-ghost mt-4 !min-h-10" disabled={!isOwner} onClick={async () => { if (confirm('Move to Starter? Your paid features stay on until the end of this period.')) { const r = await platformApi.cancel(); setOk(`Done — you move to Starter on ${fmtDate(r.endsAt)}.`); load() } }} data-testid="downgrade">Move to Starter</button>
+                : !b.subscription?.cancelAtPeriodEnd && <Link to="/support?topic=plan" className="btn-ghost mt-4 !min-h-10" data-testid="downgrade">Ask to move to Starter</Link>)}
               {p.key !== 'starter' && !mine && <button type="button" disabled={!!busy || !isOwner} onClick={() => upgrade(p.key as 'pro' | 'enterprise')} className="btn-gold mt-4 !min-h-10" data-testid={`upgrade-${p.key}`}>{busy === p.key ? 'Opening checkout…' : `Choose ${p.label}`}</button>}
               {mine && p.key !== 'starter' && b.subscription && (b.subscription.cancelAtPeriodEnd
                 ? <button type="button" className="btn-ghost mt-4 !min-h-10" onClick={async () => { await platformApi.resume(); load() }} data-testid="resume">Keep {p.label}</button>
@@ -50,7 +53,7 @@ export default function BillingPage() {
             </div>
           ) })}
         </div>
-        {!b.online && <p className="mt-4 text-sm text-text-muted">Card billing isn’t switched on yet — contact Ntemtem to change your plan.</p>}
+        {!b.online && <p className="mt-4 text-sm text-text-muted">Card billing isn’t switched on yet — <Link to="/support?topic=plan" className="underline">ask Ntemtem</Link> to change your plan.</p>}
         {!isOwner && <p className="mt-2 text-sm text-text-muted">Only the account owner can change the plan.</p>}
         {b.history.length > 0 && <Panel title="History" className="mt-6"><ul className="divide-y divide-border text-sm">{b.history.map((h, i) => <li key={i} className="flex justify-between py-2"><span>{h.kind.replace(/_/g, ' ')} · {h.plan}{h.amountUsd ? ` · ${money(h.amountUsd)}` : ''}</span><span className="text-text-muted">{fmtDate(h.at)}{h.by ? ` · ${h.by}` : ''}</span></li>)}</ul></Panel>}
       </>}

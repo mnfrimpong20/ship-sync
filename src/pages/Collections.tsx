@@ -12,7 +12,7 @@ import { fadeUp, stagger } from '../lib/motion'
 import { Chip, Pager, SearchBox, StatCard, Th, thead, trow, usePaged } from '../components/board'
 
 type Filter = 'open' | 'overdue' | 'paid' | 'all'
-const ago = (iso: string | null) => (iso ? `${Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 86400000))}d ago` : '')
+const ago = (iso: string | null) => { if (!iso) return ''; const d = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)); return d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d}d ago` }
 
 function SettingsCard({ s0, channels, onSaved }: { s0: CollectionSettings; channels: { email: boolean; sms: boolean }; onSaved: (s: CollectionSettings) => void }) {
   const [s, setS] = useState(s0); const [busy, setBusy] = useState(false); const [error, setError] = useState('')
@@ -55,7 +55,7 @@ export default function Collections() {
       <div className="container-x py-10 md:py-14">
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Collections</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{t && t.overdueCount ? `${t.overdueCount} overdue · ${usd(t.overdue)}` : 'Invoices & collections'}</motion.h1><motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Every invoice has a pay link — clients pay by card without signing in, the money lands in your balance, and the invoice marks itself paid. Reminders go out on your schedule; send one by hand any time.</motion.p></div>
+            <div><motion.p variants={fadeUp} className="eyebrow mb-1">Collections</motion.p><motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{t && t.overdueCount ? `${t.overdueCount} overdue · ${usd(t.overdue)}` : 'Invoices & collections'}</motion.h1><motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">The bills you send clients. Card payments through an invoice’s pay link arrive in your balance under <Link to="/dashboard/payments" className="underline">Payments</Link> and mark the invoice paid; cash, MoMo or Zelle you record on the invoice.</motion.p></div>
             <motion.div variants={fadeUp}><Link to="/dashboard/clients" className="btn-ghost">Raise an invoice</Link></motion.div>
           </div>
           {toast && <p role="status" className="mt-6 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</p>}
@@ -66,7 +66,7 @@ export default function Collections() {
             <StatCard label="Collected (30d)" value={usd(t?.collected30 ?? 0)} hint="All methods" icon={Check} active={filter === 'paid'} onClick={() => setFilter(filter === 'paid' ? 'open' : 'paid')} />
             <StatCard label="Auto reminders" value={data?.settings.autoRemind ? 'On' : 'Off'} hint={data ? `${data.settings.beforeDays}d before · ${data.settings.afterDays.join('/')}d after` : ''} icon={BellRing} />
           </motion.div>
-          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0">
               <motion.div variants={fadeUp} className="flex flex-wrap items-center gap-2">
                 <Chip active={filter === 'open'} onClick={() => setFilter('open')} count={all.filter((i) => i.status === 'sent').length}>Open</Chip>
@@ -85,11 +85,11 @@ export default function Collections() {
                       {data && pg.rows.length === 0 && <tr><td colSpan={6} className="px-3 py-10"><Empty title={all.length ? 'Nothing matches' : 'No invoices sent yet'} body={all.length ? 'Try another filter.' : 'Raise an invoice on a client and send it — the pay link does the rest.'} /></td></tr>}
                       {pg.rows.map((inv) => (
                         <tr key={inv.id} className={trow(false, inv.status === 'paid')} data-testid="collection-row">
-                          <td className="px-3 py-3"><Link to={`/dashboard/invoices/${inv.id}`} className="font-mono text-xs text-gold-deep hover:underline">{inv.number}</Link>{inv.shipmentRef && <p className="text-xs text-text-muted">{inv.shipmentRef}</p>}</td>
+                          <td className="whitespace-nowrap px-3 py-3"><Link to={`/dashboard/invoices/${inv.id}`} className="font-mono text-xs text-gold-deep hover:underline">{inv.number}</Link>{inv.shipmentRef && <p className="font-mono text-xs text-text-muted">{inv.shipmentRef}</p>}</td>
                           <td className="px-3 py-3"><Link to={`/dashboard/clients/${inv.clientId}?tab=invoices`} className="hover:text-gold-deep">{inv.clientName}</Link><p className="truncate text-xs text-text-muted">{inv.clientEmail || 'no email'}</p></td>
                           <td className="whitespace-nowrap px-3 py-3 text-xs">{inv.dueAt ? fmtDate(inv.dueAt) : '—'}<p>{inv.status === 'paid' ? <Pill tone="green">Paid</Pill> : inv.overdue ? <Pill tone="danger">Overdue</Pill> : <Pill tone="gold">Open</Pill>}</p></td>
                           <td className="px-3 py-3 text-right font-semibold tabular-nums">{usd(inv.status === 'paid' ? inv.total : inv.balance)}</td>
-                          <td className="whitespace-nowrap px-3 py-3 text-xs text-text-muted">{inv.sentAt ? `Sent ${ago(inv.sentAt)}` : 'Not sent'}{inv.remindersSent.length > 0 && <p>{inv.remindersSent.length} msg · last {ago(inv.lastReminderAt)}</p>}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-xs text-text-muted">{inv.sentAt ? `Sent ${ago(inv.sentAt)}` : 'Not sent'}{inv.remindersSent.length > 0 && <p>{inv.remindersSent.length === 1 ? '1 reminder' : `${inv.remindersSent.length} reminders`} · last {ago(inv.lastReminderAt)}</p>}</td>
                           <td className="px-3 py-3 text-right">
                             {inv.status === 'sent' && <div className="inline-flex gap-1.5">
                               <button onClick={() => send(inv, inv.sentAt ? (inv.overdue ? 'overdue' : 'reminder') : 'invoice')} disabled={busy.startsWith(inv.id)} className="btn-gold !min-h-8 whitespace-nowrap !px-2.5 text-xs disabled:opacity-60" data-testid="send-invoice"><Mail size={12} aria-hidden="true" /> {inv.sentAt ? 'Remind' : 'Send'}</button>
@@ -104,7 +104,7 @@ export default function Collections() {
                 <Pager p={pg} noun="invoice" />
               </motion.div>
             </div>
-            <motion.div variants={fadeUp}>{data && <SettingsCard s0={data.settings} channels={data.channels} onSaved={(s) => { setData({ ...data, settings: s }); setToast('Reminder settings saved.') }} />}</motion.div>
+            <motion.div variants={fadeUp} className="max-w-xl 2xl:max-w-none">{data && <SettingsCard s0={data.settings} channels={data.channels} onSaved={(s) => { setData({ ...data, settings: s }); setToast('Reminder settings saved.') }} />}</motion.div>
           </div>
         </motion.div>
       </div>

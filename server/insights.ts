@@ -107,7 +107,7 @@ export function mountInsights(r: Router, d: Deps) {
     for (const f of followups.slice(0, 3)) attention.push({ kind: 'followup', severity: new Date(f.due_at) < now ? 'warning' : 'info', title: `Follow up with ${f.client_name}`, body: f.body, to: `/dashboard/clients/${f.client_id}?tab=activity`, at: iso(f.due_at) })
     for (const x of runsToday.slice(0, 2)) attention.push({ kind: 'run', severity: 'info', title: `${x.name} · ${x.pending} of ${x.stops} stops to go`, body: `${x.driver_name ?? 'No driver assigned'} · ${x.status === 'in_progress' ? 'On the road now' : 'Planned for today'}`, to: `/dashboard/routes/${x.id}` })
     if (vehicles.some((v) => v.status === 'maintenance')) attention.push({ kind: 'vehicle', severity: 'info', title: `${vehicles.filter((v) => v.status === 'maintenance').length} vehicle${vehicles.filter((v) => v.status === 'maintenance').length === 1 ? '' : 's'} in maintenance`, body: 'Not available for runs until marked back in service.', to: '/dashboard/fleet' })
-    if (!me.verified) attention.push({ kind: 'profile', severity: 'warning', title: 'Your company isn’t verified yet', body: 'Verified shippers rank higher and win more quotes. Complete your profile to start the check.', to: '/dashboard/shipper?view=profile' })
+    if (!me.verified) attention.push({ kind: 'profile', severity: 'warning', title: 'Your company isn’t verified yet', body: 'Verified shippers rank higher and win more quotes. Upload your registration and insurance to start the check.', to: '/dashboard/verification' })
     const sevRank = { critical: 0, warning: 1, info: 2 }
     attention.sort((a, b) => sevRank[a.severity] - sevRank[b.severity])
 

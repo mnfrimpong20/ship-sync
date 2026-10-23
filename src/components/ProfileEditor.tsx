@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Check, ImagePlus, Plus, Trash2, X } from 'lucide-react'
 import { cargoTypes, countries, origins as originCities, type Shipper } from '../lib/data'
@@ -7,6 +8,8 @@ import { Flag } from './ui'
 
 /** Shipper's own listing — the fields customers see on the directory and profile pages. */
 export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; onDone: (msg: string) => void }) {
+  const [sp] = useSearchParams(); const lanesRef = useRef<HTMLFieldSetElement>(null)
+  useEffect(() => { if (sp.get('focus') === 'lanes') setTimeout(() => { lanesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); lanesRef.current?.focus({ preventScroll: true }) }, 350) }, [sp])
   const { updateShipper } = useStore()
   const [f, setF] = useState<ShipperProfileInput>({
     name: shipper.name, tagline: shipper.tagline, hq: shipper.hq, founded: shipper.founded, modes: shipper.modes, destinations: shipper.destinations,
@@ -82,7 +85,7 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
         <div><label htmlFor="pf-founded" className="label-dark">Founded</label><input id="pf-founded" type="number" className="input-dark" min={1900} max={new Date().getFullYear()} value={f.founded} onChange={(e) => setF({ ...f, founded: Number(e.target.value) })} /></div>
       </div>
 
-      <fieldset className="mt-6"><legend className="label-dark">Modes</legend>
+      <fieldset className="mt-6 scroll-mt-24" ref={lanesRef} tabIndex={-1} aria-label="Lanes: modes, destinations, cargo and pickup origins"><legend className="label-dark">Modes</legend>
         <div className="mt-2 flex flex-wrap gap-2">{(['ocean', 'air'] as const).map((m) => <button type="button" key={m} aria-pressed={f.modes.includes(m)} onClick={() => setF({ ...f, modes: toggle(f.modes, m) })} className={chip(f.modes.includes(m))}>{m === 'ocean' ? 'Ocean freight' : 'Air freight'}</button>)}</div>
       </fieldset>
       <fieldset className="mt-5"><legend className="label-dark">Destinations you serve</legend>

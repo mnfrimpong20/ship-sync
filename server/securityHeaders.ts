@@ -29,7 +29,9 @@ const EMBED = policy('*')
 
 export function securityHeaders(req: Request, res: Response, next: NextFunction) {
   const embed = req.path.startsWith('/embed/') || req.path.startsWith('/widget')
-  res.setHeader(process.env.CSP_REPORT_ONLY === '1' ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy', embed ? EMBED : PAGE)
+  // The CSP is for the built site only: the Vite dev server (the Replit workspace) needs an inline preamble script
+  // and a live-reload WebSocket, so it would render blank there.
+  if (process.env.NODE_ENV === 'production') res.setHeader(process.env.CSP_REPORT_ONLY === '1' ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy', embed ? EMBED : PAGE)
   if (!embed) res.setHeader('X-Frame-Options', 'SAMEORIGIN')
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { distanceKm } from '../lib/geo'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Banknote, Check, CheckCircle2, ChevronDown, Clock, CreditCard, Flag, Fuel, KeyRound, LocateFixed, LogOut, Map as MapIcon, MessageCircle, MessageSquare, Minus, Navigation, Package, PackageCheck, Phone, Play, Plus, Route, Send, ShieldCheck, SkipForward, Smartphone, Sun, Undo2, Volume2, Warehouse, WifiOff } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Banknote, Check, CheckCircle2, ChevronDown, Clock, CreditCard, Flag, Fuel, KeyRound, LocateFixed, LogOut, MapPin, Map as MapIcon, MessageCircle, MessageSquare, Minus, Navigation, Package, PackageCheck, Phone, Play, Plus, Route, Send, ShieldCheck, SkipForward, Smartphone, Sun, Undo2, Volume2, Warehouse, WifiOff } from 'lucide-react'
 import { opsApi, type Run, type RunStop } from '../lib/ops'
 import { stopOrQueue, startQueueSync, type StopPatch } from '../lib/scan'
 import { daySummary, routeLink, stopLink, telLink, useMyRuns, useOnline, useQueued, useWakeLock, waLink } from '../lib/driver'
@@ -180,7 +181,14 @@ export default function DriverRun({ id }: { id: string }) {
   const [tool, setTool] = useState<null | { kind: 'vcheck' | 'load' | 'drop' | 'incident' | 'msg' | 'expense'; stopId?: string; start?: boolean }>(null)
   useEffect(() => { setDispatchContext(next?.id); return () => setDispatchContext(undefined) }, [next?.id])
   const { d, reload: reloadDetails } = useStopDetails(run?.id, next?.id, !offline, run?.status)
-  const loc = useLiveLocation(run, (labels) => setInfo(t('Arriving soon — {names} told you’re a few minutes away.', { names: labels.join(', ') })))
+  const [here, setHere] = useState<string | null>(null); const [notHere, setNotHere] = useState<string[]>([])
+  const nextRef = useRef(next); nextRef.current = next
+  const loc = useLiveLocation(run, (labels) => setInfo(t('Arriving soon — {names} told you’re a few minutes away.', { names: labels.join(', ') })), (lat, lon, acc) => {
+    const n = nextRef.current; if (!n || n.lat == null || n.lon == null || acc > 120) return
+    if (distanceKm([lon, lat], [n.lon, n.lat]) <= 0.15) setHere((h) => { if (h !== n.id && navigator.vibrate) navigator.vibrate([80, 60, 80]); return n.id })
+  })
+  const [outBusy, setOutBusy] = useState(false)
+  const outside = async (st: RunStop) => { setOutBusy(true); setErr(''); try { const r = await driverApi.outside(run!.id, st.id); void reload(); setInfo(r.already ? t('They were already told you’re outside.') : r.texted ? t('Sent: “{text}”', { text: r.text ?? '' }) : t('Noted on their tracking page. Texts go out once the text-message service is connected.')) } catch (e) { setErr(e instanceof Error ? e.message : t('Could not send.')) } finally { setOutBusy(false) } }
   useRunWatch(run, reload, (n) => { setInfo(t('{n} new stops added by dispatch.', { n })); if (navigator.vibrate) navigator.vibrate([60, 40, 60]) })
   if (!runs && !offline) return <BrandLoader partner />
   if (!run) return <div className="container-x py-10"><p className="text-text-muted">{error || t('This run isn’t on your list any more.')}</p><Link to="/dashboard/runs" className="btn-gold mt-4 !min-h-12">{t('Back to my runs')}</Link></div>
@@ -239,6 +247,17 @@ export default function DriverRun({ id }: { id: string }) {
         {next && (
           <section className="mt-5 rounded-3xl border-2 border-gold bg-surface p-5 shadow-sm" aria-labelledby="next-h" data-testid="next-stop">
             <div className="flex items-start justify-between gap-2"><p className="pt-1 text-sm font-bold uppercase tracking-wider text-gold-deep">{t('Next stop')} · {ordered.indexOf(next) + 1}/{ordered.length}{next.tries ? ` · ${t('try {n}', { n: next.tries + 1 })}` : ''}</p><button onClick={() => readAloud(next)} className="-mr-2 -mt-1 grid h-11 w-11 shrink-0 place-items-center rounded-xl text-gold-deep focus-ring" aria-label={t('Read aloud')} title={t('Read aloud')} data-testid="read-aloud"><Volume2 size={20} aria-hidden="true" /></button></div>
+            {run.status === 'in_progress' && !notHere.includes(next.id) && (here === next.id || (next.arrivedAt && Date.now() - Date.parse(next.arrivedAt) < 30 * 60000)) && (
+              <div role="status" className="mt-2 rounded-2xl border-2 border-teal bg-teal/10 p-4" data-testid="arrived">
+                <p className="flex items-center gap-2 text-lg font-bold"><MapPin size={20} className="text-teal" aria-hidden="true" /> {t('You’ve arrived')}</p>
+                <p className="mt-0.5 text-base text-text-muted">{t('You’re at {name}. What next?', { name: next.contact || next.label })}</p>
+                <div className="mt-3 grid gap-2">
+                  <Big tone="gold" onClick={() => setSheet({ kind: 'proof', stop: next })} testid="arrived-done"><CheckCircle2 size={22} aria-hidden="true" /> {run.kind === 'pickup' ? t('Mark collected') : t('Mark delivered')}</Big>
+                  {!next.outsideAt && (next.phone || next.shipmentId) && <Big onClick={() => void outside(next)} disabled={outBusy || offline} testid="arrived-outside"><Send size={20} aria-hidden="true" /> {t('Tell them I’m outside')}</Big>}
+                </div>
+                <button onClick={() => { setNotHere((x) => [...x, next.id]); setHere(null) }} className="mt-2 inline-flex min-h-11 items-center px-1 text-base text-text-muted underline focus-ring" data-testid="arrived-dismiss">{t('Not here yet')}</button>
+              </div>
+            )}
             <h2 id="next-h" className="mt-1 !text-2xl leading-tight">{next.contact || next.label}</h2>
             {next.contact && next.contact !== next.label && <p className="text-base text-text-muted">{next.label}</p>}
             <p className="mt-2 text-lg leading-snug">{next.address || <span className="italic text-text-muted">{t('No address — call them')}</span>}</p>
@@ -250,7 +269,9 @@ export default function DriverRun({ id }: { id: string }) {
               <div className={`mt-2 grid gap-2 ${n === 3 ? 'grid-cols-3' : n === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 {next.phone && <a href={telLink(next.phone)} className={c}><Phone size={20} aria-hidden="true" /> {t('Call')}</a>}
                 {next.phone && <a href={waLink(next.phone)} target="_blank" rel="noreferrer" className={c}><MessageCircle size={20} aria-hidden="true" /> WhatsApp</a>}
-                {run.status === 'in_progress' && <button onClick={() => setSheet({ kind: 'onway', stop: next })} disabled={offline} className={c} data-testid="onway"><Send size={20} aria-hidden="true" /> {next.onWayAt ? t('Told them') : t('On my way')}</button>}
+                {run.status === 'in_progress' && (next.outsideAt ? <button disabled className={c} data-testid="outside-sent"><Check size={20} aria-hidden="true" /> {t('Told: outside')}</button>
+                  : next.onWayAt ? <button onClick={() => void outside(next)} disabled={offline || outBusy} className={c} data-testid="outside"><MapPin size={20} aria-hidden="true" /> {t('I’m outside')}</button>
+                  : <button onClick={() => setSheet({ kind: 'onway', stop: next })} disabled={offline} className={c} data-testid="onway"><Send size={20} aria-hidden="true" /> {t('On my way')}</button>)}
               </div>) })()}
             {run.status === 'in_progress' && <StopTools run={run} stop={next} d={d} reload={() => { reloadDetails(); void reload() }} onInfo={setInfo} />}
             {run.status === 'in_progress' && <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">

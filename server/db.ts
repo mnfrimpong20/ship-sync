@@ -1452,6 +1452,8 @@ alter table run_stops add column if not exists on_way_at timestamptz;
 alter table run_stops add column if not exists collected jsonb;
 alter table runs add column if not exists summary_sent_at timestamptz;
 alter table run_stops add column if not exists near_at timestamptz;
+alter table run_stops add column if not exists arrived_at timestamptz;
+alter table run_stops add column if not exists outside_at timestamptz;
 alter table pieces add column if not exists sticker text;
 create index if not exists idx_pieces_sticker on pieces (upper(sticker));
 alter table run_stops add column if not exists code text;

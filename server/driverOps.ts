@@ -264,6 +264,12 @@ export function mountDriverOps(r: Router, d: Deps) {
     if (run.status !== 'in_progress') { res.json({ ok: false }); return }
     const b = z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), accuracy: z.number().min(0).max(100000).optional() }).parse(req.body)
     await db.query(`insert into driver_positions (staff_id,shipper_id,run_id,lat,lon,accuracy,at) values ($1,$2,$3,$4,$5,$6,now()) on conflict (staff_id) do update set run_id = excluded.run_id, lat = excluded.lat, lon = excluded.lon, accuracy = excluded.accuracy, at = now()`, [me.id, shipperId, run.id, b.lat, b.lon, b.accuracy ?? null])
+    // Within ~150 m of a pending stop (and a decent GPS fix): note the arrival time — the app asks "You've arrived?".
+    const arrived: { id: string; label: string }[] = []
+    if ((b.accuracy ?? 50) <= 120) {
+      const { rows: here } = await db.query<Row>(`select id, label, lat, lon from run_stops where run_id = $1 and status = 'pending' and arrived_at is null and lat is not null`, [run.id])
+      for (const st of here) if (distanceKm([b.lon, b.lat], [Number(st.lon), Number(st.lat)]) <= 0.15) { await db.query('update run_stops set arrived_at = now() where id = $1 and arrived_at is null', [st.id]); arrived.push({ id: st.id, label: st.label }) }
+    }
     // Within ~2 km of a pending stop: one automatic "arriving soon" per stop.
     const { rows: stops } = await db.query<Row>(`select st.*, sh.ref, sh.user_id, sh.status as sh_status from run_stops st left join shipments sh on sh.id = st.shipment_id where st.run_id = $1 and st.status = 'pending' and st.near_at is null and st.lat is not null`, [run.id])
     const near: string[] = []
@@ -278,7 +284,25 @@ export function mountDriverOps(r: Router, d: Deps) {
         if (st.user_id) await notify(db, { userId: st.user_id, kind: 'shipment_status', title: `${st.ref}: driver arriving soon`, body: msg, link: `/dashboard?tab=shipments&open=${st.shipment_id}`, dedupe: `near:${st.id}` })
       }
     }
-    res.json({ ok: true, near })
+    res.json({ ok: true, near, arrived })
+  }))
+  /** "I'm outside": one text to the receiver/sender, and it shows on their tracking. */
+  r.post('/runs/:id/stops/:sid/outside', wrap(async (req, res) => {
+    const db = await getDb(); const { run, me } = await onRun(db, req)
+    if (run.status !== 'in_progress') throw new HttpError(409, 'Start the run first.')
+    const { rows } = await db.query<Row>(`select st.*, sh.ref, sh.user_id, sh.status as sh_status from run_stops st left join shipments sh on sh.id = st.shipment_id where st.id = $1 and st.run_id = $2`, [String(req.params.sid), run.id]); const st = rows[0]
+    if (!st) throw new HttpError(404, 'Stop not found.')
+    if (st.status !== 'pending') throw new HttpError(409, 'This stop is already closed.')
+    if (st.outside_at) { res.json({ ok: true, texted: false, already: true }); return }
+    await db.query('update run_stops set outside_at = now(), arrived_at = coalesce(arrived_at, now()) where id = $1', [st.id])
+    const first = me.name.split(' ')[0]
+    const msg = `${first} is outside now${run.kind === 'pickup' ? ' to collect your shipment' : ' with your delivery'}${st.ref ? ` (${st.ref})` : ''}.`
+    const texted = st.phone ? await text(st.phone, msg) : false
+    if (st.shipment_id) {
+      await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [st.shipment_id, st.sh_status, st.label || '', `Driver ${first} has arrived.`])
+      if (st.user_id) await notify(db, { userId: st.user_id, kind: 'shipment_status', title: `${st.ref}: your driver is outside`, body: msg, link: `/dashboard?tab=shipments&open=${st.shipment_id}`, dedupe: `outside:${st.id}` })
+    }
+    res.json({ ok: true, texted, text: msg })
   }))
   r.get('/runs/positions', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, office } = await staffOf(db, req); if (!office) throw new HttpError(403, 'Office staff only.')

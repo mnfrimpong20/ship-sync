@@ -292,6 +292,13 @@ const FR: Record<string, string> = {
   'Office': 'Bureau',
   'Remove PIN': 'Supprimer le code PIN',
   'This phone signs in with your PIN.': 'Ce téléphone se connecte avec votre code PIN.',
+  'You’ve arrived': 'Vous êtes arrivé',
+  'You’re at {name}. What next?': 'Vous êtes chez {name}. Et maintenant ?',
+  'Tell them I’m outside': 'Dire que je suis devant',
+  'Not here yet': 'Pas encore arrivé',
+  'Told: outside': 'Prévenu : devant',
+  'I’m outside': 'Je suis devant',
+  'They were already told you’re outside.': 'Ils savent déjà que vous êtes devant.',
 }
 export function translate(lang: Lang, s: string, vars?: Record<string, string | number>) {
   let out = lang === 'fr' ? FR[s] ?? s : s

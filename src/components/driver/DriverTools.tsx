@@ -204,9 +204,10 @@ export function ExpenseSheet({ run, onClose, onDone, defaultCurrency = 'USD' }: 
 /* ============ live location while the run is open ============ */
 /** Sends the phone's position at most every ~30 s (or after ~150 m) while a run is in progress and the app is open.
  *  The server texts "arriving soon" when the driver comes within ~2 km of a stop. */
-export function useLiveLocation(run: Run | null, onNear: (labels: string[]) => void) {
+export function useLiveLocation(run: Run | null, onNear: (labels: string[]) => void, onFix?: (lat: number, lon: number, accuracy: number) => void) {
   const [state, setState] = useState<'off' | 'on' | 'denied'>('off')
   const nearRef = useRef(onNear); nearRef.current = onNear
+  const fixRef = useRef(onFix); fixRef.current = onFix
   const active = run?.status === 'in_progress'
   useEffect(() => {
     if (!active || !run || !navigator.geolocation) { setState('off'); return }
@@ -214,6 +215,7 @@ export function useLiveLocation(run: Run | null, onNear: (labels: string[]) => v
     const id = navigator.geolocation.watchPosition((p) => {
       setState('on')
       const { latitude: lat, longitude: lon, accuracy } = p.coords
+      fixRef.current?.(lat, lon, accuracy)
       const moved = Math.hypot((lat - last.lat) * 111000, (lon - last.lon) * 111000 * Math.cos((lat * Math.PI) / 180))
       if (Date.now() - last.at < 30000 && moved < 150) return
       last = { at: Date.now(), lat, lon }

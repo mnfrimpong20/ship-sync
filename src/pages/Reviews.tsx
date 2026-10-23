@@ -76,6 +76,15 @@ export default function ReviewsPage() {
 }
 
 /** Admin: open disputes to mediate and resolve, and every review (hide abuse). */
+/** Open disputes give the other side 3 days to answer; past that, Ntemtem should step in. */
+function waiting(x: Dispute): { text: string; late: boolean } | null {
+  if (x.status !== 'open' || !x.createdAt) return null
+  const other = x.openedByRole === 'customer' ? 'office' : 'customer'; const who = other === 'office' ? x.shipperName ?? 'The shipper' : x.customer ?? 'The customer'
+  if (x.messages.some((m) => m.role === other)) return { text: `${who} has replied — decide when ready.`, late: false }
+  const due = new Date(x.createdAt).getTime() + 3 * 86_400_000; const days = Math.ceil((due - Date.now()) / 86_400_000)
+  return days >= 0 ? { text: `Waiting on ${who} — reply due in ${days || 'under 1'} day${days === 1 ? '' : 's'}.`, late: false } : { text: `${who} hasn’t replied — ${-days} day${days === -1 ? '' : 's'} overdue. Step in.`, late: true }
+}
+
 export function AdminDisputes() {
   const [d, setD] = useState<Awaited<ReturnType<typeof reviewsApi.admin>> | null>(null)
   const [sel, setSel] = useState<Dispute | null>(null)
@@ -84,27 +93,28 @@ export function AdminDisputes() {
   const [busy, setBusy] = useState(''); const [error, setError] = useState(''); const [toast, setToast] = useState('')
   const load = () => reviewsApi.admin().then((r) => { setD(r); if (sel) setSel(r.disputes.find((x) => x.id === sel.id) ?? null) }).catch((e) => setError(e instanceof Error ? e.message : 'Could not load.'))
   useEffect(() => { void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Linked from a shipment case (?d=) — open that dispute straight away.
+  useEffect(() => { const want = new URLSearchParams(window.location.search).get('d'); if (want && d && !sel) { const x = d.disputes.find((y) => y.id === want); if (x) setSel(x) } }, [d]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t) }, [toast])
   const act = async (fn: () => Promise<unknown>, m: string, key: string) => { setBusy(key); setError(''); try { await fn(); await load(); setToast(m) } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong.') } finally { setBusy('') } }
   const open = d?.disputes.filter((x) => x.status === 'open') ?? []
   return (
-    <section className="mt-14" data-testid="admin-disputes">
-      <p className="eyebrow mb-1">Disputes & reviews</p>
-      <h2 className="!text-[clamp(1.5rem,3vw,2rem)]">Mediation</h2>
-      <p className="mt-1 text-text-muted">Open disputes hold the escrow payment. Read the thread, add a message, then resolve with a refund (full or partial, back to the customer's card), a release to the shipper, or no action.</p>
+    <section className="mt-6" data-testid="admin-disputes">
       {toast && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {toast}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
       <div className="mt-6 grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
         <div className="card-dark p-4">
           <h3 className="!text-base">Disputes <span className="text-xs font-normal text-text-muted">· {open.length} open</span></h3>
-          <ul className="mt-2 divide-y divide-border/70 text-sm">{d?.disputes.map((x) => <li key={x.id}><button onClick={() => { setSel(x); setRes({ outcome: x.paymentId ? 'refund_partial' : 'no_action', amountUsd: x.amountClaimedUsd ? String(x.amountClaimedUsd) : '', note: '' }) }} className={`w-full py-2.5 text-left ${sel?.id === x.id ? 'text-gold-deep' : ''}`} data-testid="admin-dispute-row"><p className="font-semibold">{x.reasonLabel} · <span className="font-mono text-xs">{x.shipmentRef}</span></p><p className="text-xs text-text-muted">{x.customer} vs {x.shipperName} · {x.status}{x.paymentAmountUsd ? ` · ${money(x.paymentAmountUsd)}` : ''}</p></button></li>)}{d && d.disputes.length === 0 && <li className="py-3 text-text-muted">No disputes.</li>}</ul>
+          <ul className="mt-2 divide-y divide-border/70 text-sm">{d?.disputes.map((x) => <li key={x.id}><button onClick={() => { setSel(x); setRes({ outcome: x.paymentId ? 'refund_partial' : 'no_action', amountUsd: x.amountClaimedUsd ? String(x.amountClaimedUsd) : '', note: '' }) }} className={`w-full py-2.5 text-left ${sel?.id === x.id ? 'text-gold-deep' : ''}`} data-testid="admin-dispute-row"><p className="font-semibold">{x.reasonLabel} · <span className="font-mono text-xs">{x.shipmentRef}</span></p><p className="text-xs text-text-muted">{x.customer} vs {x.shipperName} · {x.status}{x.paymentAmountUsd ? ` · ${money(x.paymentAmountUsd)}` : ''}</p>{(() => { const w = waiting(x); return w && <p className={`text-xs font-semibold ${w.late ? 'text-danger' : 'text-text-muted'}`}>{w.text}</p> })()}</button></li>)}{d && d.disputes.length === 0 && <li className="py-3 text-text-muted">No disputes.</li>}</ul>
         </div>
         <div className="card-dark p-5">
           {!sel ? <p className="text-sm text-text-muted">Pick a dispute.</p> : (
             <div data-testid="admin-dispute-detail">
               <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="!text-base">{sel.reasonLabel} — {sel.shipmentRef}</h3><Pill tone={sel.status === 'open' ? 'danger' : 'muted'}>{sel.status}</Pill></div>
+              {(() => { const w = waiting(sel); return w && <p className={`mt-2 rounded-lg px-3 py-1.5 text-xs font-semibold ${w.late ? 'border border-danger/40 bg-danger/10 text-danger' : 'bg-surface-2/60'}`} data-testid="dispute-deadline">{w.text}</p> })()}
+              <div className="mt-2 flex flex-wrap gap-3 text-xs"><Link to={`/admin?view=shipment&id=${sel.shipmentId}`} className="font-semibold text-gold-deep underline" data-testid="dispute-case-link">Open the shipment — tracking, chat, contacts</Link></div>
               <p className="mt-1 text-xs text-text-muted">{sel.customer} (customer) vs {sel.shipperName} (shipper) · opened by {sel.openedBy} · {sel.amountClaimedUsd ? `claims ${money(sel.amountClaimedUsd)} · ` : ''}{sel.paymentId ? `payment ${money(sel.paymentAmountUsd ?? 0)} (${sel.paymentStatus})` : 'no platform payment'}</p>
-              <ul className="mt-3 max-h-64 space-y-1.5 overflow-y-auto text-xs">{sel.messages.map((m, i) => <li key={i} className={`rounded-lg px-3 py-2 ${m.role === 'shipsync' ? 'border border-gold/40 bg-gold/10' : 'bg-surface-2/40'}`}><span className="font-semibold">{m.by}</span> <span className="text-text-muted">· {m.role} · {fmt(m.at)}</span><p className="mt-0.5 whitespace-pre-line">{m.text}</p></li>)}</ul>
+              <ul className="mt-3 max-h-64 space-y-1.5 overflow-y-auto text-xs">{sel.messages.map((m, i) => <li key={i} className={`rounded-lg px-3 py-2 ${m.role === 'shipsync' ? 'border border-gold/40 bg-gold/10' : 'bg-surface-2/40'}`}><span className="font-semibold">{m.by}</span> <span className="text-text-muted">· {m.role} · {fmt(m.at)}</span><p className="mt-0.5 whitespace-pre-line">{m.text}</p>{(m as { photo?: string }).photo && <a href={(m as { photo?: string }).photo} target="_blank" rel="noreferrer" className="mt-1 inline-block font-semibold text-gold-deep underline">See the photo</a>}</li>)}</ul>
               {sel.status === 'open' ? (
                 <>
                   <form onSubmit={(e) => { e.preventDefault(); void act(() => reviewsApi.message(sel.id, msg), 'Message sent to both sides.', 'msg'); setMsg('') }} className="mt-3 flex gap-2"><input required aria-label="Message" className="input-dark !min-h-9 flex-1 text-sm" placeholder="Message as Ntemtem…" value={msg} onChange={(e) => setMsg(e.target.value)} /><button disabled={busy === 'msg'} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60">Send</button></form>

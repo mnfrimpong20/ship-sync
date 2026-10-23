@@ -10,7 +10,7 @@ import { Spark } from './ShipperOverview'
 type WeekPoint = { week: string; count: number }
 export interface Business {
   realOnly: boolean
-  revenue: { takeRate: { all: number; last30: number }; sourcingFees: { all: number; last30: number }; sourcingGoods: { all: number; last30: number }; subscriptionsMrr: number; planCounts: Record<string, number>; gmv: { all: number; last30: number }; refunded: number; totalLast30: number }
+  revenue: { takeRate: { all: number; last30: number }; sourcingFees: { all: number; last30: number }; sourcingGoods: { all: number; last30: number }; subscriptionsMrr: number; subscriptionsCardCount?: number; plansListValue?: number; planCounts: Record<string, number>; gmv: { all: number; last30: number }; refunded: number; totalLast30: number }
   escrow: { heldGross: number; heldNet: number; onHold: number; heldCount: number; availableToShippers: number; payoutsRequested: number; payoutsRequestedCount: number; payoutsPaid30: number }
   series: { signups: WeekPoint[]; shipperSignups: WeekPoint[]; requests: WeekPoint[]; bookings: WeekPoint[]; sourcing: WeekPoint[]; gmv: WeekPoint[] }
   funnel: { requests: number; quoted: number; booked: number; quotesPerRequest: number; hoursToFirstQuote: number; quoteRatePct: number; bookRatePct: number }
@@ -21,7 +21,7 @@ export interface Business {
   reviews: { last90: number; avg: number }
   generatedAt: string
 }
-export interface Exception { kind: string; severity: 'high' | 'medium' | 'low'; title: string; detail: string; link: string; since: string; id: string }
+export interface Exception { kind: string; severity: 'high' | 'medium' | 'low'; title: string; detail: string; link: string; since: string; id: string; key?: string }
 
 export const adminApi = {
   business: () => api<Business>('/admin/business'),
@@ -64,9 +64,9 @@ export function AdminBusiness() {
 
       <h3 className="eyebrow mb-3">Revenue</h3>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Tile label="Revenue · last 30 days" value={money(b.revenue.totalLast30)} icon={BadgeDollarSign} hint={<>{money(b.revenue.takeRate.last30)} take-rate · {money(b.revenue.sourcingFees.last30)} sourcing fees · {money(b.revenue.subscriptionsMrr)} plans</>} />
+        <Tile label="Revenue · last 30 days" value={money(b.revenue.totalLast30)} icon={BadgeDollarSign} hint={<>{money(b.revenue.takeRate.last30)} take-rate · {money(b.revenue.sourcingFees.last30)} sourcing fees · {money(b.revenue.subscriptionsMrr)} plans billed by card</>} />
         <Tile label="Platform GMV · 30 days" value={money(b.revenue.gmv.last30)} icon={TrendingUp} spark={s.gmv} hint={<Delta a={s.gmv} />} tone="teal" />
-        <Tile label="Subscriptions (MRR)" value={money(b.revenue.subscriptionsMrr)} icon={Landmark} hint={<>{b.revenue.planCounts.enterprise ?? 0} enterprise · {b.revenue.planCounts.pro ?? 0} pro · {b.revenue.planCounts.starter ?? 0} starter — set by plan, not yet billed in-app</>} to="/admin?view=shippers" />
+        <Tile label="Plans billed by card (MRR)" value={money(b.revenue.subscriptionsMrr)} icon={Landmark} hint={<>{b.revenue.subscriptionsCardCount ?? 0} by card{b.revenue.plansListValue ? <> · {money(b.revenue.plansListValue)}/month more on plans set by hand, not collected through Ntemtem</> : ''}</>} to="/admin?view=billing" />
         <Tile label="Sourcing goods billed · 30 days" value={money(b.revenue.sourcingGoods.last30)} icon={Globe2} spark={s.sourcing} hint={<>{b.sourcing.open} open job{b.sourcing.open === 1 ? '' : 's'} worth ~{money(b.sourcing.valueUsd)} · agents owed {money(b.sourcing.agentOwedUsd)}</>} to="/admin?view=sourcing" tone="sky" />
       </div>
 
@@ -160,7 +160,9 @@ export function AdminAttention() {
   const [d, setD] = useState<Awaited<ReturnType<typeof adminApi.exceptions>> | null>(null)
   const [err, setErr] = useState('')
   const [kind, setKind] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState(false); const [toast, setToast] = useState('')
+  // Snooze (a few days) or mark handled (30 days): the item leaves the board and comes back if still true.
+  const snooze = async (e: Exception, days: number, label: string) => { try { await api('/admin/attention/snooze', { json: { key: e.key ?? `${e.kind}:${e.id}`, days, note: label } }); setToast(`${label}: “${e.title}”. It comes back in ${days} day${days === 1 ? '' : 's'} if it’s still true.`); await load() } catch (x) { setErr(errMsg(x, 'Could not snooze.')) } }
   const load = () => { setBusy(true); return adminApi.exceptions().then(setD).catch((e) => setErr(errMsg(e, 'Could not load.'))).finally(() => setBusy(false)) }
   useEffect(() => { load() }, [])
   if (err) return <p role="alert" className="mt-6 text-sm text-danger">{err}</p>
@@ -175,21 +177,28 @@ export function AdminAttention() {
         {kinds.map((k) => <button key={k} onClick={() => setKind(k === kind ? '' : k)} aria-pressed={kind === k} className={`rounded-full border px-3 py-1 text-xs focus-ring ${kind === k ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{KIND_LABEL[k] ?? k} ({d.exceptions.filter((e) => e.kind === k).length})</button>)}
         <button onClick={load} disabled={busy} className="btn-ghost ml-auto !min-h-8 !px-2.5 text-xs"><RefreshCw size={13} className={busy ? 'animate-spin' : ''} aria-hidden="true" /> Refresh</button>
       </div>
+      {toast && <p role="status" className="mt-4 rounded-lg border border-teal/40 bg-teal/10 px-3 py-2 text-sm text-teal" data-testid="attention-toast">{toast}</p>}
       {list.length === 0 ? (
         <div className="card-dark mt-5 flex items-center gap-3 p-5"><span className="grid h-10 w-10 place-items-center rounded-full bg-teal/15 text-teal"><CheckCircle2 size={18} aria-hidden="true" /></span><div><p className="font-semibold">All clear</p><p className="text-sm text-text-muted">Nothing on the platform is stuck or waiting on a person right now.</p></div></div>
       ) : (
         <ul className="mt-5 grid gap-3 md:grid-cols-2" aria-label="Needs attention">
           {list.map((e) => { const Sev = sevIcon[e.severity]; return (
-            <li key={`${e.kind}:${e.id}`}>
-              <Link to={e.link} className={`card-dark flex h-full gap-3 border-l-4 p-4 transition-colors hover:border-gold/40 focus-ring ${sevCls[e.severity]}`}>
+            <li key={`${e.kind}:${e.id}`} className={`card-dark flex h-full flex-col border-l-4 ${sevCls[e.severity]}`} data-testid="attention-item">
+              <Link to={e.link} className="flex flex-1 gap-3 rounded-t-[inherit] p-4 transition-colors hover:bg-surface-2/40 focus-ring">
                 <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${e.severity === 'high' ? 'bg-danger/10 text-danger' : e.severity === 'medium' ? 'bg-gold/15 text-gold-deep' : 'bg-sky/10 text-sky'}`}><Sev size={16} aria-hidden="true" /></span>
                 <span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><Pill tone="muted">{KIND_LABEL[e.kind] ?? e.kind}</Pill><span className="text-xs text-text-muted">since {fmtDateTime(e.since)}</span></span><span className="mt-1 block text-sm font-semibold leading-tight">{e.title}</span><span className="mt-1 block text-xs text-text-muted">{e.detail}</span></span>
               </Link>
+              <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 px-4 py-2 text-xs">
+                <span className="mr-auto text-text-muted">Not now?</span>
+                <button onClick={() => snooze(e, 1, 'Snoozed until tomorrow')} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="attention-snooze1">Tomorrow</button>
+                <button onClick={() => snooze(e, 3, 'Snoozed for 3 days')} className="btn-ghost !min-h-8 !px-2.5 text-xs">3 days</button>
+                <button onClick={() => snooze(e, 30, 'Marked handled')} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="attention-handled"><CheckCircle2 size={13} aria-hidden="true" /> Handled</button>
+              </div>
             </li>
           ) })}
         </ul>
       )}
-      <p className="mt-4 text-xs text-text-muted">Rules: requests unquoted after 48h · shipments 2+ days past ETA or 10 days without an event · escrow held 45+ days, on hold, or after delivery · disputes idle 3+ days · payouts waiting 3+ days · shippers unverified 3+ days · sourcing jobs unassigned 24h, quotes unanswered 7 days, no movement 14 days · contact messages unanswered 24h · unresolved errors.</p>
+      <p className="mt-4 text-xs text-text-muted">Rules: requests unquoted after 48h · shipments 2+ days past ETA or 10 days without an event · escrow held 45+ days, on hold, or after delivery · disputes idle 3+ days · payouts waiting 3+ days · shippers unverified 3+ days · sourcing jobs unassigned 24h, quotes unanswered 7 days, no movement 14 days · support tickets waiting 24h · unresolved errors.</p>
     </div>
   )
 }

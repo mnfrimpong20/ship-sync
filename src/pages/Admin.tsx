@@ -5,12 +5,13 @@ import { AdminReceiverPayments } from '../components/AdminReceiverPayments'
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Check, ChevronDown, Clock, FileText, ShieldCheck, ShieldOff, XCircle } from 'lucide-react'
+import { Archive, Check, ChevronDown, Clock, FileText, ShieldCheck, ShieldOff, XCircle } from 'lucide-react'
 import { onboardingApi, type CompanyDoc } from '../lib/onboarding'
-import { AdminAttention, AdminBusiness, adminApi } from '../components/AdminBusiness'
+import { AdminAttention, AdminBusiness } from '../components/AdminBusiness'
 import { countryByCode, type Shipper } from '../lib/data'
-import { useStore, type AdminShipper } from '../lib/store'
+import { api, useStore, type AdminShipper } from '../lib/store'
 import { Avatar, Pill, Rating, fmtDate, fmtDateTime, VerifiedMark } from '../components/ui'
+import { Confirm } from '../components/board'
 import { fadeUp, stagger } from '../lib/motion'
 import { AdminInsurance } from '../components/AdminInsurance'
 import { AdminSupplies } from '../components/AdminSupplies'
@@ -21,23 +22,27 @@ import { AdminDisputes } from './Reviews'
 import { AdminSourcing } from './Sourcing'
 import { AdminSystem } from '../components/AdminSystem'
 import { AdminDestinations } from '../components/AdminDestinations'
+import { AdminShipment } from '../components/AdminShipment'
 import { AdminAnnouncements, AdminAudit, AdminBilling, AdminFeatures, AdminMarketplace, AdminMessaging, AdminPlatform, AdminRisk, AdminScorecards, AdminSupport } from '../components/AdminConsole'
 
-const VIEWS = [['overview', 'Business'], ['attention', 'Attention'], ['shippers', 'Shippers'], ['disputes', 'Disputes'], ['payments', 'Payments'], ['brokers', 'Brokers'], ['sourcing', 'Sourcing'], ['insurance', 'Insurance'], ['supplies', 'Supplies'], ['screening', 'Screening'], ['tickets', 'Support'], ['partners', 'Partners'], ['destinations', 'Destinations'], ['system', 'System'], ['analytics', 'Platform'], ['marketplace', 'Marketplace'], ['scorecards', 'Scorecards'], ['risk', 'Risk'], ['messaging', 'Messaging'], ['billing', 'Billing'], ['announcements', 'Announcements'], ['audit', 'Audit log'], ['support', 'View as'], ['features', 'Features']] as const
+const VIEWS = [['overview', 'Business'], ['attention', 'Attention'], ['shippers', 'Shippers'], ['disputes', 'Disputes'], ['payments', 'Payments'], ['brokers', 'Brokers'], ['sourcing', 'Sourcing'], ['insurance', 'Insurance'], ['supplies', 'Supplies'], ['screening', 'Screening'], ['tickets', 'Support'], ['partners', 'Partners'], ['destinations', 'Destinations'], ['system', 'System'], ['analytics', 'Platform'], ['marketplace', 'Marketplace'], ['scorecards', 'Scorecards'], ['risk', 'Risk'], ['messaging', 'Messaging'], ['billing', 'Billing'], ['announcements', 'Announcements'], ['audit', 'Audit log'], ['support', 'View as'], ['features', 'Features'], ['shipment', 'Shipment']] as const
 type View = (typeof VIEWS)[number][0]
 
 /** Ntemtem staff: the business overview, the attention board, and every admin work queue in tabs. */
 export default function Admin() {
   const { ready, user, adminShippers, adminVerify } = useStore()
-  const [sp, setSp] = useSearchParams()
+  const [sp] = useSearchParams()
   const view = (VIEWS.some(([v]) => v === sp.get('view')) ? sp.get('view') : 'overview') as View
-  const [urgent, setUrgent] = useState<number | null>(null)
-  useEffect(() => { if (ready && user?.admin) adminApi.exceptions().then((d) => setUrgent(d.counts.high)).catch(() => {}) }, [ready, user])
   const [rows, setRows] = useState<AdminShipper[] | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
-  const [filter, setFilter] = useState<'all' | 'pending' | 'verified'>('all')
+  const [filter, setFilter] = useState<'all' | 'pending' | 'verified' | 'archived'>('pending'); const [q, setQ] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
+  const [done, setDone] = useState(''); useEffect(() => { if (!done) return; const t = setTimeout(() => setDone(''), 4000); return () => clearTimeout(t) }, [done])
+  // A search hit links here with ?q= (and ?f=) — prefill the search so the company is the first thing on screen.
+  useEffect(() => { const sq = sp.get('q'); const sf = sp.get('f'); if (view === 'shippers' && sq) { setQ(sq); if (sf === 'all' || sf === 'archived' || sf === 'verified' || sf === 'pending') setFilter(sf); else setFilter('all') } }, [sp, view])
+  // Verify, revoke and plan changes ask first — they change what customers see and what a company pays.
+  const [ask, setAsk] = useState<{ kind: 'verify' | 'revoke' | 'plan' | 'archive'; s: AdminShipper; plan?: Shipper['plan'] } | null>(null); const [why, setWhy] = useState('')
 
   useEffect(() => {
     if (!ready || !user?.admin) return
@@ -58,16 +63,36 @@ export default function Admin() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Update failed.') } finally { setBusy(null) }
   }
 
-  const list = (rows ?? []).filter((s) => filter === 'all' || (filter === 'verified' ? s.verified : !s.verified))
-  const pending = (rows ?? []).filter((s) => !s.verified).length
+  const term = q.trim().toLowerCase()
+  const live = (rows ?? []).filter((s) => !s.archivedAt)
+  const list = (filter === 'archived' ? (rows ?? []).filter((s) => s.archivedAt) : live.filter((s) => filter === 'all' || (filter === 'verified' ? s.verified : !s.verified)))
+    .filter((s) => !term || [s.name, s.hq, s.owner?.email, s.owner?.name, s.tagline].join(' ').toLowerCase().includes(term))
+  const pending = live.filter((s) => !s.verified).length; const archived = (rows ?? []).length - live.length
+  const archive = async (s: AdminShipper, on: boolean, reason = '') => { setBusy(s.id); setError(''); try { await api(`/admin/shippers/${s.id}/archive`, { json: { archived: on, reason } }); setRows((prev) => prev?.map((x) => (x.id === s.id ? { ...x, archivedAt: on ? new Date().toISOString() : null, verified: on ? false : x.verified } : x)) ?? prev); setDone(on ? `${s.name} archived — find it under Archived.` : `${s.name} restored — it’s back in the queue as unverified.`) } catch (e) { setError(e instanceof Error ? e.message : 'Could not update.') } finally { setBusy(null) } }
+
+  const PLAN = { starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise' } as const
+  const dialog = ask && (ask.kind === 'verify'
+    ? <Confirm danger={false} title={`Verify ${ask.s.name}?`} confirmLabel={ask.s.docCount ? 'Verify' : 'Verify without documents'} busy={busy === ask.s.id} onClose={() => setAsk(null)} onConfirm={() => { const x = ask.s; setAsk(null); void act(x, { verified: true }) }}
+        body={<div className="space-y-2" data-testid="confirm-verify"><p>They get the Ntemtem Verified badge, rank higher in matching, and customers are told they’ve been checked.</p>{ask.s.docCount
+          ? <p>{ask.s.docCount} document{ask.s.docCount === 1 ? '' : 's'} uploaded{ask.s.docsPending ? <> — <b className="text-text">{ask.s.docsPending} not checked yet</b>. Open Documents first.</> : ', all checked.'}</p>
+          : <p className="rounded-lg border border-danger/40 bg-danger/10 p-2 text-danger">They haven’t uploaded any documents — no licence, insurance or registration has been checked.</p>}</div>} />
+    : ask.kind === 'revoke'
+    ? <Confirm title={`Remove ${ask.s.name}’s verification?`} confirmLabel="Remove the badge" busy={busy === ask.s.id} onClose={() => setAsk(null)} onConfirm={() => { const x = ask.s; setAsk(null); void act(x, { verified: false }) }}
+        body={<p data-testid="confirm-revoke">The badge comes off their profile and quotes straight away, and they drop in matching. The owner is told.</p>} />
+    : ask.kind === 'archive'
+    ? <Confirm title={`Archive ${ask.s.name}?`} confirmLabel="Archive" busy={busy === ask.s.id} onClose={() => setAsk(null)} onConfirm={() => { const x = ask.s; setAsk(null); void archive(x, true, why.trim()) }}
+        body={<div className="space-y-2" data-testid="confirm-archive"><p>For test or junk sign-ups. They leave the public directory, matching and this queue{ask.s.verified ? ', and lose the badge' : ''}. Their login and data stay, and you can restore them from Archived.</p><label className="block text-sm font-semibold text-text" htmlFor="arch-why">Reason (optional, for the audit log)</label><input id="arch-why" className="input-dark text-sm" value={why} onChange={(e) => setWhy(e.target.value)} placeholder="e.g. Test account" /></div>} />
+    : <Confirm danger={false} title={`Move ${ask.s.name} to ${PLAN[ask.plan!]}?`} confirmLabel={`Change to ${PLAN[ask.plan!]}`} busy={busy === ask.s.id} onClose={() => setAsk(null)} onConfirm={() => { const x = ask.s, pl = ask.plan!; setAsk(null); void act(x, { plan: pl }) }}
+        body={<p data-testid="confirm-plan">From {PLAN[ask.s.plan]} to {PLAN[ask.plan!]}. Their features change at once. Card billing isn’t switched on, so set this to match what they actually pay you.</p>} />)
 
   const shippersView = (
-    <>
+    <>{dialog}
       <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-2">
-        {(['all', 'pending', 'verified'] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f} className={`rounded-full border px-4 py-1.5 text-sm capitalize focus-ring ${filter === f ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{f}{f === 'pending' && pending > 0 ? ` (${pending})` : ''}</button>
+        {(['pending', 'verified', 'all', 'archived'] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f} className={`rounded-full border px-4 py-1.5 text-sm capitalize focus-ring ${filter === f ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted hover:text-text'}`}>{f}{f === 'pending' && pending > 0 ? ` (${pending})` : f === 'archived' && archived > 0 ? ` (${archived})` : ''}</button>
         ))}
-        <span className="ml-auto text-xs text-text-muted">{rows ? `${rows.length} shippers` : 'Loading…'}</span>
+        <label className="relative ml-auto w-full sm:w-72"><span className="sr-only">Search shippers</span><input type="search" className="input-dark !min-h-10 text-sm" placeholder="Search name, email or city" value={q} onChange={(e) => setQ(e.target.value)} data-testid="admin-shipper-search" /></label>
+        <span className="w-full text-xs text-text-muted sm:w-auto">{rows ? `${list.length} of ${live.length} shippers${filter === 'pending' ? ' · review requested and documents to check come first' : ''}` : 'Loading…'}</span>
       </motion.div>
       <motion.ul variants={fadeUp} className="mt-4 space-y-3" aria-label="Shippers">
         {list.map((s) => (
@@ -89,19 +114,23 @@ export default function Admin() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="text-xs text-text-muted">Plan
-                  <select className="input-dark ml-2 !inline-block !min-h-9 !w-auto text-xs" value={s.plan} disabled={busy === s.id} onChange={(e) => act(s, { plan: e.target.value as Shipper['plan'] })}><option value="starter">Starter</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select>
+                  <select className="input-dark ml-2 !inline-block !min-h-9 !w-auto text-xs" value={s.plan} disabled={busy === s.id} onChange={(e) => setAsk({ kind: 'plan', s, plan: e.target.value as Shipper['plan'] })}><option value="starter">Starter</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select>
                 </label>
                 <button onClick={() => setOpenId(openId === s.id ? null : s.id)} aria-expanded={openId === s.id} className="btn-ghost !min-h-9 !px-3 text-xs"><FileText size={14} aria-hidden="true" /> Documents{s.docCount ? ` (${s.docCount})` : ''} <ChevronDown size={12} className={`transition-transform ${openId === s.id ? 'rotate-180' : ''}`} aria-hidden="true" /></button>
-                {s.verified
-                  ? <button onClick={() => act(s, { verified: false })} disabled={busy === s.id} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60"><ShieldOff size={14} aria-hidden="true" /> Revoke</button>
-                  : <button onClick={() => act(s, { verified: true })} disabled={busy === s.id} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60"><ShieldCheck size={14} aria-hidden="true" /> {busy === s.id ? 'Saving…' : 'Verify'}</button>}
+                {s.archivedAt
+                  ? <button onClick={() => archive(s, false)} disabled={busy === s.id} className="btn-ghost !min-h-9 !px-3 text-xs">Restore</button>
+                  : <button onClick={() => { setWhy(''); setAsk({ kind: 'archive', s }) }} disabled={busy === s.id} className="btn-ghost !min-h-9 !px-3 text-xs" aria-label={`Archive ${s.name}`}><Archive size={14} aria-hidden="true" /> Archive</button>}
+                {s.archivedAt ? null : s.verified
+                  ? <button onClick={() => setAsk({ kind: 'revoke', s })} disabled={busy === s.id} className="btn-ghost !min-h-9 !px-3 text-xs disabled:opacity-60"><ShieldOff size={14} aria-hidden="true" /> Revoke</button>
+                  : <button onClick={() => setAsk({ kind: 'verify', s })} disabled={busy === s.id} className="btn-gold !min-h-9 !px-3 text-xs disabled:opacity-60"><ShieldCheck size={14} aria-hidden="true" /> {busy === s.id ? 'Saving…' : 'Verify'}</button>}
               </div>
             </div>
             {s.verifiedAt && <p className="mt-3 text-xs text-text-muted">Verified {fmtDate(s.verifiedAt)}</p>}
+            {s.archivedAt && <p className="mt-3 text-xs text-text-muted">Archived {fmtDate(s.archivedAt)}{s.archivedReason ? ` · ${s.archivedReason}` : ''}</p>}
             {openId === s.id && <ShipperDocs shipper={s} onDecline={(note) => act(s, { verified: false, note })} busy={busy === s.id} />}
           </li>
         ))}
-        {rows && list.length === 0 && <li className="card-dark p-8 text-center text-sm text-text-muted">Nothing here.</li>}
+        {rows && list.length === 0 && <li className="card-dark p-8 text-center text-sm text-text-muted">{term ? `No shippers match “${q}”.` : filter === 'pending' ? 'Nobody waiting for verification.' : 'Nothing here.'}</li>}
       </motion.ul>
     </>
   )
@@ -109,8 +138,8 @@ export default function Admin() {
     overview: ['How the business is doing', 'Revenue by stream, the money held in escrow, growth, conversion and where demand is — live from the database.'],
     attention: ['What needs a person today', 'Everything stuck or waiting across the platform, most urgent first. Each card opens where you fix it.'],
     shippers: ['Shipper verification', 'Verified shippers get the badge, rank higher in matching and reassure customers. Check licence, insurance and a real office before granting it.'],
-    disputes: ['Disputes', 'Customer and shipper disputes on escrow payments.'], payments: ['Money through the platform', 'Escrow, releases, holds and payouts.'], brokers: ['Customs brokers', 'Broker listings and assignments.'],
-    sourcing: ['Sourcing settings', 'Pricing, exchange rates, agents and commissions for the China, UK and USA desks.'], insurance: ['Insurance', 'Cargo cover sold on the platform.'], supplies: ['Supplies', 'Equipment stock, orders and rentals.'], screening: ['Screening', 'Sanctions checks on senders, receivers and shipping companies.'], destinations: ['Destinations', 'The countries customers can ship to — ports, airports, transit days and dial codes.'], system: ['Health, errors & backups', 'What is wired up, what broke, and a copy of the database you can download.'],
+    disputes: ["Disputes", "Open disputes hold the escrow payment. Read the thread, add a message, then resolve with a refund (full or partial, back to the customer's card), a release to the shipper, or no action."], payments: ["Payments & escrow", "Customers pay Ntemtem; funds are released to the shipper’s balance at the milestone below, less the take-rate. Payouts are sent by bank transfer and marked here."], brokers: ["Customs brokers", "Licensed agents customers and shippers can book per shipment. Verify a listing once you've seen the licence."],
+    sourcing: ['Sourcing settings', 'Pricing, exchange rates, agents and commissions for the China, UK and USA desks.'], insurance: ["Cargo insurance", "Set the product once; customers add cover on booked shipments and shippers collect the premium with the freight. Plug in an underwriter by changing the provider and rates."], supplies: ["Equipment & supplies", "Printers, scanners and labels Ntemtem sells and rents to shipping companies, and the packing supplies Ntemtem sends to customers whose shipper doesn’t stock them (marked “Customer”). Stock is held back when an order is placed and goes back on the shelf if it’s cancelled or a rental comes home. Kits use the stock of the parts inside them."], screening: ["Sanctions screening", "Senders, receivers and shipping companies are checked against the US Treasury OFAC list. A possible match holds the booking (or verification) until someone here reviews it. Most matches are just a shared name — clear them with a short note."], destinations: ['Destinations', 'The countries customers can ship to — ports, airports, transit days and dial codes.'], system: ['Health, errors & backups', 'What is wired up, what broke, and a copy of the database you can download.'],
     analytics: ['Platform analytics', 'Value booked through Ntemtem, our own revenue, growth and conversion across the marketplace.'],
     marketplace: ['Marketplace health', 'Demand against supply on every lane — where requests go unanswered and which shippers to recruit.'],
     scorecards: ['Shipper scorecards', 'Quality scores that drive directory ranking, warnings, probation and pauses.'],
@@ -122,6 +151,7 @@ export default function Admin() {
     support: ['Support — view as', 'See exactly what a shipper or customer sees, read-only and logged.'],
     partners: ['Destination partners', 'Vetted clearing agents, warehouses and delivery partners shippers can hand a container to — and the jobs to confirm with them.'],
     tickets: ['Support inbox', 'Tickets from customers, shippers and the contact form — oldest waiting first.'],
+    shipment: ['Shipment', 'Who to call, what has happened, the money — and a message to the shipping company.'],
     features: ['Feature switches', 'Turn features on or off for everyone or for one shipper.']
   }
   return (
@@ -131,14 +161,8 @@ export default function Admin() {
           <motion.p variants={fadeUp} className="eyebrow mb-1">Admin</motion.p>
           <motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{titles[view][0]}</motion.h1>
           <motion.p variants={fadeUp} className="mt-1 text-text-muted">{titles[view][1]}</motion.p>
-          <motion.nav variants={fadeUp} className="mt-6 -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0" aria-label="Admin sections">
-            <ul className="flex w-max gap-1 rounded-full border border-border bg-surface p-1 md:w-auto md:flex-wrap">
-              {VIEWS.map(([v, label]) => (
-                <li key={v}><button onClick={() => setSp(v === 'overview' ? {} : { view: v })} aria-current={view === v ? 'page' : undefined} className={`min-h-9 whitespace-nowrap rounded-full px-3.5 text-sm transition-colors focus-ring ${view === v ? 'bg-gold text-on-accent font-semibold' : 'text-text-muted hover:text-text'}`}>{label}{v === 'attention' && urgent ? <span className="ml-1.5 rounded-full bg-danger px-1.5 text-[11px] font-bold text-white">{urgent}</span> : null}{v === 'shippers' && pending > 0 ? <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 text-[11px] font-bold text-text">{pending}</span> : null}</button></li>
-              ))}
-            </ul>
-          </motion.nav>
           {error && <p role="alert" className="mt-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
+          {done && <p role="status" className="mt-6 rounded-lg border border-teal/40 bg-teal/10 px-4 py-3 text-sm text-teal" data-testid="admin-done">{done}</p>}
           {view === 'overview' && <AdminBusiness />}
           {view === 'attention' && <AdminAttention />}
           {view === 'shippers' && shippersView}
@@ -163,6 +187,7 @@ export default function Admin() {
           {view === 'audit' && <AdminAudit />}
           {view === 'support' && <AdminSupport />}
           {view === 'features' && <AdminFeatures />}
+          {view === 'shipment' && <AdminShipment />}
         </motion.div>
       </div>
     </div>

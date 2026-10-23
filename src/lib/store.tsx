@@ -10,7 +10,7 @@ export type ShipperProfileInput = Pick<Shipper, 'name' | 'tagline' | 'hq' | 'fou
   /** New logo as a data URL, '' to remove it; leave out to keep the current one. */
   logo?: string
 }
-export type AdminShipper = Shipper & { owner: { email: string; name: string } | null; quoteCount: number; shipmentCount: number; docCount: number; docsPending: number; verificationRequestedAt: string | null }
+export type AdminShipper = Shipper & { owner: { email: string; name: string } | null; quoteCount: number; shipmentCount: number; docCount: number; docsPending: number; verificationRequestedAt: string | null; archivedAt?: string | null; archivedReason?: string }
 
 export interface RequestConsignee { name: string; phone?: string; address?: string; city?: string; country?: string; relationship?: string; gps?: string; lat?: number | null; lng?: number | null }
 export type PackingKind = 'barrel' | 'box' | 'lock' | 'tape' | 'other'

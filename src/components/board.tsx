@@ -51,14 +51,14 @@ export function Expander({ open, onClick, label }: { open: boolean; onClick: () 
 }
 
 /** Little confirm dialog for destructive actions — never do those on a single click. */
-export function Confirm({ title, body, confirmLabel, danger = true, busy, onClose, onConfirm }: { title: string; body: ReactNode; confirmLabel: string; danger?: boolean; busy?: boolean; onClose: () => void; onConfirm: () => void }) {
+export function Confirm({ title, body, confirmLabel, danger = true, busy, disabled, onClose, onConfirm }: { title: string; body: ReactNode; confirmLabel: string; danger?: boolean; busy?: boolean; disabled?: boolean; onClose: () => void; onConfirm: () => void }) {
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [onClose])
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-h" className="card-dark w-full max-w-md p-6">
         <h2 id="confirm-h" className="!text-lg">{title}</h2>
         <div className="mt-2 text-sm text-text-muted">{body}</div>
-        <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-ghost !min-h-10 !px-4 text-sm">Cancel</button><button onClick={onConfirm} disabled={busy} className={danger ? 'inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-danger px-4 text-sm font-semibold text-white hover:opacity-90 focus-ring disabled:opacity-60' : 'btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60'}>{busy ? 'Working…' : confirmLabel}</button></div>
+        <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-ghost !min-h-10 !px-4 text-sm">Cancel</button><button onClick={onConfirm} disabled={busy || disabled} className={danger ? 'inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-danger px-4 text-sm font-semibold text-white hover:opacity-90 focus-ring disabled:opacity-60' : 'btn-gold !min-h-10 !px-4 text-sm disabled:opacity-60'}>{busy ? 'Working…' : confirmLabel}</button></div>
       </div>
     </div>
   )

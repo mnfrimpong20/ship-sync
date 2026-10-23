@@ -38,7 +38,7 @@ export function AdminReceiverPayments() {
         <form onSubmit={saveSub} className="card-dark p-5">
           <h3 className="inline-flex items-center gap-2 !text-base"><Smartphone size={16} className="text-gold-deep" aria-hidden="true" /> Settle straight to a shipper</h3>
           <p className="mt-1 text-xs text-text-muted">Create a subaccount for the shipper in Paystack (their MoMo wallet or bank) and paste its code. Their receiver payments then settle to them directly, minus Ntemtem’s fee.</p>
-          <select required className="input-dark mt-3 !min-h-10 w-full text-sm" value={pick} onChange={(e) => setPick(e.target.value)}><option value="">Choose a shipper…</option>{shippers.map((s) => <option key={s.id} value={s.id}>{s.name}{s.paystackSubaccount ? ' ✓' : ''}</option>)}</select>
+          <select required aria-label="Shipper" className="input-dark mt-3 !min-h-10 w-full text-sm" value={pick} onChange={(e) => setPick(e.target.value)}><option value="">Choose a shipper…</option>{shippers.map((s) => <option key={s.id} value={s.id}>{s.name}{s.paystackSubaccount ? ' ✓' : ''}</option>)}</select>
           <input className="input-dark mt-2 !min-h-10 w-full font-mono text-sm" placeholder="ACCT_xxxxxxxx" value={code} onChange={(e) => setCode(e.target.value)} disabled={!pick} />
           {err && <p role="alert" className="mt-2 text-xs text-danger">{err}</p>}{msg && <p role="status" className="mt-2 text-xs text-teal">{msg}</p>}
           <button disabled={!pick} className="btn-gold mt-3 !min-h-10 text-sm disabled:opacity-60">Save</button>

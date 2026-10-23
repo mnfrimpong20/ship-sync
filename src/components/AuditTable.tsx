@@ -25,7 +25,7 @@ export function AuditTable({ admin }: { admin: boolean }) {
       </div>
       {err && <p role="alert" className="text-sm text-danger">{err}</p>}
       {!rows ? <NoData>Loading…</NoData> : !rows.length ? <NoData>Nothing matches.</NoData> : (
-        <div className="-mx-5 overflow-x-auto px-5"><table className="w-full min-w-[40rem] text-sm"><thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-text-muted"><th className="px-2 py-2">When</th><th className="px-2 py-2">Who</th>{admin && <th className="px-2 py-2">Company</th>}<th className="px-2 py-2">What</th><th className="px-2 py-2">Where</th></tr></thead>
+        <div className="-mx-5 overflow-x-auto px-5 focus-ring" tabIndex={0} role="region" aria-label="Audit log (scrolls sideways)"><table className="w-full min-w-[40rem] text-sm"><thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-text-muted"><th className="px-2 py-2">When</th><th className="px-2 py-2">Who</th>{admin && <th className="px-2 py-2">Company</th>}<th className="px-2 py-2">What</th><th className="px-2 py-2">Where</th></tr></thead>
           <tbody>{rows.map((e) => (
             <tr key={e.id} className="cursor-pointer border-b border-border/60 align-top hover:bg-surface-2/50" onClick={() => setOpen(open === e.id ? null : e.id)} data-testid="audit-row">
               <td className="whitespace-nowrap px-2 py-2 text-text-muted">{fmtDateTime(e.at)}</td>

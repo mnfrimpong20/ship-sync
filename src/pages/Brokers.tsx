@@ -332,10 +332,7 @@ export function AdminBrokers() {
   const act = async (fn: () => Promise<unknown>, m: string, key: string) => { setBusy(key); setError(''); try { await fn(); await load(); setMsg(m) } catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong.') } finally { setBusy('') } }
   const fee = (k: CargoType, v: string) => form && setForm({ ...form, fees: { ...form.fees, [k]: v ? Number(v) : undefined } })
   return (
-    <section className="mt-14" data-testid="admin-brokers">
-      <p className="eyebrow mb-1">Customs brokers</p>
-      <h2 className="!text-[clamp(1.5rem,3vw,2rem)]">Clearing agents on the marketplace</h2>
-      <p className="mt-1 text-text-muted">Licensed agents customers and shippers can book per shipment. Verify a listing once you've seen the licence.</p>
+    <section className="mt-6" data-testid="admin-brokers">
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4"><StatCard label="Listed" value={list?.length ?? 0} hint="All ports" icon={Landmark} /><StatCard label="Verified" value={list?.filter((b) => b.verified).length ?? 0} hint="Licence checked" icon={BadgeCheck} /><StatCard label="Jobs" value={list?.reduce((n, b) => n + b.jobs, 0) ?? 0} hint="Booked through the platform" icon={FileText} /></div>

@@ -59,6 +59,8 @@ async function main() {
   app.use(express.json({ limit: '10mb' })) // document uploads and POD photos travel as base64 in JSON
   app.use(cookieParser())
   app.use('/api', apiRouter())
+  // Anything else under /api is a typo or a stale client — answer in JSON, never with the website's HTML.
+  app.use('/api', (_req, res) => { res.status(404).json({ error: 'Not found.' }) })
   // White-label custom domains: a shipper's own host lands on their branded page.
   app.get('/', async (req, res, next) => { try { const slug = await slugForHost(await getDb(), req.headers.host); if (slug && !req.url.includes('#')) return res.redirect(302, `/t/${slug}`) } catch { /* ignore */ } next() })
 

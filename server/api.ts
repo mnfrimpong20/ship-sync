@@ -43,6 +43,7 @@ import { mountBrokers } from './brokers'
 import { mountSourcing } from './sourcing'
 import { mountSite } from './site'
 import { errorRecorder, mountSystem } from './system'
+import { mountAdminOps } from './adminOps'
 import { mountBusiness } from './business'
 import { mountSupplierPortal } from './supplierPortal'
 import { mountOnboarding, onVerified } from './onboarding'
@@ -620,7 +621,10 @@ export function apiRouter() {
     res.set({ 'Content-Type': m[1], 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" })
     res.send(Buffer.from(m[2], 'base64'))
   }))
-  r.get('/shippers/:id', wrap(async (req, res) => { const db = await getDb(); const { rows } = await db.query<Row>('select * from shippers where id = $1', [req.params.id]); if (!rows[0]) throw new HttpError(404, 'Shipper not found.'); res.json({ shipper: shipperOut(rows[0]) }) }))
+  r.get('/shippers/:id', wrap(async (req, res) => { const db = await getDb(); const { rows } = await db.query<Row>('select * from shippers where id = $1', [req.params.id]); if (!rows[0]) throw new HttpError(404, 'Shipper not found.')
+    // Archived companies are gone from the public site — only Ntemtem admins and their own staff can still open the profile.
+    if (rows[0].archived_at) { const u = await currentUser(db, req); if (!u || (!u.admin && u.shipperId !== rows[0].id)) throw new HttpError(404, 'Shipper not found.') }
+    res.json({ shipper: shipperOut(rows[0]) }) }))
   r.patch('/shippers/me', wrap(async (req, res) => {
     const db = await getDb(); const user = await requireUser(db, req)
     if (user.role !== 'shipper' || !user.shipperId) throw new HttpError(403, 'Only shipper accounts have a company profile.')
@@ -645,8 +649,8 @@ export function apiRouter() {
         (select count(*) from shipments x where x.shipper_id = s.id)::int as shipment_count,
         (select count(*) from company_documents cd where cd.shipper_id = s.id)::int as doc_count,
         (select count(*) from company_documents cd where cd.shipper_id = s.id and cd.status = 'submitted')::int as docs_pending
-      from shippers s left join users u on u.id = (select id from users x where x.shipper_id = s.id order by x.created_at limit 1) order by s.verified asc, (s.verification_requested_at is null) asc, s.verification_requested_at desc, s.created_at desc`)
-    res.json({ shippers: rows.map((r) => ({ ...shipperOut(r), paystackSubaccount: r.paystack_subaccount ?? '', owner: r.owner_email ? { email: r.owner_email, name: r.owner_name } : null, quoteCount: r.quote_count, shipmentCount: r.shipment_count, docCount: r.doc_count, docsPending: r.docs_pending, verificationRequestedAt: r.verification_requested_at ? ISO(r.verification_requested_at) : null })) })
+      from shippers s left join users u on u.id = (select id from users x where x.shipper_id = s.id order by x.created_at limit 1) order by (s.archived_at is not null) asc, s.verified asc, (s.verification_requested_at is null) asc, s.verification_requested_at desc, (select count(*) from company_documents cd where cd.shipper_id = s.id and cd.status = 'submitted') desc, (select count(*) from company_documents cd where cd.shipper_id = s.id) desc, s.created_at desc`)
+    res.json({ shippers: rows.map((r) => ({ ...shipperOut(r), paystackSubaccount: r.paystack_subaccount ?? '', owner: r.owner_email ? { email: r.owner_email, name: r.owner_name } : null, quoteCount: r.quote_count, shipmentCount: r.shipment_count, docCount: r.doc_count, docsPending: r.docs_pending, archivedAt: r.archived_at ? new Date(r.archived_at).toISOString() : null, archivedReason: r.archived_reason ?? '', verificationRequestedAt: r.verification_requested_at ? ISO(r.verification_requested_at) : null })) })
   }))
   r.post('/admin/shippers/:id/verify', wrap(async (req, res) => {
     const db = await getDb(); const admin = await requireAdmin(db, req)
@@ -660,6 +664,14 @@ export function apiRouter() {
     res.json({ shipper: shipperOut(rows[0]) })
   }))
 
+  /** Junk or test sign-ups: archive takes them off the public directory and out of the admin queues (reversible). */
+  r.post('/admin/shippers/:id/archive', wrap(async (req, res) => {
+    const db = await getDb(); const admin = await requireAdmin(db, req)
+    const b = z.object({ archived: z.boolean(), reason: z.string().trim().max(300).default('') }).parse(req.body)
+    const { rows } = await db.query<Row>(`update shippers set archived_at = case when $2 then now() else null end, archived_reason = case when $2 then $3 else '' end, verified = case when $2 then false else verified end where id = $1 and id <> 'ship-sync-sourcing' returning id`, [String(req.params.id), b.archived, b.reason ? `${b.reason} — ${admin.name}` : admin.name])
+    if (!rows[0]) throw new HttpError(404, 'Shipper not found.')
+    res.json({ ok: true })
+  }))
   r.post('/match', wrap(async (req, res) => {
     const db = await getDb(); const b = zMatchPriced.parse(req.body)
     const matches = await matchShippers(db, b)
@@ -933,6 +945,7 @@ export function apiRouter() {
   mountSite(r, { getDb, requireAdmin, HttpError, wrap })
   mountSystem(r, { getDb, requireAdmin, HttpError, wrap })
   mountBusiness(r, { getDb, requireAdmin, wrap })
+  mountAdminOps(r, { getDb, requireAdmin, HttpError, wrap })
   mountSupplierPortal(r, { getDb, requireUser, HttpError, wrap })
   mountOnboarding(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountCustomer(r, { getDb, requireUser, HttpError, wrap })

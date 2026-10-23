@@ -6,7 +6,7 @@ import { fmtDate } from './ui'
 import { StatCard, Th, thead, trow } from './board'
 import { SalesTaxCard } from './Compliance'
 
-const tone: Record<Order['status'], string> = { awaiting_payment: 'bg-gold/15 text-gold-deep', paid: 'bg-sky/15 text-sea', packed: 'bg-sky/15 text-sea', shipped: 'bg-sky/15 text-sea', delivered: 'bg-teal/15 text-teal', cancelled: 'bg-surface-2 text-text-muted' }
+const tone: Record<Order['status'], string> = { awaiting_payment: 'bg-gold/15 text-gold-deep', paid: 'bg-sky/15 text-sea', packed: 'bg-sky/15 text-sea', shipped: 'bg-sky/15 text-sea', delivered: 'bg-teal/10 text-teal', cancelled: 'bg-surface-2 text-text-muted' }
 const toInput = (p?: Product): ProductInput => p ? { audience: p.audience ?? 'shipper', packingKind: p.packingKind ?? null, name: p.name, sku: p.sku, category: p.category, blurb: p.blurb, specs: p.specs, priceUsd: p.priceUsd, rentUsd: p.rentUsd, reorderLevel: p.reorderLevel, labelsPerUnit: p.labelsPerUnit, kit: p.kit.map(({ productId, qty }) => ({ productId, qty })), includedWith: p.includedWith, active: p.active, sort: p.sort }
   : { audience: 'shipper', packingKind: null, name: '', sku: '', category: 'accessory', blurb: '', specs: [], priceUsd: 0, rentUsd: null, reorderLevel: 5, labelsPerUnit: 0, kit: [], includedWith: [], active: true, sort: 50 }
 
@@ -27,10 +27,7 @@ export function AdminSupplies() {
   const saveProduct = async (e: React.FormEvent) => { e.preventDefault(); if (!edit) return; const f = { ...edit.f, specs: edit.specs.split('\n').map((s) => s.trim()).filter(Boolean) }; await act('prod', () => (edit.id ? suppliesApi.updateProduct(edit.id, f) : suppliesApi.createProduct(f)), 'Product saved.'); setEdit(null) }
 
   return (
-    <section className="mt-14" data-testid="admin-supplies">
-      <p className="eyebrow mb-1">Supplies</p>
-      <h2 className="!text-[clamp(1.5rem,3vw,2rem)]">Equipment stock, orders and rentals</h2>
-      <p className="mt-1 text-text-muted">Printers, scanners and labels Ntemtem sells and rents to shipping companies, and the packing supplies Ntemtem sends to customers whose shipper doesn’t stock them (marked “Customer”). Stock is held back when an order is placed and goes back on the shelf if it’s cancelled or a rental comes home. Kits use the stock of the parts inside them.</p>
+    <section className="mt-6" data-testid="admin-supplies">
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
@@ -103,7 +100,7 @@ export function AdminSupplies() {
             <ul className="divide-y divide-border text-sm">{d.rentals.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center gap-2 p-3" data-testid="admin-rental">
                 <span className="min-w-0 flex-1"><b>{r.qty > 1 ? `${r.qty} × ` : ''}{r.productName}</b><span className="block text-xs text-text-muted">{r.shipperName} · {r.mode === 'included' ? 'free with plan' : `${usd(r.monthlyUsd)}/mo`}{r.startedAt ? ` · since ${fmtDate(r.startedAt)}` : ''}</span></span>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.status === 'return_requested' ? 'bg-gold/15 text-gold-deep' : r.status === 'active' ? 'bg-teal/15 text-teal' : 'bg-surface-2 text-text-muted'}`}>{rentalStatusLabels[r.status]}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.status === 'return_requested' ? 'bg-gold/15 text-gold-deep' : r.status === 'active' ? 'bg-teal/10 text-teal' : 'bg-surface-2 text-text-muted'}`}>{rentalStatusLabels[r.status]}</span>
                 {(r.status === 'active' || r.status === 'return_requested') && <button disabled={!!busy} onClick={() => act(r.id, () => suppliesApi.rentalAction(r.id, 'returned'), `${r.productName} checked back in.`)} className="btn-ghost !min-h-8 !px-2.5 text-xs">Received back</button>}
                 {r.status === 'return_requested' && <button disabled={!!busy} onClick={() => act(r.id, () => suppliesApi.rentalAction(r.id, 'keep'), 'Return cancelled.')} className="text-xs text-text-muted hover:underline">Keep out</button>}
               </li>

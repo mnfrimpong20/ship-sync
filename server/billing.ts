@@ -174,10 +174,12 @@ export function mountBilling(r: Router, d: Deps) {
       return { id: x.id, name: x.name, demo: !!x.demo, plan: x.plan, effective: e.plan, trial: e.trial, trialEndsAt: e.trialEndsAt, status: x.status ?? (x.plan === 'starter' ? 'free' : 'manual'), provider: x.provider ?? 'manual', mrr: amount, periodEnd: ISO(x.current_period_end), cancelAtPeriodEnd: !!x.cancel_at_period_end, team: x.team } })
     const { rows: ev } = await db.query<Row>(`select kind, count(*)::int as n, coalesce(sum(amount_usd),0)::float as amt from subscription_events where at > now() - interval '30 days' group by kind`)
     const evs = Object.fromEntries(ev.map((e) => [e.kind, { n: e.n, amount: e.amt }]))
-    const mrr = list.reduce((a, x) => a + x.mrr, 0)
+    // Only card billing is money we know arrives; hand-set plans are a list value until someone records the payment.
+    const card = list.filter((x) => x.provider === 'stripe' && x.mrr > 0); const manual = list.filter((x) => x.provider !== 'stripe' && x.mrr > 0)
+    const mrr = card.reduce((a, x) => a + x.mrr, 0); const manualValue = manual.reduce((a, x) => a + x.mrr, 0)
     const byPlan = PLAN_ORDER.map((p) => ({ plan: p, label: PLANS[p].label, shippers: list.filter((x) => x.plan === p).length, mrr: list.filter((x) => x.plan === p).reduce((a, x) => a + x.mrr, 0) }))
     const trials = list.filter((x) => x.trial); const soon = trials.filter((x) => x.trialEndsAt && new Date(x.trialEndsAt).getTime() - Date.now() < 7 * 86400000)
-    res.json({ prices, online: stripeMode() !== 'off', mrr, arr: mrr * 12, paying: list.filter((x) => x.mrr > 0).length, byPlan, trials: trials.length, trialsEndingSoon: soon.length, churn30: (evs.canceled?.n ?? 0), upgrades30: (evs.upgrade?.n ?? 0) + (evs.change?.n ?? 0), list })
+    res.json({ prices, online: stripeMode() !== 'off', mrr, arr: mrr * 12, paying: card.length, manualPaid: manual.length, manualValue, byPlan, trials: trials.length, trialsEndingSoon: soon.length, churn30: (evs.canceled?.n ?? 0), upgrades30: (evs.upgrade?.n ?? 0) + (evs.change?.n ?? 0), list })
   }))
   r.put('/admin/billing/prices', wrap(async (req, res) => {
     const db = await getDb(); const admin = await requireAdmin(db, req)

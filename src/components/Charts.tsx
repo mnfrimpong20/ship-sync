@@ -166,7 +166,7 @@ export function DataTable<T extends Record<string, any>>({ rows, cols, csvName, 
   if (!rows.length) return <NoData />
   return (
     <div data-testid={testid}>
-      <div className="-mx-5 overflow-x-auto px-5">
+      <div className="-mx-5 overflow-x-auto px-5 focus-ring" tabIndex={0} role="region" aria-label="Table (scrolls sideways)">
         <table className="w-full min-w-[22rem] whitespace-nowrap text-sm">
           <thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-text-muted">
             {cols.map((c) => !c.label ? <th key={c.key} className="px-2 py-2"><span className="sr-only">Actions</span></th> : <th key={c.key} className={`px-2 py-2 font-semibold ${c.align === 'right' ? 'text-right' : ''}`} aria-sort={sort?.k === c.key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}><button type="button" onClick={() => setSort((s) => ({ k: c.key, dir: s?.k === c.key ? ((s.dir * -1) as 1 | -1) : -1 }))} className="-my-1 min-h-8 uppercase tracking-wider hover:text-text focus-ring">{c.label}{sort?.k === c.key ? (sort.dir === 1 ? ' ↑' : ' ↓') : ''}</button></th>)}

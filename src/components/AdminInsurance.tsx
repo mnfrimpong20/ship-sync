@@ -23,10 +23,7 @@ export function AdminInsurance() {
   const resolve = async () => { if (!resolving) return; setBusy('res'); setError(''); try { await insuranceApi.resolve(resolving.id, { outcome: rs.outcome, amountUsd: rs.outcome === 'paid' ? Number(rs.amountUsd) || 0 : undefined, note: rs.note }); await load(); setMsg('Claim resolved and both sides notified.'); setResolving(null) } catch (e) { setError(e instanceof Error ? e.message : 'Could not resolve.') } finally { setBusy('') } }
   const open = d.policies.filter((p) => p.status === 'claim_open')
   return (
-    <section className="mt-14" data-testid="admin-insurance">
-      <p className="eyebrow mb-1">Insurance</p>
-      <h2 className="!text-[clamp(1.5rem,3vw,2rem)]">Cargo cover sold on the platform</h2>
-      <p className="mt-1 text-text-muted">Set the product once; customers add cover on booked shipments and shippers collect the premium with the freight. Plug in an underwriter by changing the provider and rates.</p>
+    <section className="mt-6" data-testid="admin-insurance">
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
@@ -37,7 +34,7 @@ export function AdminInsurance() {
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 card-dark overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto focus-ring" tabIndex={0} role="region" aria-label="Insurance policies (scrolls sideways)">
             <table className="w-full min-w-[820px] text-sm">
               <thead><tr className={thead}><Th>Certificate</Th><Th>Shipment</Th><Th>Shipper</Th><Th className="text-right">Insured</Th><Th className="text-right">Premium</Th><Th>Status</Th><Th className="text-right">Actions</Th></tr></thead>
               <tbody>

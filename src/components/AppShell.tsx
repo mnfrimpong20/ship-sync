@@ -5,7 +5,7 @@ import { adoptAccountDisplay } from '../lib/prefs'
 import { Suspense, useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { IdCard, Bot, LifeBuoy, Anchor, BarChart3, LineChart, Calculator, Megaphone, Plug, CreditCard, History, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X, Printer } from 'lucide-react'
+import { Landmark, IdCard, Bot, LifeBuoy, Anchor, BarChart3, LineChart, Calculator, Megaphone, Plug, CreditCard, History, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X, Printer } from 'lucide-react'
 import { Avatar, Logo, Mark } from './ui'
 import { PlatformBanners } from './PlatformBanners'
 import { NotificationBell } from './NotificationBell'
@@ -20,6 +20,38 @@ import { roleAllows, roleHome, roleLabels } from '../lib/ops'
 import { scanQueue, startQueueSync, SCAN_QUEUE_EVENT } from '../lib/scan'
 import { Navigation, Phone, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Type, WifiOff, CloudUpload, CalendarDays, MessageSquare, FolderArchive, Repeat, AlertTriangle, CircleUser, Contact, Home } from 'lucide-react'
 import { hubApi } from '../lib/customerHub'
+import { Scale, Handshake, Umbrella, Store, Gauge, ShieldAlert, ScanSearch, MapPin, Send, ToggleRight, Eye, Server } from 'lucide-react'
+import { api } from '../lib/store'
+
+/** Ntemtem's own console — every admin section, grouped by the job, under /admin. */
+type AdminCounts = { urgent: number; shippers: number; tickets: number; disputes: number; payouts: number; brokers: number }
+const adminNav = (c: AdminCounts | null): Item[] => [
+  { to: '/admin', label: 'Business', icon: BarChart3, end: true },
+  { to: '/admin?view=attention', label: 'Attention', icon: BellRing, badge: c?.urgent || undefined, group: 'Today' },
+  { to: '/admin?view=tickets', label: 'Support inbox', icon: LifeBuoy, badge: c?.tickets || undefined, group: 'Today' },
+  { to: '/admin?view=disputes', label: 'Disputes & reviews', icon: Scale, badge: c?.disputes || undefined, group: 'Today' },
+  { to: '/admin?view=shippers', label: 'Shippers', icon: ShieldCheck, badge: c?.shippers || undefined, group: 'Approvals' },
+  { to: '/admin?view=brokers', label: 'Customs brokers', icon: Landmark, badge: c?.brokers || undefined, group: 'Approvals' },
+  { to: '/admin?view=partners', label: 'Destination partners', icon: Handshake, group: 'Approvals' },
+  { to: '/admin?view=payments', label: 'Payments & payouts', icon: Wallet, badge: c?.payouts || undefined, group: 'Money' },
+  { to: '/admin?view=billing', label: 'Plans & billing', icon: CreditCard, group: 'Money' },
+  { to: '/admin?view=insurance', label: 'Insurance', icon: Umbrella, group: 'Money' },
+  { to: '/admin?view=analytics', label: 'Platform analytics', icon: LineChart, group: 'Marketplace' },
+  { to: '/admin?view=marketplace', label: 'Lanes & demand', icon: Store, group: 'Marketplace' },
+  { to: '/admin?view=scorecards', label: 'Scorecards', icon: Gauge, group: 'Marketplace' },
+  { to: '/admin?view=risk', label: 'Risk & fraud', icon: ShieldAlert, group: 'Marketplace' },
+  { to: '/admin?view=sourcing', label: 'Sourcing settings', icon: Globe2, group: 'Operations' },
+  { to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2, group: 'Operations', more: true },
+  { to: '/admin?view=supplies', label: 'Equipment & supplies', icon: Printer, group: 'Operations' },
+  { to: '/admin?view=screening', label: 'Sanctions screening', icon: ScanSearch, group: 'Operations' },
+  { to: '/admin?view=destinations', label: 'Destinations', icon: MapPin, group: 'Operations', more: true },
+  { to: '/admin?view=announcements', label: 'Announcements', icon: Megaphone, group: 'Messages' },
+  { to: '/admin?view=messaging', label: 'Message delivery', icon: Send, group: 'Messages' },
+  { to: '/admin?view=support', label: 'View as a user', icon: Eye, group: 'Settings' },
+  { to: '/admin?view=features', label: 'Feature switches', icon: ToggleRight, group: 'Settings' },
+  { to: '/admin?view=audit', label: 'Audit log', icon: History, group: 'Settings' },
+  { to: '/admin?view=system', label: 'System & backups', icon: Server, group: 'Settings' },
+]
 import { refreshSummary, useSummary } from '../lib/account'
 
 interface Item { to: string; label: string; icon: typeof Inbox; end?: boolean; badge?: number | string; group?: string; more?: boolean }
@@ -64,7 +96,7 @@ export default function AppShell() {
   useEffect(() => { setNavTick((n) => n + 1) }, [loc.pathname, loc.search])
   const toggleFold = (g: string) => { setFoldTick((m) => ({ ...m, [g]: navTick })); setFolded((f) => { const n = f.includes(g) ? f.filter((x) => x !== g) : [...f, g]; try { localStorage.setItem('ss-nav-folded-v2', JSON.stringify(n)) } catch { /* private mode */ } return n }) }
   const [menu, setMenu] = useState(false)
-  const [dueReminders, setDueReminders] = useState(0)
+  const [dueReminders, setDueReminders] = useState(0); const [adminCounts, setAdminCounts] = useState<AdminCounts | null>(null)
   const t = useT()
   const [displayOpen, setDisplayOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(() => { try { return localStorage.getItem('ss-nav-more') === '1' } catch { return false } })
@@ -81,6 +113,8 @@ export default function AppShell() {
     clientsApi.remindersDue().then((r) => setDueReminders(r.filter((x) => x.dueAt && new Date(x.dueAt).getTime() < Date.now() + 86400000).length)).catch(() => {})
   }, [user, loc.pathname])
 
+  const inAdmin = !!user?.admin && loc.pathname.startsWith('/admin')
+  useEffect(() => { if (!inAdmin) return; const load = () => api<AdminCounts>('/admin/counts').then(setAdminCounts).catch(() => {}); void load(); const x = setInterval(load, 60000); return () => clearInterval(x) }, [inAdmin, loc.search]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!ready) return <BrandLoader label="Loading your account…" />
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />
   // Staff see only their area: a warehouse clerk who lands on the owner's overview goes to the warehouse, a finance user asking for Fleet goes home.
@@ -98,7 +132,7 @@ export default function AppShell() {
   const sourcingTeam = !!user.admin || (isShipper && user.shipperId === SOURCING_SHIPPER && !isDriver)
   // Menu structure: task-based sections of ~3–6 links each; secondary links sit behind "more" inside their own section.
   const office = ['owner', 'dispatcher', 'finance'].includes(staffRole)
-  const items: Item[] = isDriver
+  const items: Item[] = inAdmin ? adminNav(adminCounts) : isDriver
     ? [
         { to: '/dashboard/runs', label: 'Today', icon: MapPinned, end: true },
         { to: '/dashboard/runs/pay', label: 'My pay', icon: Wallet, group: 'My work' },
@@ -164,7 +198,7 @@ export default function AppShell() {
         { to: '/dashboard?tab=account', label: 'Account', icon: CircleUser, group: 'Help & account' },
       ]
   const visible = items.filter(allowed)
-  const tools: Item[] = isDriver ? [] : [
+  const tools: Item[] = inAdmin ? [{ to: '/dashboard', label: 'My customer account', icon: CircleUser, more: true }, { to: '/track', label: 'Track a shipment', icon: Search, more: true }, { to: '/live', label: 'Live map', icon: Radar, more: true }, { to: '/', label: 'Ntemtem website', icon: Globe, more: true }] : isDriver ? [] : [
     ...(isShipper ? [{ to: '/dashboard/notifications', label: 'Notifications', icon: BellRing } as Item] : []),
     ...(isShipper ? [{ to: '/dashboard/scan', label: 'Scan a sticker', icon: ScanLine } as Item] : []),
     ...(isDriver ? [] : [{ to: '/live', label: 'Live map', icon: Radar, more: !isShipper } as Item]),
@@ -239,7 +273,7 @@ export default function AppShell() {
           ? (isShipper && company ? <div className="flex justify-center pb-3" title={user.company ?? ''}><Avatar initials={company.initials} hue={company.hue} logo={company.logo} size={32} /></div> : null)
           : <div className="flex items-center gap-2.5 px-4 pb-3">
               {isShipper && company && <Avatar initials={company.initials} hue={company.hue} logo={company.logo} size={32} />}
-              <div className="min-w-0"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : t('Customer')}</p>{isShipper && user.staffRole && <p className="text-xs text-text-muted">{t(roleLabels[user.staffRole as keyof typeof roleLabels] ?? user.staffRole)}</p>}</div>
+              <div className="min-w-0"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{inAdmin ? 'Ntemtem admin' : isShipper ? user.company ?? 'Shipper' : t('Customer')}</p>{isShipper && user.staffRole && <p className="text-xs text-text-muted">{t(roleLabels[user.staffRole as keyof typeof roleLabels] ?? user.staffRole)}</p>}</div>
             </div>}
         <nav className={`nav-scroll flex-1 overflow-y-auto overflow-x-hidden ${compact ? 'px-2 space-y-1' : `px-3 ${isShipper ? 'space-y-3' : 'space-y-2.5'}`}`} aria-label="Application" onScroll={() => setTip(null)}>
           <NavItems list={visible.filter((i) => !i.group && !i.more)} compact={compact} />
@@ -294,7 +328,7 @@ export default function AppShell() {
           </div>
           <div className="flex items-center gap-2">
             {isShipper && <SyncBadge />}
-            <QuickSearch isShipper={isShipper} pages={[...visible, ...tools].filter((i) => !i.to.startsWith('/admin') && i.to !== '/').map((i) => ({ to: i.to, label: t(i.label), group: i.group ? t(i.group) : undefined }))} />
+            <QuickSearch isShipper={isShipper} admin={inAdmin} pages={[...visible, ...tools].filter((i) => (inAdmin || !i.to.startsWith('/admin')) && i.to !== '/').map((i) => ({ to: i.to, label: t(i.label), group: i.group ? t(i.group) : undefined }))} />
             <NotificationBell />
             <div className="relative">
               <button onClick={() => setMenu((m) => !m)} className="btn-ghost !min-h-10 !px-2 text-sm sm:!px-3" aria-expanded={menu} aria-haspopup="menu">
@@ -324,20 +358,42 @@ export default function AppShell() {
             </div>
           </motion.div>
         )}</AnimatePresence>
-        <PlatformBanners />
+        {!inAdmin && <PlatformBanners />}
         {user?.actingBy && <div data-testid="acting-banner" role="status" className="flex flex-wrap items-center justify-center gap-3 border-b border-gold/40 bg-gold/10 px-4 py-2 text-sm"><span>You’re using <b>{user.name}</b>’s account as {user.actingBy.name}.</span><button data-testid="acting-exit" onClick={() => { hubApi.switchTo(null).finally(() => { window.location.hash = '#/dashboard'; window.location.reload() }) }} className="rounded-md border border-gold/50 px-2.5 py-1 text-xs font-semibold text-gold-deep hover:bg-gold/10 focus-ring">Switch back to my account</button></div>}
-        <main id="main" tabIndex={-1} className={`ss-app flex-1 outline-none ${isShipper && !isDriver ? '' : 'pb-20 lg:pb-0'}`}>
+        <main id="main" tabIndex={-1} className={`ss-app flex-1 outline-none ${isShipper && !isDriver && !inAdmin ? '' : 'pb-20 lg:pb-0'}`}>
           <AnimatePresence mode="wait">
             <motion.div key={loc.pathname} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
               <Suspense fallback={<BrandLoader partner={isShipper} />}>{outlet}</Suspense>
             </motion.div>
           </AnimatePresence>
         </main>
-        {!isShipper && <BottomBar unread={summary?.unread ?? 0} owe={summary?.owe ?? 0} onMenu={() => setOpen(true)} />}
+        {inAdmin ? <AdminBar counts={adminCounts} onMenu={() => setOpen(true)} /> : !isShipper && <BottomBar unread={summary?.unread ?? 0} owe={summary?.owe ?? 0} onMenu={() => setOpen(true)} />}
         {isDriver && <DriverBar />}
         {isDriver && <DispatchHost />}
       </div>
     </div>
+  )
+}
+
+/** Phone-only bar in the admin console: what needs a person, the inbox, the money, and the full menu. */
+function AdminBar({ counts, onMenu }: { counts: AdminCounts | null; onMenu: () => void }) {
+  const loc = useLocation(); const view = new URLSearchParams(loc.search).get('view') ?? ''
+  const items: { to: string; label: string; icon: typeof Home; on: boolean; badge?: number }[] = [
+    { to: '/admin', label: 'Business', icon: BarChart3, on: !view },
+    { to: '/admin?view=attention', label: 'Attention', icon: BellRing, on: view === 'attention', badge: counts?.urgent || undefined },
+    { to: '/admin?view=tickets', label: 'Support', icon: LifeBuoy, on: view === 'tickets', badge: counts?.tickets || undefined },
+    { to: '/admin?view=payments', label: 'Payments', icon: Wallet, on: view === 'payments', badge: counts?.payouts || undefined },
+  ]
+  return (
+    <nav className="no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden" aria-label="Admin quick menu" data-testid="admin-bar">
+      {items.map((it) => (
+        <Link key={it.to} to={it.to} aria-current={it.on ? 'page' : undefined} className={`relative flex min-h-[3.75rem] flex-col items-center justify-center gap-0.5 text-xs focus-ring ${it.on ? 'font-semibold text-gold-deep' : 'text-text-muted'}`}>
+          <it.icon size={20} aria-hidden="true" />{it.label}
+          {it.badge ? <span className="absolute left-[calc(50%+4px)] top-1.5 min-w-4 rounded-full bg-gold px-1 text-center text-[11px] font-bold leading-4 text-on-accent">{it.badge}</span> : null}
+        </Link>
+      ))}
+      <button type="button" onClick={onMenu} className="flex min-h-[3.75rem] flex-col items-center justify-center gap-0.5 text-xs text-text-muted focus-ring" aria-label="Open the admin menu"><Menu size={20} aria-hidden="true" />More</button>
+    </nav>
   )
 }
 

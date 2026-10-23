@@ -38,7 +38,13 @@ export async function businessSnapshot(db: Db) {
       coalesce(sum(case when p.status = 'refunded' then p.amount_usd end),0)::float as refunded_all
     from escrow_payments p join shippers s on s.id = p.shipper_id where true ${shipperFilter}`)
   const { rows: plans } = await db.query<Row>(`select plan, count(*)::int as n from shippers s where s.id <> '${SOURCING}' ${shipperFilter} group by plan`)
-  const mrr = plans.reduce((a, p) => a + (PLAN_USD[p.plan] ?? 0) * n(p.n), 0)
+  // Plan revenue counts only what card billing actually collects (Stripe subscriptions in good standing).
+  // Plans set by hand are shown as their list value, apart — nothing proves that money was received.
+  const { rows: billed } = await db.query<Row>(`select coalesce(sum(case when b.provider = 'stripe' and b.status in ('active','past_due') then coalesce(nullif(b.amount_usd, 0), case s.plan when 'pro' then ${PLAN_USD.pro ?? 0} when 'enterprise' then ${PLAN_USD.enterprise ?? 0} else 0 end) end),0)::float as card,
+      count(*) filter (where b.provider = 'stripe' and b.status in ('active','past_due'))::int as card_n
+    from shippers s left join subscriptions b on b.shipper_id = s.id where s.id <> '${SOURCING}' ${shipperFilter}`)
+  const mrr = r2(n(billed[0]?.card))
+  const listValue = plans.reduce((a, p) => a + (PLAN_USD[p.plan] ?? 0) * n(p.n), 0)
   const planCounts = Object.fromEntries(plans.map((p) => [p.plan, n(p.n)]))
 
   // --- escrow position (platform-wide, shippers' money we hold) ---
@@ -98,7 +104,7 @@ export async function businessSnapshot(db: Db) {
       takeRate: { all: r2(n(rev[0].take_rate_all)), last30: r2(n(rev[0].take_rate_30)) },
       sourcingFees: { all: r2(n(rev[0].sourcing_fees_all)), last30: r2(n(rev[0].sourcing_fees_30)) },
       sourcingGoods: { all: r2(n(rev[0].sourcing_goods_all)), last30: r2(n(rev[0].sourcing_goods_30)) },
-      subscriptionsMrr: mrr, planCounts,
+      subscriptionsMrr: mrr, subscriptionsCardCount: n(billed[0]?.card_n), plansListValue: r2(Math.max(0, listValue - mrr)), planCounts,
       gmv: { all: r2(n(rev[0].gmv_all)), last30: r2(n(rev[0].gmv_30)) }, refunded: r2(n(rev[0].refunded_all)),
       totalLast30: r2(n(rev[0].take_rate_30) + n(rev[0].sourcing_fees_30) + mrr),
     },
@@ -115,7 +121,7 @@ export async function businessSnapshot(db: Db) {
 
 /* ---------------- exceptions ---------------- */
 
-export interface Exception { kind: string; severity: 'high' | 'medium' | 'low'; title: string; detail: string; link: string; since: string; id: string }
+export interface Exception { kind: string; severity: 'high' | 'medium' | 'low'; title: string; detail: string; link: string; since: string; id: string; key?: string }
 
 export async function platformExceptions(db: Db) {
   const out: Exception[] = []
@@ -125,10 +131,10 @@ export async function platformExceptions(db: Db) {
   for (const r of unq) out.push({ kind: 'unquoted_request', severity: 'high', id: r.id, title: `${r.ref} has no quote after ${age(r.created_at)}`, detail: `${r.origin} → ${r.destination} · ${r.mode} · ${r.cargo} · ${r.contact_name}`, link: `/shippers?destination=${encodeURIComponent(r.destination)}`, since: new Date(r.created_at).toISOString() })
 
   const { rows: late } = await db.query<Row>(`select sh.id, sh.ref, sh.status, sh.eta, sh.customer, s.name as shipper, (select max(at) from shipment_events e where e.shipment_id = sh.id) as last_event from shipments sh join shippers s on s.id = sh.shipper_id where sh.status <> 'delivered' and sh.eta < current_date - 2 order by sh.eta asc limit 50`)
-  for (const r of late) out.push({ kind: 'late_shipment', severity: 'high', id: r.id, title: `${r.ref} is ${Math.round((Date.now() - new Date(r.eta).getTime()) / 86_400_000)} days past ETA`, detail: `${r.shipper} · ${r.status.replace(/_/g, ' ')} · ${r.customer}`, link: `/track?ref=${r.ref}`, since: new Date(r.eta).toISOString() })
+  for (const r of late) out.push({ kind: 'late_shipment', severity: 'high', id: r.id, title: `${r.ref} is ${Math.round((Date.now() - new Date(r.eta).getTime()) / 86_400_000)} days past ETA`, detail: `${r.shipper} · ${r.status.replace(/_/g, ' ')} · ${r.customer}`, link: `/admin?view=shipment&id=${r.id}`, since: new Date(r.eta).toISOString() })
 
   const { rows: stale } = await db.query<Row>(`select sh.id, sh.ref, sh.status, sh.customer, s.name as shipper, coalesce((select max(at) from shipment_events e where e.shipment_id = sh.id), sh.created_at) as last_event from shipments sh join shippers s on s.id = sh.shipper_id where sh.status not in ('delivered') and sh.eta >= current_date - 2 and coalesce((select max(at) from shipment_events e where e.shipment_id = sh.id), sh.created_at) < now() - interval '10 days' order by last_event asc limit 50`)
-  for (const r of stale) out.push({ kind: 'stale_shipment', severity: 'medium', id: r.id, title: `${r.ref} has had no update for ${age(r.last_event)}`, detail: `${r.shipper} · ${r.status.replace(/_/g, ' ')} · ${r.customer}`, link: `/track?ref=${r.ref}`, since: new Date(r.last_event).toISOString() })
+  for (const r of stale) out.push({ kind: 'stale_shipment', severity: 'medium', id: r.id, title: `${r.ref} has had no update for ${age(r.last_event)}`, detail: `${r.shipper} · ${r.status.replace(/_/g, ' ')} · ${r.customer}`, link: `/admin?view=shipment&id=${r.id}`, since: new Date(r.last_event).toISOString() })
 
   const { rows: held } = await db.query<Row>(`select p.id, p.amount_usd, p.paid_at, coalesce(p.hold,false) as hold, sh.ref, sh.status, s.name as shipper from escrow_payments p join shipments sh on sh.id = p.shipment_id join shippers s on s.id = p.shipper_id where p.status = 'held' and (coalesce(p.hold,false) or sh.status in ('delivered') or p.paid_at < now() - interval '45 days') order by p.paid_at asc limit 50`)
   for (const r of held) out.push({ kind: r.hold ? 'escrow_on_hold' : 'escrow_waiting', severity: r.hold ? 'medium' : 'high', id: r.id, title: r.hold ? `$${n(r.amount_usd).toLocaleString()} on ${r.ref} is on hold` : `$${n(r.amount_usd).toLocaleString()} on ${r.ref} still in escrow after ${age(r.paid_at)}`, detail: `${r.shipper} · shipment ${r.status.replace(/_/g, ' ')}`, link: `/admin?view=payments`, since: new Date(r.paid_at).toISOString() })
@@ -148,12 +154,16 @@ export async function platformExceptions(db: Db) {
     out.push({ kind: 'sourcing', severity: r.status === 'requested' ? 'high' : 'medium', id: r.id, title: `${r.ref} ${why}`, detail: `${r.title} · ${String(r.status).replace(/_/g, ' ')}`, link: `/dashboard/sourcing/${r.id}`, since: new Date(r.updated_at).toISOString() })
   }
 
-  const { rows: cm } = await db.query<Row>(`select id, name, topic, created_at from contact_messages where not handled and created_at < now() - interval '24 hours' order by created_at asc limit 20`)
-  for (const r of cm) out.push({ kind: 'contact', severity: 'low', id: r.id, title: `${r.name} wrote about ${r.topic} ${age(r.created_at)} ago — unanswered`, detail: 'Reply from the contact inbox under System.', link: `/admin?view=system`, since: new Date(r.created_at).toISOString() })
+  // Everyone writes to one place now — the support inbox (contact-form messages become tickets).
+  const { rows: cm } = await db.query<Row>(`select id, ref, name, subject, created_at from support_tickets where status = 'open' and last_from = 'person' and updated_at < now() - interval '24 hours' order by updated_at asc limit 20`)
+  for (const r of cm) out.push({ kind: 'contact', severity: 'low', id: r.id, title: `${r.name} is waiting on ${r.ref} for ${age(r.created_at)}`, detail: r.subject, link: `/admin?view=tickets&t=${r.id}`, since: new Date(r.created_at).toISOString() })
 
   const { rows: er } = await db.query<Row>(`select count(*)::int as c, min(created_at) as first from app_errors where resolved_at is null`)
   if (n(er[0].c) > 0) out.push({ kind: 'errors', severity: n(er[0].c) > 10 ? 'high' : 'low', id: 'errors', title: `${er[0].c} unresolved error${n(er[0].c) === 1 ? '' : 's'} in the log`, detail: 'Server 500s and browser crashes — look for a pattern.', link: `/admin?view=system`, since: new Date(er[0].first).toISOString() })
 
+  // Snoozed or handled items stay off the board until their time is up.
+  const { snoozedKeys } = await import('./adminOps'); const snoozed = await snoozedKeys(db)
+  for (let i = out.length - 1; i >= 0; i--) { const k = `${out[i].kind}:${out[i].id}`; out[i].key = k; if (snoozed.has(k)) out.splice(i, 1) }
   const order = { high: 0, medium: 1, low: 2 }
   out.sort((a, b) => order[a.severity] - order[b.severity] || a.since.localeCompare(b.since))
   const counts = { high: out.filter((x) => x.severity === 'high').length, medium: out.filter((x) => x.severity === 'medium').length, low: out.filter((x) => x.severity === 'low').length }
@@ -164,4 +174,18 @@ export function mountBusiness(r: Router, d: Deps) {
   const { getDb, requireAdmin, wrap } = d
   r.get('/admin/business', wrap(async (req, res) => { const db = await getDb(); await requireAdmin(db, req); res.json(await businessSnapshot(db)) }))
   r.get('/admin/exceptions', wrap(async (req, res) => { const db = await getDb(); await requireAdmin(db, req); res.json(await platformExceptions(db)) }))
+  /** What's waiting, for the admin sidebar badges — one cheap call. */
+  r.get('/admin/counts', wrap(async (req, res) => {
+    const db = await getDb(); await requireAdmin(db, req)
+    const one = async (sql: string) => Number((await db.query<Row>(sql)).rows[0]?.n ?? 0)
+    const [urgent, shippers, tickets, disputes, payouts, brokers] = await Promise.all([
+      platformExceptions(db).then((x) => x.counts.high).catch(() => 0),
+      one(`select count(*)::int as n from shippers where not verified and not demo and archived_at is null and id <> 'ship-sync-sourcing'`),
+      one(`select count(*)::int as n from support_tickets where status = 'open' and last_from = 'person'`),
+      one(`select count(*)::int as n from disputes where status = 'open'`),
+      one(`select count(*)::int as n from payouts where status = 'requested'`),
+      one(`select count(*)::int as n from broker_applications where status = 'pending'`),
+    ])
+    res.set('Cache-Control', 'no-store'); res.json({ urgent, shippers, tickets, disputes, payouts, brokers })
+  }))
 }

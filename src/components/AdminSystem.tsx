@@ -1,5 +1,6 @@
+import { Link } from 'react-router-dom'
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Check, Database, Download, Inbox, RefreshCw, ServerCog } from 'lucide-react'
+import { AlertTriangle, Check, Database, Download, RefreshCw, ServerCog } from 'lucide-react'
 import { siteApi, type AppError, type DbExport, type SystemInfo } from '../lib/site'
 import { Pill, fmtDateTime } from './ui'
 
@@ -15,7 +16,7 @@ export function AdminSystem() {
         <ExportsCard />
       </div>
       <ErrorsCard />
-      <ContactInbox />
+      <p className="card-dark mt-5 p-5 text-sm text-text-muted" data-testid="admin-contact-note">Messages from the website’s contact form arrive as tickets in the <Link to="/admin?view=tickets" className="font-semibold text-gold-deep underline">Support inbox</Link>, with everything else people send us.</p>
     </section>
   )
 }
@@ -118,32 +119,3 @@ function ErrorsCard() {
   )
 }
 
-function ContactInbox() {
-  const [msgs, setMsgs] = useState<Awaited<ReturnType<typeof siteApi.adminMessages>> | null>(null)
-  const [err, setErr] = useState('')
-  const load = useCallback(() => siteApi.adminMessages().then(setMsgs).catch((e) => setErr(errMsg(e, 'Could not load.'))), [])
-  useEffect(() => { load() }, [load])
-  const handled = async (id: string) => { try { await siteApi.handled(id); await load() } catch (e) { setErr(errMsg(e, 'Failed.')) } }
-  const open = msgs?.filter((m) => !m.handled) ?? []
-  return (
-    <div className="card-dark mt-5 p-5" data-testid="admin-contact-card">
-      <h3 className="flex items-center gap-2 font-semibold"><Inbox size={16} className="text-gold-deep" aria-hidden="true" /> Contact form inbox {msgs && <span className="text-xs font-normal text-text-muted">{open.length} unanswered</span>}</h3>
-      {err && <p role="alert" className="mt-3 text-sm text-danger">{err}</p>}
-      <ul className="mt-3 divide-y divide-border">
-        {msgs?.slice(0, 50).map((m) => (
-          <li key={m.id} className={`py-3 text-sm ${m.handled ? 'dimmed' : ''}`}>
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="flex flex-wrap items-center gap-2 font-semibold">{m.name} <Pill tone="muted">{m.topic}</Pill> <span className="text-xs font-normal text-text-muted">{fmtDateTime(m.createdAt)}</span></p>
-                <p className="text-xs text-text-muted"><a href={`mailto:${m.email}`} className="hover:text-gold-deep">{m.email}</a>{m.phone ? ` · ${m.phone}` : ''}{m.company ? ` · ${m.company}` : ''}</p>
-                <p className="mt-1 whitespace-pre-wrap break-words">{m.message}</p>
-              </div>
-              {!m.handled && <button onClick={() => handled(m.id)} className="btn-ghost !min-h-8 !px-2.5 text-xs"><Check size={13} aria-hidden="true" /> Handled</button>}
-            </div>
-          </li>
-        ))}
-        {msgs && msgs.length === 0 && <li className="py-3 text-sm text-text-muted">No messages yet.</li>}
-      </ul>
-    </div>
-  )
-}

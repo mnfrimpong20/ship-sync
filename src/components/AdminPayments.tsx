@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Banknote, Check, Lock, Save, Wallet } from 'lucide-react'
 import { methodLabels, paymentStatusLabels, paymentsApi, usd, type Payment, type PaymentSettings, type Payout } from '../lib/payments'
-import { StatCard, Th, thead, trow } from './board'
+import { Confirm, StatCard, Th, thead, trow } from './board'
 
 const fmt = (v: string | null) => (v ? new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—')
 
@@ -17,6 +17,8 @@ export function AdminPayments() {
   const [ref, setRef] = useState('')
   const [rejecting, setRejecting] = useState<Payout | null>(null)
   const [note, setNote] = useState('')
+  // Money never moves on one click: Release and Refund open a confirmation that says exactly what happens.
+  const [ask, setAsk] = useState<{ kind: 'release' | 'refund'; p: Payment } | null>(null); const [why, setWhy] = useState('')
   const load = () => paymentsApi.admin().then((r) => { setD(r); setSt(r.settings) }).catch((e) => setError(e instanceof Error ? e.message : 'Could not load.'))
   useEffect(() => { void load() }, [])
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(''), 3500); return () => clearTimeout(t) }, [msg])
@@ -25,10 +27,14 @@ export function AdminPayments() {
   const pending = d.payouts.filter((o) => o.status === 'requested')
   const releaseLabel = (p: Payment) => (p.releaseReason?.startsWith('status:') ? 'auto' : p.releaseReason?.startsWith('manual:') ? p.releaseReason.slice(7) : '')
   return (
-    <section className="mt-14" data-testid="admin-payments">
-      <p className="eyebrow mb-1">Payments & escrow</p>
-      <h2 className="!text-[clamp(1.5rem,3vw,2rem)]">Money through the platform</h2>
-      <p className="mt-1 text-text-muted">Customers pay Ntemtem; funds are released to the shipper’s balance at the milestone below, less the take-rate. Payouts are sent by bank transfer and marked here.</p>
+    <section className="mt-6" data-testid="admin-payments">
+      {ask && (ask.kind === 'release'
+        ? <Confirm danger={false} title={`Release ${usd(ask.p.amountUsd)} to ${ask.p.shipperName}?`} confirmLabel={`Release ${usd(ask.p.amountUsd - (ask.p.feeUsd ?? 0))}`} busy={busy === ask.p.id} onClose={() => setAsk(null)}
+            onConfirm={() => { const x = ask.p; setAsk(null); void act(() => paymentsApi.release(x.id), `${usd(x.amountUsd - (x.feeUsd ?? 0))} released to ${x.shipperName}.`, x.id) }}
+            body={<div className="space-y-2" data-testid="confirm-release"><p>{ask.p.shipmentRef} · paid by {ask.p.customer}.</p><p><b className="text-text">{usd(ask.p.amountUsd - (ask.p.feeUsd ?? 0))}</b> goes into {ask.p.shipperName}’s balance ({usd(ask.p.amountUsd)} less the {usd(ask.p.feeUsd ?? 0)} platform fee). They can request a payout straight away.</p><p>Release early only if the goods are really on their way — the customer loses the hold.</p></div>} />
+        : <Confirm title={`Refund ${usd(ask.p.amountUsd)} to ${ask.p.customer}?`} confirmLabel="Refund to their card" busy={busy === ask.p.id} disabled={why.trim().length < 5} onClose={() => setAsk(null)}
+            onConfirm={() => { if (why.trim().length < 5) return; const x = ask.p; setAsk(null); void act(() => paymentsApi.refund(x.id, why.trim()), `Refunded ${usd(x.amountUsd)} to ${x.customer}.`, x.id) }}
+            body={<div className="space-y-2" data-testid="confirm-refund"><p>{ask.p.shipmentRef} · {ask.p.shipperName}. The full {usd(ask.p.amountUsd)} goes back to the customer’s card; the shipper gets nothing for it.</p><label className="block text-sm font-semibold text-text" htmlFor="refund-why">Reason — the customer and shipper see it</label><textarea id="refund-why" rows={3} className="input-dark py-2 text-sm" value={why} onChange={(e) => setWhy(e.target.value)} placeholder="e.g. Shipment cancelled before pickup" />{why.trim().length < 5 && <p className="text-xs">Write a short reason to continue.</p>}</div>} />)}
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
@@ -80,7 +86,7 @@ export function AdminPayments() {
                       <td className="px-3 py-3 text-right tabular-nums">{usd(p.amountUsd)}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-text-muted">{p.feeUsd ? usd(p.feeUsd) : '—'}</td>
                       <td className="whitespace-nowrap px-3 py-3 text-xs">{paymentStatusLabels[p.status]}{p.releasedAt && <span className="text-text-muted"> · {fmt(p.releasedAt)} {releaseLabel(p)}</span>}{p.refundReason && <p className="max-w-[200px] truncate text-text-muted" title={p.refundReason}>{p.refundReason}</p>}</td>
-                      <td className="px-3 py-3 text-right">{p.status === 'held' && <div className="inline-flex gap-1.5"><button onClick={() => act(() => paymentsApi.release(p.id), 'Funds released to the shipper.', p.id)} disabled={busy === p.id} className="btn-ghost !min-h-8 !px-2.5 text-xs disabled:opacity-60">Release</button>{p.provider === 'stripe' && <button onClick={() => { const r = window.prompt('Refund reason (shown to the customer):'); if (r) void act(() => paymentsApi.refund(p.id, r), 'Refund issued.', p.id) }} disabled={busy === p.id} className="btn-ghost !min-h-8 !px-2.5 text-xs text-danger disabled:opacity-60">Refund</button>}</div>}</td>
+                      <td className="px-3 py-3 text-right">{p.status === 'held' && <div className="inline-flex gap-1.5"><button onClick={() => setAsk({ kind: 'release', p })} disabled={busy === p.id} className="btn-ghost !min-h-8 !px-2.5 text-xs disabled:opacity-60">Release</button>{p.provider === 'stripe' && <button onClick={() => { setWhy(''); setAsk({ kind: 'refund', p }) }} disabled={busy === p.id} className="btn-ghost !min-h-8 !px-2.5 text-xs text-danger disabled:opacity-60">Refund</button>}</div>}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -74,10 +74,7 @@ export function AdminScreening() {
   if (!d) return <section className="mt-12"><p className="text-sm text-text-muted">{error || 'Loading…'}</p></section>
   const open = d.hits.filter((h) => h.status === 'open')
   return (
-    <section className="mt-14" data-testid="admin-screening">
-      <p className="eyebrow mb-1">Compliance</p>
-      <h2 className="!text-[clamp(1.5rem,3vw,2rem)]">Sanctions screening</h2>
-      <p className="mt-1 max-w-3xl text-text-muted">Senders, receivers and shipping companies are checked against the US Treasury OFAC list. A possible match holds the booking (or verification) until someone here reviews it. Most matches are just a shared name — clear them with a short note.</p>
+    <section className="mt-6" data-testid="admin-screening">
       {msg && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2 text-sm text-teal"><Check size={14} aria-hidden="true" /> {msg}</p>}
       {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
       <div className="mt-6 grid gap-4 md:grid-cols-3">

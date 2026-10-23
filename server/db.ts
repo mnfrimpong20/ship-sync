@@ -12,7 +12,7 @@ import { seedDestinations } from './geoMeta'
 /** HIDE_DEMO_SHIPPERS=true removes the fictional seed shippers from every public list (directory, matching, home stats) without deleting them. */
 export const hideDemoShippers = () => /^(1|true|yes)$/i.test(process.env.HIDE_DEMO_SHIPPERS ?? '')
 /** SQL fragment for public shipper queries (`where <publicShipperSql()>`): never the platform's own sourcing desk, and no demo shippers once hidden. */
-export const publicShipperSql = (alias = '') => `${alias}id <> 'ship-sync-sourcing' and coalesce(${alias}standing, 'good') <> 'paused'${hideDemoShippers() ? ` and ${alias}demo = false` : ''}`
+export const publicShipperSql = (alias = '') => `${alias}id <> 'ship-sync-sourcing' and ${alias}archived_at is null and coalesce(${alias}standing, 'good') <> 'paused'${hideDemoShippers() ? ` and ${alias}demo = false` : ''}`
 import { seedGroupageDemo } from './groupage'
 import { seedBrokersDemo } from './brokers'
 import { rollSchedule } from './booking'
@@ -1384,6 +1384,9 @@ create index if not exists receiver_charges_shipment on receiver_charges (shipme
 alter table receiver_charges add column if not exists settled_to text not null default '';
 alter table receiver_charges add column if not exists payout_done boolean not null default false;
 alter table shippers add column if not exists paystack_subaccount text not null default '';
+alter table shippers add column if not exists archived_at timestamptz;
+create table if not exists admin_snoozes (key text primary key, until timestamptz not null, note text not null default '', by_name text not null default '', at timestamptz not null default now());
+alter table shippers add column if not exists archived_reason text not null default '';
 alter table pieces add column if not exists weight_kg numeric;
 alter table pieces add column if not exists length_cm numeric;
 alter table pieces add column if not exists width_cm numeric;

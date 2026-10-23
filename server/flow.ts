@@ -87,6 +87,16 @@ export async function cascadeEta(db: Db, containerId: string, eta: string, sourc
   return rows.length
 }
 
+/** A shipment just went into a container: from now on its arrival date is the container's. The quoted date is kept as eta_original. */
+export async function etaFromContainer(db: Db, s: Row, c: Row) {
+  const eta = c.eta ? DATE(c.eta) : null; const was = s.eta ? DATE(s.eta) : null
+  if (!eta || eta === was) return false
+  await db.query('update shipments set eta_original = coalesce(eta_original, eta), eta = $2 where id = $1', [s.id, eta])
+  await db.query('insert into shipment_events (shipment_id,status,place,note) select id, status, $2, $3 from shipments where id = $1', [s.id, '', `Arrival date ${fmtDay(eta)}${was ? ` (was ${fmtDay(was)})` : ''} — now follows container ${c.ref}${c.vessel_name ? ` on ${c.vessel_name}` : ''}.`])
+  if (s.user_id) await notify(db, { userId: s.user_id, kind: 'shipment_status', title: `${s.ref}: arriving about ${fmtDay(eta)}`, body: `Your shipment is in its container${c.etd ? `, sailing ${fmtDay(DATE(c.etd)!)}` : ''}. It should arrive about ${fmtDay(eta)}${was && was !== eta ? ` (we first estimated ${fmtDay(was)})` : ''}. The date updates by itself if the ship is early or late.`, link: `/track?ref=${s.ref}` }).catch(() => {})
+  return true
+}
+
 /* ---------------- 2 · unloading at destination ---------------- */
 
 /** Container unloaded at the destination warehouse: pieces into the yard, collection shipments open for collection, delivery ones flagged for a run. */

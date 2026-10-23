@@ -1,4 +1,4 @@
-import { cascadeEta, devanShipments, sendPreAlerts } from './flow'
+import { cascadeEta, devanShipments, etaFromContainer, sendPreAlerts } from './flow'
 import { isDriverRole } from '../src/lib/roles'
 import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
@@ -166,6 +166,7 @@ export async function loadIntoContainer(db: Db, c: Row, ids: string[], by: strin
       await db.query('update shipments set container_id = $2 where id = $1', [s.id, c.id])
       const target = CASCADE[c.status as ContainerStatus] ?? 'picked_up' // loading a box means the shipment has been collected
       await raise(db, s, target, c.origin_port || 'Origin yard', `Loaded into container ${c.ref}${c.number ? ` (${c.number})` : ''} by ${by}.`)
+      await etaFromContainer(db, s, c) // the shipment's ETA follows the container from here on
     }
     if (c.status === 'booked') { await db.query(`update containers set status = 'loading' where id = $1`, [c.id]); await db.query('insert into container_events (container_id,status,place,note,by_name) values ($1,\'loading\',$2,$3,$4)', [c.id, c.origin_port || '', 'First shipments loaded.', by]) }
 }

@@ -64,7 +64,7 @@ export function HowItWorks() {
       <ol className="grid gap-6 md:grid-cols-3">
         {steps.map((s, i) => (
           <motion.li key={s.title} variants={fadeUp} className="card-dark relative p-7">
-            <span className="absolute right-6 top-5 font-heading text-5xl font-extrabold text-gold/70" aria-hidden="true">0{i + 1}</span>
+            <span className="absolute right-6 top-5 font-heading text-5xl font-extrabold text-gold-deep" aria-hidden="true">0{i + 1}</span>
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gold/15 text-gold-deep"><s.icon size={22} aria-hidden="true" /></span>
             <h3 className="mt-5 text-text">{s.title}</h3>
             <p className="mt-2 text-text-muted">{s.body}</p>

@@ -1,6 +1,7 @@
 import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { roleAllows, roleHome } from '../lib/ops'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Clock, FileText, Pencil, PlusCircle, Search, Send, X } from 'lucide-react'
 import { cargoName, countryByCode, type CargoType, type Shipper } from '../lib/data'
@@ -86,7 +87,7 @@ export function CustomerDashboard() {
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 6000); return () => clearTimeout(t) } }, [toast])
   if (!ready) return <div className="bg-bg text-text"><BrandLoader label="Loading your dashboard…" /></div>
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/dashboard${sp.toString() ? `?${sp}` : ''}`)}`} replace />
-  if (user.role === 'shipper') return <Navigate to="/dashboard/shipper" replace />
+  if (user.role === 'shipper') return <Navigate to={roleHome[user.staffRole ?? 'owner']} replace />
 
   const meta = SECTIONS[tab as Exclude<Tab, 'overview'>]
   void shipments
@@ -349,6 +350,8 @@ export function ShipperDashboard() {
   if (!ready) return <div className="bg-bg text-text"><BrandLoader label="Loading your dashboard…" /></div>
   if (!user) return <Navigate to="/login?role=shipper&next=/dashboard/shipper" replace />
   if (user.role !== 'shipper' || !user.shipperId) return <Navigate to="/dashboard" replace />
+  // The company profile is the owner's (and dispatcher's) to edit — the server refuses everyone else too.
+  if (view === 'profile' && !roleAllows(user.staffRole, '/dashboard/brand', user.perms as never)) return <Navigate to="/dashboard/shipper" replace />
   const me = user.shipperId
   const leads = requests.filter((r) => r.status === 'open')
   const full = shipperById(me)

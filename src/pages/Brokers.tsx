@@ -7,10 +7,11 @@ import { Anchor, ArrowLeft, LogIn, BadgeCheck, Calculator, Check, ClipboardCheck
 import { brokersApi, jobStepLabels, JOB_STEPS, type Broker, type BrokerInput, type JobStep, type StepInput } from '../lib/brokers'
 import { countries, countryByCode, cargoLabel, cargoTypes, type CargoType } from '../lib/data'
 import { useStore } from '../lib/store'
-import { Avatar, Empty, Logo, Pill, Rating, fmtDateTime, money, Flag } from '../components/ui'
+import { Avatar, Empty, Logo, Pill, Rating, fmtDate, fmtDateTime, money, Flag } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
 import { StatCard } from '../components/board'
 import { BrokerApplications, DashboardAccess, useBrokerAccess } from '../components/AdminBrokerNetwork'
+import { LinkProblem } from '../components/LinkProblem'
 
 /* ================= public directory ================= */
 export function BrokerCard({ b, cargo }: { b: Broker; cargo?: CargoType }) {
@@ -271,9 +272,10 @@ export function BrokerPortal() {
   const load = () => brokersApi.portal(token).then(setD).catch((e) => setError(e instanceof Error ? e.message : 'Not found.'))
   useEffect(() => { void load() }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 4000); return () => clearTimeout(t) }, [toast])
-  if (error && !d) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center text-danger">{error}</div></div>
+  if (error && !d) return <LinkProblem chrome title="This clearance-job link doesn’t work" body="The job may have been cancelled or reassigned. Ask the shipping company, or sign in to your broker dashboard to see your jobs." track={false} />
   if (!d) return <div className="min-h-dvh bg-bg text-text"><BrandLoader /></div>
   const { job: j, shipment: s } = d
+  setPageTitle(`${s.ref} · clearance job`)
   const idx = JOB_STEPS.indexOf(j.status as JobStep); const next: JobStep | null = idx >= 0 && idx < JOB_STEPS.length - 1 ? JOB_STEPS[idx + 1] : null
   const closed = ['done', 'cancelled', 'declined'].includes(j.status)
   const submit = async (e: React.FormEvent) => { e.preventDefault(); if (!f) return; setBusy(true); setError(''); try { await brokersApi.portalStep(token, f); await load(); setF(null); setToast('Updated — the customer and the shipper have been told.') } catch (err) { setError(err instanceof Error ? err.message : 'Could not update.') } finally { setBusy(false) } }
@@ -290,7 +292,7 @@ export function BrokerPortal() {
               <div><dt className="text-xs text-text-muted">Your fee on file</dt><dd className="font-semibold tabular-nums">{money(j.feeUsd)}</dd></div>
               {s.consignee && <div><dt className="text-xs text-text-muted">Consignee</dt><dd>{s.consignee.name} · <a href={`tel:${s.consignee.phone}`} className="text-gold-deep hover:underline"><Phone size={11} className="inline" aria-hidden="true" /> {s.consignee.phone}</a><span className="block text-xs text-text-muted">{s.consignee.address}{s.consignee.city ? `, ${s.consignee.city}` : ''}</span></dd></div>}
               {s.vehicle && <div className="sm:col-span-2"><dt className="text-xs text-text-muted">Vehicle</dt><dd>{s.vehicle.label}{s.vehicle.body ? ` · ${s.vehicle.body}` : ''}{s.vehicle.engineL ? ` · ${s.vehicle.engineL} L` : ''}{s.vehicle.valueUsd ? ` · declared ${money(s.vehicle.valueUsd)}` : ''}<span className="block font-mono text-xs">{s.vehicle.vin}</span></dd></div>}
-              {s.container && <div><dt className="text-xs text-text-muted">Container</dt><dd className="font-mono text-xs">{s.container.number} · {s.container.vessel}{s.container.eta ? ` · ETA ${s.container.eta}` : ''}</dd></div>}
+              {s.container && <div><dt className="text-xs text-text-muted">Container</dt><dd className="font-mono text-xs">{s.container.number} · {s.container.vessel}{s.container.eta ? ` · ETA ${fmtDate(s.container.eta + 'T12:00:00Z')}` : ''}</dd></div>}
               {j.notes && <div className="sm:col-span-2"><dt className="text-xs text-text-muted">Notes</dt><dd>{j.notes}</dd></div>}
             </dl>
             {d.documents.length > 0 && <div className="mt-4"><p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Documents</p><ul className="mt-1 flex flex-wrap gap-2">{d.documents.map((x) => x.link ? <li key={x.id}><Link to={x.link} target="_blank" className="btn-ghost !min-h-8 !px-2.5 text-xs"><FileText size={12} aria-hidden="true" /> {x.title}</Link></li> : <li key={x.id} className="text-xs text-text-muted">{x.title} (ask the shipper for a share link)</li>)}</ul></div>}

@@ -92,8 +92,9 @@ export function SignInLink() {
   const [sp] = useSearchParams(); const nav = useNavigate(); const { refresh } = useStore()
   const [err, setErr] = useState('')
   const token = sp.get('token') ?? ''
-  useEffect(() => { if (!token) { setErr('This link is missing its code.'); return } api<{ user: ApiUserLite }>('/auth/link/use', { json: { token } }).then(async (r) => { await refresh(); nav(homeFor(r.user), { replace: true }) }).catch((e) => setErr(e instanceof Error ? e.message : 'Sign in failed.')) }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  return <Shell title="Signing you in" sub="One moment…" aside={<Aside />}>{err ? <div className="grid gap-3"><p role="alert" className="text-danger">{err}</p><Link to="/login" className="btn-gold !min-h-12">Go to sign in</Link></div> : <p className="flex items-center gap-2"><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Checking your link…</p>}</Shell>
+  useEffect(() => { document.title = 'Signing in · Ntemtem' }, [])
+  useEffect(() => { if (!token) { setErr('This link is missing its code.'); return } api<{ user: ApiUserLite }>('/auth/link/use', { json: { token } }).then(async (r) => { await refresh(); nav(homeFor(r.user), { replace: true }) }).catch((e) => setErr(/too many/i.test(String(e?.message)) ? String(e.message) : 'This sign-in link has expired or was already used. Ask for a new one, or sign in with your password.')) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  return <Shell title={err ? "That link didn’t work" : "Signing you in"} sub={err ? "Sign-in links work once, for a short time." : "One moment…"} aside={<Aside />}>{err ? <div className="grid gap-3"><p role="alert" className="text-danger">{err}</p><Link to="/login" className="btn-gold !min-h-12">Go to sign in</Link></div> : <p className="flex items-center gap-2"><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Checking your link…</p>}</Shell>
 }
 
 export function Login() {

@@ -110,12 +110,12 @@ export function OpsOverview({ scope }: { scope: 'shipper' | 'customer' }) {
   const tiles = useMemo(() => {
     if (!k) return []
     return scope === 'shipper' ? [
-      { label: 'Revenue', value: money(k.money.value), sub: `Collected · USD · ${period}`, icon: Wallet, kpi: k.money, testid: 'ops-revenue' },
+      ...(k.money ? [{ label: 'Revenue', value: money(k.money.value), sub: `Collected · USD · ${period}`, icon: Wallet, kpi: k.money, testid: 'ops-revenue' }] : [{ label: 'On the way', value: String(k.onTheWay), sub: 'Right now', icon: Ship, testid: 'ops-ontheway' }]),
       { label: 'Shipments', value: String(k.shipments.value), sub: `Picked up · ${period}`, icon: Package, kpi: k.shipments, testid: 'ops-shipments' },
       { label: 'Containers', value: String(k.third.value), sub: `Created · ${period}`, icon: Container, kpi: k.third, testid: 'ops-containers' },
       { label: 'Ratings', value: k.rating?.value != null ? `${k.rating.value} / 5` : '—', sub: k.rating?.count ? `${k.rating.count} customer review${k.rating.count === 1 ? '' : 's'} · ${period}` : 'Your overall rating', icon: Star, testid: 'ops-rating' },
     ] : [
-      { label: 'Spent', value: money(k.money.value), sub: `Paid · USD · ${period}`, icon: Wallet, kpi: k.money, testid: 'ops-spent' },
+      { label: 'Spent', value: money(k.money?.value ?? 0), sub: `Paid · USD · ${period}`, icon: Wallet, kpi: k.money ?? undefined, testid: 'ops-spent' },
       { label: 'Shipments', value: String(k.shipments.value), sub: `Booked · ${period}`, icon: Package, kpi: k.shipments, testid: 'ops-shipments' },
       { label: 'Delivered', value: String(k.third.value), sub: period, icon: Truck, kpi: k.third, testid: 'ops-delivered' },
       { label: 'On the way', value: String(k.onTheWay), sub: 'Right now', icon: Ship, testid: 'ops-ontheway' },
@@ -137,7 +137,7 @@ export function OpsOverview({ scope }: { scope: 'shipper' | 'customer' }) {
             <motion.section variants={fadeUp} className="card-dark min-w-0 p-5 xl:col-span-7" aria-labelledby="ops-vol-h" data-testid="ops-volume">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div><h2 id="ops-vol-h" className="!text-base">{kind === 'usd' ? (scope === 'shipper' ? 'Revenue' : 'Spending') : 'Shipment volume'}</h2><p className="text-xs text-text-muted">{kind === 'usd' ? (scope === 'shipper' ? 'Collected' : 'Paid') : scope === 'shipper' ? 'Shipments picked up' : 'Shipments booked'} per {d.bucket} · {period}</p></div>
-                <div className="inline-flex rounded-full border border-border p-0.5 text-xs" role="radiogroup" aria-label="Measure">{([['shipments', 'Shipments'], ['usd', scope === 'shipper' ? 'Revenue' : 'Spending']] as const).map(([v, l]) => <button key={v} type="button" role="radio" aria-checked={kind === v} onClick={() => setKind(v)} className={`min-h-7 rounded-full px-3 font-semibold focus-ring ${kind === v ? 'bg-ink text-bg' : 'text-text-muted'}`}>{l}</button>)}</div>
+                {k?.money !== null && <div className="inline-flex rounded-full border border-border p-0.5 text-xs" role="radiogroup" aria-label="Measure">{([['shipments', 'Shipments'], ['usd', scope === 'shipper' ? 'Revenue' : 'Spending']] as const).map(([v, l]) => <button key={v} type="button" role="radio" aria-checked={kind === v} onClick={() => setKind(v)} className={`min-h-7 rounded-full px-3 font-semibold focus-ring ${kind === v ? 'bg-ink text-bg' : 'text-text-muted'}`}>{l}</button>)}</div>}
               </div>
               <Bars data={d.series} bucket={d.bucket} kind={kind} />
             </motion.section>

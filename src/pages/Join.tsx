@@ -13,6 +13,7 @@ export default function Join() {
   const [params] = useSearchParams()
   const token = params.get('token') ?? ''
   const nav = useNavigate()
+  useEffect(() => { document.title = 'Join your team · Ntemtem' }, [])
   const { refresh } = useStore()
   const [invite, setInvite] = useState<JoinInvite | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'invalid'>('loading')

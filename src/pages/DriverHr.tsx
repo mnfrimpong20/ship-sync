@@ -316,6 +316,7 @@ export function PayslipPage() {
 export function VerifyDriverPage() {
   const { token } = useParams(); const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.verify>> | null>(null); const [err, setErr] = useState('')
   useEffect(() => { hrApi.verify(token ?? '').then(setD).catch((e) => setErr(errOf(e, 'This badge isn’t valid.'))) }, [token])
+  useEffect(() => { document.title = 'Driver check · Ntemtem' }, [])
   return (
     <div className="bg-bg text-text"><div className="container-x max-w-md py-12" data-testid="verify-page">
       <h1 className="!text-2xl">Driver check</h1>

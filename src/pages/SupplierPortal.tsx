@@ -7,6 +7,7 @@ import { AlertTriangle, Camera, Check, ClipboardCheck, Clock, Loader2, PackageCh
 import { Logo, Pill, fmtDate, fmtDateTime } from '../components/ui'
 import { supplierApi, type SupplierPortal as Portal, type SupplierUpdate } from '../lib/sourcing'
 import { fadeUp, stagger } from '../lib/motion'
+import { LinkProblem } from '../components/LinkProblem'
 
 /** Labels in English and Simplified Chinese — factories read both, the agents read both. */
 const T = {
@@ -32,7 +33,7 @@ export default function SupplierPortalPage() {
   useEffect(() => { void load(); try { setF((x) => ({ ...x, by: localStorage.getItem('ss-supplier-name') ?? '' })) } catch { /* ignore */ } }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 5000); return () => clearTimeout(t) }, [toast])
   useEffect(() => { if (d?.po?.readyBy && !f.readyBy) setF((x) => ({ ...x, readyBy: d.po!.readyBy })) }, [d]) // eslint-disable-line react-hooks/exhaustive-deps
-  if (error && !d) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center text-danger">{error}</div></div>
+  if (error && !d) return <LinkProblem chrome title="This supplier link doesn’t work · 链接无效" body="It may have expired or been replaced. Ask your Ntemtem sourcing agent for a new one. · 请联系您的 Ntemtem 采购代理获取新链接。" track={false} />
   if (!d) return <div className="min-h-dvh bg-bg text-text"><BrandLoader /></div>
   const closed = ['closed', 'cancelled', 'delivered'].includes(d.job.status)
   const needsDate = kind === 'ready' || kind === 'delay'

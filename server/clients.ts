@@ -6,7 +6,7 @@ import type { Request, Response, NextFunction, Router } from 'express'
 import { z } from 'zod'
 import { normaliseGps } from '../src/lib/address'
 import { makeRef, uid, type Db } from './db'
-import type { ApiUser } from './api'
+import { can, type ApiUser } from './api'
 import { countryByCode } from '../src/lib/data'
 
 type Row = Record<string, any>
@@ -238,7 +238,8 @@ export function mountClients(r: Router, d: Deps) {
   }))
   /** Everything due across all clients — for the dashboard's reminder strip. */
   r.get('/clients/reminders/due', wrap(async (req, res) => {
-    const db = await getDb(); const { shipperId } = await shipperOf(db, req)
+    const db = await getDb(); const { user, shipperId } = await shipperOf(db, req)
+    if (!can(user, 'clients')) return res.json({ reminders: [] }) // follow-ups name clients — only for people with the client book
     const { rows } = await db.query<Row>(`select a.*, c.name as client_name from client_activities a join clients c on c.id = a.client_id where a.shipper_id = $1 and a.type = 'reminder' and a.done = false order by a.due_at asc limit 50`, [shipperId])
     res.json({ reminders: rows.map((x) => ({ ...activityOut(x), clientName: x.client_name })) })
   }))

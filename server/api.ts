@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { defaultShipsOn } from './shipDate'
 import { publicShipperSql, getDb, makeRef, uid, type Db } from './db'
+import { isDriver, staffGuard } from './staffGuard'
 import { nextStatus, statusLabels, statusOrder, type CargoType, type ShipmentStatus } from '../src/lib/data'
 import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } from '../src/lib/geo'
 import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion, type Position } from './live'
@@ -85,7 +86,7 @@ const ROLE_BASE: Record<string, Area[] | 'all'> = {
   owner: 'all', dispatcher: 'all',
   agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing', 'analytics'],
   finance: ['clients', 'payments', 'collections', 'reviews', 'shipments', 'team', 'analytics'],
-  warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team', 'analytics'],
+  warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team'],
   pickup_driver: ['routes'], delivery_driver: ['routes'], driver: ['routes'],
 }
 /** Role + per-person overrides → may this staff member use this area? Admins and customers are handled by callers. */
@@ -197,6 +198,12 @@ const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Re
 
 /* ---------------- auth ---------------- */
 async function currentUser(db: Db, req: Request): Promise<ApiUser | null> {
+  // Looked up once per request — the staff guard and the route share it.
+  const memo = req as Request & { ssUserLookup?: Promise<ApiUser | null> }
+  if (!memo.ssUserLookup) memo.ssUserLookup = lookupUser(db, req)
+  return memo.ssUserLookup
+}
+async function lookupUser(db: Db, req: Request): Promise<ApiUser | null> {
   const sid = req.cookies?.[SESSION_COOKIE]
   if (!sid) return null
   const { rows } = await db.query<Row>(
@@ -491,6 +498,8 @@ const zQuote = z.object({ price: z.number().int().min(1), transitDays: z.number(
 export function apiRouter() {
   const r = Router()
   r.use(auditMiddleware(getDb))
+  // Role layer for shipping-company staff (drivers, warehouse, finance, agents) — see staffGuard.ts.
+  r.use(staffGuard({ resolve: async (req) => currentUser(await getDb(), req), can }))
 
   r.get('/health', wrap(async (_req, res) => { const db = await getDb(); res.json({ ok: true, db: db.kind }) }))
 
@@ -684,6 +693,7 @@ export function apiRouter() {
   r.get('/requests', wrap(async (req, res) => {
     const db = await getDb(); const user = await requireUser(db, req)
     if (user.role === 'customer') return res.json({ requests: await loadRequests(db, 'user_id = $1', [user.id]) })
+    if (!can(user, 'leads')) return res.json({ requests: [] }) // quote requests are for owners, dispatchers and sales
     // shipper: eligible open requests (one rule: leadFit) + anything they've quoted. Filtered in SQL first so it scales.
     const { rows: me } = await db.query<Row>('select * from shippers where id = $1', [user.shipperId])
     const s = shipperOut(me[0])
@@ -838,7 +848,10 @@ export function apiRouter() {
   // shipments
   r.get('/shipments', wrap(async (req, res) => {
     const db = await getDb(); const user = await requireUser(db, req)
-    const shipments = user.role === 'customer' ? await loadShipments(db, 'user_id = $1', [user.id]) : await loadShipments(db, 'shipper_id = $1', [user.shipperId])
+    // Drivers only see the shipments on their own runs; the rest of the office sees the company's book.
+    const shipments = user.role === 'customer' ? await loadShipments(db, 'user_id = $1', [user.id])
+      : isDriver(user.staffRole) ? await loadShipments(db, `shipper_id = $1 and id in (select st.shipment_id from run_stops st join runs ru on ru.id = st.run_id where ru.driver_id = $2 and st.shipment_id is not null)`, [user.shipperId, user.staffId ?? ''])
+      : await loadShipments(db, 'shipper_id = $1', [user.shipperId])
     const docs = await documentCounts(db, shipments.map((s) => s.id), user.role === 'customer')
     res.json({ shipments: shipments.map((s) => ({ ...s, documents: docs[s.id] ?? 0 })) })
   }))
@@ -848,6 +861,7 @@ export function apiRouter() {
     const s = rows[0]
     if (!s) throw new HttpError(404, 'Shipment not found.')
     if (user.role !== 'shipper' || s.shipper_id !== user.shipperId) throw new HttpError(403, 'Only the handling shipper can update this shipment.')
+    if (isDriver(user.staffRole)) { const { rows: mine } = await db.query<Row>(`select 1 from run_stops st join runs ru on ru.id = st.run_id where st.shipment_id = $1 and ru.driver_id = $2 limit 1`, [s.id, user.staffId ?? '']); if (!mine[0]) throw new HttpError(403, 'You can only update shipments on your own runs.') }
     if (s.cancelled_at) throw new HttpError(409, 'This shipment was cancelled.')
     const next = nextStatus(s.status as ShipmentStatus, s.handover)
     if (!next) throw new HttpError(409, 'Shipment is already delivered.')

@@ -11,6 +11,7 @@ import { OnboardingChecklist } from './Onboarding'
 import { OrderLinkCard } from './OrderLink'
 import { OpsOverview } from './OpsOverview'
 import { useStore } from '../lib/store'
+import { roleAllows } from '../lib/ops'
 
 /* ---------- small pieces ---------- */
 function Delta({ d }: { d?: number | null }) {
@@ -182,7 +183,8 @@ function QuotesOverview({ firstName }: { firstName: string }) {
 
       {/* KPIs */}
       <motion.section variants={fadeUp} aria-label="Key numbers" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Tile label="Invoiced · 30 days" kpi={{ ...k.invoiced, hint: `${money(k.collected.value ?? 0)} collected · ${money(k.outstanding.value ?? 0)} outstanding` }} format={money} spark={o.series.map((s) => s.invoiced)} icon={Wallet} to="/dashboard/clients?filter=owing" />
+        {k.invoiced ? <Tile label="Invoiced · 30 days" kpi={{ ...k.invoiced, hint: `${money(k.collected?.value ?? 0)} collected · ${money(k.outstanding?.value ?? 0)} outstanding` }} format={money} spark={o.series.map((s) => s.invoiced)} icon={Wallet} to="/dashboard/clients?filter=owing" />
+          : <Tile label="Delivered · 30 days" kpi={k.delivered} spark={o.series.map((s) => s.booked)} icon={Ship} to="/dashboard/shipments" />}
         <Tile label="Quotes sent · 30 days" kpi={k.quotes} spark={o.series.map((s) => s.quotes)} icon={Send} to="/dashboard/shipper?view=leads" />
         <Tile label="Win rate · 90 days" kpi={k.winRate} format={(v) => `${v}%`} icon={TrendingUp} to="/dashboard/shipper?view=leads" />
         <Tile label="Active shipments" kpi={k.active} spark={o.series.map((s) => s.booked)} icon={Ship} to="/dashboard/shipments" />
@@ -192,7 +194,8 @@ function QuotesOverview({ firstName }: { firstName: string }) {
           { l: 'New client requests', v: k.leads.value, h: k.leads.hint, i: Inbox, to: '/dashboard/leads' },
           { l: 'Avg first reply', v: k.response.value == null ? '—' : `${k.response.value}h`, h: k.response.hint, i: Clock, to: '/dashboard/leads' },
           { l: 'Delivered · 30 days', v: k.delivered.value, h: k.delivered.hint, i: Package, to: '/dashboard/shipments' },
-          { l: 'Collected · 30 days', v: money(k.collected.value ?? 0), h: k.collected.delta != null ? `${k.collected.delta > 0 ? '+' : ''}${k.collected.delta}% vs last 30d` : k.collected.hint, i: Wallet, to: '/dashboard/clients?filter=owing' },
+          k.collected ? { l: 'Collected · 30 days', v: money(k.collected.value ?? 0), h: k.collected.delta != null ? `${k.collected.delta > 0 ? '+' : ''}${k.collected.delta}% vs last 30d` : k.collected.hint, i: Wallet, to: '/dashboard/clients?filter=owing' }
+            : { l: 'Past their ETA', v: o.today.late, h: 'Shipments to update', i: Clock, to: '/dashboard/shipments' },
           { l: 'Active clients', v: k.clients.value, h: k.clients.hint, i: Users, to: '/dashboard/clients' },
         ].map((s) => <Link key={s.l} to={s.to} className="flex items-start gap-3 px-4 py-4 hover:bg-surface-2 focus-ring first:rounded-l-[var(--radius-lg)] last:rounded-r-[var(--radius-lg)]"><s.i size={16} className="mt-0.5 shrink-0 text-text-muted" aria-hidden="true" /><span className="min-w-0"><span className="block text-xs text-text-muted">{s.l}</span><span className="block font-heading text-xl font-bold tabular-nums">{s.v}</span><span className="block truncate text-xs text-text-muted">{s.h}</span></span></Link>)}
       </motion.div>
@@ -239,7 +242,7 @@ function QuotesOverview({ firstName }: { firstName: string }) {
                 { to: '/dashboard/routes/new', l: 'Plan a run', i: MapPinned }, { to: '/dashboard/clients?new=1', l: 'Add a client', i: UserPlus },
                 { to: '/dashboard/team', l: 'Invite teammate', i: Users }, { to: '/dashboard/fleet', l: 'Add a vehicle', i: Truck },
                 { to: '/dashboard/shipments', l: 'Update a shipment', i: Ship }, { to: '/dashboard/shipper?view=profile', l: 'Edit profile', i: FileText },
-              ].map((a) => <Link key={a.l} to={a.to} className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 hover:border-gold/40 hover:bg-surface-2 focus-ring"><a.i size={15} className="text-gold-deep" aria-hidden="true" /> {a.l}</Link>)}
+              ].filter((a) => roleAllows(user?.staffRole, a.to === '/dashboard/shipper?view=profile' ? '/dashboard/brand' : a.to.split('?')[0], user?.perms as never)).map((a) => <Link key={a.l} to={a.to} className="flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 hover:border-gold/40 hover:bg-surface-2 focus-ring"><a.i size={15} className="text-gold-deep" aria-hidden="true" /> {a.l}</Link>)}
             </div>
           </motion.section>
         </div>

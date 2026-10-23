@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction, Router } from 'express'
 import { isDriverRole } from '../src/lib/roles'
 import { humanizeDates } from '../src/lib/dates'
 import type { Db } from './db'
-import type { ApiUser } from './api'
+import { can, type ApiUser } from './api'
 import { countryByCode, statusLabels, statusOrder, type ShipmentStatus } from '../src/lib/data'
 
 type Row = Record<string, any>
@@ -138,8 +138,13 @@ export function mountInsights(r: Router, d: Deps) {
       verified: !!me.verified,
     }
 
+    // People without money or client access get the operational picture only.
+    const money = can(u, 'payments') || can(u, 'collections'); const book = can(u, 'clients'); const sales = can(u, 'leads')
+    if (!money) { for (let i = attention.length - 1; i >= 0; i--) if (attention[i].kind === 'invoice') attention.splice(i, 1); for (const s of series) s.invoiced = 0 }
+    if (!book) for (let i = attention.length - 1; i >= 0; i--) if (attention[i].kind === 'followup') attention.splice(i, 1)
+    if (!sales) for (let i = attention.length - 1; i >= 0; i--) if (attention[i].kind === 'lead') attention.splice(i, 1)
     res.json({
-      today: todayBlock, benchmarks,
+      money, today: todayBlock, benchmarks,
       period: { from: t30.toISOString(), to: now.toISOString() },
       kpis: {
         leads: { value: leads.length, hint: `${staleLeads.length} waiting > 24h` },
@@ -148,17 +153,17 @@ export function mountInsights(r: Router, d: Deps) {
         response: { value: avgResponse, hint: 'avg hours to first quote · 90 days' },
         active: { value: active.length, hint: `${late.length} late · ${stale.length} stale` },
         delivered: { value: delivered30.length, prev: deliveredPrev.length, delta: delta(delivered30.length, deliveredPrev.length), hint: `${me.on_time}% on-time record` },
-        invoiced: { value: invoiced30, prev: invoicedPrev, delta: delta(invoiced30, invoicedPrev), hint: `${inv30.length} invoice${inv30.length === 1 ? '' : 's'}` },
-        collected: { value: collected30, prev: collectedPrev, delta: delta(collected30, collectedPrev), hint: outstanding ? `$${outstanding.toLocaleString()} outstanding` : 'Nothing outstanding' },
-        outstanding: { value: outstanding, hint: overdue.length ? `${overdue.length} overdue` : `${open.length} open invoice${open.length === 1 ? '' : 's'}` },
+        invoiced: !money ? null : { value: invoiced30, prev: invoicedPrev, delta: delta(invoiced30, invoicedPrev), hint: `${inv30.length} invoice${inv30.length === 1 ? '' : 's'}` },
+        collected: !money ? null : { value: collected30, prev: collectedPrev, delta: delta(collected30, collectedPrev), hint: outstanding ? `$${outstanding.toLocaleString()} outstanding` : 'Nothing outstanding' },
+        outstanding: !money ? null : { value: outstanding, hint: overdue.length ? `${overdue.length} overdue` : `${open.length} open invoice${open.length === 1 ? '' : 's'}` },
         clients: { value: clients[0]?.n ?? 0, hint: `${clients[0]?.new30 ?? 0} new this month` },
       },
       series, lanes: lanes.map((l) => ({ ...l, share: laneTotal ? Math.round((l.n / laneTotal) * 100) : 0 })), byStatus,
       pipeline: { leads: leads.length, quoted: q30.length, won: q30.filter((q) => q.status === 'accepted').length },
       ops: { runsToday: runsToday.map((x) => ({ id: x.id, name: x.name, kind: x.kind, status: x.status, driver: x.driver_name ?? null, stops: x.stops, pending: x.pending })), vehicles: { total: vehicles.length, available: vehicles.filter((v) => v.status === 'available').length, onRun: vehicles.filter((v) => v.status === 'on_run').length, maintenance: vehicles.filter((v) => v.status === 'maintenance').length }, team: { active: team.filter((t) => t.status === 'active').length, drivers: team.filter((t) => isDriverRole(t.role) && t.status === 'active').length, invited: team.filter((t) => t.status === 'invited').length }, followupsDue: followups.length },
       attention: attention.slice(0, 8).map((a) => ({ ...a, title: humanizeDates(a.title, { rel: true }), body: humanizeDates(a.body, { rel: true }) })),
-      leads: leads.slice(0, 4).map((l) => ({ id: l.id, ref: l.ref, origin: l.origin, destination: l.destination, mode: l.mode, cargo: l.cargo, contact: l.contact_name, createdAt: iso(l.created_at), competing: l.quote_count })),
-      activity: activity.map((a) => ({ id: a.id, type: a.type, body: a.body, at: iso(a.at), clientName: a.client_name, clientId: a.client_id })),
+      leads: (sales ? leads : []).slice(0, 4).map((l) => ({ id: l.id, ref: l.ref, origin: l.origin, destination: l.destination, mode: l.mode, cargo: l.cargo, contact: l.contact_name, createdAt: iso(l.created_at), competing: l.quote_count })),
+      activity: (book ? activity : []).map((a) => ({ id: a.id, type: a.type, body: a.body, at: iso(a.at), clientName: a.client_name, clientId: a.client_id })),
     })
   }))
 }

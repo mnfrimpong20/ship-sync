@@ -1,4 +1,6 @@
 import { BrandLoader } from '../components/BrandLoader'
+import { Confirm } from '../components/board'
+import { LinkProblem } from '../components/LinkProblem'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Check, KeyRound, MessageSquare, Phone, Ship } from 'lucide-react'
@@ -6,6 +8,7 @@ import { countryByCode, statusLabels } from '../lib/data'
 import { shipmentOpsApi, type ManifestRow, type PartnerView } from '../lib/shipmentOps'
 import { Logo, Pill, fmtDate } from '../components/ui'
 import { stageLabels } from '../lib/containers'
+import { setPageTitle } from '../lib/site'
 
 /** `/p/:token` — the destination agent's page for one container. No login; the shipper can switch the link off. */
 export default function PartnerPortal() {
@@ -14,12 +17,14 @@ export default function PartnerPortal() {
   const [err, setErr] = useState(''); const [toast, setToast] = useState(''); const [busy, setBusy] = useState('')
   const [open, setOpen] = useState<{ id: string; kind: 'handover' | 'note' } | null>(null)
   const [f, setF] = useState({ code: '', name: '', note: '' })
+  const [ask, setAsk] = useState(false) // container stage changes are confirmed first — senders and receivers see them
   const load = () => shipmentOpsApi.partnerView(token).then(setD).catch((e) => setErr(e instanceof Error ? e.message : 'Not found.'))
   useEffect(() => { void load() }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(''), 4000); return () => clearTimeout(t) } }, [toast])
-  if (err && !d) return <div className="min-h-dvh bg-bg text-text"><div className="container-x py-24 text-center text-danger">{err}</div></div>
+  if (err && !d) return <LinkProblem chrome title="This agent link doesn’t work" body="It may have been switched off by the shipping company, or the container is finished. Ask them for a new link." track={false} />
   if (!d) return <div className="min-h-dvh bg-bg text-text"><BrandLoader /></div>
   const c = d.container
+  setPageTitle(`${c.ref} · destination agent`)
   const order = ['sailed', 'arrived', 'customs', 'devanned']
   const nextStage = (['arrived', 'customs', 'devanned'] as const).find((st) => order.indexOf(st) > order.indexOf(c.status))
   const stageLabel = { arrived: 'Mark arrived at port', customs: 'Mark in customs', devanned: 'Mark unloaded at warehouse' } as const
@@ -37,7 +42,10 @@ export default function PartnerPortal() {
         </header>
         {toast && <p role="status" className="mt-4 flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-3 py-2 text-sm text-teal"><Check size={15} aria-hidden="true" />{toast}</p>}
         {err && <p role="alert" className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger" data-testid="partner-error">{err}</p>}
-        {nextStage && <div className="card-dark mt-5 flex flex-wrap items-center justify-between gap-3 p-4"><p className="text-sm">Container update</p><button disabled={!!busy} onClick={() => act('stage', () => shipmentOpsApi.partnerStage(token, nextStage), `${c.ref}: ${stageLabel[nextStage].replace('Mark ', '')}.`)} className="btn-gold !min-h-10 !px-4 text-sm" data-testid="partner-stage">{stageLabel[nextStage]}</button></div>}
+        {nextStage && <div className="card-dark mt-5 flex flex-wrap items-center justify-between gap-3 p-4"><p className="text-sm">Container update</p><button disabled={!!busy} onClick={() => setAsk(true)} className="btn-gold !min-h-10 !px-4 text-sm" data-testid="partner-stage">{stageLabel[nextStage]}</button></div>}
+        {ask && nextStage && <Confirm danger={false} title={`${stageLabel[nextStage]}?`} confirmLabel={stageLabel[nextStage].replace('Mark', 'Yes, mark')} busy={busy === 'stage'} onClose={() => setAsk(false)}
+          onConfirm={() => { setAsk(false); void act('stage', () => shipmentOpsApi.partnerStage(token, nextStage), `${c.ref}: ${stageLabel[nextStage].replace('Mark ', '')}.`) }}
+          body={<p>All {d.totals.shipments} shipments in {c.ref} will show this to their senders and receivers, and {d.shipper.name} is told.{nextStage === 'devanned' ? ' Receivers who collect get their collection code by text.' : ''} Only confirm once it has really happened.</p>} />}
         {c.status === 'devanned' && <p className="mt-3 text-xs text-text-muted">Unloaded: recipients who collect have had their code by text. Ask for it at handover.</p>}
         <ul className="mt-5 space-y-2">
           {d.shipments.map((s) => (

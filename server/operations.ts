@@ -6,6 +6,7 @@
  *   GET /shipper/operations?range=30d|90d|ytd|12m|all
  *   GET /me/operations?range=…
  */
+import { can } from './api'
 import type { Request, Response, NextFunction, Router } from 'express'
 import type { Db } from './db'
 import type { ApiUser } from './api'
@@ -159,7 +160,10 @@ export function mountOperations(r: Router, d: Deps) {
   r.get('/shipper/operations', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireUser(db, req)
     if (u.role !== 'shipper' || !u.shipperId) throw new HttpError(403, 'For shipping companies only.')
-    res.set('Cache-Control', 'no-store'); res.json(await build(db, { shipperId: u.shipperId }, rangeOf(req)))
+    const out = await build(db, { shipperId: u.shipperId }, rangeOf(req))
+    // Revenue is for people who handle money (owner, dispatcher, finance) — warehouse, sales and drivers see volume only.
+    if (!(can(u, 'payments') || can(u, 'collections'))) { (out.kpis as { money: unknown }).money = null; out.series = out.series.map((x) => ({ ...x, usd: 0 })) }
+    res.set('Cache-Control', 'no-store'); res.json(out)
   }))
   r.get('/me/operations', wrap(async (req, res) => {
     const db = await getDb(); const u = await requireUser(db, req)

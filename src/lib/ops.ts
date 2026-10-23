@@ -47,12 +47,27 @@ export const ROLE_BASE: Record<StaffRole, Area[] | 'all'> = {
   owner: 'all', dispatcher: 'all',
   agent: ['leads', 'rates', 'lanes', 'groupage', 'shipments', 'containers', 'sailings', 'pickups', 'routes', 'warehouse', 'clients', 'reviews', 'team', 'sourcing', 'analytics'],
   finance: ['clients', 'payments', 'collections', 'reviews', 'shipments', 'team', 'analytics'],
-  warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team', 'analytics'],
+  warehouse: ['warehouse', 'containers', 'pickups', 'shipments', 'team'],
   pickup_driver: ['routes'],
   delivery_driver: ['routes'],
   driver: ['routes'],
 }
-const ALWAYS = ['/dashboard/hr', '/dashboard/me', '/dashboard/costs', '/dashboard/campaigns', '/dashboard/integrations', '/dashboard/activity', '/dashboard/billing', '/dashboard/shipper', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/documents', '/dashboard/invoices', '/dashboard/runs', '/dashboard/suppliers', '/dashboard/drivers', '/dashboard/payslip']
+/** Pages every staff member can open — their own work, pay and time, scanning and labels. */
+const ALWAYS = ['/dashboard/me', '/dashboard/shipper', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/documents', '/dashboard/runs', '/dashboard/payslip']
+const has = (a: Area[] | 'all', ...x: Area[]) => a === 'all' || x.some((y) => a.includes(y))
+/** Pages that belong to particular roles (the server refuses the data behind them to everyone else). */
+const PAGE_NEEDS: [string, (role: StaffRole, a: Area[] | 'all') => boolean][] = [
+  ['/dashboard/billing', (r) => r === 'owner' || r === 'finance'],
+  ['/dashboard/integrations', (r) => r === 'owner' || r === 'dispatcher'],
+  ['/dashboard/activity', (r) => r === 'owner' || r === 'dispatcher'],
+  ['/dashboard/hr', (r) => r === 'owner' || r === 'dispatcher' || r === 'finance'],
+  ['/dashboard/drivers', (r) => r === 'owner' || r === 'dispatcher' || r === 'finance'],
+  ['/dashboard/costs', (_r, a) => has(a, 'payments')],
+  ['/dashboard/campaigns', (_r, a) => has(a, 'clients', 'leads')],
+  ['/dashboard/invoices', (_r, a) => has(a, 'collections', 'payments', 'clients')],
+  ['/dashboard/broker-invoices', (_r, a) => has(a, 'collections', 'payments')],
+  ['/dashboard/suppliers', (_r, a) => has(a, 'sourcing')],
+]
 /** Effective areas for a person: role defaults + allow − deny. */
 export function areasFor(role: StaffRole | undefined, perms?: StaffPerms): Area[] | 'all' {
   const base = ROLE_BASE[role ?? 'owner']
@@ -65,7 +80,9 @@ export const roleAllows = (role: StaffRole | undefined, pathname: string, perms?
   const hit = (p: string) => pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p + '?')
   if (isDriverRole(role) && (hit('/dashboard/shipper') || hit('/dashboard/drivers'))) return false
   if (ALWAYS.some(hit)) return true
-  const a = areasFor(role, perms); if (a === 'all') return true
+  const a = areasFor(role, perms)
+  const page = PAGE_NEEDS.find(([p]) => hit(p)); if (page) return page[1](role ?? 'owner', a)
+  if (a === 'all') return true
   return a.some((x) => hit(AREA_PATHS[x]))
 }
 

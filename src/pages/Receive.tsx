@@ -9,6 +9,7 @@ import { statusOrder } from '../lib/data'
 import { RX, STATUS_FR, type RxCopy } from '../lib/receiverText'
 import type { Lang } from '../lib/address'
 import { fadeUp, stagger } from '../lib/motion'
+import { setPageTitle } from '../lib/site'
 
 const STEP_DONE: ((s: string) => boolean)[] = [
   () => true,
@@ -53,9 +54,10 @@ export default function Receive() {
     setBusy(c.id); setError('')
     try { const r = await recipientApi.pay(token, c.id); location.assign(r.url) } catch (err) { setError(err instanceof Error ? err.message : 'Could not open payment.'); setBusy('') }
   }
-  if (error && !d) return <div className="container-x py-24 text-center"><Logo /><p className="mt-6 text-danger">{error}</p><p className="mt-2 text-sm text-text-muted">{t.askSender} <Link to="/track" className="text-gold-deep hover:underline">{t.trackRef}</Link>.</p></div>
+  if (error && !d) { document.title = 'Link not valid · Ntemtem'; return <div className="container-x py-24 text-center"><Logo /><p className="mt-6 text-danger">{error}</p><p className="mt-2 text-sm text-text-muted">{t.askSender} <Link to="/track" className="text-gold-deep hover:underline">{t.trackRef}</Link>.</p></div> }
   if (!d) return <div className="container-x py-24 text-center text-text-muted">{t.loading}</div>
   const s = d.shipment
+  setPageTitle(`${s.ref} · your shipment`)
   const delivered = s.status === 'delivered'
   const collect = !delivered && (d.readyForCollection || s.status === 'customs' || s.status === 'arrived')
   const due = d.charges.filter((c) => c.status === 'due')

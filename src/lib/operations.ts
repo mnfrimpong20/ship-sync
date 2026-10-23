@@ -6,7 +6,7 @@ export const rangeLabels: Record<OpsRange, string> = { '30d': 'Last 30 days', '9
 export interface OpsKpi { value: number; prev: number; delta: number | null }
 export interface Operations {
   range: OpsRange; from: string; bucket: 'week' | 'month'
-  kpis: { money: OpsKpi; shipments: OpsKpi; third: OpsKpi; rating: { value: number | null; count: number } | null; onTheWay: number }
+  kpis: { money: OpsKpi | null; shipments: OpsKpi; third: OpsKpi; rating: { value: number | null; count: number } | null; onTheWay: number }
   series: { start: string; shipments: number; usd: number }[]
   statuses: { key: string; label: string; n: number }[]
   activity: { shipmentId: string; ref: string; customer?: string; status: ShipmentStatus; label: string; at: string; place: string; note: string }[]

@@ -29,8 +29,8 @@ const J = (v: unknown) => (v == null ? null : typeof v === 'string' ? JSON.parse
 const today = () => new Date().toISOString().slice(0, 10)
 const appUrl = () => (process.env.APP_URL || '').replace(/\/$/, '')
 
-export interface CollectionSettings { autoRemind: boolean; beforeDays: number; afterDays: number[]; sms: boolean; message: string }
-export const DEFAULT_COLLECTIONS: CollectionSettings = { autoRemind: true, beforeDays: 3, afterDays: [3, 10, 21], sms: false, message: 'Thank you for shipping with us. You can pay securely online with the button below, or reply to this email to arrange a bank transfer or mobile money.' }
+export interface CollectionSettings { autoRemind: boolean; beforeDays: number; afterDays: number[]; sms: boolean; message: string; /** Shown on every pay link: bank, mobile money, cash office… */ howToPay: string }
+export const DEFAULT_COLLECTIONS: CollectionSettings = { howToPay: '', autoRemind: true, beforeDays: 3, afterDays: [3, 10, 21], sms: false, message: 'Thank you for shipping with us. You can pay securely online with the button below, or reply to this email to arrange a bank transfer or mobile money.' }
 export async function collectionSettings(db: Db, shipperId: string): Promise<CollectionSettings> {
   const { rows } = await db.query<Row>('select collections from shippers where id = $1', [shipperId])
   return { ...DEFAULT_COLLECTIONS, ...(J(rows[0]?.collections) ?? {}) }
@@ -104,7 +104,7 @@ export function startCollectionSweeps(getDb: () => Promise<Db>) {
   setTimeout(run, 40_000); setInterval(run, 6 * 3600_000)
 }
 
-const zSettings = z.object({ autoRemind: z.boolean(), beforeDays: z.number().int().min(0).max(30), afterDays: z.array(z.number().int().min(1).max(120)).max(6), sms: z.boolean(), message: z.string().trim().max(400) })
+const zSettings = z.object({ autoRemind: z.boolean(), beforeDays: z.number().int().min(0).max(30), afterDays: z.array(z.number().int().min(1).max(120)).max(6), sms: z.boolean(), message: z.string().trim().max(400), howToPay: z.string().trim().max(600).default('') })
 
 export function mountCollections(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
@@ -136,7 +136,10 @@ export function mountCollections(r: Router, d: Deps) {
     const db = await getDb(); const inv = await byToken(db, String(req.params.token))
     const [full] = await withPayments(db, [inv]); const p = await latestPayment(db, inv.id); const cfg = await paymentSettings(db)
     res.set('Cache-Control', 'no-store')
-    res.json({ invoice: full, payment: p ? paymentOut(p) : null, online: cfg.enabled && stripeMode() !== 'off', mode: stripeMode(), bank: (J((await db.query<Row>('select payout_details from shippers where id = $1', [inv.shipper_id])).rows[0]?.payout_details) ?? {}).bankName ? 'Bank transfer details available from the shipper.' : null })
+    // How to pay without a card: the company's own instructions, and who to ask (the account owner's contact details).
+    const howToPay = (await collectionSettings(db, inv.shipper_id)).howToPay || ''
+    const { rows: own } = await db.query<Row>(`select name, email, phone from users where shipper_id = $1 order by created_at limit 1`, [inv.shipper_id])
+    res.json({ invoice: full, payment: p ? paymentOut(p) : null, online: cfg.enabled && stripeMode() !== 'off', mode: stripeMode(), howToPay, contact: own[0] ? { email: own[0].email, phone: own[0].phone || '' } : null })
   }))
   r.post('/pay/:token/checkout', wrap(async (req, res) => {
     const db = await getDb(); const inv = await byToken(db, String(req.params.token))
@@ -176,7 +179,7 @@ export function mountCollections(r: Router, d: Deps) {
     res.json({ invoices: list, settings: await collectionSettings(db, u.shipperId!), channels: { email: emailProvider().id !== 'off', sms: smsProvider().id !== 'off' }, totals: { outstanding: open.reduce((n, i) => n + i.balance, 0), overdue: open.filter((i) => i.overdue).reduce((n, i) => n + i.balance, 0), overdueCount: open.filter((i) => i.overdue).length, collected30: list.filter((i) => i.status === 'paid').flatMap((i) => i.payments).filter((p) => (p.at ?? "") >= new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)).reduce((n, p) => n + p.amount, 0) } })
   }))
   r.put('/collections/settings', wrap(async (req, res) => {
-    const db = await getDb(); const u = await office(db, req); if (u.staffRole !== 'owner' && u.staffRole !== 'dispatcher') throw new HttpError(403, 'Owners and dispatchers only.')
+    const db = await getDb(); const u = await office(db, req); if (!['owner', 'dispatcher', 'finance'].includes(u.staffRole ?? 'owner')) throw new HttpError(403, 'Owners, dispatchers and finance only.')
     const b = zSettings.parse({ ...(await collectionSettings(db, u.shipperId!)), ...req.body })
     await db.query('update shippers set collections = $2 where id = $1', [u.shipperId, JSON.stringify(b)])
     res.json({ settings: b })

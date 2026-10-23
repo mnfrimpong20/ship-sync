@@ -5,6 +5,8 @@ import { countries } from '../lib/data'
 import { shipmentOpsApi, type RecipientForm } from '../lib/shipmentOps'
 import { Logo } from '../components/ui'
 import { AddressLookup } from '../components/AddressLookup'
+import { setPageTitle } from '../lib/site'
+import { LinkProblem } from '../components/LinkProblem'
 
 /** `/add-recipient/:token` — the sender tells us who collects the shipment. Phone first, no login. */
 export default function AddRecipient() {
@@ -19,7 +21,8 @@ export default function AddRecipient() {
       <div className="container-x max-w-lg py-8">
         <Logo />
         {!d && !err && <p className="mt-10 text-text-muted">Loading…</p>}
-        {err && !d && <p className="mt-10 text-danger">{err}</p>}
+        {err && !d && <div className="-mx-4"><LinkProblem title="This link doesn’t work any more" body="The recipient may already be saved, or the link has expired. Ask the sender for a new one." /></div>}
+        {d && <TitleOf t={`Who receives ${d.ref}?`} />}
         {d && (done || d.done) ? (
           <div className="card-dark mt-8 p-6 text-center" data-testid="recipient-done"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-teal/15 text-teal"><Check size={22} aria-hidden="true" /></span><h1 className="mt-3 !text-xl">Thank you</h1><p className="mt-2 text-sm text-text-muted">{done ? `${f.name} will get a text when ${d.ref} arrives, with what they need to collect it.` : `${d.recipient?.name ?? 'The recipient'} is already on file for ${d.ref}.`}</p></div>
         ) : d && (
@@ -38,3 +41,6 @@ export default function AddRecipient() {
     </div>
   )
 }
+
+
+function TitleOf({ t }: { t: string }) { setPageTitle(t); return null }

@@ -10,7 +10,9 @@ export interface Overview {
   today: TodayBlock
   benchmarks: Benchmarks
   period: { from: string; to: string }
-  kpis: { leads: Kpi; quotes: Kpi; winRate: Kpi; response: Kpi; active: Kpi; delivered: Kpi; invoiced: Kpi; collected: Kpi; outstanding: Kpi; clients: Kpi }
+  /** false when this person's role doesn't handle money — invoiced/collected/outstanding come back null. */
+  money?: boolean
+  kpis: { leads: Kpi; quotes: Kpi; winRate: Kpi; response: Kpi; active: Kpi; delivered: Kpi; invoiced: Kpi | null; collected: Kpi | null; outstanding: Kpi | null; clients: Kpi }
   series: WeekPoint[]
   lanes: { code: string; name: string; n: number; share: number }[]
   byStatus: { status: ShipmentStatus; label: string; n: number }[]

@@ -1,3 +1,4 @@
+import { setPageTitle } from '../lib/site'
 import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -5,6 +6,7 @@ import { ArrowLeft, Download, Printer } from 'lucide-react'
 import { Logo, fmtDate, fmtDateTime, money } from '../components/ui'
 import { documentsApi, docKindLabels, fmtBytes, type DocFull, type DocPayload } from '../lib/documents'
 import { useStore } from '../lib/store'
+import { LinkProblem } from '../components/LinkProblem'
 
 /* ---------------- generated document templates (white sheet, print-friendly) ---------------- */
 const Sheet = ({ title, number, p, children, foot }: { title: string; number: string; p: DocPayload; children: React.ReactNode; foot?: React.ReactNode }) => (
@@ -191,6 +193,7 @@ export default function DocumentView({ shared = false }: { shared?: boolean }) {
     p.then(setD).catch((e) => setError(e instanceof Error ? e.message : 'Could not open this document.'))
   }, [id, token, shared, ready])
   const doc = d?.document
+  useEffect(() => { if (doc) setPageTitle(doc.title) }, [doc?.title]) // eslint-disable-line react-hooks/exhaustive-deps
   const back = user?.role === 'customer' ? '/dashboard?tab=shipments' : '/dashboard/shipments'
   return (
     <div className="bg-bg text-text">
@@ -200,7 +203,7 @@ export default function DocumentView({ shared = false }: { shared?: boolean }) {
           {shared ? <span className="inline-flex items-center gap-2 text-sm text-text-muted"><Logo tagline={false} /> {d?.shipment ? `Shipment ${d.shipment.ref} · ${d.shipment.origin} → ${d.shipment.destination}` : 'Shared document'}</span> : <Link to={back} className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-gold-deep focus-ring rounded"><ArrowLeft size={14} aria-hidden="true" /> Back to shipments</Link>}
           {doc && <div className="flex flex-wrap gap-2">{d?.dataUrl && <a href={d.dataUrl} download={doc.filename || doc.title} className="btn-ghost !min-h-10 !px-4 text-sm"><Download size={15} aria-hidden="true" /> Download</a>}<button onClick={() => window.print()} className="btn-gold !min-h-10 !px-4 text-sm"><Printer size={15} aria-hidden="true" /> Print / save as PDF</button></div>}
         </div>
-        {error && <div className="py-24 text-center text-danger">{error}</div>}
+        {error && (shared ? <LinkProblem title="This document link doesn’t work" who="the shipping company that shared it" /> : <div className="py-24 text-center text-danger">{error}</div>)}
         {!d && !error && <BrandLoader label="Loading document…" />}
         {doc && (
           <>

@@ -82,7 +82,7 @@ export default function RoutePlanner() {
   useEffect(() => {
     if (!ready || user?.role !== 'shipper') return
     let live = true
-    Promise.all([opsApi.team(), opsApi.vehicles(), isNew ? Promise.resolve(null) : (isDriverRole(user.staffRole) ? opsApi.myRuns() : opsApi.runs()).then((rs) => rs.find((r) => r.id === id) ?? null)])
+    Promise.all([isDriverRole(user.staffRole) ? Promise.resolve([] as Staff[]) : opsApi.team().catch(() => [] as Staff[]), opsApi.vehicles().catch(() => []), isNew ? Promise.resolve(null) : (isDriverRole(user.staffRole) ? opsApi.myRuns() : opsApi.runs()).then((rs) => rs.find((r) => r.id === id) ?? null)])
       .then(([t, v, r]) => { if (!live) return; setTeam(t); setVehicles(v); if (!isNew) { if (!r) setError('Run not found.'); setRun(r) } })
       .catch((e) => live && setError(e instanceof Error ? e.message : 'Could not load.'))
     return () => { live = false }

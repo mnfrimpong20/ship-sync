@@ -17,7 +17,7 @@ const SOCIAL_LABELS: Record<string, string> = { linkedin: 'LinkedIn', instagram:
 export default function Footer() {
   const cfg = useSiteConfig()
   return (
-    <footer className="theme-dark border-t border-border bg-bg text-text">
+    <footer className="theme-dark border-t border-border bg-bg pb-24 text-text md:pb-0">
       <div className="container-fluid border-b border-border py-5">
         <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-xs text-text-muted" aria-label="Trust" data-testid="trust-strip">
           <li className="inline-flex items-center gap-2"><Lock size={14} className="text-gold-deep" aria-hidden="true" /> Payments held in escrow until your goods are on their way</li>
@@ -67,7 +67,7 @@ export default function Footer() {
       <div className="border-t border-border">
         <div className="container-fluid flex flex-col gap-2 py-6 text-xs text-text-muted md:flex-row md:items-center md:justify-between">
           <p>© {new Date().getFullYear()} Ntemtem{cfg?.legalName ? ` · operated by ${cfg.legalName}` : ''}. All rights reserved.</p>
-          <nav aria-label="Legal" className="flex flex-wrap gap-x-5 gap-y-2"><Link to="/privacy" className="hover:text-text focus-ring rounded">Privacy policy</Link><Link to="/terms" className="hover:text-text focus-ring rounded">Terms of service</Link><Link to="/shipper-agreement" className="hover:text-text focus-ring rounded">Shipper agreement</Link></nav>
+          <nav aria-label="Legal" className="flex flex-wrap gap-x-5 gap-y-2"><Link to="/privacy" className="hover:text-text focus-ring rounded">Privacy policy</Link><Link to="/terms" className="hover:text-text focus-ring rounded">Terms of service</Link><Link to="/shipper-agreement" className="hover:text-text focus-ring rounded">Shipper agreement</Link><Link to="/admin" className="hover:text-text focus-ring rounded" data-testid="footer-admin">Admin sign-in</Link></nav>
         </div>
       </div>
     </footer>

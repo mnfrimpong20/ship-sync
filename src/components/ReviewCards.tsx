@@ -102,7 +102,8 @@ export function DisputeCard({ shipmentId }: { shipmentId: string }) {
 }
 
 /** Public: a shipper's real reviews with the distribution. */
-export function ShipperReviews({ shipperId, fallback }: { shipperId: string; fallback: { n: string; d: string; r: number; t: string }[] }) {
+/** Only real reviews from customers who booked through Ntemtem — never sample text. */
+export function ShipperReviews({ shipperId }: { shipperId: string }) {
   const [d, setD] = useState<Awaited<ReturnType<typeof reviewsApi.forShipper>> | null>(null)
   useEffect(() => { reviewsApi.forShipper(shipperId).then(setD).catch(() => setD({ reviews: [], summary: { count: 0, average: null, distribution: [], tags: [] } })) }, [shipperId])
   const list: Review[] = d?.reviews ?? []
@@ -116,7 +117,7 @@ export function ShipperReviews({ shipperId, fallback }: { shipperId: string; fal
       )}
       <ul className="mt-4 divide-y divide-border">
         {list.map((r) => <li key={r.id} className="py-4" data-testid="shipper-review"><div className="flex items-center justify-between"><p className="font-semibold text-text">{r.author} <span className="font-normal text-xs text-text-muted">· verified · {r.lane}</span></p><span className="text-xs text-text-muted">{fmt(r.createdAt)}</span></div><div className="mt-1"><Stars n={r.rating} /></div>{r.tags.length > 0 && <p className="mt-1 text-xs text-text-muted">{r.tags.join(' · ')}</p>}<p className="mt-2 text-sm text-text-muted">{r.body}</p>{r.reply && <p className="mt-2 rounded-lg border border-border bg-surface-2/40 px-3 py-2 text-xs"><strong>Reply:</strong> {r.reply}</p>}</li>)}
-        {d && list.length === 0 && fallback.map((r) => <li key={r.n} className="py-4"><div className="flex items-center justify-between"><p className="font-semibold text-text">{r.n}</p><span className="text-xs text-text-muted">{r.d}</span></div><div className="mt-1"><Stars n={r.r} /></div><p className="mt-2 text-sm text-text-muted">{r.t}</p></li>)}
+        {d && list.length === 0 && <li className="py-4 text-sm text-text-muted" data-testid="no-reviews">No reviews yet. Reviews appear here once customers who booked through Ntemtem rate their shipment.</li>}
       </ul>
     </div>
   )

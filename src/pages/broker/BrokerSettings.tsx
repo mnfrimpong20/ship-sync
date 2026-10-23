@@ -6,6 +6,7 @@ import { jobStepLabels } from '../../lib/brokers'
 import { cargoTypes } from '../../lib/data'
 import { Card, Empty, Err, Page, Toast, errMsg, useBp, useToast } from './BrokerApp'
 import { Thread } from './BrokerJobs'
+import { PasswordInput } from '../../components/PasswordInput'
 
 /* ---------------- messages: every job thread in one place ---------------- */
 export function Messages() {
@@ -94,8 +95,8 @@ export function Profile() {
       </form>
       <Card className="mt-6 max-w-xl" title="Your password" sub={`Signed in as ${me.member.email}`} id="pf-pw">
         <form onSubmit={async (e) => { e.preventDefault(); setPwErr(''); if (pw.length < 8) return setPwErr('Use at least 8 characters.'); if (pw !== pw2) return setPwErr('The two passwords don’t match.'); try { await bpApi.password(pw); setPw(''); setPw2(''); setToast('Password changed.') } catch (er) { setPwErr(errMsg(er)) } }} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-          <Field id="pw1" label="New password"><input id="pw1" type="password" autoComplete="new-password" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} /></Field>
-          <Field id="pw2" label="Repeat it"><input id="pw2" type="password" autoComplete="new-password" className="input-dark" value={pw2} onChange={(e) => setPw2(e.target.value)} /></Field>
+          <Field id="pw1" label="New password"><PasswordInput id="pw1" autoComplete="new-password" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} /></Field>
+          <Field id="pw2" label="Repeat it"><PasswordInput id="pw2" autoComplete="new-password" className="input-dark" value={pw2} onChange={(e) => setPw2(e.target.value)} /></Field>
           <button className="btn-ghost">Change</button>
         </form>
         <Err e={pwErr} />

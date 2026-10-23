@@ -12,6 +12,7 @@ import { fmtDate, fmtDateTime, money } from './ui'
 import { C, HBars, NoData, Panel, Stat, Trend } from './Charts'
 import { MessageThread } from './RequestPanel'
 import { ShipmentChat } from './ShipmentExtras'
+import { PasswordInput } from './PasswordInput'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type R = Record<string, any>
@@ -288,9 +289,9 @@ function SecurityCard() {
   return (
     <Panel title="Password & devices" sub="Changing your password signs you out everywhere else." testid="security">
       <form onSubmit={change} className="grid gap-3 text-sm sm:grid-cols-3">
-        <label><span className="label-dark">Current password</span><input type="password" required className={cls} value={f.current} onChange={(e) => setF({ ...f, current: e.target.value })} autoComplete="current-password" data-testid="pw-current" /></label>
-        <label><span className="label-dark">New password</span><input type="password" required minLength={8} className={cls} value={f.next} onChange={(e) => setF({ ...f, next: e.target.value })} autoComplete="new-password" data-testid="pw-next" /></label>
-        <label><span className="label-dark">New password again</span><input type="password" required minLength={8} className={cls} value={f.again} onChange={(e) => setF({ ...f, again: e.target.value })} autoComplete="new-password" data-testid="pw-again" /></label>
+        <label><span className="label-dark">Current password</span><PasswordInput required className={cls} value={f.current} onChange={(e) => setF({ ...f, current: e.target.value })} autoComplete="current-password" data-testid="pw-current" /></label>
+        <label><span className="label-dark">New password</span><PasswordInput required minLength={8} className={cls} value={f.next} onChange={(e) => setF({ ...f, next: e.target.value })} autoComplete="new-password" data-testid="pw-next" /></label>
+        <label><span className="label-dark">New password again</span><PasswordInput required minLength={8} className={cls} value={f.again} onChange={(e) => setF({ ...f, again: e.target.value })} autoComplete="new-password" data-testid="pw-again" /></label>
         <div className="flex flex-wrap items-center gap-2 sm:col-span-3"><button disabled={busy} className="btn-gold !min-h-10" data-testid="pw-save">{busy ? 'Changing…' : 'Change password'}</button>{msg && <span role="status" className="text-sm text-teal">{msg}</span>}</div>
         <div className="sm:col-span-3"><Err e={err} /></div>
       </form>
@@ -311,7 +312,7 @@ function DataCard() {
       {open && <form onSubmit={del} className="mt-4 rounded-xl border border-danger/40 bg-danger/5 p-4 text-sm" data-testid="delete-form">
         <p className="font-semibold text-danger">This can’t be undone.</p>
         <p className="mt-1 text-text-muted">We remove your name, contact details, recipients, saved shippers, alerts and messages settings, and sign you out everywhere. Invoices and shipment records stay (anonymised) because tax and customs law require them. You can’t delete while a shipment is on the way or money is owed or held.</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2"><label><span className="label-dark">Your password</span><input type="password" required className={cls} value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" data-testid="del-pw" /></label><label><span className="label-dark">Type DELETE to confirm</span><input required className={cls} value={word} onChange={(e) => setWord(e.target.value)} data-testid="del-word" /></label></div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2"><label><span className="label-dark">Your password</span><PasswordInput required className={cls} value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" data-testid="del-pw" /></label><label><span className="label-dark">Type DELETE to confirm</span><input required className={cls} value={word} onChange={(e) => setWord(e.target.value)} data-testid="del-word" /></label></div>
         <Err e={err} />
         <div className="mt-3 flex gap-2"><button type="button" onClick={() => { setOpen(false); setErr('') }} className="btn-ghost !min-h-10 text-sm">Keep my account</button><button disabled={busy || word !== 'DELETE'} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-danger px-4 text-sm font-semibold text-white disabled:opacity-50" data-testid="del-confirm">{busy ? 'Deleting…' : 'Delete my account'}</button></div>
       </form>}

@@ -6,6 +6,7 @@ import { Check, Loader2, ShieldCheck } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { opsApi, roleBlurb, roleLabels, type JoinInvite } from '../lib/ops'
 import { fadeUp, stagger } from '../lib/motion'
+import { PasswordInput } from '../components/PasswordInput'
 
 /** Public page a teammate lands on from an invitation link: set a password, join the company, straight into the workspace. */
 export default function Join() {
@@ -54,7 +55,7 @@ export default function Join() {
                 {error && <p role="alert" className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
                 <div><label htmlFor="j-email" className="label-dark">Email</label><input id="j-email" className="input-dark bg-surface-2" value={invite.email} readOnly /></div>
                 <div><label htmlFor="j-name" className="label-dark">Your name</label><input id="j-name" className="input-dark" required minLength={2} value={name} onChange={(e) => setName(e.target.value)} /></div>
-                <div><label htmlFor="j-pass" className="label-dark">Choose a password</label><input id="j-pass" type="password" className="input-dark" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /><p className="mt-1 text-xs text-text-muted">At least 8 characters. If you already have a Ntemtem account with this email, enter that password to link it.</p></div>
+                <div><label htmlFor="j-pass" className="label-dark">Choose a password</label><PasswordInput id="j-pass" className="input-dark" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /><p className="mt-1 text-xs text-text-muted">At least 8 characters. If you already have a Ntemtem account with this email, enter that password to link it.</p></div>
                 <button disabled={busy} className="btn-gold w-full disabled:opacity-60">{busy ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Check size={16} aria-hidden="true" />} Join {invite.company}</button>
                 <p className="flex items-center justify-center gap-1.5 text-center text-xs text-text-muted"><ShieldCheck size={12} aria-hidden="true" /> This link works once and stops working after you join.</p>
               </motion.form>

@@ -4,6 +4,7 @@ import { Anchor, Check, Link2, Mail, Plus, RefreshCw, Ship, Unplug } from 'lucid
 import { api } from '../lib/store'
 import { Panel } from './Charts'
 import { fmtDateTime } from './ui'
+import { PasswordInput } from './PasswordInput'
 
 const cls = 'input-dark !min-h-10 text-sm'
 const msgOf = (e: unknown, f: string) => (e instanceof Error ? e.message : f)
@@ -63,7 +64,7 @@ export function LineConnectionsPanel() {
           <div className="grid grid-cols-2 gap-2"><label><span className="label-dark">Line</span><select className={cls} value={f.line} onChange={(e) => setF({ ...f, line: e.target.value })}>{Object.entries(d.lines).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label><label><span className="label-dark">How</span><select className={cls} value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value as 'dcsa' | 'email' })}><option value="dcsa">Booking API (DCSA)</option><option value="email">Email the booking desk</option></select></label></div>
           {f.mode === 'dcsa' ? <>
             <label><span className="label-dark">Booking API address (from the line’s developer portal)</span><input className={cls} placeholder="https://api.line.com/booking/v2" value={f.baseUrl} onChange={(e) => setF({ ...f, baseUrl: e.target.value })} /></label>
-            <div className="grid grid-cols-[1fr_150px] gap-2"><label><span className="label-dark">API key{f.id ? ' (blank keeps the saved one)' : ''}</span><input type="password" autoComplete="off" className={cls} value={f.apiKey} onChange={(e) => setF({ ...f, apiKey: e.target.value })} /></label><label><span className="label-dark">Key header</span><input className={cls} value={f.keyHeader} onChange={(e) => setF({ ...f, keyHeader: e.target.value })} /></label></div>
+            <div className="grid grid-cols-[1fr_150px] gap-2"><label><span className="label-dark">API key{f.id ? ' (blank keeps the saved one)' : ''}</span><PasswordInput autoComplete="off" className={cls} value={f.apiKey} onChange={(e) => setF({ ...f, apiKey: e.target.value })} /></label><label><span className="label-dark">Key header</span><input className={cls} value={f.keyHeader} onChange={(e) => setF({ ...f, keyHeader: e.target.value })} /></label></div>
           </> : <label><span className="label-dark">Booking desk email</span><input type="email" className={cls} value={f.bookingEmail} onChange={(e) => setF({ ...f, bookingEmail: e.target.value })} /></label>}
           <div className="grid grid-cols-2 gap-2"><label><span className="label-dark">Service contract (optional)</span><input className={cls} value={f.contract} onChange={(e) => setF({ ...f, contract: e.target.value })} /></label><label><span className="label-dark">Name (optional)</span><input className={cls} placeholder="e.g. Houston desk" value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} /></label></div>
           <div className="flex gap-2"><button type="button" onClick={() => setF(null)} className="btn-ghost !min-h-10 text-sm">Cancel</button><button disabled={busy} className="btn-gold !min-h-10 text-sm" data-testid="line-save">Save</button></div>

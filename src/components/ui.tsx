@@ -128,6 +128,8 @@ export function ModeBadge({ mode, light = false }: { mode: Mode; light?: boolean
 }
 
 export function Rating({ value, count, light = false }: { value: number; count?: number; light?: boolean }) {
+  // No reviews yet: say so instead of showing a made-up score.
+  if (count === 0 || (!value && !count)) return <span className={`inline-flex items-center gap-1 text-sm ${light ? 'text-ink-muted' : 'text-text-muted'}`} data-testid="rating-new"><Star size={15} aria-hidden="true" /> New · no reviews yet</span>
   return (
     <span className={`inline-flex items-center gap-1 text-sm ${light ? 'text-ink' : 'text-text'}`} role="img" aria-label={`Rated ${value} out of 5${count ? ` from ${count} reviews` : ''}`}>
       <Star size={15} className="fill-gold text-gold-deep" aria-hidden="true" />

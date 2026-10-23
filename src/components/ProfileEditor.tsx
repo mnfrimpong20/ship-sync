@@ -13,11 +13,14 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
   const { updateShipper } = useStore()
   const [f, setF] = useState<ShipperProfileInput>({
     name: shipper.name, tagline: shipper.tagline, hq: shipper.hq, founded: shipper.founded, modes: shipper.modes, destinations: shipper.destinations,
-    origins: shipper.origins, cargo: shipper.cargo, services: shipper.services, about: shipper.about, priceIndex: shipper.priceIndex, responseHours: shipper.responseHours,
+    origins: shipper.origins, cargo: shipper.cargo, cargoOther: shipper.cargoOther ?? [], services: shipper.services, about: shipper.about, priceIndex: shipper.priceIndex, responseHours: shipper.responseHours,
   })
   const [logo, setLogo] = useState<string | null>(shipper.logo ?? null)   // what the preview shows
   const [logoErr, setLogoErr] = useState('')
   const [newService, setNewService] = useState('')
+  const [newCargo, setNewCargo] = useState('')
+  const other = f.cargoOther ?? []
+  const addCargo = (v: string) => { const add = v.split(',').map((x) => x.trim()).filter((x) => x.length >= 2 && !other.some((o) => o.toLowerCase() === x.toLowerCase())); if (add.length) setF({ ...f, cargoOther: [...new Set([...other, ...add])].slice(0, 12) }); setNewCargo('') }
   const [newOrigin, setNewOrigin] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -94,6 +97,14 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
       <fieldset className="mt-5"><legend className="label-dark">Cargo you handle</legend>
         <div className="mt-2 flex flex-wrap gap-2">{cargoTypes.map((c) => <button type="button" key={c.id} aria-pressed={f.cargo.includes(c.id)} onClick={() => setF({ ...f, cargo: toggle(f.cargo, c.id) })} className={chip(f.cargo.includes(c.id))}>{c.label}</button>)}</div>
       </fieldset>
+      <fieldset className="mt-5" data-testid="cargo-other"><legend className="label-dark">Other cargo you carry <span className="font-normal text-text-muted">(optional)</span></legend>
+        <p className="text-xs text-text-muted">Anything beyond the types above. It shows on your profile so customers know to ask you.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {other.map((o) => <button type="button" key={o} onClick={() => setF({ ...f, cargoOther: other.filter((x) => x !== o) })} className={chip(true)} aria-label={`Remove ${o}`}>{o} <X size={12} className="ml-1 inline" aria-hidden="true" /></button>)}
+          {['Motorcycles', 'Machinery & equipment', 'Furniture & appliances', 'Food & provisions', 'Building materials', 'Medical supplies', 'Documents & small parcels', 'Refrigerated goods'].filter((x) => !other.includes(x)).map((x) => <button type="button" key={x} onClick={() => addCargo(x)} className={chip(false)} aria-label={`Add ${x}`}><Plus size={12} className="mr-1 inline" aria-hidden="true" />{x}</button>)}
+        </div>
+        <div className="mt-2 flex gap-2"><input aria-label="Add another cargo type" className="input-dark !min-h-10 max-w-xs text-sm" placeholder="e.g. Generators, tyres" maxLength={40} value={newCargo} onChange={(e) => setNewCargo(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCargo(newCargo) } }} data-testid="cargo-other-input" /><button type="button" className="btn-ghost !min-h-10 !px-3 text-sm" onClick={() => addCargo(newCargo)}><Plus size={14} aria-hidden="true" /> Add</button></div>
+      </fieldset>
       <fieldset className="mt-5"><legend className="label-dark">Pickup origins</legend>
         <p className="text-xs text-text-muted">Cities where you collect regularly. Matching uses these to rank you for nearby customers.</p>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -104,7 +115,7 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
       </fieldset>
       <fieldset className="mt-5"><legend className="label-dark">Services</legend>
         <div className="mt-2 flex flex-wrap gap-2">{f.services.map((sv) => <button type="button" key={sv} onClick={() => setF({ ...f, services: f.services.filter((x) => x !== sv) })} className={chip(true)} aria-label={`Remove ${sv}`}>{sv} <X size={12} className="ml-1 inline" aria-hidden="true" /></button>)}</div>
-        <div className="mt-2 flex gap-2"><input aria-label="Add a service" className="input-dark !min-h-10 max-w-xs text-sm" placeholder="e.g. Door delivery Kumasi" maxLength={60} value={newService} onChange={(e) => setNewService(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (newService.trim().length >= 2 && f.services.length < 12) { setF({ ...f, services: [...new Set([...f.services, newService.trim()])] }); setNewService('') } } }} /><button type="button" className="btn-ghost !min-h-10 !px-3 text-sm" onClick={() => { if (newService.trim().length >= 2 && f.services.length < 12) { setF({ ...f, services: [...new Set([...f.services, newService.trim()])] }); setNewService('') } }}><Plus size={14} aria-hidden="true" /> Add</button></div>
+        <div className="mt-2 flex gap-2"><input aria-label="Add a service" className="input-dark !min-h-10 max-w-xs text-sm" placeholder="e.g. Door delivery Kumasi" maxLength={60} value={newService} onChange={(e) => setNewService(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (newService.trim().length >= 2 && f.services.length < 12) { setF({ ...f, services: [...new Set([...f.services, ...newService.split(',').map((x) => x.trim()).filter((x) => x.length >= 2)])].slice(0, 12) }); setNewService('') } } }} /><button type="button" className="btn-ghost !min-h-10 !px-3 text-sm" onClick={() => { if (newService.trim().length >= 2 && f.services.length < 12) { setF({ ...f, services: [...new Set([...f.services, ...newService.split(',').map((x) => x.trim()).filter((x) => x.length >= 2)])].slice(0, 12) }); setNewService('') } }}><Plus size={14} aria-hidden="true" /> Add</button></div>
       </fieldset>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -116,6 +127,7 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
         <p className="text-xs text-text-muted">Ratings, reviews and the verified badge are managed by Ntemtem and can't be edited here.</p>
+        {(!f.modes.length || !f.destinations.length || !f.cargo.length) && <p className="w-full text-right text-xs text-gold-deep sm:w-auto" role="status" data-testid="save-hint">To save, pick at least {(() => { const need = [!f.modes.length && 'one mode', !f.destinations.length && 'one destination', !f.cargo.length && 'one cargo type'].filter(Boolean) as string[]; return need.length > 1 ? `${need.slice(0, -1).join(', ')} and ${need[need.length - 1]}` : need[0] })()}.</p>}
         <div className="flex gap-2"><button type="button" onClick={() => onDone('')} className="btn-ghost !min-h-10 !px-4 text-sm">Cancel</button><button disabled={busy || !f.modes.length || !f.destinations.length || !f.cargo.length} className="btn-gold !min-h-10 !px-5 text-sm disabled:opacity-60"><Check size={16} aria-hidden="true" /> {busy ? 'Saving…' : 'Save profile'}</button></div>
       </div>
     </motion.form>

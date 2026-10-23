@@ -112,7 +112,7 @@ const logoUrl = (r: Row) => { const l = brandLogo(r); return l ? `/api/shippers/
 const shipperOut = (r: Row) => ({
   logo: logoUrl(r),
   id: r.id, name: r.name, tagline: r.tagline, hq: r.hq, founded: r.founded, modes: J(r.modes), destinations: J(r.destinations), origins: J(r.origins), cargo: J(r.cargo),
-  rating: Number(r.rating), reviews: r.reviews, verified: r.verified, responseHours: r.response_hours, onTime: r.on_time, services: J(r.services), about: r.about,
+  rating: Number(r.rating), reviews: r.reviews, verified: r.verified, responseHours: r.response_hours, onTime: r.on_time, services: J(r.services), cargoOther: J(r.cargo_other) ?? [], about: r.about,
   priceIndex: r.price_index, plan: r.plan, standing: r.standing ?? 'good', qualityScore: J(r.quality)?.score ?? null, initials: r.initials, hue: r.hue, demo: r.demo, verifiedAt: r.verified_at ? ISO(r.verified_at) : undefined, createdAt: r.created_at ? ISO(r.created_at) : undefined,
 })
 const quoteMode = (r: Row) => (r.mode === 'air' || r.mode === 'ocean' ? r.mode : (J(r.includes) as string[] ?? []).includes('Air freight') ? 'air' : 'ocean')
@@ -463,6 +463,7 @@ const zProfile = z.object({
   origins: z.array(z.string().trim().min(2).max(60)).max(25),
   cargo: z.array(z.enum(['barrels', 'boxes', 'pallets', 'vehicle', 'container20', 'container40', 'commercial'])).min(1, 'Choose at least one cargo type.'),
   services: z.array(z.string().trim().min(2).max(60)).max(12),
+  cargoOther: z.array(z.string().trim().min(2).max(40)).max(12).default([]),
   about: z.string().trim().max(2000).default(''),
   priceIndex: z.number().int().min(1).max(3),
   responseHours: z.number().int().min(1).max(168),
@@ -612,8 +613,8 @@ export function apiRouter() {
     for (const c of b.destinations) if (!(await isActiveDestination(db, c))) throw new HttpError(400, `${c} is not a destination Ntemtem serves yet.`)
     bustOrigins()
     await db.query(
-      `update shippers set name=$2, tagline=$3, hq=$4, founded=$5, modes=$6, destinations=$7, origins=$8, cargo=$9, services=$10, about=$11, price_index=$12, response_hours=$13, initials=$14 where id = $1`,
-      [user.shipperId, b.name, b.tagline, b.hq, b.founded, JSON.stringify(b.modes), JSON.stringify([...new Set(b.destinations)]), JSON.stringify([...new Set(b.origins)]), JSON.stringify([...new Set(b.cargo)]), JSON.stringify([...new Set(b.services)]), b.about, b.priceIndex, b.responseHours, initialsOf(b.name)],
+      `update shippers set name=$2, tagline=$3, hq=$4, founded=$5, modes=$6, destinations=$7, origins=$8, cargo=$9, services=$10, about=$11, price_index=$12, response_hours=$13, initials=$14, cargo_other=$15 where id = $1`,
+      [user.shipperId, b.name, b.tagline, b.hq, b.founded, JSON.stringify(b.modes), JSON.stringify([...new Set(b.destinations)]), JSON.stringify([...new Set(b.origins)]), JSON.stringify([...new Set(b.cargo)]), JSON.stringify([...new Set(b.services)]), b.about, b.priceIndex, b.responseHours, initialsOf(b.name), JSON.stringify([...new Set(b.cargoOther.map((x) => x.trim()))])],
     )
     if (b.logo !== undefined) await db.query(`update shippers set brand = coalesce(brand, '{}'::jsonb) || jsonb_build_object('logo', $2::text) where id = $1`, [user.shipperId, b.logo])
     const { rows } = await db.query<Row>('select * from shippers where id = $1', [user.shipperId])

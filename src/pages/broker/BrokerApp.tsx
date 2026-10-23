@@ -5,6 +5,7 @@ import { BarChart3, Bell, Briefcase, ChevronDown, FileSpreadsheet, LayoutDashboa
 import { bpApi, ago, type BpMe } from '../../lib/brokerPortal'
 import { BrandLoader } from '../../components/BrandLoader'
 import { Mark } from '../../components/ui'
+import { PasswordInput } from '../../components/PasswordInput'
 
 /** Mark + wordmark + "Broker" (no link of its own — callers wrap it). */
 const Logo = ({ dark = false }: { dark?: boolean }) => <span className="inline-flex items-center gap-2.5"><Mark size={32} /><span className="flex flex-col leading-none"><span className={`font-heading text-[1.35rem] font-extrabold tracking-[-0.02em] ${dark ? 'text-white' : 'text-text'}`}>ntemtem</span><span className={`mt-1 text-[9.5px] font-bold uppercase tracking-[0.16em] ${dark ? 'text-gold' : 'text-gold-deep'}`}>Broker</span></span></span>
@@ -123,7 +124,7 @@ function Login({ onIn }: { onIn: () => void }) {
         <form onSubmit={go} className="grid gap-4" data-testid="bp-login">
           <Err e={err} />
           <div><label htmlFor="bp-email" className="label-dark">Email</label><input id="bp-email" type="email" autoComplete="username" required className="input-dark" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-          {mode === 'pw' && <div><label htmlFor="bp-pw" className="label-dark">Password</label><input id="bp-pw" type="password" autoComplete="current-password" required className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} /></div>}
+          {mode === 'pw' && <div><label htmlFor="bp-pw" className="label-dark">Password</label><PasswordInput id="bp-pw" autoComplete="current-password" required className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} /></div>}
           <button disabled={busy} className="btn-gold w-full" data-testid="bp-login-go">{busy ? 'One moment…' : mode === 'pw' ? 'Sign in' : 'Email me a sign-in link'}</button>
           <button type="button" onClick={() => setMode(mode === 'pw' ? 'link' : 'pw')} className="text-sm font-semibold text-gold-deep underline">{mode === 'pw' ? 'Forgot your password? Email me a link' : 'Use my password instead'}</button>
         </form>)}
@@ -143,7 +144,7 @@ function Join({ onIn }: { onIn: () => void }) {
   return (
     <AuthFrame title={info ? `Join ${info.company}` : 'Join your team'} sub={info ? `Hi ${info.name.split(' ')[0]} — set a password for ${info.email}.` : undefined}>
       <Err e={err} />
-      {info && <form onSubmit={async (e) => { e.preventDefault(); setBusy(true); setErr(''); try { await bpApi.join(token, pw); onIn() } catch (er) { setErr(errMsg(er)) } finally { setBusy(false) } }} className="grid gap-4"><div><label htmlFor="bp-new" className="label-dark">New password (8+ characters)</label><input id="bp-new" type="password" autoComplete="new-password" minLength={8} required className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} /></div><button disabled={busy} className="btn-gold w-full">Set password &amp; open the dashboard</button></form>}
+      {info && <form onSubmit={async (e) => { e.preventDefault(); setBusy(true); setErr(''); try { await bpApi.join(token, pw); onIn() } catch (er) { setErr(errMsg(er)) } finally { setBusy(false) } }} className="grid gap-4"><div><label htmlFor="bp-new" className="label-dark">New password (8+ characters)</label><PasswordInput id="bp-new" autoComplete="new-password" minLength={8} required className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} /></div><button disabled={busy} className="btn-gold w-full">Set password &amp; open the dashboard</button></form>}
     </AuthFrame>
   )
 }

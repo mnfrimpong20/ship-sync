@@ -8,6 +8,7 @@ import type { User as ApiUserLite } from '../lib/store'
 import { api, useStore, type Role } from '../lib/store'
 import { fadeUp, stagger } from '../lib/motion'
 import { useSiteConfig } from '../lib/site'
+import { PasswordInput } from '../components/PasswordInput'
 
 function Shell({ title, sub, children, aside }: { title: string; sub: string; children: React.ReactNode; aside: React.ReactNode }) {
   return (
@@ -121,7 +122,7 @@ export function Login() {
       <form onSubmit={submit} className="grid gap-4" noValidate>
         <RoleToggle role={role} setRole={setRole} />
         <div><label htmlFor="email" className="label-dark">Email</label><input id="email" type="email" className="input-dark" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder={role === 'shipper' ? 'ops@yourcompany.com' : 'you@example.com'} /></div>
-        <div><div className="flex items-baseline justify-between"><label htmlFor="pw" className="label-dark">Password</label><Link to="/forgot" className="text-xs text-gold-deep hover:underline">Forgot password?</Link></div><input id="pw" type="password" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" /></div>
+        <div><div className="flex items-baseline justify-between"><label htmlFor="pw" className="label-dark">Password</label><Link to="/forgot" className="text-xs text-gold-deep hover:underline">Forgot password?</Link></div><PasswordInput id="pw" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" /></div>
         {err && <p role="alert" className="text-sm text-danger">{err}</p>}
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Signing in</> : 'Sign in'}</motion.button>
         <p className="text-center text-sm text-text-muted">New here? <Link to={`/signup?role=${role}${sp.get('next') ? `&next=${encodeURIComponent(sp.get('next')!)}` : ''}`} className="text-gold-deep hover:underline">Create an account</Link></p>
@@ -162,7 +163,7 @@ export function Signup() {
         <div><label htmlFor="name" className="label-dark">Full name</label><input id="name" className="input-dark" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoComplete="name" /></div>
         {role === 'shipper' && <div><label htmlFor="company" className="label-dark">Company name</label><input id="company" className="input-dark" value={f.company} onChange={(e) => setF({ ...f, company: e.target.value })} autoComplete="organization" /></div>}
         <div><label htmlFor="semail" className="label-dark">Email</label><input id="semail" type="email" className="input-dark" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} autoComplete="email" /></div>
-        <div><label htmlFor="spw" className="label-dark">Password</label><input id="spw" type="password" className="input-dark" value={f.pw} onChange={(e) => setF({ ...f, pw: e.target.value })} autoComplete="new-password" /><p className="mt-1 text-xs text-text-muted">At least 8 characters.</p></div>
+        <div><label htmlFor="spw" className="label-dark">Password</label><PasswordInput id="spw" className="input-dark" value={f.pw} onChange={(e) => setF({ ...f, pw: e.target.value })} autoComplete="new-password" /><p className="mt-1 text-xs text-text-muted">At least 8 characters.</p></div>
         <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm text-text-muted"><input type="checkbox" className="mt-0.5 h-5 w-5 accent-gold" checked={f.agree} onChange={(e) => setF({ ...f, agree: e.target.checked })} /> I agree to the Terms of Service{role === 'shipper' ? ' and Shipper Agreement' : ''} and Privacy Policy.</label>
         {err && <p role="alert" className="text-sm text-danger">{err}</p>}
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Creating account</> : role === 'shipper' ? 'Create shipper account' : 'Create account'}</motion.button>
@@ -239,8 +240,8 @@ export function ResetPassword() {
         <p className="text-sm text-text-muted">This link is missing its token. <Link to="/forgot" className="text-gold-deep hover:underline">Request a new reset link</Link>.</p>
       ) : (
         <form onSubmit={submit} className="grid gap-4" noValidate>
-          <div><label htmlFor="rpw" className="label-dark">New password</label><input id="rpw" type="password" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /><p className="mt-1 text-xs text-text-muted">At least 8 characters.</p></div>
-          <div><label htmlFor="rpw2" className="label-dark">Repeat password</label><input id="rpw2" type="password" className="input-dark" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></div>
+          <div><label htmlFor="rpw" className="label-dark">New password</label><PasswordInput id="rpw" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /><p className="mt-1 text-xs text-text-muted">At least 8 characters.</p></div>
+          <div><label htmlFor="rpw2" className="label-dark">Repeat password</label><PasswordInput id="rpw2" className="input-dark" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></div>
           {err && <p role="alert" className="text-sm text-danger">{err} {/expired|used/i.test(err) && <Link to="/forgot" className="text-gold-deep hover:underline">Request a new link</Link>}</p>}
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Saving</> : 'Save new password'}</motion.button>
         </form>

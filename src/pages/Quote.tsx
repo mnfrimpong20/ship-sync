@@ -15,6 +15,7 @@ import { congestionLabel, useCongestion } from '../lib/useCongestion'
 import { hubApi } from '../lib/customerHub'
 import { PackingNeeds } from '../components/PackingSupplies'
 import { DeclarationBox } from '../components/Compliance'
+import { PasswordInput } from '../components/PasswordInput'
 
 type Form = NewRequest
 const stepsMeta = ['Route', 'Cargo', 'Services', 'Contact']
@@ -217,7 +218,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                     {!user && (
                       <div>
                         <label htmlFor="cpw" className="label-dark">Create a password <span className="font-normal text-text-muted">(optional)</span></label>
-                        <input id="cpw" type="password" className="input-dark" value={form.password ?? ''} onChange={(e) => set('password', e.target.value)} aria-invalid={!!errors.password} autoComplete="new-password" />
+                        <PasswordInput id="cpw" className="input-dark" value={form.password ?? ''} onChange={(e) => set('password', e.target.value)} aria-invalid={!!errors.password} autoComplete="new-password" />
                         {errors.password ? <p className="mt-1 text-xs text-danger">{errors.password}</p> : <p className="mt-1 text-xs text-text-muted">Leave it blank and we’ll email you a link to set one — your quotes are waiting either way. Already have one? <Link to="/login?next=/quote" className="text-gold-deep hover:underline">Sign in</Link>.</p>}
                       </div>
                     )}

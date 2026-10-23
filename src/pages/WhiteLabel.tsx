@@ -10,6 +10,7 @@ import { Avatar, Logo, money, VerifiedMark } from '../components/ui'
 import { ShipmentDetail } from './Track'
 import { Stars } from '../components/ReviewCards'
 import { fadeUp, stagger } from '../lib/motion'
+import { PasswordInput } from '../components/PasswordInput'
 
 /* ================= public branded page ================= */
 export default function BrandedPage() {
@@ -75,7 +76,7 @@ export default function BrandedPage() {
                 <input required minLength={2} aria-label="Your name" className="input-dark !min-h-9 text-sm" placeholder="Your name" value={q.name} onChange={(e) => setQ({ ...q, name: e.target.value })} />
                 <input required type="email" aria-label="Email" className="input-dark !min-h-9 text-sm" placeholder="Email" value={q.email} onChange={(e) => setQ({ ...q, email: e.target.value })} />
                 <input required minLength={7} aria-label="Phone" className="input-dark !min-h-9 text-sm" placeholder="Phone / WhatsApp" value={q.phone} onChange={(e) => setQ({ ...q, phone: e.target.value })} />
-                {!user && <><input required minLength={8} type="password" aria-label="Password" className="input-dark !min-h-9 text-sm" placeholder="Create a password (to track your quote)" value={q.password} onChange={(e) => setQ({ ...q, password: e.target.value })} /><p className="text-xs text-text-muted">Already have an account? <Link to={`/login?next=/t/${slug}`} className="text-gold-deep hover:underline">Sign in</Link>.</p></>}
+                {!user && <><PasswordInput required minLength={8} aria-label="Password" className="input-dark !min-h-9 text-sm" placeholder="Create a password (to track your quote)" value={q.password} onChange={(e) => setQ({ ...q, password: e.target.value })} /><p className="text-xs text-text-muted">Already have an account? <Link to={`/login?next=/t/${slug}`} className="text-gold-deep hover:underline">Sign in</Link>.</p></>}
                 <button disabled={sending} className="mt-1 inline-flex min-h-10 items-center justify-center rounded-full px-4 text-sm font-semibold disabled:opacity-60" style={{ background: b.accent, color: fg }} data-testid="wl-submit">{sending ? 'Sending…' : `Request a quote`}</button>
                 <p className="text-xs text-text-muted">Goes only to {s.name}. Your booking, payment and tracking run on Ntemtem.</p>
               </form>

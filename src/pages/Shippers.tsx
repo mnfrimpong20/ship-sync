@@ -30,11 +30,6 @@ export function ShipperProfile() {
   if (!s) return (
     <div className="container-x py-20 text-text"><Empty title="Shipper not found" body="This profile may have been removed or the link is wrong." action={<Link to="/shippers" className="btn-gold">Back to directory</Link>} /></div>
   )
-  const reviews = [
-    { n: 'Efua M.', d: 'Aug 2026', r: 5, t: 'Barrels arrived in Kumasi exactly when they said. Communication on WhatsApp throughout.' },
-    { n: 'Daniel O.', d: 'Jul 2026', r: 5, t: 'Shipped my Camry. They handled the title, inspection and duty estimate up front — no surprises at the port.' },
-    { n: 'Rita A.', d: 'Jun 2026', r: 4, t: 'Good price and reliable. Pickup was a day late but they called ahead and made up the time.' },
-  ]
   return (
     <div className="relative bg-bg text-text">
       <ShippingBackdrop />
@@ -73,8 +68,9 @@ export function ShipperProfile() {
                 <h2 className="!text-lg">Cargo & services</h2>
                 <ul className="mt-4 space-y-2 text-sm">
                   {s.cargo.map((c) => <li key={c} className="flex items-center gap-2 text-text"><Check size={15} className="text-gold-deep" aria-hidden="true" />{cargoLabel(c)}</li>)}
+                  {(s.cargoOther ?? []).map((c) => <li key={c} className="flex items-center gap-2 text-text" data-testid="cargo-other-item"><Check size={15} className="text-gold-deep" aria-hidden="true" />{c}</li>)}
                 </ul>
-                <ul className="mt-4 flex flex-wrap gap-1.5 border-t border-border pt-4">{s.services.map((x) => <li key={x} className="rounded-full border border-border px-2.5 py-1 text-xs text-text-muted">{x}</li>)}</ul>
+                {s.services.length > 0 && <ul className="mt-4 flex flex-wrap gap-1.5 border-t border-border pt-4">{s.services.map((x) => <li key={x} className="rounded-full border border-border px-2.5 py-1 text-xs text-text-muted">{x}</li>)}</ul>}
               </div>
             </motion.div>
 
@@ -83,7 +79,7 @@ export function ShipperProfile() {
             <motion.div variants={fadeUp} className="card-dark mt-6 p-6">
               <h2 className="!text-lg">Recent reviews</h2>
               <p className="mt-1 text-xs text-text-muted">Only customers who booked through Ntemtem can review.</p>
-              <ShipperReviews shipperId={s.id} fallback={reviews} />
+              <ShipperReviews shipperId={s.id} />
             </motion.div>
           </div>
 

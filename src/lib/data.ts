@@ -56,6 +56,8 @@ export interface Shipper {
   responseHours: number
   onTime: number
   services: string[]
+  /** Other cargo the company carries beyond the standard types (motorbikes, machinery…). Shown on the profile. */
+  cargoOther?: string[]
   about: string
   priceIndex: number // 1 = budget, 2 = mid, 3 = premium
   plan: 'starter' | 'pro' | 'enterprise'

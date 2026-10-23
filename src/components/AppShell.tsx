@@ -38,16 +38,20 @@ export default function AppShell() {
   const toggleRail = () => setRail((v) => { try { localStorage.setItem('ss-nav-rail', v ? '0' : '1') } catch { /* private mode */ } return !v })
   const [tip, setTip] = useState<{ label: string; top: number } | null>(null)
   // Sidebar sections the person folded away (by heading), remembered on this device.
-  const [folded, setFolded] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('ss-nav-folded') ?? '[]') } catch { return [] } })
+  // v2: the menu was regrouped; settings-type sections start folded so the day-to-day work is what you see first.
+  const [folded, setFolded] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('ss-nav-folded-v2') ?? '["Company","Tools"]') } catch { return ['Company', 'Tools'] } })
   // Page visits count up; a section folded before the latest visit reopens while you're on one of its pages.
   const [navTick, setNavTick] = useState(0); const [foldTick, setFoldTick] = useState<Record<string, number>>({})
   useEffect(() => { setNavTick((n) => n + 1) }, [loc.pathname, loc.search])
-  const toggleFold = (g: string) => { setFoldTick((m) => ({ ...m, [g]: navTick })); setFolded((f) => { const n = f.includes(g) ? f.filter((x) => x !== g) : [...f, g]; try { localStorage.setItem('ss-nav-folded', JSON.stringify(n)) } catch { /* private mode */ } return n }) }
+  const toggleFold = (g: string) => { setFoldTick((m) => ({ ...m, [g]: navTick })); setFolded((f) => { const n = f.includes(g) ? f.filter((x) => x !== g) : [...f, g]; try { localStorage.setItem('ss-nav-folded-v2', JSON.stringify(n)) } catch { /* private mode */ } return n }) }
   const [menu, setMenu] = useState(false)
   const [dueReminders, setDueReminders] = useState(0)
   const t = useT()
   const [displayOpen, setDisplayOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(() => { try { return localStorage.getItem('ss-nav-more') === '1' } catch { return false } })
+  /** Sections whose secondary links ("Show 3 more") are expanded — remembered per browser. */
+  const [secMore, setSecMore] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('ss-nav-sec-more') ?? '[]') } catch { return [] } })
+  const toggleSecMore = (g: string) => setSecMore((cur) => { const n = cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g]; try { localStorage.setItem('ss-nav-sec-more', JSON.stringify(n)) } catch { /* private mode */ } return n })
   const toggleMore = () => setMoreOpen((v) => { try { localStorage.setItem('ss-nav-more', v ? '0' : '1') } catch { /* private mode */ } return !v })
   useEffect(() => { if (user?.display) adoptAccountDisplay(user.display) }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setOpen(false); setMenu(false) }, [loc])
@@ -73,43 +77,55 @@ export default function AppShell() {
   const canManage = isShipper && (staffRole === 'owner' || staffRole === 'dispatcher')
   const allowed = (it: Item) => !isShipper || user.admin || roleAllows(staffRole, it.to.split('?')[0], user.perms as never) || !it.to.startsWith('/dashboard')
   const sourcingTeam = !!user.admin || (isShipper && user.shipperId === SOURCING_SHIPPER && !isDriver)
+  // Menu structure: task-based sections of ~3–6 links each; secondary links sit behind "more" inside their own section.
+  const office = ['owner', 'dispatcher', 'finance'].includes(staffRole)
   const items: Item[] = isDriver
     ? [
-        { to: '/dashboard/runs', label: 'My runs', icon: MapPinned, end: true },
+        { to: '/dashboard/runs', label: 'Today', icon: MapPinned, end: true },
+        { to: '/dashboard/runs/pay', label: 'My pay', icon: Wallet, group: 'My work' },
+        { to: '/dashboard/runs/time', label: 'Time off & rota', icon: CalendarDays, group: 'My work' },
+        { to: '/dashboard/runs/me', label: 'My file', icon: IdCard, group: 'My work' },
+        { to: '/dashboard/scan', label: 'Scan a sticker', icon: ScanLine, group: 'On the road' },
+        { to: '/dashboard/notifications', label: 'Notifications', icon: BellRing, group: 'On the road' },
+        { to: '/track', label: 'Track a shipment', icon: Search, group: 'On the road' },
       ]
     : isShipper
     ? [
         { to: '/dashboard/shipper', label: 'Overview', icon: LayoutDashboard, end: true },
         { to: '/dashboard/analytics', label: 'Analytics', icon: LineChart },
-        ...(canManage ? [{ to: '/dashboard/autopilot', label: 'Autopilot', icon: Bot } as Item] : []),
         ...(sourcingTeam ? [{ to: '/dashboard/sourcing', label: 'Sourcing board', icon: Globe2, group: 'Sourcing' } as Item, { to: '/dashboard/sourcing/today', label: 'Today (phone)', icon: Smartphone, group: 'Sourcing' } as Item, { to: '/dashboard/suppliers', label: 'Suppliers', icon: Factory, group: 'Sourcing' } as Item] : []),
-        { to: '/dashboard/leads', label: 'Requests', icon: Inbox, badge: openLeads, group: 'Sell' },
-        { to: '/dashboard/rates', label: 'Rate cards', icon: Tags, group: 'Sell' },
-        { to: '/dashboard/lanes', label: 'Lane intelligence', icon: BarChart3, group: 'Sell', more: true },
-        { to: '/dashboard/groupage', label: 'Fill a barrel', icon: Boxes, group: 'Sell' },
-        ...(['owner', 'dispatcher', 'agent'].includes(staffRole) ? [{ to: '/dashboard/campaigns', label: 'Campaigns', icon: Megaphone, group: 'Sell', more: true } as Item] : []),
-        ...(canManage ? [{ to: '/dashboard/brand', label: 'Branded page', icon: Globe, group: 'Sell', more: true } as Item] : []),
-        { to: '/dashboard/shipments', label: 'Client shipments', icon: Ship, badge: active, group: 'Operate' },
-        { to: '/dashboard/containers', label: 'Containers', icon: Container, group: 'Operate' },
-        { to: '/dashboard/sailings', label: 'Book a sailing', icon: Anchor, group: 'Operate' },
-        { to: '/dashboard/pickups', label: 'Pickups', icon: CalendarCheck, group: 'Operate' },
-        { to: '/dashboard/routes', label: 'Routes', icon: MapPinned, group: 'Operate' },
-        ...(['owner', 'dispatcher', 'finance'].includes(staffRole) ? [{ to: '/dashboard/drivers', label: 'Drivers', icon: Truck, group: 'Operate' } as Item] : []),
-        { to: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, group: 'Operate' },
-        ...(!isDriverRole(staffRole) ? [{ to: '/dashboard/supplies', label: 'Equipment & supplies', icon: Printer, group: 'Operate' } as Item] : []),
-        { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders, group: 'Money' },
+        // Sales: win the work and keep the customer
+        { to: '/dashboard/leads', label: 'Requests', icon: Inbox, badge: openLeads, group: 'Sales' },
+        { to: '/dashboard/clients', label: 'Clients', icon: Users, badge: dueReminders, group: 'Sales' },
+        { to: '/dashboard/rates', label: 'Rate cards', icon: Tags, group: 'Sales' },
+        { to: '/dashboard/groupage', label: 'Fill a barrel', icon: Boxes, group: 'Sales' },
+        { to: '/dashboard/reviews', label: 'Reviews', icon: Star, group: 'Sales', more: true },
+        { to: '/dashboard/lanes', label: 'Lane intelligence', icon: BarChart3, group: 'Sales', more: true },
+        ...(['owner', 'dispatcher', 'agent'].includes(staffRole) ? [{ to: '/dashboard/campaigns', label: 'Campaigns', icon: Megaphone, group: 'Sales', more: true } as Item] : []),
+        ...(canManage ? [{ to: '/dashboard/brand', label: 'Branded page', icon: Globe, group: 'Sales', more: true } as Item] : []),
+        // Shipping: the freight itself
+        { to: '/dashboard/shipments', label: 'Client shipments', icon: Ship, badge: active, group: 'Shipping' },
+        { to: '/dashboard/containers', label: 'Containers', icon: Container, group: 'Shipping' },
+        { to: '/dashboard/sailings', label: 'Book a sailing', icon: Anchor, group: 'Shipping' },
+        // Pickup & delivery: trucks, drivers and the yard
+        { to: '/dashboard/pickups', label: 'Pickups', icon: CalendarCheck, group: 'Pickup & delivery' },
+        { to: '/dashboard/routes', label: 'Routes', icon: MapPinned, group: 'Pickup & delivery' },
+        ...(office ? [{ to: '/dashboard/drivers', label: 'Drivers', icon: Truck, group: 'Pickup & delivery' } as Item] : []),
+        { to: '/dashboard/warehouse', label: 'Warehouse', icon: Warehouse, group: 'Pickup & delivery' },
+        ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck, group: 'Pickup & delivery', more: true } as Item] : []),
+        { to: '/dashboard/supplies', label: 'Equipment & supplies', icon: Printer, group: 'Pickup & delivery', more: true },
+        // Money
         { to: '/dashboard/payments', label: 'Payments', icon: Wallet, group: 'Money' },
-        { to: '/dashboard/collections', label: 'Collections', icon: Receipt, group: 'Money' },
-        ...(['owner', 'dispatcher', 'finance'].includes(staffRole) ? [{ to: '/dashboard/costs', label: 'Costs & profit', icon: Calculator, group: 'Money' } as Item] : []),
-        { to: '/dashboard/reviews', label: 'Reviews', icon: Star, group: 'Money' },
-        ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck, group: 'Company', more: true } as Item] : []),
-        ...(['owner', 'dispatcher', 'finance'].includes(staffRole) ? [{ to: '/dashboard/hr', label: 'Team & HR', icon: IdCard, group: 'Company' } as Item] : []),
-        ...(staffRole !== 'owner' && !isDriverRole(staffRole) ? [{ to: '/dashboard/me/pay', label: 'My pay & time', icon: IdCard, group: 'Company' } as Item] : []),
-        { to: '/dashboard/team', label: 'Team', icon: UsersRound, group: 'Company' },
-        ...(canManage ? [{ to: '/dashboard/integrations', label: 'Integrations', icon: Plug, group: 'Company', more: true } as Item, { to: '/dashboard/activity', label: 'Activity log', icon: History, group: 'Company', more: true } as Item] : []),
-        ...(['owner', 'finance'].includes(staffRole) ? [{ to: '/dashboard/billing', label: 'Plan & billing', icon: CreditCard, group: 'Company', more: true } as Item] : []),
-        ...(canManage ? [{ to: '/dashboard/verification', label: 'Verification', icon: ShieldCheck, group: 'Company', more: true } as Item] : []),
+        { to: '/dashboard/collections', label: 'Invoices & collections', icon: Receipt, group: 'Money' },
+        ...(office ? [{ to: '/dashboard/costs', label: 'Costs & profit', icon: Calculator, group: 'Money' } as Item] : []),
+        ...(['owner', 'finance'].includes(staffRole) ? [{ to: '/dashboard/billing', label: 'Plan & billing', icon: CreditCard, group: 'Money', more: true } as Item] : []),
+        // People
+        ...(office ? [{ to: '/dashboard/hr', label: 'Team & HR', icon: IdCard, group: 'People' } as Item] : []),
+        ...(staffRole !== 'owner' ? [{ to: '/dashboard/me/pay', label: 'My pay & time', icon: IdCard, group: 'People' } as Item] : []),
+        { to: '/dashboard/team', label: 'Logins & access', icon: UsersRound, group: 'People' },
+        // Company: settings and automation
         ...(staffRole === 'owner' ? [{ to: '/dashboard/shipper?view=profile', label: 'Company profile', icon: UserCog, group: 'Company' } as Item] : []),
+        ...(canManage ? [{ to: '/dashboard/autopilot', label: 'Autopilot', icon: Bot, group: 'Company' } as Item, { to: '/dashboard/integrations', label: 'Integrations', icon: Plug, group: 'Company' } as Item, { to: '/dashboard/verification', label: 'Verification', icon: ShieldCheck, group: 'Company', more: true } as Item, { to: '/dashboard/activity', label: 'Activity log', icon: History, group: 'Company', more: true } as Item] : []),
       ]
     : [
         { to: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -129,7 +145,7 @@ export default function AppShell() {
         { to: '/dashboard?tab=account', label: 'Account', icon: CircleUser, group: 'Help & account' },
       ]
   const visible = items.filter(allowed)
-  const tools: Item[] = [
+  const tools: Item[] = isDriver ? [] : [
     ...(isShipper ? [{ to: '/dashboard/notifications', label: 'Notifications', icon: BellRing } as Item] : []),
     ...(isShipper ? [{ to: '/dashboard/scan', label: 'Scan a sticker', icon: ScanLine } as Item] : []),
     ...(isDriver ? [] : [{ to: '/live', label: 'Live map', icon: Radar, more: !isShipper } as Item]),
@@ -143,6 +159,7 @@ export default function AppShell() {
     if (path === '/') return loc.pathname === '/'
     if (loc.pathname !== path && !(path !== '/dashboard' && path !== '/dashboard/shipper' && loc.pathname.startsWith(path))) return false
     if (qs) return loc.search.includes(qs)
+    if (it.end && loc.pathname !== path) return false
     if (it.end) return loc.search === '' || (!loc.search.includes('view=') && !loc.search.includes('tab='))
     return true
   }
@@ -166,12 +183,12 @@ export default function AppShell() {
     </ul>
   )
   const renderSidebar = (compact: boolean) => {
-    const groups = Array.from(new Set(visible.filter((i) => !i.more).map((i) => i.group).filter(Boolean))) as string[]
+    const groups = Array.from(new Set(visible.map((i) => i.group).filter(Boolean))) as string[]
     const rest = [...visible, ...tools].filter((i) => i.more); const open2 = moreOpen || rest.some(isActive)
     /** A section: heading button that folds its links away. Going to a page inside a folded section opens it again. */
-    const Section = ({ label, items }: { label: string; items: Item[] }) => {
-      if (compact) return <div><div className="mx-auto my-2 h-px w-8 bg-border" aria-hidden="true" /><NavItems list={items} compact /></div>
-      const here = items.some(isActive); const shut = folded.includes(label) && !(here && (foldTick[label] ?? -1) < navTick)
+    const Section = ({ label, items, extra = [] }: { label: string; items: Item[]; extra?: Item[] }) => {
+      if (compact) return items.length ? <div><div className="mx-auto my-2 h-px w-8 bg-border" aria-hidden="true" /><NavItems list={items} compact /></div> : null
+      const here = [...items, ...extra].some(isActive); const shut = folded.includes(label) && !(here && (foldTick[label] ?? -1) < navTick)
       const id = `nav-sec-${label.replace(/\W+/g, '-').toLowerCase()}`
       const count = items.reduce((n, i) => n + (typeof i.badge === 'number' ? i.badge : 0), 0)
       return (
@@ -182,7 +199,12 @@ export default function AppShell() {
             {shut && count > 0 && <span className="rounded-full bg-gold/20 px-1.5 text-[11px] font-bold normal-case tracking-normal text-gold-deep" aria-label={`${count} waiting`}>{count}</span>}
             <ChevronDown size={14} className={`transition-transform ${shut ? '-rotate-90' : ''}`} aria-hidden="true" />
           </button>
-          {!shut && <div id={id} className="mt-0.5"><NavItems list={items} /></div>}
+          {!shut && <div id={id} className="mt-0.5"><NavItems list={items} />
+            {extra.length > 0 && (() => { const showExtra = secMore.includes(label) || extra.some(isActive); return <>
+              {showExtra && <NavItems list={extra} />}
+              {!extra.some(isActive) && <button type="button" onClick={() => toggleSecMore(label)} aria-expanded={showExtra} className="flex min-h-8 w-full items-center gap-3 rounded-lg px-3 text-xs text-text-muted hover:bg-surface-2 hover:text-text focus-ring" data-testid="nav-sec-more"><MoreHorizontal size={15} aria-hidden="true" /><span className="flex-1 text-left">{showExtra ? t('Show less') : `${t('Show')} ${extra.length} ${t('more')}`}</span></button>}
+            </> })()}
+          </div>}
         </div>
       )
     }
@@ -198,11 +220,12 @@ export default function AppShell() {
               {isShipper && company && <Avatar initials={company.initials} hue={company.hue} logo={company.logo} size={32} />}
               <div className="min-w-0"><p className="truncate text-xs font-semibold uppercase tracking-wider text-text-muted">{isShipper ? user.company ?? 'Shipper' : t('Customer')}</p>{isShipper && user.staffRole && <p className="text-xs text-text-muted">{t(roleLabels[user.staffRole as keyof typeof roleLabels] ?? user.staffRole)}</p>}</div>
             </div>}
-        <nav className={`flex-1 overflow-y-auto overflow-x-hidden ${compact ? 'px-2 space-y-1' : `px-3 ${isShipper ? 'space-y-3' : 'space-y-2.5'}`}`} aria-label="Application" onScroll={() => setTip(null)}>
+        <nav className={`nav-scroll flex-1 overflow-y-auto overflow-x-hidden ${compact ? 'px-2 space-y-1' : `px-3 ${isShipper ? 'space-y-3' : 'space-y-2.5'}`}`} aria-label="Application" onScroll={() => setTip(null)}>
           <NavItems list={visible.filter((i) => !i.group && !i.more)} compact={compact} />
-          {groups.map((g) => <Section key={g} label={g} items={visible.filter((i) => i.group === g && !i.more)} />)}
-          {tools.some((i) => !i.more) && <Section label="Tools" items={tools.filter((i) => !i.more)} />}
-          {rest.length > 0 && (
+          {groups.map((g) => <Section key={g} label={g} items={visible.filter((i) => i.group === g && !i.more)} extra={visible.filter((i) => i.group === g && i.more)} />)}
+          {!compact && visible.some((i) => !i.group && i.more) && <Section label="More" items={visible.filter((i) => !i.group && i.more)} />}
+          {tools.length > 0 && <Section label="Tools" items={tools.filter((i) => !i.more)} extra={tools.filter((i) => i.more)} />}
+          {compact && rest.length > 0 && (
             <div data-testid="nav-more">
               {compact && <div className="mx-auto my-2 h-px w-8 bg-border" aria-hidden="true" />}
               <button type="button" onClick={() => toggleMore()} aria-expanded={open2}

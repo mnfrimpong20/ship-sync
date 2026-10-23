@@ -182,3 +182,9 @@ table, dl, .tabular-nums, [data-testid$="card"] { font-variant-numeric: tabular-
 html.road { --color-text-muted: var(--color-text); }
 html.road .ss-app :is(.card-dark, .border-border) { border-color: color-mix(in srgb, var(--color-text) 28%, transparent); }
 @keyframes ntm-flash { 0% { opacity: 0 } 15% { opacity: 1 } 70% { opacity: 1 } 100% { opacity: 0 } }
+
+/* Sidebar: a thin, quiet scrollbar instead of the system one. */
+.nav-scroll { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, currentColor 25%, transparent) transparent; }
+.nav-scroll::-webkit-scrollbar { width: 6px; }
+.nav-scroll::-webkit-scrollbar-thumb { background: color-mix(in oklab, currentColor 25%, transparent); border-radius: 999px; }
+.nav-scroll::-webkit-scrollbar-track { background: transparent; }

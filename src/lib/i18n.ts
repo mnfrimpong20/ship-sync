@@ -235,6 +235,17 @@ const FR: Record<string, string> = {
   'Certificate': 'Certificat',
   'Work permit': 'Permis de travail',
   'Employment contract on file': 'Contrat de travail au dossier',
+  'Today': 'Aujourd’hui',
+  'Sales': 'Ventes',
+  'Pickup & delivery': 'Collecte et livraison',
+  'Invoices & collections': 'Factures et recouvrement',
+  'Logins & access': 'Accès et connexions',
+  'Team & HR': 'Équipe et RH',
+  'My pay & time': 'Ma paie et mon temps',
+  'Show': 'Afficher',
+  'more': 'de plus',
+  'Show less': 'Afficher moins',
+  'On the road': 'Sur la route',
 }
 export function translate(lang: Lang, s: string, vars?: Record<string, string | number>) {
   let out = lang === 'fr' ? FR[s] ?? s : s

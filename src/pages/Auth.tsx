@@ -98,6 +98,39 @@ export function SignInLink() {
 
 export function Login() {
   const [sp] = useSearchParams()
+  if (sp.get('next')?.startsWith('/admin')) return <AdminLogin next={sp.get('next')!} />
+  return <MemberLogin />
+}
+
+/** Staff sign-in for the Ntemtem admin area — no customer/company choice, no sign-up, no demo hints. */
+function AdminLogin({ next }: { next: string }) {
+  const nav = useNavigate(); const { login, logout } = useStore()
+  const [email, setEmail] = useState(''); const [pw, setPw] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false)
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!/^\S+@\S+\.\S+$/.test(email)) return setErr('Enter a valid email address.')
+    if (pw.length < 1) return setErr('Enter your password.')
+    setErr(''); setBusy(true)
+    try {
+      const u = await login(email, pw)
+      if (!u.admin) { await logout().catch(() => {}); setBusy(false); return setErr('That account isn’t an Ntemtem admin. Customers and shipping companies sign in on the regular sign-in page.') }
+      nav(next)
+    } catch (x) { setErr(x instanceof Error ? x.message : 'Sign in failed.'); setBusy(false) }
+  }
+  return (
+    <Shell title="Ntemtem admin" sub="Staff sign-in. Only Ntemtem admin accounts can open the admin area." aside={<div className="card-dark p-6 text-sm text-text-muted" data-testid="admin-login-aside"><p className="eyebrow mb-2">Admin area</p><p>Approvals, payments, disputes, support and the business numbers. Every action is written to the audit log.</p><p className="mt-3">Not Ntemtem staff? <Link to="/login" className="font-semibold text-gold-deep underline">Go to the regular sign-in</Link>.</p></div>}>
+      <form onSubmit={submit} className="grid gap-4" noValidate data-testid="admin-login">
+        <div><label htmlFor="email" className="label-dark">Admin email</label><input id="email" type="email" className="input-dark" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" /></div>
+        <div><div className="flex items-baseline justify-between"><label htmlFor="pw" className="label-dark">Password</label><Link to="/forgot" className="text-xs text-gold-deep hover:underline">Forgot password?</Link></div><PasswordInput id="pw" className="input-dark" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" /></div>
+        {err && <p role="alert" className="text-sm text-danger">{err}</p>}
+        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="btn-gold w-full" disabled={busy}>{busy ? <><Loader2 className="animate-spin" size={18} aria-hidden="true" /> Signing in</> : 'Sign in to admin'}</motion.button>
+      </form>
+    </Shell>
+  )
+}
+
+function MemberLogin() {
+  const [sp] = useSearchParams()
   const nav = useNavigate()
   const { login } = useStore()
   const [mode, setMode] = useState<'password' | 'pin' | 'link'>(() => (devicePin() ? 'pin' : 'password'))

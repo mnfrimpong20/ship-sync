@@ -764,6 +764,7 @@ create table if not exists broker_job_messages (id text primary key, job_id text
 create index if not exists idx_bjm_job on broker_job_messages(job_id, at);
 create table if not exists broker_charges (id text primary key, job_id text not null references broker_jobs(id) on delete cascade, broker_id text not null, kind text not null, description text not null default '', amount numeric not null, currency text not null default 'USD', amount_usd numeric not null, rebill boolean not null default true, invoice_id text, receipt text, created_by text not null default '', at timestamptz not null default now());
 create table if not exists broker_invoices (id text primary key, broker_id text not null, shipper_id text not null, number text not null, lines jsonb not null default '[]', job_ids jsonb not null default '[]', total_usd numeric not null default 0, status text not null default 'draft', due_at date, sent_at timestamptz, paid_at timestamptz, paid_ref text not null default '', notes text not null default '', created_by text not null default '', created_at timestamptz not null default now());
+alter table broker_invoices add column if not exists reminded_at timestamptz;
 create table if not exists broker_notifications (id text primary key, broker_id text not null, title text not null, body text not null default '', link text not null default '', read_at timestamptz, at timestamptz not null default now());
 create index if not exists idx_bn_broker on broker_notifications(broker_id, at);
 alter table broker_jobs add column if not exists assigned_to text;

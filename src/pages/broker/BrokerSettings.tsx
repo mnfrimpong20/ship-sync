@@ -59,6 +59,8 @@ export function Profile() {
       await reload(); setToast('Saved. Shipping companies see the changes on your listing straight away.')
     } catch (er) { setErr(errMsg(er)) } finally { setBusy(false) }
   }
+  // Links from the Overview's setup list land on the right card.
+  useEffect(() => { const h = window.location.hash.slice(1); if (h) setTimeout(() => document.getElementById(h)?.closest('section')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50) }, [])
   const licDays = b.licenceExpires ? Math.round((new Date(b.licenceExpires + 'T12:00:00Z').getTime() - Date.now()) / 86400000) : null
   return (
     <Page eyebrow="Profile & settings" title={b.company || b.name} sub={<>Licence {b.licenceNo} · {b.licenceAuthority} · <Link to={`/brokers/${b.id}`} className="inline-flex items-center gap-1 underline">See your public listing <ExternalLink size={13} aria-hidden="true" /></Link></>}>

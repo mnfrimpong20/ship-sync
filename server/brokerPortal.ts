@@ -64,6 +64,7 @@ export function mountBrokerPortal(r: Router, d: Deps) {
     brake('l:' + b.email + ':' + req.ip)
     const { rows } = await db.query<Row>(`select * from broker_members where lower(email) = $1 and status = 'active'`, [b.email]); const m = rows[0]
     if (!m?.password_hash || !(await bcrypt.compare(b.password, m.password_hash))) throw new HttpError(401, 'Wrong email or password.')
+    tries.delete('l:' + b.email + ':' + req.ip) // only wrong passwords count toward the limit
     await session(db, res, m.id); res.json({ ok: true })
   }))
   r.post('/bp/logout', wrap(async (req, res) => { const db = await getDb(); const sid = req.cookies?.[COOKIE]; if (sid) await db.query('delete from broker_sessions where id = $1', [sid]); res.clearCookie(COOKIE, { path: '/' }); res.json({ ok: true }) }))
@@ -94,7 +95,8 @@ export function mountBrokerPortal(r: Router, d: Deps) {
     const { rows: n } = await db.query<{ n: number }>('select count(*)::int as n from broker_notifications where broker_id = $1 and read_at is null', [m.broker_id])
     const { rows: u } = await db.query<{ n: number }>(`select count(*)::int as n from broker_job_messages x join broker_jobs j on j.id = x.job_id where j.broker_id = $1 and x.from_side <> 'broker' and not x.read_by_broker`, [m.broker_id])
     const { rows: rq } = await db.query<{ n: number }>(`select count(*)::int as n from broker_jobs where broker_id = $1 and status = 'requested'`, [m.broker_id])
-    res.set('Cache-Control', 'no-store'); res.json({ member: memberOut(m), broker: { ...brokerOut(b[0], true), accepting: !!b[0].accepting, settings: J<Row>(b[0].settings, {}), licenceExpires: DATE(b[0].licence_expires) }, counts: { notifications: n[0].n, unread: u[0].n, requests: rq[0].n } })
+    const { rows: tm } = await db.query<{ n: number }>(`select count(*)::int as n from broker_members where broker_id = $1`, [m.broker_id])
+    res.set('Cache-Control', 'no-store'); res.json({ member: memberOut(m), broker: { ...brokerOut(b[0], true), accepting: !!b[0].accepting, settings: J<Row>(b[0].settings, {}), licenceExpires: DATE(b[0].licence_expires) }, counts: { notifications: n[0].n, unread: u[0].n, requests: rq[0].n, team: tm[0].n } })
   }))
 
   /* ---------------- jobs ---------------- */
@@ -109,6 +111,19 @@ export function mountBrokerPortal(r: Router, d: Deps) {
     if (!rows[0]) throw new HttpError(404, 'Job not found.'); return { m, job: rows[0] }
   }
 
+  /** Released or cleared jobs not on an invoice yet, plus their rebillable charges — the same figure on Overview and Finance. */
+  const readyToBill = async (db: Db, brokerId: string) => {
+    const { rows } = await db.query<Row>(`with ready as (select j.id, j.fee_usd from broker_jobs j where j.broker_id = $1 and j.status in ('released','done') and not exists (select 1 from broker_invoices i where i.broker_id = j.broker_id and i.status <> 'void' and i.job_ids ? j.id))
+      select (select coalesce(sum(fee_usd),0) from ready) + (select coalesce(sum(c.amount_usd),0) from broker_charges c where c.job_id in (select id from ready) and c.rebill and c.invoice_id is null) as n`, [brokerId])
+    return r2(Number(rows[0]?.n ?? 0))
+  }
+  /** Job rows with who they're assigned to and unread messages — used by Overview and the Jobs board. */
+  const withNames = async (db: Db, brokerId: string, jobs: Row[]) => {
+    const { rows: unread } = await db.query<Row>(`select x.job_id, count(*)::int as n from broker_job_messages x join broker_jobs j on j.id = x.job_id where j.broker_id = $1 and x.from_side <> 'broker' and not x.read_by_broker group by x.job_id`, [brokerId])
+    const um = new Map(unread.map((x) => [x.job_id, x.n]))
+    const { rows: team } = await db.query<Row>('select id, name from broker_members where broker_id = $1', [brokerId]); const names = new Map(team.map((t) => [t.id, t.name]))
+    return jobs.map((j) => jobRow(j, { unread: um.get(j.id) ?? 0, assignedName: j.assigned_to ? names.get(j.assigned_to) ?? null : null }))
+  }
   r.get('/bp/overview', wrap(async (req, res) => {
     const db = await getDb(); const m = await me(db, req); const jobs = await jobsOf(db, m.broker_id)
     const open = jobs.filter((j) => OPEN(j.status)); const done = jobs.filter((j) => j.status === 'done')
@@ -116,8 +131,8 @@ export function mountBrokerPortal(r: Router, d: Deps) {
     const doneMonth = done.filter((j) => (stepAt(j, 'done') ?? '').slice(0, 7) === month)
     const clearDays = done.map((j) => { const e = stepAt(j, 'done'); return e ? (new Date(e).getTime() - new Date(j.created_at).getTime()) / 86400000 : null }).filter((x): x is number => x != null)
     const { rows: inv } = await db.query<Row>(`select status, total_usd, due_at from broker_invoices where broker_id = $1 and status in ('sent','draft')`, [m.broker_id])
-    const { rows: unbilled } = await db.query<Row>(`select coalesce(sum(j.fee_usd),0) as fees from broker_jobs j where j.broker_id = $1 and j.status = 'done' and not exists (select 1 from broker_invoices i where i.broker_id = j.broker_id and i.status <> 'void' and i.job_ids ? j.id)`, [m.broker_id])
-    const { rows: disb } = await db.query<Row>(`select coalesce(sum(amount_usd),0) as n from broker_charges where broker_id = $1 and rebill and invoice_id is null`, [m.broker_id])
+    const unbilledUsd = await readyToBill(db, m.broker_id)
+    const isOwner = m.role === 'owner'
     const attention: Row[] = []
     for (const j of open) {
       const d0 = daysSince(lastMove(j))
@@ -125,24 +140,21 @@ export function mountBrokerPortal(r: Router, d: Deps) {
       else if (d0 >= 3) attention.push({ kind: 'stuck', jobId: j.id, ref: j.ref, title: `${j.ref} has been at “${jobStepLabels[j.status as JobStep]}” for ${Math.floor(d0)} days`, detail: `${j.shipper_name} · ${j.customer}`, age: Math.round(d0 * 24) })
     }
     const overdue = inv.filter((i) => i.status === 'sent' && i.due_at && DATE(i.due_at)! < new Date().toISOString().slice(0, 10))
-    if (overdue.length) attention.push({ kind: 'overdue', title: `${overdue.length} invoice${overdue.length === 1 ? '' : 's'} overdue`, detail: fmtUsd(overdue.reduce((n, i) => n + Number(i.total_usd), 0)), link: '/broker-portal/finance' })
+    if (overdue.length && isOwner) attention.push({ kind: 'overdue', title: `${overdue.length} invoice${overdue.length === 1 ? '' : 's'} overdue`, detail: fmtUsd(overdue.reduce((n, i) => n + Number(i.total_usd), 0)), link: '/broker-portal/finance' })
     const { rows: msgs } = await db.query<Row>(`select x.*, j.id as jid, s.ref from broker_job_messages x join broker_jobs j on j.id = x.job_id join shipments s on s.id = j.shipment_id where j.broker_id = $1 and x.from_side <> 'broker' and not x.read_by_broker order by x.at desc limit 5`, [m.broker_id])
     for (const x of msgs) attention.push({ kind: 'message', jobId: x.jid, ref: x.ref, title: `Message on ${x.ref} from ${x.from_name}`, detail: x.body.slice(0, 120), age: Math.round(daysSince(ISO(x.at)) * 24) })
     const pipeline = JOB_STEPS.filter((s) => s !== 'done').map((s) => ({ step: s, label: jobStepLabels[s], n: open.filter((j) => j.status === s).length }))
     const { rows: dutyRows } = await db.query<Row>(`select duty_currency, sum(duty_local) as n from broker_jobs where broker_id = $1 and duty_local is not null and to_char(updated_at, 'YYYY-MM') = $2 group by duty_currency`, [m.broker_id, month])
     res.set('Cache-Control', 'no-store')
     res.json({
-      kpis: { open: open.length, requests: open.filter((j) => j.status === 'requested').length, doneMonth: doneMonth.length, feesMonth: r2(doneMonth.reduce((n, j) => n + Number(j.fee_usd), 0)), avgClearDays: clearDays.length ? Math.round((clearDays.reduce((a, x) => a + x, 0) / clearDays.length) * 10) / 10 : null, outstanding: r2(inv.filter((i) => i.status === 'sent').reduce((n, i) => n + Number(i.total_usd), 0)), unbilled: r2(Number(unbilled[0].fees) + Number(disb[0].n)), dutyMonth: dutyRows.map((x) => ({ currency: x.duty_currency, amount: Number(x.n) })) },
+      kpis: { open: open.length, requests: open.filter((j) => j.status === 'requested').length, doneMonth: doneMonth.length, feesMonth: isOwner ? r2(doneMonth.reduce((n, j) => n + Number(j.fee_usd), 0)) : null, avgClearDays: clearDays.length ? Math.round((clearDays.reduce((a, x) => a + x, 0) / clearDays.length) * 10) / 10 : null, outstanding: isOwner ? r2(inv.filter((i) => i.status === 'sent').reduce((n, i) => n + Number(i.total_usd), 0)) : null, unbilled: isOwner ? unbilledUsd : null, dutyMonth: dutyRows.map((x) => ({ currency: x.duty_currency, amount: Number(x.n) })) },
       attention: attention.sort((a, b) => (a.kind === 'request' ? -1 : 0) - (b.kind === 'request' ? -1 : 0)).slice(0, 12), pipeline,
-      recent: jobs.slice(0, 8).map((j) => jobRow(j)),
+      recent: await withNames(db, m.broker_id, jobs.slice(0, 8)),
     })
   }))
   r.get('/bp/jobs', wrap(async (req, res) => {
     const db = await getDb(); const m = await me(db, req); const jobs = await jobsOf(db, m.broker_id)
-    const { rows: unread } = await db.query<Row>(`select job_id, count(*)::int as n from broker_job_messages where from_side <> 'broker' and not read_by_broker group by job_id`)
-    const um = new Map(unread.map((x) => [x.job_id, x.n]))
-    const { rows: team } = await db.query<Row>('select id, name from broker_members where broker_id = $1', [m.broker_id]); const names = new Map(team.map((t) => [t.id, t.name]))
-    res.set('Cache-Control', 'no-store'); res.json({ jobs: jobs.map((j) => jobRow(j, { unread: um.get(j.id) ?? 0, assignedName: j.assigned_to ? names.get(j.assigned_to) ?? null : null })) })
+    res.set('Cache-Control', 'no-store'); res.json({ jobs: await withNames(db, m.broker_id, jobs) })
   }))
   r.get('/bp/jobs/:id', wrap(async (req, res) => {
     const db = await getDb(); const { m, job } = await ownJob(db, req)
@@ -245,9 +257,9 @@ export function mountBrokerPortal(r: Router, d: Deps) {
     res.status(201).json({ ok: true })
   }))
   r.delete('/bp/charges/:id', wrap(async (req, res) => { const db = await getDb(); const m = await me(db, req); const { rows } = await db.query<Row>('delete from broker_charges where id = $1 and broker_id = $2 and invoice_id is null returning id', [String(req.params.id), m.broker_id]); if (!rows[0]) throw new HttpError(409, 'Already on an invoice.'); res.json({ ok: true }) }))
-  const invOut = (i: Row) => ({ id: i.id, number: i.number, shipperId: i.shipper_id, shipper: i.shipper_name ?? undefined, lines: J<Row[]>(i.lines, []), jobIds: J<string[]>(i.job_ids, []), totalUsd: Number(i.total_usd), status: i.status as 'draft' | 'sent' | 'paid' | 'void', dueAt: DATE(i.due_at), sentAt: ISO(i.sent_at), paidAt: ISO(i.paid_at), paidRef: i.paid_ref, notes: i.notes, createdAt: ISO(i.created_at), overdue: i.status === 'sent' && !!i.due_at && DATE(i.due_at)! < new Date().toISOString().slice(0, 10) })
+  const invOut = (i: Row) => ({ id: i.id, number: i.number, shipperId: i.shipper_id, shipper: i.shipper_name ?? undefined, lines: J<Row[]>(i.lines, []), jobIds: J<string[]>(i.job_ids, []), totalUsd: Number(i.total_usd), status: i.status as 'draft' | 'sent' | 'paid' | 'void', dueAt: DATE(i.due_at), sentAt: ISO(i.sent_at), paidAt: ISO(i.paid_at), paidRef: i.paid_ref, remindedAt: ISO(i.reminded_at), notes: i.notes, createdAt: ISO(i.created_at), overdue: i.status === 'sent' && !!i.due_at && DATE(i.due_at)! < new Date().toISOString().slice(0, 10) })
   r.get('/bp/finance', wrap(async (req, res) => {
-    const db = await getDb(); const m = await me(db, req)
+    const db = await getDb(); const m = await owner(db, req)
     const { rows: inv } = await db.query<Row>(`select i.*, sh.name as shipper_name from broker_invoices i join shippers sh on sh.id = i.shipper_id where i.broker_id = $1 order by i.created_at desc`, [m.broker_id])
     // Ready to bill: finished (or released) jobs not yet on an invoice, with their rebillable charges.
     const { rows: ready } = await db.query<Row>(`${JOB_SELECT} where j.broker_id = $1 and j.status in ('released','done') and not exists (select 1 from broker_invoices i where i.broker_id = j.broker_id and i.status <> 'void' and i.job_ids ? j.id) order by j.updated_at desc`, [m.broker_id])
@@ -263,7 +275,7 @@ export function mountBrokerPortal(r: Router, d: Deps) {
       totals: { outstanding: r2(inv.filter((i) => i.status === 'sent').reduce((n, i) => n + Number(i.total_usd), 0)), paidYear: r2(inv.filter((i) => i.status === 'paid' && (ISO(i.paid_at) ?? '').slice(0, 4) === new Date().toISOString().slice(0, 4)).reduce((n, i) => n + Number(i.total_usd), 0)), unbilled: r2(unbilled.reduce((n, u) => n + u.feeUsd + u.charges.reduce((a, c) => a + c.amountUsd, 0), 0)), disbursementsOpen: r2(Number(disb[0].open)) }, settings: { termsDays: Number(st.termsDays ?? 14), bank: st.bank ?? '', invoiceNote: st.invoiceNote ?? '' } })
   }))
   r.post('/bp/invoices', wrap(async (req, res) => {
-    const db = await getDb(); const m = await me(db, req); const { jobIds, notes } = z.object({ jobIds: z.array(z.string()).min(1).max(50), notes: z.string().trim().max(500).default('') }).parse(req.body)
+    const db = await getDb(); const m = await owner(db, req); const { jobIds, notes } = z.object({ jobIds: z.array(z.string()).min(1).max(50), notes: z.string().trim().max(500).default('') }).parse(req.body)
     const { rows: jobs } = await db.query<Row>(`${JOB_SELECT} where j.broker_id = $1 and j.id = any($2::text[])`, [m.broker_id, jobIds])
     if (jobs.length !== jobIds.length) throw new HttpError(400, 'Some jobs aren’t yours.')
     const shippers = new Set(jobs.map((j) => j.shipper_id)); if (shippers.size > 1) throw new HttpError(400, 'One invoice per shipping company — pick jobs for the same company.')
@@ -279,7 +291,7 @@ export function mountBrokerPortal(r: Router, d: Deps) {
     await db.query('update broker_charges set invoice_id = $2 where id = any($1::text[])', [ch.map((c) => c.id), id])
     res.status(201).json({ id })
   }))
-  const ownInv = async (db: Db, req: Request) => { const m = await me(db, req); const { rows } = await db.query<Row>(`select i.*, sh.name as shipper_name from broker_invoices i join shippers sh on sh.id = i.shipper_id where i.id = $1 and i.broker_id = $2`, [String(req.params.id), m.broker_id]); if (!rows[0]) throw new HttpError(404, 'Invoice not found.'); return { m, inv: rows[0] } }
+  const ownInv = async (db: Db, req: Request) => { const m = await owner(db, req); const { rows } = await db.query<Row>(`select i.*, sh.name as shipper_name from broker_invoices i join shippers sh on sh.id = i.shipper_id where i.id = $1 and i.broker_id = $2`, [String(req.params.id), m.broker_id]); if (!rows[0]) throw new HttpError(404, 'Invoice not found.'); return { m, inv: rows[0] } }
   r.get('/bp/invoices/:id', wrap(async (req, res) => {
     const db = await getDb(); const { m, inv } = await ownInv(db, req)
     const { rows: b } = await db.query<Row>('select * from brokers where id = $1', [m.broker_id])
@@ -288,7 +300,16 @@ export function mountBrokerPortal(r: Router, d: Deps) {
   r.post('/bp/invoices/:id/send', wrap(async (req, res) => {
     const db = await getDb(); const { m, inv } = await ownInv(db, req); if (inv.status !== 'draft') throw new HttpError(409, 'Already sent.')
     await db.query(`update broker_invoices set status = 'sent', sent_at = now() where id = $1`, [inv.id])
-    await notifyShipperStaff(db, inv.shipper_id, { kind: 'payment', title: `Broker invoice ${inv.number}: ${fmtUsd(Number(inv.total_usd))}`, body: `${m.b_company || m.b_name} · due ${DATE(inv.due_at)} · ${J<string[]>(inv.job_ids, []).length} job(s)`, link: '/dashboard/shipments', dedupe: `binv:${inv.id}` }, ['owner', 'finance'])
+    await notifyShipperStaff(db, inv.shipper_id, { kind: 'payment', title: `Broker invoice ${inv.number}: ${fmtUsd(Number(inv.total_usd))}`, body: `${m.b_company || m.b_name} · due ${DATE(inv.due_at)} · ${J<string[]>(inv.job_ids, []).length} job(s)`, link: `/dashboard/broker-invoices/${inv.id}`, dedupe: `binv:${inv.id}` }, ['owner', 'finance'])
+    res.json({ ok: true })
+  }))
+  /** A polite nudge to the shipping company about a sent invoice — at most once a day. */
+  r.post('/bp/invoices/:id/remind', wrap(async (req, res) => {
+    const db = await getDb(); const { m, inv } = await ownInv(db, req); if (inv.status !== 'sent') throw new HttpError(409, 'Only sent, unpaid invoices can be chased.')
+    if (inv.reminded_at && Date.now() - new Date(inv.reminded_at).getTime() < 20 * 3600000) throw new HttpError(429, `You sent a reminder ${new Date(inv.reminded_at).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' })} — try again tomorrow.`)
+    const late = inv.due_at && DATE(inv.due_at)! < new Date().toISOString().slice(0, 10)
+    await notifyShipperStaff(db, inv.shipper_id, { kind: 'payment', title: `Reminder: broker invoice ${inv.number} ${late ? 'is overdue' : 'is due'} — ${fmtUsd(Number(inv.total_usd))}`, body: `${m.b_company || m.b_name} · due ${DATE(inv.due_at)}`, link: `/dashboard/broker-invoices/${inv.id}`, dedupe: `binv-remind:${inv.id}:${new Date().toISOString().slice(0, 10)}` })
+    await db.query('update broker_invoices set reminded_at = now() where id = $1', [inv.id])
     res.json({ ok: true })
   }))
   r.post('/bp/invoices/:id/paid', wrap(async (req, res) => { const db = await getDb(); const { inv } = await ownInv(db, req); if (inv.status !== 'sent') throw new HttpError(409, 'Only sent invoices can be marked paid.'); const { ref } = z.object({ ref: z.string().trim().max(80).default('') }).parse(req.body); await db.query(`update broker_invoices set status = 'paid', paid_at = now(), paid_ref = $2 where id = $1`, [inv.id, ref]); res.json({ ok: true }) }))
@@ -303,7 +324,7 @@ export function mountBrokerPortal(r: Router, d: Deps) {
 
   /* ---------------- analytics & reports ---------------- */
   r.get('/bp/analytics', wrap(async (req, res) => {
-    const db = await getDb(); const m = await me(db, req); const months = Math.min(24, Math.max(3, Number(req.query.months) || 6))
+    const db = await getDb(); const m = await owner(db, req); const months = Math.min(24, Math.max(3, Number(req.query.months) || 6))
     const jobs = (await jobsOf(db, m.broker_id)).filter((j) => new Date(j.created_at).getTime() > Date.now() - months * 31 * 86400000)
     const keys: string[] = []; for (let i = months - 1; i >= 0; i--) { const d0 = new Date(); d0.setUTCDate(1); d0.setUTCMonth(d0.getUTCMonth() - i); keys.push(d0.toISOString().slice(0, 7)) }
     const done = jobs.filter((j) => j.status === 'done')
@@ -326,7 +347,7 @@ export function mountBrokerPortal(r: Router, d: Deps) {
   const csv = (rows: unknown[][]) => rows.map((rr) => rr.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
   const range = (req: Request) => { const from = typeof req.query.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.from) ? req.query.from : new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10); const to = typeof req.query.to === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.to) ? req.query.to : new Date().toISOString().slice(0, 10); return { from, to } }
   r.get('/bp/reports/:kind', wrap(async (req, res) => {
-    const db = await getDb(); const m = await me(db, req); const { from, to } = range(req); const kind = String(req.params.kind).replace(/\.csv$/, '')
+    const db = await getDb(); const m = await me(db, req); const { from, to } = range(req); const kind = String(req.params.kind).replace(/\.csv$/, ''); if (kind === 'finance' && m.role !== 'owner') throw new HttpError(403, 'Only the account owner can download invoices.')
     let out: unknown[][] = []
     if (kind === 'jobs') {
       const jobs = (await jobsOf(db, m.broker_id)).filter((j) => { const d0 = ISO(j.created_at)!.slice(0, 10); return d0 >= from && d0 <= to })
@@ -377,10 +398,20 @@ export function mountBrokerPortal(r: Router, d: Deps) {
   r.post('/bp/notifications/read', wrap(async (req, res) => { const db = await getDb(); const m = await me(db, req); await db.query('update broker_notifications set read_at = now() where broker_id = $1 and read_at is null', [m.broker_id]); res.json({ ok: true }) }))
 }
 
+/** Demo jobs still being cleared shouldn't sit on shipments that were already delivered — move them onto shipments at the port. */
+async function alignDemoJobs(db: Db) {
+  const { rows: bad } = await db.query<Row>(`select j.id, j.shipper_id from broker_jobs j join shipments s on s.id = j.shipment_id where j.id like 'job_demo_%' and j.status not in ('done','declined','cancelled') and s.status in ('delivered','out_for_delivery','booked','picked_up')`)
+  for (const j of bad) {
+    const { rows: free } = await db.query<Row>(`select s.id, s.shipper_id from shipments s where s.destination = 'GH' and s.status in ('customs','arrived','in_transit') and s.cancelled_at is null and not exists (select 1 from broker_jobs x where x.shipment_id = s.id) order by (s.shipper_id = $1) desc, (s.status = 'customs') desc, (s.status = 'arrived') desc, s.created_at limit 1`, [j.shipper_id])
+    if (!free[0]) break
+    await db.query('update broker_jobs set shipment_id = $2, shipper_id = $3 where id = $1', [j.id, free[0].id, free[0].shipper_id])
+  }
+}
+
 /* ---------------- demo: logins for two brokers and a realistic job history (runs once) ---------------- */
 export async function seedBrokerPortalDemo(db: Db) {
   const { rows: b } = await db.query<Row>(`select id from brokers where id = 'brk_tema_1'`); if (!b[0]) return
-  const { rows: done } = await db.query<Row>(`select 1 from broker_members where broker_id = 'brk_tema_1' limit 1`); if (done[0]) return
+  const { rows: done } = await db.query<Row>(`select 1 from broker_members where broker_id = 'brk_tema_1' limit 1`); if (done[0]) return alignDemoJobs(db)
   const hash = await bcrypt.hash('shipsync', 10)
   await db.query(`insert into broker_members (id,broker_id,name,email,phone,role,password_hash,status) values ('bmem_demo_1','brk_tema_1','Kwabena Osei','kwabena@oseiclearing.demo','+233 24 400 1182','owner',$1,'active'), ('bmem_demo_2','brk_tema_1','Adwoa Owusu','adwoa@oseiclearing.demo','+233 24 400 1190','agent',$1,'active'), ('bmem_demo_3','brk_lag_1','Chinedu Okafor','chinedu@okaforbrokerage.demo','+234 803 555 0871','owner',$1,'active') on conflict do nothing`, [hash])
   await db.query(`update brokers set settings = $2, licence_expires = (current_date + 140), accepting = true where id = $1`, ['brk_tema_1', JSON.stringify({ termsDays: 14, bank: 'Osei Clearing Services · GCB Bank, Tema Main · Acc 1234-5678-901 · MoMo +233 24 400 1182', invoiceNote: 'Thank you for your business. Disbursements are charged at cost with receipts.' })])
@@ -422,4 +453,5 @@ export async function seedBrokerPortalDemo(db: Db) {
   if (live[0]) await db.query(`insert into broker_job_messages (id,job_id,from_side,from_name,body,read_by_broker,read_by_office,at) values ($1,$2,'office','Nana Boateng · Gold Coast Freight','Hi Kwabena — the commercial invoice is attached to the shipment now. Can you confirm the HS code for the generators?',true,true,now() - interval '30 hours'), ($3,$2,'broker','Kwabena Osei · Osei Clearing Services','Got it, thanks. Generators go under 8502.11 — duty 10% plus levies. Lodging today.',true,true,now() - interval '28 hours'), ($4,$2,'office','Nana Boateng · Gold Coast Freight','Great. The customer asks if it can go out on Thursday.',false,true,now() - interval '3 hours')`, ['bm_demo_1', live[0].id, 'bm_demo_2', 'bm_demo_3'])
   const reqs = (await db.query<Row>(`select j.id, s.ref from broker_jobs j join shipments s on s.id = j.shipment_id where j.broker_id = 'brk_tema_1' and j.status = 'requested'`)).rows
   for (const r0 of reqs) await db.query('insert into broker_notifications (id,broker_id,title,body,link) values ($1,$2,$3,$4,$5)', ['bn_' + uid(), 'brk_tema_1', `New clearance request: ${r0.ref}`, 'Gold Coast Freight · accept or decline from the job page', `/broker-portal/jobs/${r0.id}`])
+  await alignDemoJobs(db)
 }

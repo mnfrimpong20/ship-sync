@@ -171,19 +171,22 @@ const NAV = [
   ['/broker-portal/finance', 'Finance', Wallet, false], ['/broker-portal/analytics', 'Analytics', BarChart3, false], ['/broker-portal/reports', 'Reports', FileSpreadsheet, false],
   ['/broker-portal/team', 'Team', Users, false], ['/broker-portal/profile', 'Profile & settings', Settings, false],
 ] as const
+/** Money pages are the owner's — agents work jobs, charges and messages. */
+const OWNER_ONLY = new Set(['/broker-portal/finance', '/broker-portal/analytics'])
 function Shell({ me, reload, children }: { me: BpMe; reload: () => Promise<void>; children: ReactNode }) {
   const [menu, setMenu] = useState(false); const [acct, setAcct] = useState(false); const loc = useLocation(); const nav = useNavigate()
   useEffect(() => { setMenu(false); setAcct(false) }, [loc.pathname])
   useEffect(() => { const x = setInterval(() => { if (document.visibilityState === 'visible') void reload() }, 60000); return () => clearInterval(x) }, [reload])
+  const nav0 = NAV.filter(([to]) => me.member.role === 'owner' || !OWNER_ONLY.has(to))
   const badge = (to: string) => (to.endsWith('/jobs') ? me.counts.requests : to.endsWith('/messages') ? me.counts.unread : 0)
   const logout = async () => { await bpApi.logout(); nav('/broker-portal/login') }
-  const links = (compact = false) => <ul className="space-y-1">{NAV.map(([to, label, I, end]) => <li key={to}><NavLink to={to} end={end} className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium focus-ring ${isActive ? 'bg-gold/15 text-gold-deep lg:bg-white/10 lg:text-white' : 'text-text-muted hover:bg-surface-2 hover:text-text lg:text-white/70 lg:hover:bg-white/5 lg:hover:text-white'}`}><I size={18} aria-hidden="true" /><span className="flex-1">{label}</span>{badge(to) > 0 && <span className="rounded-full bg-gold px-1.5 text-xs font-bold text-on-accent">{badge(to)}</span>}{compact ? null : null}</NavLink></li>)}</ul>
+  const links = (compact = false) => <ul className="space-y-1">{nav0.map(([to, label, I, end]) => <li key={to}><NavLink to={to} end={end} className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium focus-ring ${isActive ? 'bg-gold/15 text-gold-deep lg:bg-white/10 lg:text-white' : 'text-text-muted hover:bg-surface-2 hover:text-text lg:text-white/70 lg:hover:bg-white/5 lg:hover:text-white'}`}><I size={18} aria-hidden="true" /><span className="flex-1">{label}</span>{badge(to) > 0 && <span className="rounded-full bg-gold px-1.5 text-xs font-bold text-on-accent">{badge(to)}</span>}{compact ? null : null}</NavLink></li>)}</ul>
   const b = me.broker
   return (
     <div className="ss-app min-h-screen bg-bg text-text lg:flex">
       <a href="#bp-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[90] focus:rounded focus:bg-gold focus:px-3 focus:py-2 focus:text-on-accent">Skip to content</a>
       <aside className="hidden w-64 shrink-0 flex-col bg-[#0D1424] text-white lg:flex" aria-label="Broker navigation">
-        <div className="px-5 pb-4 pt-6"><Link to="/broker-portal" className="inline-flex items-center gap-2" aria-label="Broker dashboard home"><Logo dark /></Link><p className="mt-3 text-xs font-bold uppercase tracking-wider text-gold">Broker</p><p className="truncate text-sm font-semibold">{b.company || b.name}</p><p className="truncate text-xs text-white/60">{b.ports.join(' · ')} · {b.licenceNo}</p></div>
+        <div className="px-5 pb-4 pt-6"><Link to="/broker-portal" className="inline-flex items-center gap-2" aria-label="Broker dashboard home"><Logo dark /></Link><p className="mt-4 truncate text-sm font-semibold">{b.company || b.name}</p><p className="truncate text-xs text-white/60">{b.ports.join(' · ')} · {b.licenceNo}</p></div>
         <nav className="flex-1 px-3" aria-label="Main">{links()}</nav>
         <div className="border-t border-white/10 p-4 text-xs text-white/60"><p className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-semibold ${b.accepting ? 'bg-[#3FB950]/20 text-[#7EE2A0]' : 'bg-white/10'}`}><span className={`h-2 w-2 rounded-full ${b.accepting ? 'bg-[#3FB950]' : 'bg-white/40'}`} aria-hidden="true" />{b.accepting ? 'Taking new jobs' : 'Not taking new jobs'}</p><p>Questions? <a href="mailto:hello@ntemtem.com" className="underline">hello@ntemtem.com</a></p></div>
       </aside>
@@ -200,7 +203,7 @@ function Shell({ me, reload, children }: { me: BpMe; reload: () => Promise<void>
         </header>
         <main id="bp-main" tabIndex={-1} className="outline-none pb-20 lg:pb-0">{children}</main>
         <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-bg/95 backdrop-blur-xl lg:hidden" aria-label="Quick links">
-          {NAV.slice(0, 4).map(([to, label, I, end]) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `relative flex min-h-16 flex-col items-center justify-center gap-0.5 text-xs font-medium ${isActive ? 'text-gold-deep' : 'text-text-muted'}`}><I size={20} aria-hidden="true" />{label}{badge(to) > 0 && <span className="absolute right-[28%] top-2 h-2.5 w-2.5 rounded-full bg-gold" aria-label={`${badge(to)} new`} />}</NavLink>)}
+          {nav0.slice(0, 4).map(([to, label, I, end]) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `relative flex min-h-16 flex-col items-center justify-center gap-0.5 text-xs font-medium ${isActive ? 'text-gold-deep' : 'text-text-muted'}`}><I size={20} aria-hidden="true" />{label}{badge(to) > 0 && <span className="absolute right-[28%] top-2 h-2.5 w-2.5 rounded-full bg-gold" aria-label={`${badge(to)} new`} />}</NavLink>)}
         </nav>
       </div>
       {menu && createPortal(<div className="ss-app fixed inset-0 z-[85] lg:hidden" role="dialog" aria-modal="true" aria-label="Menu"><button className="absolute inset-0 bg-black/50" aria-label="Close menu" onClick={() => setMenu(false)} /><div className="absolute inset-y-0 left-0 w-72 overflow-y-auto bg-bg p-4 shadow-2xl"><div className="mb-4 flex items-center justify-between"><Logo /><button onClick={() => setMenu(false)} className="grid h-11 w-11 place-items-center rounded-lg" aria-label="Close menu"><X size={20} /></button></div><p className="mb-3 px-3 text-sm font-semibold">{b.company || b.name}</p>{links(true)}</div></div>, document.body)}
@@ -213,9 +216,11 @@ export default function BrokerApp() {
   const [me, setMe] = useState<BpMe | null | 'out'>(null); const loc = useLocation(); const nav = useNavigate()
   const reload = useCallback(async () => { try { setMe(await bpApi.me()) } catch { setMe('out') } }, [])
   useEffect(() => { void reload() }, [reload])
-  const signedIn = async () => { await reload(); nav('/broker-portal', { replace: true }) }
+  // Back to the page they were sent to sign in from (a link in an email, say) — only ever a broker-portal page.
+  const next = (() => { const n = new URLSearchParams(loc.search).get('next') ?? ''; return /^\/broker-portal(\/(?!login|signin|join)[\w/-]*)?$/.test(n) ? n : '/broker-portal' })()
+  const signedIn = async () => { await reload(); nav(next, { replace: true }) }
   const open = ['/broker-portal/login', '/broker-portal/signin'].includes(loc.pathname) || loc.pathname.startsWith('/broker-portal/join/')
-  if (open) return <Routes><Route path="login" element={me && me !== 'out' ? <Navigate to="/broker-portal" replace /> : <Login onIn={signedIn} />} /><Route path="signin" element={<SignInLink onIn={signedIn} />} /><Route path="join/:token" element={<Join onIn={signedIn} />} /></Routes>
+  if (open) return <Routes><Route path="login" element={me && me !== 'out' ? <Navigate to={next} replace /> : <Login onIn={signedIn} />} /><Route path="signin" element={<SignInLink onIn={signedIn} />} /><Route path="join/:token" element={<Join onIn={signedIn} />} /></Routes>
   if (me === null) return <BrandLoader label="Opening your broker dashboard…" />
   if (me === 'out') return <Navigate to={`/broker-portal/login?next=${encodeURIComponent(loc.pathname)}`} replace />
   return (
@@ -227,9 +232,9 @@ export default function BrokerApp() {
             <Route path="jobs" element={<Jobs />} />
             <Route path="jobs/:id" element={<JobPage />} />
             <Route path="messages" element={<Messages />} />
-            <Route path="finance" element={<Finance />} />
-            <Route path="invoices/:id" element={<InvoicePage />} />
-            <Route path="analytics" element={<Analytics />} />
+            <Route path="finance" element={me.member.role === 'owner' ? <Finance /> : <Navigate to="/broker-portal" replace />} />
+            <Route path="invoices/:id" element={me.member.role === 'owner' ? <InvoicePage /> : <Navigate to="/broker-portal" replace />} />
+            <Route path="analytics" element={me.member.role === 'owner' ? <Analytics /> : <Navigate to="/broker-portal" replace />} />
             <Route path="reports" element={<Reports />} />
             <Route path="team" element={<Team />} />
             <Route path="profile" element={<Profile />} />

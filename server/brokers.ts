@@ -10,7 +10,7 @@ import type { Request, Response, NextFunction, Router } from 'express'
 import { isDriverRole } from '../src/lib/roles'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
-import { uid, type Db } from './db'
+import { hideDemoShippers, uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { emailProvider, emailTemplate, notify, notifyShipperStaff, sendEmail } from './notify'
 import { cargoLabel, countryByCode, type CargoType } from '../src/lib/data'
@@ -58,15 +58,22 @@ const zBook = z.object({ brokerId: z.string().min(1), note: z.string().trim().ma
 export const zStep = z.object({ status: z.enum([...JOB_STEPS, 'declined', 'cancelled']), note: z.string().trim().max(400).default(''), dutyLocal: z.number().min(0).max(1_000_000_000).optional(), dutyCurrency: z.string().trim().max(3).optional(), reference: z.string().trim().max(60).optional(), feeUsd: z.number().min(0).max(100_000).optional() })
 
 /** Apply a step: timeline, duty confirmation on 'assessed', notifications to both sides. `by` is who did it. */
+/** Listed brokers — the six demo firms (.demo emails) drop out with HIDE_DEMO_SHIPPERS, like the demo shippers. */
+const liveB = () => `b.active${hideDemoShippers() ? ` and coalesce(b.email, '') not like '%.demo'` : ''}`
+const STEP_TICKS: Record<string, string[]> = { documents: ['declaration'], duty_paid: ['receipt'], released: ['release'], done: ['gatepass'] }
 export async function advanceJob(db: Db, job: Row, b: z.infer<typeof zStep>, by: string, byRole: 'broker' | 'office' | 'customer' | 'admin', HttpError: Deps['HttpError']) {
   const order = [...JOB_STEPS] as string[]
   if (['cancelled', 'declined', 'done'].includes(job.status)) throw new HttpError(409, `This job is already ${jobStepLabels[job.status as JobStep]?.toLowerCase() ?? job.status}.`)
   if (b.status !== 'cancelled' && b.status !== 'declined' && order.indexOf(b.status) < order.indexOf(job.status)) throw new HttpError(409, 'Jobs only move forward.')
   if (b.status === 'declined' && byRole !== 'broker') throw new HttpError(403, 'Only the broker can decline.')
   if (b.status === 'assessed' && (b.dutyLocal == null || !(b.dutyLocal >= 0))) throw new HttpError(400, 'Enter the assessed duty amount.')
+  // "Documents lodged" means a declaration exists — the broker gives its reference so the office and customer can quote it.
+  if (b.status === 'documents' && byRole === 'broker' && !(b.reference ?? '').trim() && !String(job.reference ?? '').trim()) throw new HttpError(400, 'Enter the declaration / ICUMS reference — it’s what “documents lodged” tells the shipper and customer.')
   const timeline = (J(job.timeline) ?? []) as Row[]; timeline.push({ at: new Date().toISOString(), status: b.status, note: b.note, by })
-  await db.query(`update broker_jobs set status = $2, notes = case when $3 = '' then notes else $3 end, duty_local = coalesce($4, duty_local), duty_currency = coalesce($5, duty_currency), reference = coalesce($6, reference), fee_usd = coalesce($7, fee_usd), timeline = $8, updated_at = now() where id = $1`,
-    [job.id, b.status, b.note, b.dutyLocal ?? null, b.dutyCurrency?.toUpperCase() ?? null, b.reference ?? null, b.feeUsd ?? null, JSON.stringify(timeline.slice(-40))])
+  // Moving a step ticks the checklist item that step proves.
+  const ticks = STEP_TICKS[b.status] ?? []; const checklist = { ...((J(job.checklist) as Record<string, boolean> | null) ?? {}), ...Object.fromEntries(ticks.map((k) => [k, true])) }
+  await db.query(`update broker_jobs set status = $2, notes = case when $3 = '' then notes else $3 end, duty_local = coalesce($4, duty_local), duty_currency = coalesce($5, duty_currency), reference = coalesce($6, reference), fee_usd = coalesce($7, fee_usd), timeline = $8, checklist = $9, updated_at = now() where id = $1`,
+    [job.id, b.status, b.note, b.dutyLocal ?? null, b.dutyCurrency?.toUpperCase() ?? null, b.reference?.trim() || null, b.feeUsd ?? null, JSON.stringify(timeline.slice(-40)), JSON.stringify(checklist)])
   const label = jobStepLabels[b.status]
   await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [job.shipment_id, job.s_status, job.destination, `Customs clearance (${job.b_name}): ${label}${b.status === 'assessed' && b.dutyLocal != null ? ` — ${(b.dutyCurrency ?? job.duty_currency ?? 'GHS').toUpperCase()} ${b.dutyLocal.toLocaleString()}${b.reference ? ` (${b.reference})` : ''}` : ''}${b.note ? ` — ${b.note}` : ''}`])
   if (b.status === 'assessed' && b.dutyLocal != null) {
@@ -98,7 +105,7 @@ export function mountBrokers(r: Router, d: Deps) {
   r.get('/brokers', wrap(async (req, res) => {
     const db = await getDb()
     const dest = typeof req.query.destination === 'string' && req.query.destination.length === 2 ? req.query.destination.toUpperCase() : null
-    const params: unknown[] = []; const where = ['b.active']
+    const params: unknown[] = []; const where = [liveB()]
     if (dest) { params.push(dest); where.push(`b.country = $${params.length}`) }
     const { rows } = await db.query<Row>(`${BROKER_SELECT} where ${where.join(' and ')} order by b.verified desc, b.rating desc, b.reviews desc`, params)
     res.set('Cache-Control', 'no-store'); res.json({ brokers: rows.map((b) => brokerOut(b, false)) })
@@ -106,11 +113,11 @@ export function mountBrokers(r: Router, d: Deps) {
 
   r.get('/brokers/:id', wrap(async (req, res) => {
     const db = await getDb()
-    const { rows } = await db.query<Row>(`${BROKER_SELECT} where b.id = $1 and b.active`, [req.params.id]); const b = rows[0]; if (!b) throw new HttpError(404, 'Broker not found.')
+    const { rows } = await db.query<Row>(`${BROKER_SELECT} where b.id = $1 and ${liveB()}`, [req.params.id]); const b = rows[0]; if (!b) throw new HttpError(404, 'Broker not found.')
     const { rows: jobs } = await db.query<Row>(`select j.status, j.created_at, j.timeline, s.cargo from broker_jobs j join shipments s on s.id = j.shipment_id where j.broker_id = $1 and j.status not in ('cancelled','declined')`, [b.id])
     const days = jobs.filter((j) => j.status === 'done').map((j) => { const t = (J(j.timeline) as Row[] | null) ?? []; const end = t.find((x) => x.status === 'done')?.at; return end ? (new Date(end).getTime() - new Date(j.created_at).getTime()) / 86400000 : null }).filter((x): x is number => x != null && x >= 0)
     const byCargo = new Map<string, number>(); for (const j of jobs) byCargo.set(j.cargo, (byCargo.get(j.cargo) ?? 0) + 1)
-    const { rows: others } = await db.query<Row>(`${BROKER_SELECT} where b.active and b.country = $1 and b.id <> $2 order by b.verified desc, b.rating desc limit 3`, [b.country, b.id])
+    const { rows: others } = await db.query<Row>(`${BROKER_SELECT} where ${liveB()} and b.country = $1 and b.id <> $2 order by b.verified desc, b.rating desc limit 3`, [b.country, b.id])
     res.set('Cache-Control', 'no-store')
     res.json({ broker: brokerOut(b, false), stats: { jobs: jobs.length, done: jobs.filter((j) => j.status === 'done').length, open: jobs.filter((j) => j.status !== 'done').length, avgClearDays: days.length ? Math.round((days.reduce((a, x) => a + x, 0) / days.length) * 10) / 10 : null, byCargo: [...byCargo].map(([cargo, n]) => ({ cargo, n })).sort((a, c) => c.n - a.n) }, others: others.map((o) => brokerOut(o, false)) })
   }))
@@ -119,7 +126,7 @@ export function mountBrokers(r: Router, d: Deps) {
   r.get('/shipments/:id/customs', wrap(async (req, res) => {
     const db = await getDb(); const { s, office, owner } = await access(db, req, String(req.params.id))
     const job = await jobFor(db, s.id)
-    const { rows } = await db.query<Row>(`${BROKER_SELECT} where b.active and b.country = $1 order by b.verified desc, b.rating desc`, [s.destination])
+    const { rows } = await db.query<Row>(`${BROKER_SELECT} where ${liveB()} and b.country = $1 order by b.verified desc, b.rating desc`, [s.destination])
     const fee = (b: Row) => Number((J(b.fees) as Row)?.[s.cargo] ?? 0)
     res.set('Cache-Control', 'no-store')
     res.json({ job: job ? jobOut(job) : null, brokers: rows.map((b) => ({ ...brokerOut(b, false), feeUsd: fee(b) })), supported: ['GH', 'NG'].includes(s.destination), canBook: (office || owner) && !job, canManage: office, steps: JOB_STEPS.map((id) => ({ id, label: jobStepLabels[id] })) })
@@ -129,7 +136,7 @@ export function mountBrokers(r: Router, d: Deps) {
     if (!office && !owner) throw new HttpError(403, 'Not allowed.')
     if (await jobFor(db, s.id)) throw new HttpError(409, 'A broker is already on this shipment.')
     const b = zBook.parse(req.body)
-    const { rows: bs } = await db.query<Row>(`${BROKER_SELECT} where b.id = $1 and b.active`, [b.brokerId]); const broker = bs[0]; if (!broker) throw new HttpError(404, 'Broker not found.')
+    const { rows: bs } = await db.query<Row>(`${BROKER_SELECT} where b.id = $1 and ${liveB()}`, [b.brokerId]); const broker = bs[0]; if (!broker) throw new HttpError(404, 'Broker not found.')
     if (broker.country !== s.destination) throw new HttpError(400, `${broker.name} clears at ${countryByCode(broker.country)?.name ?? broker.country}, not ${countryByCode(s.destination)?.name ?? s.destination}.`)
     const fee = Number((J(broker.fees) as Row)?.[s.cargo] ?? 0)
     const id = 'job_' + uid(); const token = randomBytes(12).toString('base64url')

@@ -25,16 +25,17 @@ export function Overview() {
   useEffect(() => { bpApi.overview().then(setD).catch((e) => setErr(errMsg(e))) }, [])
   const hour = new Date().getHours(); const hi = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   if (!d) return <Page title={`${hi}, ${me.member.name.split(' ')[0]}`}><Err e={err} />{!err && <p className="text-text-muted">Loading…</p>}</Page>
-  const k = d.kpis; const maxPipe = Math.max(1, ...d.pipeline.map((p) => p.n))
+  const k = d.kpis; const maxPipe = Math.max(1, ...d.pipeline.map((p) => p.n)); const owner = me.member.role === 'owner'
   return (
     <Page eyebrow={me.broker.company || me.broker.name} title={`${hi}, ${me.member.name.split(' ')[0]}`} sub={k.requests ? <>{k.requests} new request{k.requests === 1 ? '' : 's'} waiting for you · {k.open} jobs open</> : <>{k.open} jobs open</>}
-      actions={<Link to="/broker-portal/jobs" className="btn-gold">Open jobs board</Link>}>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6" data-testid="bp-kpis">
-        <Kpi label="Open jobs" value={k.open} hint={`${k.requests} new requests`} tone={k.requests ? 'warn' : undefined} />
-        <Kpi label="Cleared this month" value={k.doneMonth} hint={`${usd(k.feesMonth)} in fees`} tone="good" />
+      actions={<Link to={k.requests ? '/broker-portal/jobs?tab=requests' : '/broker-portal/jobs'} className="btn-gold">{k.requests ? `Review ${k.requests} new request${k.requests === 1 ? '' : 's'}` : 'Open jobs board'}</Link>}>
+      {owner && <SetupCard />}
+      <div className={`grid grid-cols-2 gap-3 lg:grid-cols-3 ${owner ? 'xl:grid-cols-6' : 'xl:grid-cols-4'}`} data-testid="bp-kpis">
+        <Kpi label="Open jobs" value={k.open} hint={`${k.requests} new request${k.requests === 1 ? '' : 's'}`} tone={k.requests ? 'warn' : undefined} />
+        <Kpi label="Cleared this month" value={k.doneMonth} hint={k.feesMonth != null ? `${usd(k.feesMonth)} in fees` : undefined} tone="good" />
         <Kpi label="Avg days to clear" value={k.avgClearDays ?? '—'} hint="request → handed over" />
-        <Kpi label="Outstanding invoices" value={usd(k.outstanding)} hint="sent, not paid" tone={k.outstanding ? 'warn' : undefined} />
-        <Kpi label="Ready to bill" value={usd(k.unbilled)} hint="fees + disbursements" />
+        {k.outstanding != null && <Kpi label="Outstanding invoices" value={usd(k.outstanding)} hint="sent, not paid" tone={k.outstanding ? 'warn' : undefined} />}
+        {k.unbilled != null && <Kpi label="Ready to bill" value={usd(k.unbilled)} hint="released or cleared, not invoiced" />}
         <Kpi label="Duty assessed this month" value={k.dutyMonth.length ? k.dutyMonth.map((x) => local(x.amount, x.currency)).join(' · ') : '—'} />
       </div>
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.3fr_1fr]">
@@ -45,11 +46,29 @@ export function Overview() {
             {a.age != null && <span className="shrink-0 text-xs text-text-muted">{a.age < 24 ? `${a.age} h` : `${Math.round(a.age / 24)} d`}</span>}<ChevronRight size={16} className="shrink-0 text-text-muted" aria-hidden="true" /></Link></li>)}</ul> : <Empty>All clear — nothing waiting on you.</Empty>}
         </Card>
         <Card title="Pipeline" sub="Open jobs by step" id="pipe-h">
-          <ul className="space-y-3" data-testid="bp-pipeline">{d.pipeline.map((p) => <li key={p.step}><Link to={`/broker-portal/jobs?step=${p.step}`} className="block focus-ring"><div className="mb-1 flex justify-between text-sm"><span className="text-text-muted">{p.label}</span><b className="tabular-nums">{p.n}</b></div><div className="h-2.5 rounded-full bg-surface-2"><div className="h-full rounded-full bg-gold" style={{ width: `${(p.n / maxPipe) * 100}%` }} /></div></Link></li>)}</ul>
+          <ul className="space-y-3" data-testid="bp-pipeline">{d.pipeline.map((p) => <li key={p.step}><Link to={`/broker-portal/jobs?tab=all&step=${p.step}`} className="block focus-ring"><div className="mb-1 flex justify-between text-sm"><span className="text-text-muted">{p.label}</span><b className="tabular-nums">{p.n}</b></div><div className="h-2.5 rounded-full bg-surface-2"><div className="h-full rounded-full bg-gold" style={{ width: `${(p.n / maxPipe) * 100}%` }} /></div></Link></li>)}</ul>
         </Card>
       </div>
       <Card className="mt-6" title="Latest activity" actions={<Link to="/broker-portal/jobs" className="text-sm font-semibold text-gold-deep underline">All jobs</Link>} id="rec-h"><JobTable jobs={d.recent} /></Card>
     </Page>
+  )
+}
+
+/** First weeks: the few things that make a new firm bookable and payable. Disappears once they're done. */
+function SetupCard() {
+  const { me } = useBp(); const b = me.broker
+  const items: [boolean, string, string, string][] = [
+    [Object.values(b.fees ?? {}).some((v) => v != null && Number(v) > 0), 'Set your fee per cargo', 'Shipping companies see it before they book you.', '/broker-portal/profile#pf-fees'],
+    [!!b.settings.bank?.trim(), 'Add how you get paid', 'Bank or mobile money — printed on every invoice.', '/broker-portal/profile#pf-inv'],
+    [!!b.about?.trim(), 'Write a line about your firm', 'Shown on your public listing.', '/broker-portal/profile#pf-list'],
+    [!!b.licenceExpires, 'Add your licence expiry date', 'We remind you before it lapses.', '/broker-portal/profile#pf-avail'],
+    [(me.counts.team ?? 1) > 1, 'Invite your team', 'Agents can work and message on jobs.', '/broker-portal/team'],
+  ]
+  const left = items.filter(([ok]) => !ok).length; if (!left) return null
+  return (
+    <Card className="mb-6" title="Get set up" sub={`${items.length - left} of ${items.length} done — jobs arrive when shipping companies book you from your listing.`} id="setup-h">
+      <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5" data-testid="bp-setup">{items.map(([ok, t, d, to]) => <li key={t}><Link to={to} className={`flex h-full gap-2.5 rounded-xl border p-3 text-sm focus-ring ${ok ? 'border-border text-text-muted' : 'border-gold/50 bg-gold/5 hover:bg-gold/10'}`}><span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${ok ? 'bg-teal text-white' : 'border-2 border-gold'}`} aria-hidden="true">{ok && <Check size={12} />}</span><span><b className={ok ? 'line-through' : ''}>{t}</b><span className="sr-only">{ok ? ' (done)' : ''}</span><span className="block text-xs text-text-muted">{d}</span></span></Link></li>)}</ul>
+    </Card>
   )
 }
 
@@ -74,7 +93,10 @@ function JobTable({ jobs }: { jobs: BpJob[] }) {
 }
 export function Jobs() {
   const [jobs, setJobs] = useState<BpJob[] | null>(null); const [err, setErr] = useState(''); const [sp, setSp] = useSearchParams()
-  const tab = sp.get('tab') ?? (sp.get('step') ? 'active' : 'active'); const step = sp.get('step') ?? ''; const [q, setQ] = useState('')
+  const step = sp.get('step') ?? ''; const [q, setQ] = useState('')
+  const waiting = (jobs ?? []).some((j) => j.status === 'requested')
+  // New requests come first when there are any; a step filter (from the pipeline) looks across every job.
+  const tab = step ? 'all' : sp.get('tab') ?? (waiting ? 'requests' : 'active')
   useEffect(() => { bpApi.jobs().then(setJobs).catch((e) => setErr(errMsg(e))) }, [])
   const list = useMemo(() => (jobs ?? []).filter((j) => (tab === 'requests' ? j.status === 'requested' : tab === 'active' ? !['done', 'declined', 'cancelled', 'requested'].includes(j.status) : tab === 'cleared' ? j.status === 'done' : true) && (!step || j.status === step) && (!q.trim() || [j.shipmentRef, j.shipperName, j.customer, j.reference].join(' ').toLowerCase().includes(q.trim().toLowerCase()))), [jobs, tab, step, q])
   const count = (t: string) => (jobs ?? []).filter((j) => (t === 'requests' ? j.status === 'requested' : t === 'active' ? !['done', 'declined', 'cancelled', 'requested'].includes(j.status) : t === 'cleared' ? j.status === 'done' : true)).length
@@ -83,7 +105,7 @@ export function Jobs() {
       <Err e={err} />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-1 rounded-xl border border-border p-1" role="tablist" aria-label="Job filter">{[['requests', 'New requests'], ['active', 'In progress'], ['cleared', 'Cleared'], ['all', 'All']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setSp({ tab: k })} className={`min-h-10 rounded-lg px-3 text-sm font-semibold ${tab === k ? 'bg-gold text-on-accent' : 'text-text-muted hover:text-text'}`} data-testid={`bp-tab-${k}`}>{l} <span className="tabular-nums">{count(k)}</span></button>)}</div>
-        {step && <button onClick={() => setSp({ tab })} className="inline-flex min-h-10 items-center gap-1 rounded-full border border-gold px-3 text-sm">{jobStepLabels[step as JobStep]} <X size={14} aria-label="Clear step filter" /></button>}
+        {step && <button onClick={() => setSp({ tab: 'active' })} className="inline-flex min-h-10 items-center gap-1 rounded-full border border-gold px-3 text-sm">{jobStepLabels[step as JobStep]} <X size={14} aria-label="Clear step filter" /></button>}
         <label className="relative ml-auto w-full sm:w-72"><span className="sr-only">Search jobs</span><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" aria-hidden="true" /><input className="input-dark !pl-9" placeholder="Search ref, company, customer, ICUMS no." value={q} onChange={(e) => setQ(e.target.value)} data-testid="bp-job-search" /></label>
       </div>
       <Card>{jobs ? <JobTable jobs={list} /> : <p className="text-text-muted">Loading…</p>}</Card>
@@ -112,7 +134,8 @@ export function JobPage() {
       <Toast msg={toast} /><Err e={err} />
       {/* ---- stepper + next action ---- */}
       <Card className="mb-6" id="step-h">
-        <ol className="grid grid-cols-7 gap-1" aria-label="Clearance steps">{JOB_STEPS.map((st, i) => { const at = j.timeline.find((t) => t.status === st)?.at; return <li key={st} className="min-w-0 text-center" aria-current={i === idx ? 'step' : undefined}><span className={`mx-auto grid h-8 w-8 place-items-center rounded-full text-xs font-bold ${i < idx || j.status === 'done' ? 'bg-teal text-white' : i === idx ? 'bg-gold text-on-accent' : 'bg-surface-2 text-text-muted'}`}>{i < idx || j.status === 'done' ? <Check size={14} aria-hidden="true" /> : i + 1}</span><span className="mt-1 block truncate text-[0.7rem] font-medium sm:text-xs">{STEP_SHORT[st]}</span><span className="block text-[0.65rem] text-text-muted">{at ? shortDate(at) : ''}</span></li> })}</ol>
+        <ol className="grid grid-cols-7 gap-1" aria-label="Clearance steps">{JOB_STEPS.map((st, i) => { const at = j.timeline.find((t) => t.status === st)?.at; return <li key={st} className="min-w-0 text-center" aria-current={i === idx ? 'step' : undefined}><span className={`mx-auto grid h-8 w-8 place-items-center rounded-full text-xs font-bold ${i < idx || j.status === 'done' ? 'bg-teal text-white' : i === idx ? 'bg-gold text-on-accent' : 'bg-surface-2 text-text-muted'}`}>{i < idx || j.status === 'done' ? <Check size={14} aria-hidden="true" /> : i + 1}</span><span className="mt-1 hidden truncate text-xs font-medium sm:block">{STEP_SHORT[st]}</span><span className="hidden text-[0.65rem] text-text-muted sm:block">{at ? shortDate(at) : ''}</span><span className="sr-only sm:hidden">{STEP_SHORT[st]}</span></li> })}</ol>
+        <p className="mt-3 text-center text-sm sm:hidden" aria-hidden="true">{idx >= 0 ? <>Step {idx + 1} of {JOB_STEPS.length} · <b>{jobStepLabels[j.status as JobStep]}</b></> : <b>{j.status === 'declined' ? 'Declined' : 'Cancelled'}</b>}</p>
         {!closed && <div className="mt-5 rounded-xl border border-gold/50 bg-gold/5 p-4" data-testid="bp-next">
           {j.status === 'requested' ? <>
             <p className="font-semibold">New request from {j.shipperName}</p><p className="text-sm text-text-muted">Booked by {j.bookedBy}{j.notes ? ` — “${j.notes}”` : ''}. Accept to start, or decline so they can book someone else.</p>
@@ -126,10 +149,10 @@ export function JobPage() {
               {next === 'assessed' && <div><label htmlFor="bp-duty" className="label-dark">Duty assessed</label><div className="flex gap-2"><select aria-label="Currency" className="input-dark !w-24" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select><input id="bp-duty" inputMode="decimal" className="input-dark tabular-nums" value={form.duty} onChange={(e) => setForm({ ...form, duty: e.target.value.replace(/[^\d.]/g, '') })} data-testid="bp-duty" /></div></div>}
               <div className={next === 'assessed' || next === 'documents' ? '' : 'md:col-span-2'}><label htmlFor="bp-note" className="label-dark">Note (optional — the shipper and customer see it)</label><input id="bp-note" className="input-dark" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => move(next)} disabled={!!busy || (next === 'assessed' && !Number(form.duty))} className="btn-gold" data-testid="bp-advance"><Check size={16} aria-hidden="true" /> Mark “{jobStepLabels[next]}”</button>{j.dutyLocal != null && <span className="self-center text-sm text-text-muted">Duty assessed: <b>{local(j.dutyLocal, j.dutyCurrency ?? 'GHS')}</b></span>}</div>
+            <div className="mt-3 flex flex-wrap gap-2"><button onClick={() => move(next)} disabled={!!busy || (next === 'assessed' && !Number(form.duty)) || (next === 'documents' && !form.reference.trim())} className="btn-gold" data-testid="bp-advance"><Check size={16} aria-hidden="true" /> Mark “{jobStepLabels[next]}”</button>{next === 'documents' && !form.reference.trim() && <span className="self-center text-sm text-text-muted" data-testid="bp-ref-needed">Add the declaration reference first — the shipper and customer see it.</span>}{j.dutyLocal != null && <span className="self-center text-sm text-text-muted">Duty assessed: <b>{local(j.dutyLocal, j.dutyCurrency ?? 'GHS')}</b></span>}</div>
           </>}
         </div>}
-        {j.status === 'done' && <p className="mt-4 rounded-xl bg-teal/10 p-3 text-sm text-teal">Cleared and handed over {shortDate(j.timeline.find((t) => t.status === 'done')?.at ?? null)}. {d.invoices.length ? <>Billed on <Link to={`/broker-portal/invoices/${d.invoices[0].id}`} className="font-semibold underline">{d.invoices[0].number}</Link> ({d.invoices[0].status}).</> : <Link to="/broker-portal/finance" className="font-semibold underline">Bill it from Finance</Link>}</p>}
+        {j.status === 'done' && <p className="mt-4 rounded-xl bg-teal/10 p-3 text-sm text-teal">Cleared and handed over {shortDate(j.timeline.find((t) => t.status === 'done')?.at ?? null)}. {d.invoices.length ? <>Billed on <Link to={`/broker-portal/invoices/${d.invoices[0].id}`} className="font-semibold underline">{d.invoices[0].number}</Link> ({d.invoices[0].status}).</> : me.member.role === 'owner' ? <Link to="/broker-portal/finance" className="font-semibold underline">Bill it from Finance</Link> : 'Not billed yet.'}</p>}
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
@@ -172,7 +195,7 @@ function Docs({ d, onDone, onErr }: { d: BpDetail; onDone: (m: string) => void; 
       {d.documents.length ? <ul className="divide-y divide-border text-sm">{d.documents.map((x) => <li key={x.id} className="flex items-center gap-3 py-2.5" data-testid="bp-doc"><FileText size={16} className="shrink-0 text-text-muted" aria-hidden="true" /><span className="min-w-0 flex-1"><span className="block truncate font-medium">{x.title}</span><span className="block text-xs text-text-muted">{x.byBroker ? 'Added by you' : 'From the shipping company'} · {shortDate(x.at)}</span></span>{x.hasFile ? <button onClick={() => open(x.id)} className="btn-ghost !min-h-9 !px-3 text-xs"><ExternalLink size={13} aria-hidden="true" /> Open</button> : <span className="text-xs text-text-muted">generated</span>}</li>)}</ul> : <Empty>No documents yet.</Empty>}
       <div className="mt-4 flex flex-wrap items-end gap-2">
         <div className="min-w-[12rem] flex-1"><label htmlFor="bp-doc-title" className="label-dark">Add a paper</label><select id="bp-doc-title" className="input-dark" value={title} onChange={(e) => setTitle(e.target.value)}>{['Assessment notice', 'Customs declaration', 'Duty receipt', 'Release order', 'Examination report', 'Gate pass / waybill', 'Permit', 'Other'].map((t) => <option key={t}>{t}</option>)}</select></div>
-        <label className={`btn-gold cursor-pointer ${busy ? 'opacity-60' : ''}`}><Upload size={15} aria-hidden="true" /> {busy ? 'Uploading…' : 'Upload PDF or photo'}<input type="file" accept="application/pdf,image/*" className="sr-only" disabled={busy} onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; if (f.size > 4_000_000) { onErr('Keep files under 4 MB.'); return } setBusy(true); try { await bpApi.addDoc(d.job.id, { title, kind: title === 'Duty receipt' ? 'receipt' : 'customs', dataUrl: await fileToDataUrl(f), filename: f.name }); onDone(`${title} added to the shipment.`) } catch (er) { onErr(errMsg(er)) } finally { setBusy(false); e.target.value = '' } }} data-testid="bp-doc-file" /></label>
+        <label className={`btn-gold cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-gold-deep has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-bg ${busy ? 'opacity-60' : ''}`}><Upload size={15} aria-hidden="true" /> {busy ? 'Uploading…' : 'Upload PDF or photo'}<input type="file" accept="application/pdf,image/*" className="sr-only" disabled={busy} onChange={async (e) => { const f = e.target.files?.[0]; if (!f) return; if (f.size > 4_000_000) { onErr('Keep files under 4 MB.'); return } setBusy(true); try { await bpApi.addDoc(d.job.id, { title, kind: title === 'Duty receipt' ? 'receipt' : 'customs', dataUrl: await fileToDataUrl(f), filename: f.name }); onDone(`${title} added to the shipment.`) } catch (er) { onErr(errMsg(er)) } finally { setBusy(false); e.target.value = '' } }} data-testid="bp-doc-file" /></label>
       </div>
     </Card>
   )
@@ -180,10 +203,12 @@ function Docs({ d, onDone, onErr }: { d: BpDetail; onDone: (m: string) => void; 
 
 function Charges({ d, onDone, onErr }: { d: BpDetail; onDone: (m: string) => void; onErr: (e: string) => void }) {
   const [f, setF] = useState({ kind: 'port', description: '', amount: '', currency: d.shipment.destination === 'NG' ? 'NGN' : 'GHS', rebill: true }); const [open, setOpen] = useState(false)
-  const total = d.charges.reduce((n, c) => n + c.amountUsd, 0)
+  const total = d.charges.reduce((n, c) => n + c.amountUsd, 0); const [sure, setSure] = useState<string | null>(null)
   return (
     <Card title="Disbursements & charges" sub="Money you paid out on this job (port, storage, haulage…). Rebillable ones go on your invoice at cost." id="ch-h" actions={!open ? <button onClick={() => setOpen(true)} className="btn-ghost !min-h-10 text-sm" data-testid="bp-add-charge"><Plus size={14} aria-hidden="true" /> Add</button> : null}>
-      {d.charges.length ? <ul className="divide-y divide-border text-sm">{d.charges.map((c) => <li key={c.id} className="flex items-center gap-3 py-2"><span className="min-w-0 flex-1"><span className="block font-medium">{c.label}{c.description ? ` — ${c.description}` : ''}</span><span className="block text-xs text-text-muted">{c.by} · {shortDate(c.at)}{c.rebill ? '' : ' · not rebilled'}{c.invoiceId ? ' · invoiced' : ''}</span></span><span className="text-right tabular-nums">{local(c.amount, c.currency)}{c.currency !== 'USD' && <span className="block text-xs text-text-muted">≈ {usd(c.amountUsd)}</span>}</span>{!c.invoiceId && <button onClick={async () => { try { await bpApi.delCharge(c.id); onDone('Removed.') } catch (e) { onErr(errMsg(e)) } }} className="grid h-9 w-9 place-items-center rounded-md text-text-muted hover:text-danger" aria-label={`Remove ${c.label}`}><Trash2 size={14} /></button>}</li>)}<li className="flex justify-between py-2 font-semibold"><span>Total</span><span className="tabular-nums">≈ {usd(total)}</span></li></ul> : !open && <Empty>Nothing recorded.</Empty>}
+      {d.charges.length ? <ul className="divide-y divide-border text-sm">{d.charges.map((c) => <li key={c.id} className="flex items-center gap-3 py-2"><span className="min-w-0 flex-1"><span className="block font-medium">{c.label}{c.description ? ` — ${c.description}` : ''}</span><span className="block text-xs text-text-muted">{c.by} · {shortDate(c.at)}{c.rebill ? '' : ' · not rebilled'}{c.invoiceId ? ' · invoiced' : ''}</span></span><span className="text-right tabular-nums">{local(c.amount, c.currency)}{c.currency !== 'USD' && <span className="block text-xs text-text-muted">≈ {usd(c.amountUsd)}</span>}</span>{!c.invoiceId && (sure === c.id
+          ? <span className="flex gap-1"><button onClick={async () => { try { await bpApi.delCharge(c.id); setSure(null); onDone(`Removed ${c.label.toLowerCase()} — ${local(c.amount, c.currency)}.`) } catch (e) { onErr(errMsg(e)) } }} className="btn-ghost !min-h-9 !border-danger !px-2.5 text-xs text-danger" data-testid="bp-charge-remove-yes">Remove</button><button onClick={() => setSure(null)} className="btn-ghost !min-h-9 !px-2.5 text-xs">Keep</button></span>
+          : <button onClick={() => setSure(c.id)} className="grid h-9 w-9 place-items-center rounded-md text-text-muted hover:text-danger" aria-label={`Remove ${c.label}`}><Trash2 size={14} /></button>)}</li>)}<li className="flex justify-between py-2 font-semibold"><span>Total</span><span className="tabular-nums">≈ {usd(total)}</span></li></ul> : !open && <Empty>Nothing recorded.</Empty>}
       {open && <form onSubmit={async (e) => { e.preventDefault(); try { await bpApi.addCharge(d.job.id, { kind: f.kind, description: f.description, amount: Number(f.amount), currency: f.currency, rebill: f.rebill }); setOpen(false); setF({ ...f, description: '', amount: '' }); onDone('Charge recorded.') } catch (er) { onErr(errMsg(er)) } }} className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="bp-charge-form">
         <div><label htmlFor="ch-kind" className="label-dark">Type</label><select id="ch-kind" className="input-dark" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>{Object.entries(d.chargeKinds).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
         <div><label htmlFor="ch-desc" className="label-dark">Description</label><input id="ch-desc" className="input-dark" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="e.g. MPS terminal handling" /></div>
@@ -196,13 +221,13 @@ function Charges({ d, onDone, onErr }: { d: BpDetail; onDone: (m: string) => voi
 }
 
 export function Thread({ jobId, messages, onSent, title = 'Messages with the shipping company' }: { jobId: string; messages: BpDetail['messages']; onSent: () => void; title?: string }) {
-  const [body, setBody] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const end = useRef<HTMLDivElement>(null)
-  useEffect(() => { end.current?.scrollIntoView({ block: 'nearest' }) }, [messages.length])
+  const [body, setBody] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const box = useRef<HTMLDivElement>(null)
+  // Show the newest message by scrolling the thread box itself — never the page (it used to drag the job page down to the chat).
+  useEffect(() => { const el = box.current; if (el) el.scrollTop = el.scrollHeight }, [messages.length])
   return (
     <Card title={title} sub="The office gets a notification; customers can read and write here too." id="msg-h">
-      <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1" aria-live="polite" data-testid="bp-thread">
+      <div ref={box} className="max-h-[420px] space-y-2 overflow-y-auto pr-1" aria-live="polite" data-testid="bp-thread" tabIndex={0} role="region" aria-label="Message history">
         {messages.length ? messages.map((m) => <div key={m.id} className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm ${m.side === 'broker' ? 'ml-auto bg-gold/15' : m.side === 'customer' ? 'bg-sky/10' : 'bg-surface-2'}`}><p className="text-xs text-text-muted">{m.from}{m.side === 'customer' ? ' (customer)' : ''} · {ago(m.at)}</p><p className="whitespace-pre-line">{m.body}</p></div>) : <Empty>No messages yet.</Empty>}
-        <div ref={end} />
       </div>
       <Err e={err} />
       <form onSubmit={async (e) => { e.preventDefault(); if (!body.trim()) return; setBusy(true); setErr(''); try { await bpApi.send(jobId, body.trim()); setBody(''); onSent() } catch (er) { setErr(errMsg(er)) } finally { setBusy(false) } }} className="mt-3 flex gap-2"><label className="sr-only" htmlFor={`bp-msg-${jobId}`}>Message</label><textarea id={`bp-msg-${jobId}`} rows={2} className="input-dark flex-1 py-2" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Ask for a document, give an update…" data-testid="bp-msg-body" onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) (e.currentTarget.form as HTMLFormElement).requestSubmit() }} /><button disabled={busy || !body.trim()} className="btn-gold self-end" aria-label="Send message" data-testid="bp-msg-send"><Send size={16} aria-hidden="true" /></button></form>

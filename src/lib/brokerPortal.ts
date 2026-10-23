@@ -2,9 +2,9 @@ import { api } from './store'
 import type { Broker, BrokerJob, JobStatus, StepInput } from './brokers'
 
 export type BpJob = BrokerJob & { assignedTo: string | null; port: string; checklist: Record<string, boolean>; shipmentStatus?: string; daysAtStep: number; unread?: number; assignedName?: string | null }
-export interface BpMe { member: { id: string; name: string; email: string; phone: string; role: 'owner' | 'agent'; status: string }; broker: Broker & { accepting: boolean; settings: { termsDays?: number; bank?: string; invoiceNote?: string }; licenceExpires: string | null }; counts: { notifications: number; unread: number; requests: number } }
+export interface BpMe { member: { id: string; name: string; email: string; phone: string; role: 'owner' | 'agent'; status: string }; broker: Broker & { accepting: boolean; settings: { termsDays?: number; bank?: string; invoiceNote?: string }; licenceExpires: string | null }; counts: { notifications: number; unread: number; requests: number; team?: number } }
 export interface BpAttention { kind: 'request' | 'stuck' | 'overdue' | 'message'; jobId?: string; ref?: string; title: string; detail: string; age?: number; link?: string }
-export interface BpOverview { kpis: { open: number; requests: number; doneMonth: number; feesMonth: number; avgClearDays: number | null; outstanding: number; unbilled: number; dutyMonth: { currency: string; amount: number }[] }; attention: BpAttention[]; pipeline: { step: string; label: string; n: number }[]; recent: BpJob[] }
+export interface BpOverview { kpis: { open: number; requests: number; doneMonth: number; feesMonth: number | null; avgClearDays: number | null; outstanding: number | null; unbilled: number | null; dutyMonth: { currency: string; amount: number }[] }; attention: BpAttention[]; pipeline: { step: string; label: string; n: number }[]; recent: BpJob[] }
 export interface BpCharge { id: string; jobId: string; kind: string; label: string; description: string; amount: number; currency: string; amountUsd: number; rebill: boolean; invoiceId: string | null; hasReceipt: boolean; at: string; by: string }
 export interface BpMessage { id: string; side: 'broker' | 'office' | 'customer'; from: string; body: string; docId: string | null; at: string }
 export interface BpDetail {
@@ -16,7 +16,7 @@ export interface BpDetail {
   documents: { id: string; kind: string; title: string; mime: string; byBroker: boolean; by: string; hasFile: boolean; at: string }[]
   charges: BpCharge[]; messages: BpMessage[]; team: { id: string; name: string; role: string }[]; invoices: { id: string; number: string; status: string }[]
 }
-export interface BpInvoice { id: string; number: string; shipperId: string; shipper?: string; lines: { jobId: string; ref: string; chargeId?: string; label: string; amountUsd: number }[]; jobIds: string[]; totalUsd: number; status: 'draft' | 'sent' | 'paid' | 'void'; dueAt: string | null; sentAt: string | null; paidAt: string | null; paidRef: string; notes: string; createdAt: string; overdue: boolean }
+export interface BpInvoice { id: string; number: string; shipperId: string; shipper?: string; lines: { jobId: string; ref: string; chargeId?: string; label: string; amountUsd: number }[]; jobIds: string[]; totalUsd: number; status: 'draft' | 'sent' | 'paid' | 'void'; dueAt: string | null; sentAt: string | null; paidAt: string | null; paidRef: string; remindedAt?: string | null; notes: string; createdAt: string; overdue: boolean }
 export interface BpFinance { invoices: BpInvoice[]; unbilled: { jobId: string; ref: string; shipperId: string; shipper: string; customer: string; status: string; feeUsd: number; charges: BpCharge[] }[]; months: { month: string; paid: number; billed: number }[]; byShipper: { shipper: string; billed: number; paid: number; outstanding: number }[]; totals: { outstanding: number; paidYear: number; unbilled: number; disbursementsOpen: number }; settings: { termsDays: number; bank: string; invoiceNote: string } }
 export interface BpGroup { key: string; jobs: number; cleared: number; avgDays: number | null; fees: number }
 export interface BpAnalytics { months: string[]; monthly: { start: string; month: string; received: number; cleared: number; fees: number; avgDays: number }[]; kpis: { received: number; cleared: number; avgClearDays: number | null; acceptRate: number | null; avgResponseHours: number | null; fees: number }; steps: { step: string; label: string; avgDays: number; n: number }[]; byCargo: BpGroup[]; byShipper: BpGroup[]; byPort: BpGroup[]; duty: { currency: string; amount: number; jobs: number }[] }
@@ -50,6 +50,7 @@ export const bpApi = {
   sendInvoice: (id: string) => api(`/bp/invoices/${id}/send`, { json: {} }),
   paidInvoice: (id: string, ref: string) => api(`/bp/invoices/${id}/paid`, { json: { ref } }),
   voidInvoice: (id: string) => api(`/bp/invoices/${id}/void`, { json: {} }),
+  remindInvoice: (id: string) => api(`/bp/invoices/${id}/remind`, { json: {} }),
   analytics: (months = 6) => api<BpAnalytics>(`/bp/analytics?months=${months}`),
   profile: (b: Record<string, unknown>) => api('/bp/profile', { method: 'PUT', json: b }),
   team: () => api<{ members: BpMember[] }>('/bp/team').then((r) => r.members),

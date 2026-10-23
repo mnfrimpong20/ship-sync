@@ -3,7 +3,7 @@ import { Download, Printer } from 'lucide-react'
 import { bpApi, usdShort, usd, local, type BpAnalytics, type BpGroup } from '../../lib/brokerPortal'
 import { Trend, HBars, C } from '../../components/Charts'
 import { cargoLabel, type CargoType } from '../../lib/data'
-import { Card, Empty, Err, Kpi, Page, errMsg } from './BrokerApp'
+import { Card, Empty, Err, Kpi, Page, errMsg, useBp } from './BrokerApp'
 
 const days = (n: number | null) => (n == null ? '—' : `${n.toFixed(1)} d`)
 
@@ -56,8 +56,8 @@ const isoDay = (d: Date) => d.toISOString().slice(0, 10)
 
 export function Reports() {
   const now = new Date(); const [from, setFrom] = useState(isoDay(new Date(now.getFullYear(), now.getMonth(), 1))); const [to, setTo] = useState(isoDay(now))
-  const [d, setD] = useState<BpAnalytics | null>(null)
-  useEffect(() => { bpApi.analytics(12).then(setD).catch(() => {}) }, [])
+  const [d, setD] = useState<BpAnalytics | null>(null); const owner = useBp().me.member.role === 'owner'
+  useEffect(() => { if (owner) bpApi.analytics(12).then(setD).catch(() => {}) }, [owner])
   const presets: [string, () => void][] = [
     ['This month', () => { setFrom(isoDay(new Date(now.getFullYear(), now.getMonth(), 1))); setTo(isoDay(now)) }],
     ['Last month', () => { setFrom(isoDay(new Date(now.getFullYear(), now.getMonth() - 1, 1))); setTo(isoDay(new Date(now.getFullYear(), now.getMonth(), 0))) }],
@@ -74,13 +74,13 @@ export function Reports() {
         </div>
       </Card>
       <div className="mt-6 grid gap-4 md:grid-cols-2">
-        {REPORTS.map((r) => <Card key={r.kind} title={r.title} id={`rp-${r.kind}`}><p className="mb-4 text-sm text-text-muted">{r.sub}</p><a href={`/api/bp/reports/${r.kind}.csv?from=${from}&to=${to}`} download className="btn-gold" data-testid={`bp-report-${r.kind}`}><Download size={15} aria-hidden="true" /> Download CSV</a></Card>)}
+        {REPORTS.filter((r) => owner || r.kind !== 'finance').map((r) => <Card key={r.kind} title={r.title} id={`rp-${r.kind}`}><p className="mb-4 text-sm text-text-muted">{r.sub}</p><a href={`/api/bp/reports/${r.kind}.csv?from=${from}&to=${to}`} download className="btn-gold" data-testid={`bp-report-${r.kind}`}><Download size={15} aria-hidden="true" /> Download CSV</a></Card>)}
       </div>
-      <Card className="mt-6" title="Monthly summary" id="rp-summary" actions={<button onClick={() => window.print()} className="btn-ghost !min-h-10 !px-3 text-sm print:hidden"><Printer size={15} aria-hidden="true" /> Print</button>}>
+      {owner && <Card className="mt-6" title="Monthly summary" id="rp-summary" actions={<button onClick={() => window.print()} className="btn-ghost !min-h-10 !px-3 text-sm print:hidden"><Printer size={15} aria-hidden="true" /> Print</button>}>
         {inRange.length ? <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Monthly summary table"><table className="w-full min-w-[420px] text-sm"><thead><tr className="border-b border-border text-left text-xs uppercase tracking-wider text-text-muted"><th className="py-2 pr-3">Month</th><th className="py-2 pr-3 text-right">Received</th><th className="py-2 pr-3 text-right">Cleared</th><th className="py-2 pr-3 text-right">Avg days</th><th className="py-2 text-right">Fees</th></tr></thead>
           <tbody>{inRange.map((m) => <tr key={m.start} className="border-b border-border/60"><td className="py-2 pr-3">{new Date(m.start + 'T12:00:00Z').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</td><td className="py-2 pr-3 text-right tabular-nums">{m.received}</td><td className="py-2 pr-3 text-right tabular-nums">{m.cleared}</td><td className="py-2 pr-3 text-right tabular-nums">{m.avgDays ? m.avgDays.toFixed(1) : '—'}</td><td className="py-2 text-right tabular-nums">{usd(m.fees)}</td></tr>)}
             <tr className="font-semibold"><td className="py-2 pr-3">Total</td><td className="py-2 pr-3 text-right">{inRange.reduce((n, m) => n + m.received, 0)}</td><td className="py-2 pr-3 text-right">{inRange.reduce((n, m) => n + m.cleared, 0)}</td><td /><td className="py-2 text-right">{usd(inRange.reduce((n, m) => n + m.fees, 0))}</td></tr></tbody></table></div> : <Empty>No activity in this range.</Empty>}
-      </Card>
+      </Card>}
     </Page>
   )
 }

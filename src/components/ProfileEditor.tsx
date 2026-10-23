@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Check, ImagePlus, Plus, Trash2, X } from 'lucide-react'
-import { cargoTypes, countries, origins as originCities, type Shipper } from '../lib/data'
+import { OTHER_CARGO, cargoTypes, countries, origins as originCities, type Shipper } from '../lib/data'
 import { useStore, type ShipperProfileInput } from '../lib/store'
 import { Flag } from './ui'
 
@@ -101,7 +101,7 @@ export default function ProfileEditor({ shipper, onDone }: { shipper: Shipper; o
         <p className="text-xs text-text-muted">Anything beyond the types above. It shows on your profile so customers know to ask you.</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {other.map((o) => <button type="button" key={o} onClick={() => setF({ ...f, cargoOther: other.filter((x) => x !== o) })} className={chip(true)} aria-label={`Remove ${o}`}>{o} <X size={12} className="ml-1 inline" aria-hidden="true" /></button>)}
-          {['Motorcycles', 'Machinery & equipment', 'Furniture & appliances', 'Food & provisions', 'Building materials', 'Medical supplies', 'Documents & small parcels', 'Refrigerated goods'].filter((x) => !other.includes(x)).map((x) => <button type="button" key={x} onClick={() => addCargo(x)} className={chip(false)} aria-label={`Add ${x}`}><Plus size={12} className="mr-1 inline" aria-hidden="true" />{x}</button>)}
+          {OTHER_CARGO.filter((x) => !other.includes(x)).map((x) => <button type="button" key={x} onClick={() => addCargo(x)} className={chip(false)} aria-label={`Add ${x}`}><Plus size={12} className="mr-1 inline" aria-hidden="true" />{x}</button>)}
         </div>
         <div className="mt-2 flex gap-2"><input aria-label="Add another cargo type" className="input-dark !min-h-10 max-w-xs text-sm" placeholder="e.g. Generators, tyres" maxLength={40} value={newCargo} onChange={(e) => setNewCargo(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCargo(newCargo) } }} data-testid="cargo-other-input" /><button type="button" className="btn-ghost !min-h-10 !px-3 text-sm" onClick={() => addCargo(newCargo)}><Plus size={14} aria-hidden="true" /> Add</button></div>
       </fieldset>

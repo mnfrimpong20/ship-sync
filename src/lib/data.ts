@@ -194,3 +194,7 @@ export function hydrateCountries(list: Country[]) { if (!list.length) return; co
 export function hydrateOrigins(list: string[]) { if (!list.length) return; origins.splice(0, origins.length, ...list) }
 export const shipperById = (id: string) => shippers.find((s) => s.id === id)
 export const cargoLabel = (id: CargoType) => cargoTypes.find((c) => c.id === id)?.label ?? id
+/** What the customer named ("Motorcycles") when they did, else the cargo type's label. */
+export const cargoName = (id: CargoType, items?: string[]) => (items?.length ? items.join(', ') : cargoLabel(id))
+/** Common things that don't fit the standard cargo types — offered to customers and shipping companies alike. */
+export const OTHER_CARGO = ['Motorcycles', 'Machinery & equipment', 'Furniture & appliances', 'Food & provisions', 'Building materials', 'Medical supplies', 'Documents & small parcels', 'Refrigerated goods']

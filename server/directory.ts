@@ -45,7 +45,7 @@ const country = (place: string) => place.split(', ').pop() ?? ''
 
 function textScore(s: Shipper, q: string) {
   if (!q) return 1
-  const hay = [s.name, s.tagline, s.hq, s.about, ...s.services, ...s.origins, ...s.destinations.map((d) => countryByCode(d)?.name ?? d)].join(' ').toLowerCase()
+  const hay = [s.name, s.tagline, s.hq, s.about, ...s.services, ...(s.cargoOther ?? []), ...s.origins, ...s.destinations.map((d) => countryByCode(d)?.name ?? d)].join(' ').toLowerCase()
   const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
   let hits = 0
   for (const t of terms) { if (s.name.toLowerCase().includes(t)) hits += 3; else if (hay.includes(t)) hits += 1 }

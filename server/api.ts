@@ -124,7 +124,7 @@ const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.
 /** Shippers see only the town of the supplies address until the job is theirs (same rule as the contact details). */
 const maskSupAddr = (a: unknown, full: boolean) => (!a ? undefined : full ? a : { city: (a as Row).city, state: (a as Row).state, country: (a as Row).country })
 const requestOut = (r: Row, quotes: Row[]) => ({
-  id: r.id, ref: r.ref, userId: r.user_id, createdAt: ISO(r.created_at), origin: r.origin, destination: r.destination, mode: r.mode, cargo: r.cargo, quantity: r.quantity, weightKg: r.weight_kg ?? undefined,
+  id: r.id, ref: r.ref, userId: r.user_id, createdAt: ISO(r.created_at), origin: r.origin, destination: r.destination, mode: r.mode, cargo: r.cargo, cargoItems: (J(r.cargo_items) as string[] | null) ?? [], quantity: r.quantity, weightKg: r.weight_kg ?? undefined,
   description: r.description, pickup: r.pickup, delivery: r.delivery, insurance: r.insurance, readyDate: DATE(r.ready_date),
   contact: { name: r.contact_name, email: r.contact_email, phone: r.contact_phone }, status: r.status, quotes: quotes.map((q) => ({ ...quoteOut(q), stale: !!r.updated_at && new Date(q.updated_at ?? q.sent_at) < new Date(r.updated_at) })),
   declaration: r.declaration ? (J(r.declaration) as { accepted: boolean; includes: string[]; at: string; version: string }) : undefined,
@@ -277,15 +277,27 @@ async function signupUser(db: Db, input: { name: string; email: string; password
 }
 
 /* ---------------- matching ---------------- */
-type MatchInput = { origin: string; destination: string; mode: 'air' | 'ocean' | 'either'; cargo: CargoType }
+type MatchInput = { origin: string; destination: string; mode: 'air' | 'ocean' | 'either'; cargo: CargoType; cargoItems?: string[] }
+/** "Motorcycles" matches "motorcycle", "Generators" matches "generator / power", "Machinery & equipment" matches "machinery". */
+const STOP = new Set(['and', 'the', 'for', 'with', 'other', 'goods', 'items', 'stuff'])
+const itemKey = (x: string) => x.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.has(w)).map((w) => w.replace(/ies$/, 'y').replace(/(x|ch|sh|ss)es$/, '$1').replace(/([^s])s$/, '$1'))
+const sameWord = (a: string, b: string) => { if (a === b) return true; let n = 0; while (n < a.length && n < b.length && a[n] === b[n]) n++; const short = Math.min(a.length, b.length); return short >= 4 && (n === short || (n >= 5 && n / short >= 0.7)) }
+export function itemsCarried(other: string[] | undefined, items: string[] | undefined): string[] {
+  if (!other?.length || !items?.length) return []
+  const theirs = other.map((o) => itemKey(o))
+  return items.filter((it) => { const k = itemKey(it); return theirs.some((t) => t.some((w) => k.some((v) => sameWord(v, w)))) })
+}
+/** "2 × Motorcycles" when the customer named the items, else "2 × barrels". */
+export const cargoText = (r: Record<string, any>) => { const it = r.cargoItems ?? (J(r.cargo_items) as string[] | null) ?? []; return `${r.quantity} × ${it.length ? it.join(', ') : r.cargo}` }
 /**
  * The one lead rule, used by alerts, the Requests board and the customer's matching list:
  *   eligible = serves the destination, offers the mode (or the request says either), handles the cargo type.
  *   local    = also collects in that city or state ("Houston, TX" covers "Katy, TX"). Alerts go to local shippers;
  *              the board shows every eligible lead and flags the ones outside the shipper's pickup area.
  */
-export function leadFit(shipper: { destinations: string[]; modes: string[]; cargo: string[]; origins: string[] }, r: { destination: string; mode: string; cargo: string; origin: string }) {
-  const eligible = shipper.destinations.includes(r.destination) && (r.mode === 'either' || shipper.modes.includes(r.mode)) && (!shipper.cargo.length || shipper.cargo.includes(r.cargo))
+export function leadFit(shipper: { destinations: string[]; modes: string[]; cargo: string[]; origins: string[]; cargoOther?: string[] }, r: { destination: string; mode: string; cargo: string; origin: string; cargoItems?: string[]; cargo_items?: unknown }) {
+  const items = r.cargoItems ?? (J(r.cargo_items) as string[] | null) ?? []
+  const eligible = shipper.destinations.includes(r.destination) && (r.mode === 'either' || shipper.modes.includes(r.mode)) && (!shipper.cargo.length || shipper.cargo.includes(r.cargo) || itemsCarried(shipper.cargoOther, items).length > 0)
   const region = (o: string) => (o.split(',')[1] ?? '').trim().toUpperCase()
   const local = shipper.origins.includes(r.origin) || (!!region(r.origin) && shipper.origins.some((o) => region(o) === region(r.origin)))
   return { eligible, local }
@@ -301,8 +313,10 @@ async function matchShippers(db: Db, r: MatchInput) {
       score += 40; reasons.push('Serves this destination')
       if (r.mode !== 'either') { if (shipper.modes.includes(r.mode)) { score += 20; reasons.push(`Offers ${r.mode} freight`) } else return { shipper, score: -1, reasons } }
       else score += 10
-      if (shipper.cargo.length && !shipper.cargo.includes(r.cargo)) return { shipper, score: -1, reasons }
-      score += 20; reasons.push('Handles this cargo type')
+      const carried = itemsCarried(shipper.cargoOther, r.cargoItems)
+      if (shipper.cargo.length && !shipper.cargo.includes(r.cargo) && !carried.length) return { shipper, score: -1, reasons }
+      if (carried.length) { score += 25; reasons.push(`Carries ${carried.join(', ').toLowerCase()}`) }
+      else { score += 20; reasons.push('Handles this cargo type') }
       if (shipper.origins.includes(r.origin)) { score += 15; reasons.push('Regular pickups from your area') }
       else if (shipper.origins.some((o: string) => o.split(', ')[1] === r.origin.split(', ')[1])) { score += 6; reasons.push('Operates in your country') }
       if (shipper.verified) { score += 5; reasons.push('Verified') }
@@ -318,7 +332,7 @@ async function demoAutoQuotes(db: Db, req: Row) {
   // Shippers that publish rate cards price for themselves — the simulator leaves them alone.
   const { rows: priced } = await db.query<Row>('select distinct shipper_id from rate_cards where active')
   const real = new Set(priced.map((p) => p.shipper_id))
-  const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })).filter((m) => m.shipper.demo && !real.has(m.shipper.id)).slice(0, 4)
+  const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo, cargoItems: (J(req.cargo_items) as string[] | null) ?? [] })).filter((m) => m.shipper.demo && !real.has(m.shipper.id)).slice(0, 4)
   const base: Record<CargoType, number> = { barrels: 160, boxes: 95, pallets: 420, vehicle: 1650, container20: 3900, container40: 5600, commercial: 900 }
   const airMult = req.mode === 'air' ? 3.2 : 1
   for (const [i, m] of matches.entries()) {
@@ -335,12 +349,12 @@ async function demoAutoQuotes(db: Db, req: Row) {
 
 /** Shippers with a published, auto-send rate card for this lane quote instantly; the customer hears about it right away. */
 async function instantQuotesFromRates(db: Db, req: Row) {
-  const matches = await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })
+  const matches = await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo, cargoItems: (J(req.cargo_items) as string[] | null) ?? [] })
   const quoted = await autoQuoteFromRates(db, req, matches.map((m) => m.shipper.id))
   for (const q of quoted) {
     const name = matches.find((m) => m.shipper.id === q.shipperId)?.shipper.name ?? 'A shipper'
     await notify(db, { userId: req.user_id, kind: 'quote_received', title: `Instant quote: ${name} — $${q.price.toLocaleString()} for ${req.ref}`, body: `${name} publishes rates for this lane, so your price is ready now. Open your dashboard to compare and accept.`, link: '/dashboard', dedupe: `rq:${req.id}:rate:${q.shipperId}` })
-    await notifyShipperStaff(db, q.shipperId, { kind: 'new_lead', title: `Instant quote sent — ${req.ref}`, body: `$${q.price.toLocaleString()} went to ${req.contact_name} from your rate card (${req.quantity} × ${req.cargo}, ${req.origin} → ${req.destination}).`, link: '/dashboard/leads', dedupe: `lead:${req.id}:auto` }, ['owner', 'dispatcher', 'agent'])
+    await notifyShipperStaff(db, q.shipperId, { kind: 'new_lead', title: `Instant quote sent — ${req.ref}`, body: `$${q.price.toLocaleString()} went to ${req.contact_name} from your rate card (${cargoText(req)}, ${req.origin} → ${req.destination}).`, link: '/dashboard/leads', dedupe: `lead:${req.id}:auto` }, ['owner', 'dispatcher', 'agent'])
   }
   return quoted
 }
@@ -349,11 +363,11 @@ async function instantQuotesFromRates(db: Db, req: Row) {
 async function notifyNewLead(db: Db, req: Row) {
   const { rows: quoted } = await db.query<Row>('select shipper_id from quotes where request_id = $1', [req.id])
   const done = new Set(quoted.map((q) => q.shipper_id))
-  const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo })).filter((m) => !done.has(m.shipper.id) && leadFit(m.shipper, req as never).local)
+  const matches = (await matchShippers(db, { origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo, cargoItems: (J(req.cargo_items) as string[] | null) ?? [] })).filter((m) => !done.has(m.shipper.id) && leadFit(m.shipper, req as never).local)
   for (const m of matches) {
     void import('./rules').then((x) => x.fireRules(db, m.shipper.id, 'request.received', { request: req })).catch(() => {})
     void import('./integrations').then((x) => x.emitWebhook(db, m.shipper.id, 'request.received', { request: { id: req.id, ref: req.ref, origin: req.origin, destination: req.destination, mode: req.mode, cargo: req.cargo, quantity: req.quantity, readyDate: String(req.ready_date ?? '').slice(0, 10) } })).catch(() => {})
-    await notifyShipperStaff(db, m.shipper.id, { kind: 'new_lead', title: `New client request: ${req.quantity} × ${req.cargo} to ${req.destination}`, body: `${req.contact_name} wants to ship from ${req.origin} (${req.mode === 'either' ? 'air or ocean' : req.mode}), ready ${String(req.ready_date).slice(0, 10)}. Send a quote before the competition does.`, link: '/dashboard/leads', dedupe: `lead:${req.id}` }, ['owner', 'dispatcher', 'agent'])
+    await notifyShipperStaff(db, m.shipper.id, { kind: 'new_lead', title: `New client request: ${cargoText(req)} to ${req.destination}`, body: `${req.contact_name} wants to ship from ${req.origin} (${req.mode === 'either' ? 'air or ocean' : req.mode}), ready ${String(req.ready_date).slice(0, 10)}. Send a quote before the competition does.`, link: '/dashboard/leads', dedupe: `lead:${req.id}` }, ['owner', 'dispatcher', 'agent'])
   }
 }
 
@@ -425,7 +439,7 @@ async function autoDrivers(db: Db, rows: Row[]) {
 const zRole = z.enum(['customer', 'shipper'])
 const zSignup = z.object({ name: z.string().trim().min(2, 'Enter your name.'), email: z.string().trim().email('Enter a valid email address.'), password: z.string().min(8, 'Password must be at least 8 characters.'), role: zRole, company: z.string().trim().optional(), ref: z.string().trim().max(24).optional() })
 const zLogin = z.object({ email: z.string().trim().email('Enter a valid email address.'), password: z.string().min(1, 'Enter your password.') })
-const zMatch = z.object({ origin: z.string().min(1), destination: z.string().length(2), mode: z.enum(['air', 'ocean', 'either']), cargo: z.enum(['barrels', 'boxes', 'pallets', 'vehicle', 'container20', 'container40', 'commercial']) })
+const zMatch = z.object({ origin: z.string().min(1), destination: z.string().length(2), mode: z.enum(['air', 'ocean', 'either']), cargo: z.enum(['barrels', 'boxes', 'pallets', 'vehicle', 'container20', 'container40', 'commercial']), cargoItems: z.array(z.string().trim().min(2).max(40)).max(6).default([]) })
 const zMatchPriced = zMatch.extend({ quantity: z.number().int().min(1).max(10_000).optional(), weightKg: z.number().min(0).optional(), pickup: z.boolean().optional(), delivery: z.boolean().optional(), insurance: z.boolean().optional() })
 const zRequest = zMatch.extend({
   quantity: z.number().int().min(1), weightKg: z.number().int().min(0).optional(), description: z.string().max(2000).default(''), pickup: z.boolean(), delivery: z.boolean(), insurance: z.boolean(),
@@ -660,7 +674,9 @@ export function apiRouter() {
     // shipper: eligible open requests (one rule: leadFit) + anything they've quoted. Filtered in SQL first so it scales.
     const { rows: me } = await db.query<Row>('select * from shippers where id = $1', [user.shipperId])
     const s = shipperOut(me[0])
-    const all = await loadRequests(db, `(status = 'open' and (preferred_shipper_id = $1 or (preferred_shipper_id is null and destination = any($2::text[]) and (mode = 'either' or mode = any($3::text[])) and (cardinality($4::text[]) = 0 or cargo = any($4::text[]))))) or id in (select request_id from quotes where shipper_id = $1)`, [user.shipperId, s.destinations, s.modes, s.cargo], { limit: 400 })
+    const all = await loadRequests(db, `(status = 'open' and (preferred_shipper_id = $1 or (preferred_shipper_id is null and destination = any($2::text[]) and (mode = 'either' or mode = any($3::text[])) and (cardinality($4::text[]) = 0 or cargo = any($4::text[]) or cargo_items <> '[]'::jsonb)))) or id in (select request_id from quotes where shipper_id = $1)`, [user.shipperId, s.destinations, s.modes, s.cargo], { limit: 400 })
+    // Requests naming specific items (motorbikes, generators…) only show if this company handles the cargo type or carries those items.
+    .then((list) => list.filter((q) => q.preferredShipperId === user.shipperId || q.quotes.some((x) => x.shipperId === user.shipperId) || !s.cargo.length || s.cargo.includes(q.cargo) || itemsCarried(s.cargoOther, q.cargoItems).length > 0))
     const out = []
     let priced = 0
     for (const q of all) {
@@ -694,9 +710,9 @@ export function apiRouter() {
     if (body.readyDate < today) throw new HttpError(400, 'The ready date is in the past.')
     const id = uid()
     await db.query(
-      `insert into requests (id,ref,user_id,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,vehicle,preferred_shipper_id,consignee,source,dims,declared_value_usd,expires_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,least($14::date + 14, current_date + 45))`,
-      [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone, body.cargo === 'vehicle' && body.vehicle ? JSON.stringify(body.vehicle) : null, body.preferredShipperId ?? null, body.consignee ? JSON.stringify(body.consignee) : null, body.preferredShipperId ? (body.source ?? 'picked') : 'marketplace', body.dims, body.declaredValueUsd ?? null],
+      `insert into requests (id,ref,user_id,origin,destination,mode,cargo,quantity,weight_kg,description,pickup,delivery,insurance,ready_date,contact_name,contact_email,contact_phone,vehicle,preferred_shipper_id,consignee,source,dims,declared_value_usd,expires_at,cargo_items)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,least($14::date + 14, current_date + 45),$24)`,
+      [id, makeRef(), user.id, body.origin, body.destination, body.mode, body.cargo, body.quantity, body.weightKg ?? null, body.description, body.pickup, body.delivery, body.insurance, body.readyDate, body.contact.name, body.contact.email, body.contact.phone, body.cargo === 'vehicle' && body.vehicle ? JSON.stringify(body.vehicle) : null, body.preferredShipperId ?? null, body.consignee ? JSON.stringify(body.consignee) : null, body.preferredShipperId ? (body.source ?? 'picked') : 'marketplace', body.dims, body.declaredValueUsd ?? null, JSON.stringify([...new Set(body.cargoItems ?? [])])],
     )
     { // PO number (business accounts) and who placed it (household members act for the owner)
       const { rows: bz } = await db.query<Row>('select po_required from users where id = $1', [user.id])
@@ -717,7 +733,7 @@ export function apiRouter() {
       const quoted = await autoQuoteFromRates(db, rows[0], [body.preferredShipperId])
       const { rows: sh } = await db.query<Row>('select name from shippers where id = $1', [body.preferredShipperId])
       for (const q of quoted) await notify(db, { userId: user.id, kind: 'quote_received', title: `Your quote from ${sh[0]?.name ?? 'the shipper'}: $${q.price.toLocaleString()} for ${rows[0].ref}`, body: 'Priced instantly from their published rates. Open your dashboard to accept.', link: '/dashboard', dedupe: `rq:${id}:rate:${q.shipperId}` })
-      await notifyShipperStaff(db, body.preferredShipperId, { kind: 'new_lead', title: `${quoted.length ? 'Instant quote sent — ' : body.source === 'link' ? 'New order from your link — ' : body.source === 'branded' ? 'New client request from your branded page — ' : 'A customer chose you — '}${rows[0].ref}`, body: `${body.contact.name} · ${body.quantity} × ${body.cargo} · ${body.origin} → ${body.destination}${quoted.length ? ` · $${quoted[0].price.toLocaleString()} from your rate card` : '. Send a quote.'}`, link: '/dashboard/leads', dedupe: `lead:${id}` }, ['owner', 'dispatcher', 'agent'])
+      await notifyShipperStaff(db, body.preferredShipperId, { kind: 'new_lead', title: `${quoted.length ? 'Instant quote sent — ' : body.source === 'link' ? 'New order from your link — ' : body.source === 'branded' ? 'New client request from your branded page — ' : 'A customer chose you — '}${rows[0].ref}`, body: `${body.contact.name} · ${cargoText(body)} · ${body.origin} → ${body.destination}${quoted.length ? ` · $${quoted[0].price.toLocaleString()} from your rate card` : '. Send a quote.'}`, link: '/dashboard/leads', dedupe: `lead:${id}` }, ['owner', 'dispatcher', 'agent'])
     } else {
       await instantQuotesFromRates(db, rows[0])
       if (DEMO_AUTO_QUOTES) await demoAutoQuotes(db, rows[0])
@@ -782,7 +798,7 @@ export function apiRouter() {
     await db.query(`update requests set status = 'booked' where id = $1`, [q.request_id])
     const { rows: losers } = await db.query<Row>(`select * from quotes where request_id = $1 and id <> $2 and status = 'declined'`, [q.request_id, q.id])
     await db.query('insert into shipments (id,ref,request_id,shipper_id,user_id,mode,origin,destination,cargo,description,status,eta,customer) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
-      [sid, r0.ref, r0.id, q.shipper_id, user.id, mode, r0.origin, r0.destination, r0.cargo, r0.description || `${r0.quantity} × ${r0.cargo}`, 'booked', q.ships_on && DATE(q.ships_on)! >= new Date().toISOString().slice(0, 10) ? arrivalDate(DATE(q.ships_on)!, Number(q.transit_days)) : new Date(Date.now() + (q.transit_days + 4) * 86400000).toISOString().slice(0, 10), r0.contact_name])
+      [sid, r0.ref, r0.id, q.shipper_id, user.id, mode, r0.origin, r0.destination, r0.cargo, r0.description || `${cargoText(r0)}`, 'booked', q.ships_on && DATE(q.ships_on)! >= new Date().toISOString().slice(0, 10) ? arrivalDate(DATE(q.ships_on)!, Number(q.transit_days)) : new Date(Date.now() + (q.transit_days + 4) * 86400000).toISOString().slice(0, 10), r0.contact_name])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, 'booked', r0.origin, `Booking confirmed with ${shipper.name}. Quote accepted at $${q.price}.`])
     await attachShipmentToClient(db, q.shipper_id, user.id, sid, r0.contact_name, r0.contact_email)
     await consigneeToClient(db, sid, r0.consignee ? J(r0.consignee) : null)
@@ -800,7 +816,7 @@ export function apiRouter() {
     await afterBooking(db, sid, { delivery: !!r0.delivery }).catch((e) => console.error('[booking] after', e))
     { const { rows: sx } = await db.query<Row>('select * from shipments where id = $1', [sid]); if (sx[0]) { await evaluateExport(db, sx[0]).catch((e) => console.error('[export] eval', e)); const { rows: sy } = await db.query<Row>('select * from shipments where id = $1', [sid]); void import('./autopilotOps').then((m) => m.onBookedPaperwork(db, sy[0])).catch(() => {}) } }
     await notify(db, { userId: user.id, kind: 'booking_confirmed', title: `Booking confirmed — ${r0.ref}`, body: `${shipper.name} will handle your ${r0.origin} → ${r0.destination} shipment for $${Number(q.price).toLocaleString()}. Track it any time with reference ${r0.ref}.`, link: `/track?ref=${r0.ref}`, dedupe: `ship:${sid}:booked` })
-    await notifyShipperStaff(db, q.shipper_id, { kind: 'quote_accepted', title: `${r0.contact_name} accepted your quote — ${r0.ref}`, body: `$${Number(q.price).toLocaleString()} · ${r0.quantity} × ${r0.cargo} · ${r0.origin} → ${r0.destination}. The order is now booked; arrange pickup or drop-off.`, link: '/dashboard/shipments', dedupe: `ship:${sid}:accepted` }, ['owner', 'dispatcher', 'agent'])
+    await notifyShipperStaff(db, q.shipper_id, { kind: 'quote_accepted', title: `${r0.contact_name} accepted your quote — ${r0.ref}`, body: `$${Number(q.price).toLocaleString()} · ${cargoText(r0)} · ${r0.origin} → ${r0.destination}. The order is now booked; arrange pickup or drop-off.`, link: '/dashboard/shipments', dedupe: `ship:${sid}:accepted` }, ['owner', 'dispatcher', 'agent'])
     const [shipment] = await loadShipments(db, 'id = $1', [sid])
     const [request] = await loadRequests(db, 'id = $1', [q.request_id])
     res.status(201).json({ shipment, request })
@@ -925,7 +941,7 @@ export function apiRouter() {
   const requestDeps = {
     leadShippers: async (db: Db, row: Row) => {
       if (row.preferred_shipper_id) { const { rows } = await db.query<Row>('select id, response_hours from shippers where id = $1', [row.preferred_shipper_id]); return rows.map((x) => ({ id: x.id, responseHours: Number(x.response_hours ?? 24) })) }
-      return (await matchShippers(db, { origin: row.origin, destination: row.destination, mode: row.mode, cargo: row.cargo })).filter((m) => leadFit(m.shipper, row as never).local).map((m) => ({ id: m.shipper.id, responseHours: Number(m.shipper.responseHours ?? 24) }))
+      return (await matchShippers(db, { origin: row.origin, destination: row.destination, mode: row.mode, cargo: row.cargo, cargoItems: (J(row.cargo_items) as string[] | null) ?? [] })).filter((m) => leadFit(m.shipper, row as never).local).map((m) => ({ id: m.shipper.id, responseHours: Number(m.shipper.responseHours ?? 24) }))
     },
   }
   mountRequestFlow(r, { getDb, requireUser, HttpError, wrap, loadRequests: loadRequests as never, ...requestDeps,

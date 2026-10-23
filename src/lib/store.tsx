@@ -34,6 +34,8 @@ export interface QuoteRequest {
   destination: string
   mode: Mode | 'either'
   cargo: CargoType
+  /** Named items when the cargo is "something else" (motorcycles, generators…). */
+  cargoItems?: string[]
   quantity: number
   weightKg?: number
   description: string
@@ -109,7 +111,7 @@ interface Store {
   acceptQuote: (requestId: string, quoteId: string) => Promise<Shipment>
   sendQuote: (requestId: string, q: { price: number; transitDays: number; shipsOn?: string | null; notes: string; includes: string[]; validUntil?: string; kind?: 'firm' | 'estimate'; mode?: 'air' | 'ocean'; supplies?: QuoteSupplyLine[] }) => Promise<void>
   advanceShipment: (id: string, note?: string) => Promise<void>
-  matchShippers: (r: Pick<QuoteRequest, 'origin' | 'destination' | 'mode' | 'cargo'> & Partial<Pick<QuoteRequest, 'quantity' | 'weightKg' | 'pickup' | 'delivery' | 'insurance'>>) => Promise<Match[]>
+  matchShippers: (r: Pick<QuoteRequest, 'origin' | 'destination' | 'mode' | 'cargo'> & Partial<Pick<QuoteRequest, 'quantity' | 'weightKg' | 'pickup' | 'delivery' | 'insurance' | 'cargoItems'>>) => Promise<Match[]>
   track: (ref: string) => Promise<Shipment | null>
   position: (ref: string) => Promise<PositionPayload | null>
   setTransit: (id: string, t: { vesselName?: string; mmsi?: string; flight?: string }) => Promise<void>
@@ -184,7 +186,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => { await api('/auth/logout', { method: 'POST' }); setUser(null); setRequests([]); setShipments([]) }, [])
 
-  const matchShippers = useCallback<Store['matchShippers']>(async (r) => (await api<{ matches: Match[] }>('/match', { json: { origin: r.origin, destination: r.destination, mode: r.mode, cargo: r.cargo, quantity: r.quantity, weightKg: r.weightKg, pickup: r.pickup, delivery: r.delivery, insurance: r.insurance } })).matches, [])
+  const matchShippers = useCallback<Store['matchShippers']>(async (r) => (await api<{ matches: Match[] }>('/match', { json: { origin: r.origin, destination: r.destination, mode: r.mode, cargo: r.cargo, cargoItems: r.cargoItems ?? [], quantity: r.quantity, weightKg: r.weightKg, pickup: r.pickup, delivery: r.delivery, insurance: r.insurance } })).matches, [])
 
   const createRequest = useCallback<Store['createRequest']>(async (r) => {
     const { request, user: u } = await api<{ request: QuoteRequest; user: User }>('/requests', { json: r })

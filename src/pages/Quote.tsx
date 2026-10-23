@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ArrowRight, Check, Loader2, Plane, Ship, Zap } from 'lucide-react'
-import { cargoTypes, countries, countryByCode, type CargoType, type Mode } from '../lib/data'
+import { OTHER_CARGO, cargoTypes, countries, countryByCode, type CargoType, type Mode } from '../lib/data'
 import { useStore, type Match, type NewRequest, type RequestConsignee } from '../lib/store'
 import { customerApi, type Consignee } from '../lib/customer'
 import { ConsigneeForm } from '../components/CustomerHome'
@@ -42,6 +42,12 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
     password: '',
   })
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }))
+  // "Something else": motorbikes, generators, furniture… — stored as commercial cargo with the items named.
+  const [other, setOther] = useState(() => !!sp.get('item'))
+  const [itemText, setItemText] = useState('')
+  const items = form.cargoItems ?? []
+  const addItems = (v: string) => { const add = v.split(',').map((x) => x.trim()).filter((x) => x.length >= 2 && !items.some((i) => i.toLowerCase() === x.toLowerCase())); if (add.length) { set('cargoItems', [...items, ...add].slice(0, 6)); setErrors((er) => { const n = { ...er }; delete n.items; return n }) } setItemText('') }
+  useEffect(() => { const it = sp.get('item'); if (it) setForm((f) => ({ ...f, cargo: 'commercial', cargoItems: [it.slice(0, 40)] })) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const { requests } = useStore()
   const [saved, setSaved] = useState<Consignee[]>([])
   const [recipientMode, setRecipientMode] = useState<'none' | 'pick' | 'new'>('none')
@@ -50,8 +56,9 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
   useEffect(() => {
     const again = sp.get('again'); if (!again || prefilled === again) return
     const prev = requests.find((r) => r.id === again); if (!prev) return
-    setForm((f) => ({ ...f, origin: prev.origin, destination: prev.destination, mode: prev.mode, cargo: prev.cargo, quantity: prev.quantity, weightKg: prev.weightKg, description: prev.description, pickup: prev.pickup, delivery: prev.delivery, insurance: prev.insurance, vehicle: prev.vehicle, consignee: prev.consignee, contact: { ...f.contact, phone: prev.contact.phone || f.contact.phone } }))
+    setForm((f) => ({ ...f, origin: prev.origin, destination: prev.destination, mode: prev.mode, cargo: prev.cargo, cargoItems: prev.cargoItems ?? [], quantity: prev.quantity, weightKg: prev.weightKg, description: prev.description, pickup: prev.pickup, delivery: prev.delivery, insurance: prev.insurance, vehicle: prev.vehicle, consignee: prev.consignee, contact: { ...f.contact, phone: prev.contact.phone || f.contact.phone } }))
     if (prev.consignee) setRecipientMode('new')
+    if (prev.cargoItems?.length) setOther(true)
     setPrefilled(again)
   }, [sp, requests, prefilled])
   useEffect(() => {
@@ -71,7 +78,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
       matchShippers(form).then((m) => { if (live) { setMatches(m); setMatching(false) } }).catch(() => { if (live) setMatching(false) })
     }, 200)
     return () => { live = false; clearTimeout(t) }
-  }, [form.origin, form.destination, form.mode, form.cargo, form.quantity, form.weightKg, form.pickup, form.delivery, form.insurance, matchShippers])
+  }, [form.origin, form.destination, form.mode, form.cargo, (form.cargoItems ?? []).join('|'), form.quantity, form.weightKg, form.pickup, form.delivery, form.insurance, matchShippers]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (user) setForm((f) => ({ ...f, contact: { ...f.contact, name: f.contact.name || user.name, email: f.contact.email || user.email } })) }, [user])
   const preferred = sp.get('shipper') ? shipperById(sp.get('shipper')!) : undefined
   // Who receives the request: every matching shipper, or one the customer chose (from a profile, the picker here, or an order link).
@@ -95,6 +102,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
   const validate = () => {
     const e: Record<string, string> = {}
     if (step === 1 && form.quantity < 1) e.quantity = 'Enter at least 1.'
+    if (step === 1 && other && !items.length) e.items = 'Say what you’re sending — pick one or type it.'
     if (step === 2 && form.supplies?.length) {
       const a = form.suppliesAddress ?? {}
       if ((a.name ?? '').trim().length < 2) e.supName = 'Add a name for the delivery.'
@@ -166,11 +174,26 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                     <h2 className="!text-xl">What are you shipping?</h2>
                     <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Cargo type">
                       {cargoTypes.map((c) => (
-                        <button type="button" key={c.id} role="radio" aria-checked={form.cargo === c.id} onClick={() => set('cargo', c.id as CargoType)} className={`flex min-h-14 flex-col items-start justify-center rounded-[var(--radius-sm)] border px-4 py-2 text-left transition-colors focus-ring ${form.cargo === c.id ? 'border-gold bg-gold/15' : 'border-border bg-surface-2 hover:border-text-muted'}`}>
-                          <span className={`text-sm font-semibold ${form.cargo === c.id ? 'text-gold-deep' : 'text-text'}`}>{c.label}</span><span className="text-xs text-text-muted">{c.hint}</span>
+                        <button type="button" key={c.id} role="radio" aria-checked={!other && form.cargo === c.id} onClick={() => { setOther(false); setForm((f) => ({ ...f, cargo: c.id as CargoType, cargoItems: [] })) }} className={`flex min-h-14 flex-col items-start justify-center rounded-[var(--radius-sm)] border px-4 py-2 text-left transition-colors focus-ring ${!other && form.cargo === c.id ? 'border-gold bg-gold/15' : 'border-border bg-surface-2 hover:border-text-muted'}`}>
+                          <span className={`text-sm font-semibold ${!other && form.cargo === c.id ? 'text-gold-deep' : 'text-text'}`}>{c.label}</span><span className="text-xs text-text-muted">{c.hint}</span>
                         </button>
                       ))}
+                      <button type="button" role="radio" aria-checked={other} onClick={() => { setOther(true); setForm((f) => ({ ...f, cargo: 'commercial' })) }} className={`flex min-h-14 flex-col items-start justify-center rounded-[var(--radius-sm)] border px-4 py-2 text-left transition-colors focus-ring ${other ? 'border-gold bg-gold/10' : 'border-border bg-surface-2 hover:border-gold/40'}`} data-testid="cargo-other-card">
+                        <span className={`text-sm font-semibold ${other ? 'text-gold-deep' : 'text-text'}`}>Something else</span><span className="text-xs text-text-muted">Motorbikes, generators, furniture…</span>
+                      </button>
                     </div>
+                    {other && (
+                      <fieldset className="rounded-xl border border-gold/40 bg-gold/5 p-4" data-testid="q-items">
+                        <legend className="px-1 text-sm font-semibold">What are you sending?</legend>
+                        <p className="text-xs text-text-muted">We send it to companies that say they carry it.</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {items.map((it) => <button type="button" key={it} onClick={() => set('cargoItems', items.filter((x) => x !== it))} className="inline-flex min-h-9 items-center gap-1 rounded-full border border-gold bg-gold/15 px-3 text-sm font-semibold text-gold-deep focus-ring" aria-label={`Remove ${it}`}>{it} <span aria-hidden="true">×</span></button>)}
+                          {OTHER_CARGO.filter((x) => !items.includes(x)).map((x) => <button type="button" key={x} onClick={() => addItems(x)} className="inline-flex min-h-9 items-center rounded-full border border-border bg-surface px-3 text-sm text-text-muted hover:border-gold/40 focus-ring">+ {x}</button>)}
+                        </div>
+                        <div className="mt-2 flex gap-2"><input aria-label="Type what you're sending" className="input-dark !min-h-10 text-sm" placeholder="e.g. Generator, tyres" maxLength={40} value={itemText} onChange={(e) => setItemText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addItems(itemText) } }} data-testid="q-item-input" /><button type="button" onClick={() => addItems(itemText)} className="btn-ghost !min-h-10 !px-3 text-sm">Add</button></div>
+                        {errors.items && <p role="alert" className="mt-2 text-xs text-danger">{errors.items}</p>}
+                      </fieldset>
+                    )}
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div><label htmlFor="qty" className="label-dark">Quantity</label><input id="qty" type="number" min={1} className="input-dark" value={form.quantity} onChange={(e) => set('quantity', Number(e.target.value))} aria-invalid={!!errors.quantity} />{errors.quantity && <p className="mt-1 text-xs text-danger">{errors.quantity}</p>}</div>
                       <div><label htmlFor="wt" className="label-dark">Approx. total weight (kg, optional)</label><input id="wt" type="number" min={0} className="input-dark" value={form.weightKg ?? ''} onChange={(e) => set('weightKg', e.target.value ? Number(e.target.value) : undefined)} placeholder="e.g. 380" /></div>
@@ -272,7 +295,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                       <div className="min-w-0 flex-1">
                         <p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{m.shipper.name}{m.shipper.verified && <VerifiedMark size={14} role="img" aria-label="Ntemtem Verified" />}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">{m.shipper.modes.map((md) => <ModeBadge key={md} mode={md} />)}<Rating value={m.shipper.rating} /></div>
-                        <p className="mt-1 text-xs text-text-muted">{m.reasons.slice(0, 2).join(' · ')}</p>
+                        <p className="mt-1 text-xs text-text-muted">{[...m.reasons.filter((x) => x.startsWith('Carries')), ...m.reasons.filter((x) => !x.startsWith('Carries'))].slice(0, 2).map((x, i) => <span key={x}>{i > 0 && ' · '}<span className={x.startsWith('Carries') ? 'font-semibold text-teal' : ''}>{x}</span></span>)}</p>
                         {m.estimate && <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-gold/10 px-2 py-0.5 text-xs font-semibold text-gold-deep" data-testid="match-estimate">{m.estimate.instant ? <Zap size={11} aria-hidden="true" /> : null}{money(m.estimate.price)} · {m.estimate.transitDays} days{m.estimate.instant ? ' · instant quote' : ' · published rate'}</p>}
                       </div>
                     </motion.li>

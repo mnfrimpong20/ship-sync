@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Clock, FileText, Pencil, PlusCircle, Search, Send, X } from 'lucide-react'
-import { cargoLabel, countryByCode, type CargoType, type Shipper } from '../lib/data'
+import { cargoName, countryByCode, type CargoType, type Shipper } from '../lib/data'
 import { useStore, type QuoteRequest } from '../lib/store'
 import { useT, fmtDay, relDay } from '../lib/i18n'
 import { useLang } from '../lib/prefs'
@@ -120,7 +120,7 @@ export function CustomerDashboard() {
                   <div className="flex items-center gap-4">
                     <span className="grid h-11 w-11 place-items-center rounded-xl bg-gold/15 text-gold-deep"><FileText size={20} aria-hidden="true" /></span>
                     <div>
-                      <p className="font-semibold text-text">{r.origin} → <Flag code={dest.code} /> {dest.name} <span className="font-normal text-text-muted">· {r.quantity} × {cargoLabel(r.cargo)}</span></p>
+                      <p className="font-semibold text-text">{r.origin} → <Flag code={dest.code} /> {dest.name} <span className="font-normal text-text-muted">· {r.quantity} × {cargoName(r.cargo, r.cargoItems)}</span></p>
                       <p className="text-xs text-text-muted">{r.ref} · posted {fmtDate(r.createdAt)} · {r.mode === 'either' ? 'air or ocean' : r.mode}</p>
                     </div>
                   </div>
@@ -390,7 +390,7 @@ export function ShipperDashboard() {
                 <motion.div key={r.id} layout className="card-dark p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-text">{r.quantity} × {cargoLabel(r.cargo as CargoType)} · {r.origin} → <Flag code={d.code} /> {d.name}</p>
+                      <p className="font-semibold text-text">{r.quantity} × {cargoName(r.cargo as CargoType, r.cargoItems)} · {r.origin} → <Flag code={d.code} /> {d.name}</p>
                       <p className="mt-0.5 text-xs text-text-muted">{r.ref} · {r.mode === 'either' ? 'air or ocean' : r.mode} · ready {fmtDate(r.readyDate)} {r.weightKg ? `· ~${r.weightKg} kg` : ''}</p>
                       <p className="mt-2 text-sm text-text-muted">{r.description || 'No description.'}</p>
                       <ul className="mt-2 flex flex-wrap gap-1.5">{r.pickup && <li><Pill tone="muted">Pickup</Pill></li>}{r.delivery && <li><Pill tone="muted">Door delivery</Pill></li>}{r.insurance && <li><Pill tone="muted">Insurance</Pill></li>}</ul>

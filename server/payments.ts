@@ -134,8 +134,18 @@ export async function amountDue(db: Db, s: Row) {
 }
 
 /** Money arrived (webhook, verify, or an office record). Idempotent per payment row. */
+/** A replaced checkout was paid as well — tell every Ntemtem admin so one of the two can be refunded. */
+async function flagDoublePayment(db: Db, p: Row) {
+  const { rows: admins } = await db.query<Row>('select id from users where is_admin')
+  const { notify } = await import('./notify')
+  for (const a of admins) await notify(db, { userId: a.id, kind: 'system', title: `Possible double payment — $${Number(p.amount_usd).toFixed(2)}`, body: `A customer completed a checkout they had already restarted, so this ${p.invoice_id ? 'invoice' : 'shipment'} may now be paid twice. Check Payments and refund one if so.`, link: '/admin?view=payments' })
+}
+
 export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; method?: string | null; direct?: boolean; by?: string }) {
-  if (!['pending'].includes(p.status)) return p
+  // 'cancelled' too: a checkout the customer replaced with a new one can still be completed in the old tab — the money
+  // was taken, so it must be recorded (and flagged as a double payment below), never silently dropped.
+  if (!['pending', 'cancelled'].includes(p.status)) return p
+  const superseded = p.status === 'cancelled'
   const cfg = await getSettings(db)
   const amount = Number(p.amount_usd)
   // Ntemtem's own packing supplies on the bill belong to Ntemtem, so they count fully towards the fee (never paid out to the shipper).
@@ -143,7 +153,10 @@ export async function markPaid(db: Db, p: Row, opts: { intent?: string | null; m
   const fee = p.sourcing_id ? 0 : opts.direct ? ntem : r2((amount - ntem) * cfg.takeRatePct + ntem) // Ntemtem Sourcing is the platform — no take rate on its own jobs
   // No shipment behind the payment (a standalone invoice) → nothing to escrow against; released to the shipper's balance at once.
   const status: PaymentStatus = opts.direct ? 'direct' : p.shipment_id || p.sourcing_id ? 'held' : 'released'
-  await db.query(`update escrow_payments set status = $2, fee_usd = $3, net_usd = $4, provider_payment_intent = coalesce($5, provider_payment_intent), method = coalesce($6, method), paid_at = now(), recorded_by = coalesce($7, recorded_by), released_at = case when $2 = 'released' then now() else released_at end, release_reason = case when $2 = 'released' then 'invoice:no-shipment' else release_reason end where id = $1`, [p.id, status, fee, r2(amount - fee), opts.intent ?? null, opts.method ?? null, opts.by ?? null])
+  // One step that only one caller can win (webhook and the customer's return page can arrive together).
+  const { rows: won } = await db.query<Row>(`update escrow_payments set status = $2, fee_usd = $3, net_usd = $4, provider_payment_intent = coalesce($5, provider_payment_intent), method = coalesce($6, method), paid_at = now(), recorded_by = coalesce($7, recorded_by), released_at = case when $2 = 'released' then now() else released_at end, release_reason = case when $2 = 'released' then 'invoice:no-shipment' else release_reason end where id = $1 and status in ('pending', 'cancelled') returning id`, [p.id, status, fee, r2(amount - fee), opts.intent ?? null, opts.method ?? null, opts.by ?? null])
+  if (!won.length) return (await db.query<Row>('select * from escrow_payments where id = $1', [p.id])).rows[0] ?? p
+  if (superseded) await flagDoublePayment(db, p).catch((e) => console.error('[payments] double-payment flag', e))
   const { rows: ss } = p.shipment_id ? await db.query<Row>('select * from shipments where id = $1', [p.shipment_id]) : { rows: [] as Row[] }; const s = ss[0]
   const items = J(p.items ?? '[]') as { kind?: string }[]
   // Insurance premium included → collected.

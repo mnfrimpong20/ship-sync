@@ -2,7 +2,7 @@ import { pageMeta } from './pageMeta'
 import { useEffect, useState } from 'react'
 import { api } from './store'
 
-export interface SiteConfig { email: string; phone: string; whatsapp: string; whatsappUrl: string; address: string; legalName?: string; social: Record<string, string>; hoursNote: string; demoHidden: boolean }
+export interface SiteConfig { email: string; phone: string; whatsapp: string; whatsappUrl: string; address: string; legalName?: string; social: Record<string, string>; paymentsLive?: boolean; hoursNote: string; demoHidden: boolean }
 /** A public number is only shown once it means something — a new marketplace shouldn't advertise "0% on time". */
 export const statReady = {
   verifiedShippers: (s: SiteStats) => s.verifiedShippers >= 3,
@@ -28,7 +28,7 @@ export const siteApi = {
 }
 export interface AppError { id: string; source: 'api' | 'client' | 'job'; route: string | null; method: string | null; status: number | null; message: string; stack: string | null; userId: string | null; userAgent: string | null; resolvedAt: string | null; createdAt: string }
 export interface DbExport { name: string; bytes: number; at?: string }
-export interface SystemInfo { version: string | null; node: string; uptimeSec: number; env: string; database: string; demoShippersHidden: boolean; demoAutoQuotes: boolean; email: string; sms: string; whatsapp?: string; stripe: boolean; ais: boolean; terminal49: boolean; appUrl: string | null; contact: { email: boolean; phone: boolean; whatsapp: boolean }; users: { total: number; real: number }; shippers: { total: number; real: number } }
+export interface SystemInfo { version: string | null; node: string; uptimeSec: number; env: string; database: string; you?: { ip: string; hops: number; trusted: number }; demoData?: boolean; demoShippersHidden: boolean; demoAutoQuotes: boolean; email: string; sms: string; whatsapp?: string; stripe: boolean; ais: boolean; terminal49: boolean; appUrl: string | null; contact: { email: boolean; phone: boolean; whatsapp: boolean }; users: { total: number; real: number }; shippers: { total: number; real: number }; launch?: { key: string; ok: boolean; label: string; how: string }[] }
 
 let cached: SiteConfig | null = null
 /** Public contact details (cached for the session). */

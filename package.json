@@ -10,7 +10,8 @@
     "lint": "oxlint",
     "typecheck": "tsc -b",
     "vendor:maplibre": "node -e \"const fs=require('fs');fs.mkdirSync('public/vendor/maplibre',{recursive:true});for(const f of ['maplibre-gl-worker.mjs','maplibre-gl-shared.mjs'])fs.copyFileSync('node_modules/maplibre-gl/dist/'+f,'public/vendor/maplibre/'+f)\"",
-    "postinstall": "npm run vendor:maplibre"
+    "postinstall": "npm run vendor:maplibre",
+    "test": "node tests/smoke.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

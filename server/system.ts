@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { hideDemoShippers, uid, type Db } from './db'
 import { emailProvider } from './notify'
 import { smsProvider, whatsappProvider } from './sms'
+import { demoDataEnabled } from './db'
 
 type Row = Record<string, any>
 type ApiUser = { id: string; email: string; role: string; shipperId?: string | null; admin?: boolean }
@@ -158,11 +159,26 @@ export function mountSystem(r: Router, d: Deps) {
     res.json({
       version: process.env.npm_package_version ?? null, node: process.version, uptimeSec: Math.round(process.uptime()), env: process.env.NODE_ENV ?? 'development',
       database: process.env.DATABASE_URL ? 'postgres' : 'pglite (embedded — not for production)',
-      demoShippersHidden: hideDemoShippers(), demoAutoQuotes: (process.env.DEMO_AUTO_QUOTES ?? 'true') !== 'false',
+      // For checking rate limits after publishing: this should be YOUR internet address, not a proxy's.
+      you: { ip: req.ip ?? '', hops: String(req.headers['x-forwarded-for'] ?? '').split(',').filter(Boolean).length, trusted: Number(process.env.TRUST_PROXY_HOPS ?? 1) || 0 },
+      demoData: demoDataEnabled(),
+      demoShippersHidden: hideDemoShippers(), demoAutoQuotes: process.env.DEMO_AUTO_QUOTES ? process.env.DEMO_AUTO_QUOTES !== 'false' : demoDataEnabled(),
       email: emailProvider().id, sms: smsProvider().id, whatsapp: whatsappProvider().id,
       stripe: has('STRIPE_SECRET_KEY') && has('STRIPE_WEBHOOK_SECRET'), ais: has('AISSTREAM_API_KEY'), terminal49: has('TERMINAL49_API_KEY'), appUrl: process.env.APP_URL ?? null,
       contact: { email: has('CONTACT_EMAIL'), phone: has('CONTACT_PHONE'), whatsapp: has('CONTACT_WHATSAPP') },
       users: { total: u[0].n, real: u[0].real }, shippers: { total: s[0].n, real: s[0].real },
+      // Everything the published app needs before real customers arrive (shown as a checklist on this page).
+      launch: [
+        { key: 'db', ok: !!process.env.DATABASE_URL, label: 'Production database attached', how: 'Replit → Database → create the production database; turn on backups.' },
+        { key: 'demo', ok: !demoDataEnabled(), label: 'Demo data and demo logins off', how: 'Automatic on the published app; leave DEMO_DATA unset.' },
+        { key: 'admins', ok: !!(process.env.ADMIN_EMAILS ?? '').trim(), label: 'Your own admin account', how: 'Sign up with your email, then add it to the ADMIN_EMAILS secret.' },
+        { key: 'email', ok: emailProvider().id !== 'off', label: 'Email sending (password resets, invoices)', how: 'Add RESEND_API_KEY and EMAIL_FROM (e.g. Ntemtem <hello@ntemtem.com>) — verify the domain in Resend.' },
+        { key: 'payments', ok: has('STRIPE_SECRET_KEY') && has('STRIPE_WEBHOOK_SECRET') || has('PAYSTACK_SECRET_KEY'), label: 'Online payments (escrow)', how: 'Add STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (and/or PAYSTACK_SECRET_KEY).' },
+        { key: 'texts', ok: smsProvider().id !== 'off' && smsProvider().id !== 'log' || whatsappProvider().id !== 'off', label: 'Text / WhatsApp messages to receivers', how: 'Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM — and/or WHATSAPP_TOKEN + WHATSAPP_PHONE_ID.' },
+        { key: 'contact', ok: has('CONTACT_EMAIL') && (has('CONTACT_PHONE') || has('CONTACT_WHATSAPP')), label: 'Contact details on the website', how: 'Add CONTACT_EMAIL and CONTACT_PHONE or CONTACT_WHATSAPP (and CONTACT_HOURS).' },
+        { key: 'legal', ok: has('COMPANY_LEGAL_NAME') && has('CONTACT_ADDRESS'), label: 'Company legal name and address', how: 'Add COMPANY_LEGAL_NAME and CONTACT_ADDRESS (shown on legal pages and invoices).' },
+        { key: 'url', ok: !!process.env.APP_URL, label: 'Site address for links in emails/texts', how: 'Add APP_URL, e.g. https://ntemtem.com' },
+      ],
     })
   }))
 }

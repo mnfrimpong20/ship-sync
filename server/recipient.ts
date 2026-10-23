@@ -213,6 +213,8 @@ export function mountRecipient(r: Router, d: Deps) {
   r.post('/r/:token/received', wrap(async (req, res) => {
     const db = await getDb(); const s = await byToken(db, String(req.params.token))
     const b = zReceived.parse(req.body)
+    // The receiver can only confirm goods that have reached the destination — not a shipment still at origin or at sea.
+    if (b.allGood && !['arrived', 'customs', 'ready_for_collection', 'out_for_delivery', 'delivered'].includes(s.status)) throw new HttpError(409, 'This shipment hasn’t reached you yet — confirm here once the goods are actually with you.')
     const { rows: ex } = await db.query<Row>('select id from recipient_receipts where shipment_id = $1', [s.id])
     if (ex[0]) throw new HttpError(409, 'Receipt was already confirmed for this shipment — thank you.')
     await db.query('insert into recipient_receipts (id,shipment_id,name,note,all_good,ip) values ($1,$2,$3,$4,$5,$6)', ['rr_' + uid(), s.id, b.name, b.note, b.allGood, String(req.ip ?? '').slice(0, 60)])

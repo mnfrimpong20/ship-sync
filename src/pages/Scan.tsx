@@ -3,7 +3,9 @@ import { isDriverRole } from '../lib/roles'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import jsQR from 'jsqr'
+// The QR decoder (~250 KB) is only fetched when a camera scan starts on a phone without a built-in barcode reader.
+let jsQRLoad: Promise<typeof import('jsqr').default> | null = null
+const loadJsQR = () => (jsQRLoad ??= import('jsqr').then((m) => m.default))
 import { Flashlight, Volume2, VolumeX, AlertTriangle, Camera, Check, CheckCircle2, Container as ContainerIcon, Keyboard, MapPin, Package, QrCode, RefreshCw, ScanLine, Truck, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { countryByCode, statusLabels } from '../lib/data'
@@ -41,7 +43,7 @@ export function Viewfinder({ onCode, paused }: { onCode: (code: string) => void;
           else if (canvas.current) {
             const c = canvas.current; const w = Math.min(640, v.videoWidth); const h = Math.round((w / v.videoWidth) * v.videoHeight)
             c.width = w; c.height = h; const ctx = c.getContext('2d', { willReadFrequently: true })!; ctx.drawImage(v, 0, 0, w, h)
-            code = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' })?.data ?? ''
+            const jsQR = await loadJsQR(); code = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' })?.data ?? ''
           }
         } catch { /* frame not ready */ }
         if (code && (code !== last.current.code || Date.now() - last.current.at > 4000)) { last.current = { code, at: Date.now() }; onCodeRef.current(code) }

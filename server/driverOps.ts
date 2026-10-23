@@ -8,6 +8,7 @@ import { normalisePhone, sendText, smsProvider } from './sms'
 import { distanceKm } from '../src/lib/geo'
 import { ensurePieces, pieceOut } from './labels'
 import { markPaid } from './momo'
+import { csvCell as safeCsvCell } from '../src/lib/csvCell'
 
 type Row = Record<string, any>
 interface Deps {
@@ -501,7 +502,7 @@ export function mountDriverOps(r: Router, d: Deps) {
     const days = Math.min(90, Math.max(1, Number(req.query.days) || 14))
     const { rows } = await db.query<Row>(`select sh.*, s.name, s.role from shifts sh join staff s on s.id = sh.staff_id where sh.shipper_id = $1 and sh.start_at >= now() - ($2::int || ' days')::interval order by s.name, sh.start_at`, [shipperId, days])
     const lines = [['Name', 'Role', 'Clock in', 'Clock out', 'Breaks (min)', 'Hours'].join(',')]
-    for (const x of rows) { const o = shiftOut(x); const brMin = Math.round(o.breaks.reduce((n, b) => n + ((b.end ? new Date(b.end).getTime() : Date.now()) - new Date(b.start).getTime()), 0) / 60000); lines.push([x.name, x.role, o.start, o.end ?? 'still on shift', brMin, o.hours].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')) }
+    for (const x of rows) { const o = shiftOut(x); const brMin = Math.round(o.breaks.reduce((n, b) => n + ((b.end ? new Date(b.end).getTime() : Date.now()) - new Date(b.start).getTime()), 0) / 60000); lines.push([x.name, x.role, o.start, o.end ?? 'still on shift', brMin, o.hours].map((v) => safeCsvCell(v)).join(',')) }
     res.set('Content-Type', 'text/csv'); res.set('Content-Disposition', `attachment; filename="timesheet-${new Date().toISOString().slice(0, 10)}.csv"`); res.send(lines.join('\n'))
   }))
   r.get('/drivers/shifts', wrap(async (req, res) => {

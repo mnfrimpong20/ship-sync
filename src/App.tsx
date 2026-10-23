@@ -7,11 +7,20 @@ import Nav from './components/Nav'
 import Footer from './components/Footer'
 import AppShell from './components/AppShell'
 import Home from './pages/Home'
-import Quote from './pages/Quote'
-import Directory from './pages/Directory'
-import Track from './pages/Track'
-import { AboutPage, ContactPage, LegalPage, NotFound } from './pages/Company'
-import { ForgotPassword, Login, ResetPassword, SignInLink, Signup } from './pages/Auth'
+const Quote = lazy(() => import('./pages/Quote'))
+const Directory = lazy(() => import('./pages/Directory'))
+const Track = lazy(() => import('./pages/Track'))
+const companyPage = () => import('./pages/Company')
+const AboutPage = lazy(() => companyPage().then((m) => ({ default: m.AboutPage })))
+const ContactPage = lazy(() => companyPage().then((m) => ({ default: m.ContactPage })))
+const LegalPage = lazy(() => companyPage().then((m) => ({ default: m.LegalPage })))
+const NotFound = lazy(() => companyPage().then((m) => ({ default: m.NotFound })))
+const authPage = () => import('./pages/Auth')
+const ForgotPassword = lazy(() => authPage().then((m) => ({ default: m.ForgotPassword })))
+const Login = lazy(() => authPage().then((m) => ({ default: m.Login })))
+const ResetPassword = lazy(() => authPage().then((m) => ({ default: m.ResetPassword })))
+const SignInLink = lazy(() => authPage().then((m) => ({ default: m.SignInLink })))
+const Signup = lazy(() => authPage().then((m) => ({ default: m.Signup })))
 import { applyPageMeta } from './lib/site'
 
 /* Everything below loads on demand: the marketing core above is the only code a first-time visitor downloads.

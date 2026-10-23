@@ -13,7 +13,7 @@ const sceneCopy: Record<string, { tab: string; eyebrow: string; text: string; sh
   barrels: { tab: 'Barrels', eyebrow: 'Barrels & boxes home', text: 'Pack a barrel in Houston, unpack it in Kumasi. Post it once and verified shippers send you real quotes — pick one, pay safely, and track it all the way home.', short: 'Barrels and boxes home — compare real quotes.' },
   port: { tab: 'Containers', eyebrow: 'Full containers', text: 'Moving home or restocking a shop? Get door-to-door prices for a 20ft or 40ft container to Tema, Lagos, Lomé and more.', short: 'Full 20ft and 40ft containers, door to door.' },
   car: { tab: 'Cars', eyebrow: 'Cars & vehicles', text: 'Ship your car by RoRo or in a container. Shippers check the title and estimate the duty before you commit.', short: 'Ship a car — title and duty sorted up front.' },
-  air: { tab: 'Air', eyebrow: 'Urgent by air', text: 'Documents, medicine and gifts by air in 3 to 7 days, with the same protected payment.', short: 'Urgent items by air in 3 to 7 days.' },
+  air: { tab: 'Air', eyebrow: 'Urgent by air', text: 'Documents, medicine and gifts by air in 3 to 7 days, tracked all the way.', short: 'Urgent items by air in 3 to 7 days.' },
   family: { tab: 'Door to door', eyebrow: 'To the family’s door', text: 'Delivered to the door in Accra, Kumasi, Lagos or Monrovia — and the family gets WhatsApp updates at every step.', short: 'To the family’s door, with WhatsApp updates.' },
 }
 

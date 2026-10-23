@@ -60,6 +60,7 @@ export default function Receive() {
   setPageTitle(`${s.ref} · your shipment`)
   const delivered = s.status === 'delivered'
   const collect = !delivered && (d.readyForCollection || s.status === 'customs' || s.status === 'arrived')
+  const reached = ['arrived', 'customs', 'ready_for_collection', 'out_for_delivery', 'delivered'].includes(s.status) // the server refuses "received" before this
   const due = d.charges.filter((c) => c.status === 'due')
   return (
     <div className="bg-bg text-text" lang={lang}>
@@ -120,6 +121,8 @@ export default function Receive() {
           <motion.div variants={fadeUp} className={`mt-4 rounded-xl border p-5 ${d.receipt?.allGood !== false ? 'border-teal/40 bg-teal/10' : 'border-danger/40 bg-danger/10'}`} data-testid="receipt-done">
             <p className="flex items-start gap-2 text-sm">{d.receipt?.allGood !== false ? <CircleCheck size={18} className="shrink-0 text-teal" aria-hidden="true" /> : <AlertTriangle size={18} className="shrink-0 text-danger" aria-hidden="true" />}<span>{d.receipt?.allGood !== false ? <><strong>{t.thanks}{d.receipt ? `, ${d.receipt.name.split(' ')[0]}` : ''}.</strong> {t.confirmedNote(d.receipt?.at ? fmtD(d.receipt.at, lang, true) : '', s.sender, d.shipper.name)}</> : <><strong>{t.flagged}</strong> {t.followUp(d.shipper.name)}</>}</span></p>
           </motion.div>
+        ) : !reached ? (
+          <motion.p variants={fadeUp} className="card-dark mt-4 p-5 text-sm text-text-muted" data-testid="receipt-not-yet">{t.notYet}</motion.p>
         ) : (
           <motion.form variants={fadeUp} onSubmit={submit} className="card-dark mt-4 p-5" aria-label={t.didYou} data-testid="receipt-form">
             <h2 className="!text-base">{t.didYou}</h2>

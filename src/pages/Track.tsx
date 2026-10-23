@@ -139,6 +139,7 @@ function ProofOfDelivery({ pod, rateRef }: { pod: NonNullable<Shipment['pod']>; 
       </div>
       {pod.photo && open && <img src={pod.photo} alt="Proof of delivery" className="mt-3 max-h-96 w-auto rounded-lg border border-border" />}
       {pod.signature && <img src={pod.signature} alt="Receiver's signature" className="mt-3 h-16 rounded-lg border border-border bg-white" />}
+      {!pod.photo && !pod.signature && !pod.receivedBy && <p className="mt-2 text-xs text-text-muted" data-testid="pod-private">The delivery photo and signature are private — <Link to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} className="font-semibold text-gold-deep underline">sign in</Link> as the sender or the shipping company to see them.</p>}
       {rateRef && <RateDelivery refCode={rateRef} />}
     </section>
   )

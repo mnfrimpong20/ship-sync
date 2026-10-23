@@ -30,6 +30,7 @@ import { VehicleCard } from '../components/VehicleCard'
 import { CustomsCard } from '../components/CustomsCard'
 import { DisputeCard, ReviewCard } from '../components/ReviewCards'
 import { AutomationPrefs, AutoTag, ShipmentManage } from '../components/ShipmentTools'
+import { csvCell } from '../lib/csvCell'
 
 type Bucket = 'all' | 'active' | 'pickup' | 'transit' | 'destination' | 'late' | 'untracked' | 'stuck' | 'delivered'
 type Sort = 'newest' | 'eta' | 'status' | 'ref'
@@ -174,7 +175,7 @@ export default function Shipments() {
   const advance = async (s: Shipment) => { setBusy(true); setError(''); try { await advanceShipment(s.id); setToast(`${s.ref} moved to “${statusLabels[nextStatus(s.status, s.handover) ?? s.status]}”.`) } catch (e) { setError(e instanceof Error ? e.message : 'Could not update.') } finally { setBusy(false) } }
   const exportCsv = () => {
     const head = ['Ref', 'Status', 'Mode', 'Origin', 'Destination', 'Cargo', 'Description', 'Customer', 'ETA', 'Vessel/Flight', 'MMSI']
-    const lines = list.map((s) => [s.ref, statusLabels[s.status], s.mode, s.origin, countryByCode(s.destination)?.name ?? s.destination, s.cargo, s.description, s.customer, s.eta ?? '', s.flight ?? s.vesselName ?? '', s.mmsi ?? ''].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    const lines = list.map((s) => [s.ref, statusLabels[s.status], s.mode, s.origin, countryByCode(s.destination)?.name ?? s.destination, s.cargo, s.description, s.customer, s.eta ?? '', s.flight ?? s.vesselName ?? '', s.mmsi ?? ''].map((v) => csvCell(v)).join(','))
     const blob = new Blob([[head.join(','), ...lines].join('\n')], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `shipments-${today()}.csv`; a.click(); URL.revokeObjectURL(a.href)
   }
   const chip = (b: Bucket, label: string, n: number, tone = '') => <button key={b} onClick={() => set({ b: b === 'active' ? undefined : b })} aria-pressed={bucket === b} className={`inline-flex min-h-10 items-center gap-1 rounded-full border px-3.5 text-sm focus-ring ${bucket === b ? 'border-gold bg-gold/15 text-gold-deep font-semibold' : 'border-border text-text-muted hover:text-text'} ${tone}`}>{label} <span className="tabular-nums">{n}</span></button>

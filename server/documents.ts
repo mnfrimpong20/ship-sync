@@ -19,6 +19,7 @@ import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { notify, notifyShipperStaff } from './notify'
 import { cargoLabel, countryByCode, type CargoType } from '../src/lib/data'
+import { UPLOAD_TYPES } from './uploadGuard'
 
 type Row = Record<string, any>
 interface Deps {
@@ -96,7 +97,7 @@ const zUpload = z.object({
   kind: z.enum(DOC_KINDS).default('other'),
   title: z.string().trim().min(1).max(120),
   filename: z.string().trim().min(1).max(200),
-  mime: z.string().trim().min(3).max(100),
+  mime: z.string().trim().max(100).regex(UPLOAD_TYPES, 'That file type isn’t supported — upload a PDF, photo, Word or Excel file.'),
   data: z.string().min(1), // base64 (no data: prefix)
   visibility: z.enum(['shipper', 'shared']).default('shared'),
 })

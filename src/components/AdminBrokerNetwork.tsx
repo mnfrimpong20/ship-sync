@@ -3,6 +3,7 @@ import { Check, Copy, ExternalLink, FileText, KeyRound, Mail, X } from 'lucide-r
 import { networkApi, type BrokerAccess, type BrokerApplication } from '../lib/brokers'
 import { cargoLabel, countryByCode, type CargoType } from '../lib/data'
 import { fmtDateTime, money } from './ui'
+import { openDataUrl } from '../lib/openFile'
 
 const errOf = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong.')
 const full = (link: string) => `${window.location.origin}${link}`
@@ -28,7 +29,7 @@ export function BrokerApplications({ onApproved }: { onApproved: () => void }) {
   useEffect(() => { void load() }, [])
   if (!list) return null
   const pending = list.filter((a) => a.status === 'pending'); const shown = showAll ? list : list.filter((a) => a.status === 'pending' || links[a.id])
-  const viewLicence = async (id: string) => { try { const url = await networkApi.licence(id); const w = window.open(); if (w) { w.document.title = 'Licence'; w.document.body.style.margin = '0'; if (url.startsWith('data:application/pdf')) w.document.body.innerHTML = `<iframe src="${url}" style="border:0;width:100vw;height:100vh"></iframe>`; else w.document.body.innerHTML = `<img src="${url}" style="max-width:100%">` } } catch (e) { setErr(errOf(e)) } }
+  const viewLicence = async (id: string) => { try { const url = await networkApi.licence(id); openDataUrl(url, 'licence') } catch (e) { setErr(errOf(e)) } }
   return (
     <div className="mt-6" data-testid="broker-applications">
       <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-lg font-semibold">Applications {pending.length > 0 && <span className="ml-1 rounded-full bg-gold px-2 py-0.5 text-xs font-bold text-on-accent">{pending.length} waiting</span>}</h3>{list.length > pending.length && <button onClick={() => setShowAll((x) => !x)} className="text-sm text-gold-deep underline">{showAll ? 'Only waiting' : `Show decided (${list.length - pending.length})`}</button>}</div>

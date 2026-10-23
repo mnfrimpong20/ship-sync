@@ -14,6 +14,7 @@ import { emailProvider, emailTemplate, notify, notifyShipperStaff, sendEmail } f
 import { JOB_SELECT, JOB_STEPS, advanceJob, brokerOut, jobOut, jobStepLabels, zStep, type JobStep } from './brokers'
 import { cargoLabel, type CargoType } from '../src/lib/data'
 import { isDriverRole } from '../src/lib/roles'
+import { csvCell as safeCsvCell } from '../src/lib/csvCell'
 
 type Row = Record<string, any>
 interface Deps { getDb: () => Promise<Db>; requireUser: (db: Db, req: Request) => Promise<ApiUser>; HttpError: new (status: number, message: string) => Error; wrap: (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) => void }
@@ -344,7 +345,7 @@ export function mountBrokerPortal(r: Router, d: Deps) {
       steps: JOB_STEPS.filter((s) => s !== 'done').map((s) => ({ step: s, label: jobStepLabels[s], avgDays: avg(stepDur.get(s) ?? []) ?? 0, n: (stepDur.get(s) ?? []).length })),
       byCargo: group((j) => cargoLabel(j.cargo as CargoType)), byShipper: group((j) => j.shipper_name), byPort: group((j) => j.port || (j.destination === 'NG' ? 'Lagos' : 'Tema')), duty: duty.map((x) => ({ currency: x.cur, amount: Number(x.n), jobs: x.c })) })
   }))
-  const csv = (rows: unknown[][]) => rows.map((rr) => rr.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+  const csv = (rows: unknown[][]) => rows.map((rr) => rr.map((v) => safeCsvCell(v)).join(',')).join('\n')
   const range = (req: Request) => { const from = typeof req.query.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.from) ? req.query.from : new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10); const to = typeof req.query.to === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.to) ? req.query.to : new Date().toISOString().slice(0, 10); return { from, to } }
   r.get('/bp/reports/:kind', wrap(async (req, res) => {
     const db = await getDb(); const m = await me(db, req); const { from, to } = range(req); const kind = String(req.params.kind).replace(/\.csv$/, ''); if (kind === 'finance' && m.role !== 'owner') throw new HttpError(403, 'Only the account owner can download invoices.')

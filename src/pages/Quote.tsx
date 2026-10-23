@@ -16,6 +16,7 @@ import { hubApi } from '../lib/customerHub'
 import { PackingNeeds } from '../components/PackingSupplies'
 import { DeclarationBox } from '../components/Compliance'
 import { PasswordInput } from '../components/PasswordInput'
+import { useSiteConfig } from '../lib/site'
 
 type Form = NewRequest
 const stepsMeta = ['Route', 'Cargo', 'Services', 'Contact']
@@ -24,6 +25,7 @@ const stepsMeta = ['Route', 'Cargo', 'Services', 'Contact']
 export interface OrderShipper { id: string; name: string; tagline: string; hq: string; verified: boolean; rating: number; reviews: number; modes: Mode[]; destinations: string[]; origins: string[]; cargo: string[]; initials: string; hue: string; responseHours: number; onTime: number }
 
 export default function Quote({ locked }: { locked?: { shipper: OrderShipper; instantQuotes: boolean } } = {}) {
+  const siteCfg = useSiteConfig()
   const [sp] = useSearchParams()
   const nav = useNavigate()
   const { user, createRequest, matchShippers, shipperById } = useStore()
@@ -269,7 +271,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
                   <p className="eyebrow mb-2">You’re ordering from</p>
                   <div className="flex items-start gap-3"><Avatar initials={locked.shipper.initials} hue={locked.shipper.hue} size={48} /><div className="min-w-0"><p className="flex items-center gap-1 text-base font-semibold">{locked.shipper.name}{locked.shipper.verified && <VerifiedMark size={16} role="img" aria-label="Ntemtem Verified" />}</p><p className="text-sm text-text-muted">{locked.shipper.tagline || locked.shipper.hq}</p><div className="mt-1 flex flex-wrap items-center gap-1.5">{locked.shipper.modes.map((md) => <ModeBadge key={md} mode={md} />)}<Rating value={locked.shipper.rating} count={locked.shipper.reviews} /></div></div></div>
                   <dl className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-text-muted">Ships to</dt><dd>{locked.shipper.destinations.map((c) => countryByCode(c)?.name ?? c).join(', ')}</dd></div><div><dt className="text-xs text-text-muted">Collects from</dt><dd>{locked.shipper.origins.slice(0, 3).join(', ') || '—'}</dd></div>{locked.shipper.onTime > 0 && <div><dt className="text-xs text-text-muted">On time</dt><dd>{locked.shipper.onTime}%</dd></div>}<div><dt className="text-xs text-text-muted">Replies in</dt><dd>~{locked.shipper.responseHours} h</dd></div></dl>
-                  <p className="mt-4 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">This request goes only to {locked.shipper.name}. You’ll get a Ntemtem account to track it, and payment is held in escrow until the goods are on their way.</p>
+                  <p className="mt-4 rounded-lg bg-surface-2 p-3 text-xs text-text-muted">This request goes only to {locked.shipper.name}. You’ll get a Ntemtem account to track it{siteCfg?.paymentsLive ? ', and payment is held in escrow until the goods are on their way' : ''}.</p>
                 </div>
               ) : (
               <>

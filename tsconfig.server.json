@@ -27,6 +27,6 @@
     "src/lib/address.ts",
     "src/lib/receiverText.ts",
     "src/lib/weights.ts",
-    "src/lib/help.ts", "src/lib/dates.ts", "src/lib/roles.ts", "src/lib/driverHr.ts"
+    "src/lib/help.ts", "src/lib/dates.ts", "src/lib/roles.ts", "src/lib/driverHr.ts", "src/lib/csvCell.ts"
   ]
 }

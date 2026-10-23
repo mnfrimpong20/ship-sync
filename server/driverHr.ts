@@ -6,6 +6,7 @@ import { isDriverRole } from '../src/lib/roles'
 import { notify, notifyShipperStaff } from './notify'
 import { FX } from './driverOps'
 import { TRAINING, CONTRACT_VERSION } from '../src/lib/driverHr'
+import { csvCell as safeCsvCell } from '../src/lib/csvCell'
 
 /* Team HR (everyone except the owner), payroll, time and driver analytics. Office: owners, dispatchers, finance (pay: owner/finance; dispatchers see driver pay only; private notes: owner). */
 type Row = Record<string, any>
@@ -516,7 +517,7 @@ export function mountDriverHr(r: Router, d: Deps) {
       adjustments: adj.map((a) => ({ id: a.id, kind: a.kind, amount: Number(a.amount), currency: a.currency, note: a.note, remaining: Number(a.remaining), installments: Number(a.installments) })),
       expenses: ex.map((e) => ({ id: e.id, kind: e.kind, amount: Number(e.amount), currency: e.currency, note: e.note, status: e.status, at: ISO(e.at) })) })
   }))
-  const csv = (rows: unknown[][]) => rows.map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+  const csv = (rows: unknown[][]) => rows.map((r) => r.map((v) => safeCsvCell(v)).join(',')).join('\n')
   r.get('/drivers/year-end.csv', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId } = await office(db, req, ['owner', 'finance'])
     const year = Number(req.query.year) || new Date().getFullYear(); const st = await hrSettings(db, shipperId)

@@ -28,6 +28,7 @@ import type { ApiUser } from './api'
 import { emailTemplate, notify, notifyShipperStaff, sendEmail } from './notify'
 import { normalisePhone, sendText } from './sms'
 import { countryByCode, statusLabels, type ShipmentStatus } from '../src/lib/data'
+import { csvCell as safeCsvCell } from '../src/lib/csvCell'
 
 type Row = Record<string, any>
 interface Deps {
@@ -46,7 +47,7 @@ const appUrl = () => (process.env.APP_URL || 'http://localhost:5000').replace(/\
 const money = (v: number) => `$${Math.round(v).toLocaleString('en-US')}`
 const median = (xs: number[]) => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2 }
 const dest = (c: string) => countryByCode(c)?.name ?? c
-const csvCell = (v: unknown) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+const csvCell = safeCsvCell
 const esc = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
 /** Invoices addressed to this customer, across every shipper (via the shipper's client record). */

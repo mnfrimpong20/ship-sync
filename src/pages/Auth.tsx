@@ -208,6 +208,7 @@ export function Signup() {
 }
 
 function Aside({ shipper = false }: { shipper?: boolean }) {
+  const live = !!useSiteConfig()?.paymentsLive // only promise escrow once online payment is switched on
   const items = shipper
     ? ['Matched leads for your lanes, not spam', 'Verification badge after document review', 'No commission — flat monthly plans', 'Branded tracking page for your customers']
     : ['Quotes from verified shippers within 24h', 'Compare price, transit and inclusions side by side', 'One reference to track pickup → delivery', 'Free forever for customers']
@@ -215,7 +216,7 @@ function Aside({ shipper = false }: { shipper?: boolean }) {
     <div className="card-dark p-7">
       <p className="eyebrow">{shipper ? 'Why list on Ntemtem' : 'What you get'}</p>
       <ul className="mt-4 space-y-3">{items.map((i) => <li key={i} className="flex gap-3 text-text"><span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gold/15 text-gold-deep"><Check size={14} aria-hidden="true" /></span>{i}</li>)}</ul>
-      <p className="mt-6 border-t border-border pt-5 text-sm text-text-muted">{shipper ? 'Free to list on Starter. Customers pay through Ntemtem, the money is held until the goods move, and your clients stay yours.' : 'Free for senders. Compare itemised quotes, then pay only through Ntemtem — the money is held until your goods are on their way.'}</p>
+      <p className="mt-6 border-t border-border pt-5 text-sm text-text-muted">{shipper ? (live ? 'Free to list on Starter. Customers pay through Ntemtem, the money is held until the goods move, and your clients stay yours.' : 'Free to list on Starter, and your clients stay yours.') : (live ? 'Free for senders. Compare itemised quotes, then pay only through Ntemtem — the money is held until your goods are on their way.' : 'Free for senders. Compare itemised quotes and book the one that suits you.')}</p>
     </div>
   )
 }

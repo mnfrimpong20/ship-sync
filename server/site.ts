@@ -25,7 +25,9 @@ export function siteConfig() {
     email: e('CONTACT_EMAIL'), phone: e('CONTACT_PHONE'), whatsapp: wa, whatsappUrl: wa ? `https://wa.me/${wa}` : '', address: e('CONTACT_ADDRESS'), legalName: e('COMPANY_LEGAL_NAME'),
     social: Object.fromEntries((['linkedin', 'instagram', 'facebook', 'x', 'tiktok', 'youtube'] as const).map((k) => [k, e(`SOCIAL_${k.toUpperCase()}`)]).filter(([, v]) => v)) as Record<string, string>,
     demoHidden: hideDemoShippers(),
-    hoursNote: e('CONTACT_HOURS') || 'Mon–Fri 9:00–18:00 US Central · UK team Mon–Fri 9:00–17:30 UK time · China team Mon–Sat 9:00–18:00 CST',
+    hoursNote: e('CONTACT_HOURS'), // your own hours (e.g. "Mon–Fri 9:00–18:00 US Central"); hidden when not set
+    // Online payment (card via Stripe or mobile money via Paystack) is switched on — only then does the site promise escrow.
+    paymentsLive: Boolean(e('STRIPE_SECRET_KEY') || e('PAYSTACK_SECRET_KEY')),
   }
 }
 
@@ -57,7 +59,7 @@ export function mountSite(r: Router, d: Deps) {
 
   r.post('/site/contact', wrap(async (req, res) => {
     const b = zContact.parse(req.body)
-    const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || req.ip || 'unknown'
+    const ip = req.ip || 'unknown'
     const now = Date.now(); const hits = (recent.get(ip) ?? []).filter((t) => now - t < 3600_000); if (hits.length >= 5) throw new HttpError(429, 'Too many messages from this connection — try again in an hour or email us directly.'); hits.push(now); recent.set(ip, hits)
     const db = await getDb(); const id = 'cm_' + uid()
     await db.query(`insert into contact_messages (id,name,email,phone,company,topic,message,ip) values ($1,$2,$3,$4,$5,$6,$7,$8)`, [id, b.name, b.email, b.phone, b.company, b.topic, b.message, ip])

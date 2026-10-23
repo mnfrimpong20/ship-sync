@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeft, Car, Check, CheckCircle2, ChevronRight, Clock
 import { JOB_STEPS, jobStepLabels, type JobStep } from '../../lib/brokers'
 import { bpApi, ago, local, shortDate, statusTone, usd, type BpDetail, type BpJob, type BpOverview } from '../../lib/brokerPortal'
 import { Card, Empty, Err, Kpi, Page, Toast, errMsg, useBp, useToast } from './BrokerApp'
+import { openDataUrl } from '../../lib/openFile'
 
 const STEP_SHORT: Record<string, string> = { requested: 'Request', accepted: 'Accepted', documents: 'Docs lodged', assessed: 'Assessed', duty_paid: 'Duty paid', released: 'Released', done: 'Cleared' }
 const fileToDataUrl = (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) })
@@ -189,7 +190,7 @@ export function JobPage() {
 
 function Docs({ d, onDone, onErr }: { d: BpDetail; onDone: (m: string) => void; onErr: (e: string) => void }) {
   const [title, setTitle] = useState('Assessment notice'); const [busy, setBusy] = useState(false)
-  const open = async (id: string) => { try { const r = await bpApi.doc(id); if (!r.dataUrl) { onErr('This document is generated — open it from the shipment.'); return } const w = window.open(); if (w) w.document.write(r.dataUrl.startsWith('data:application/pdf') ? `<iframe src="${r.dataUrl}" style="border:0;width:100%;height:100vh"></iframe>` : `<img src="${r.dataUrl}" style="max-width:100%">`) } catch (e) { onErr(errMsg(e)) } }
+  const open = async (id: string) => { try { const r = await bpApi.doc(id); if (!r.dataUrl) { onErr('This document is generated — open it from the shipment.'); return } openDataUrl(r.dataUrl, 'document') } catch (e) { onErr(errMsg(e)) } }
   return (
     <Card title="Documents" sub="Papers shared by the shipping company, and the ones you add (they go onto the shipment for the office and customer)." id="docs-h">
       {d.documents.length ? <ul className="divide-y divide-border text-sm">{d.documents.map((x) => <li key={x.id} className="flex items-center gap-3 py-2.5" data-testid="bp-doc"><FileText size={16} className="shrink-0 text-text-muted" aria-hidden="true" /><span className="min-w-0 flex-1"><span className="block truncate font-medium">{x.title}</span><span className="block text-xs text-text-muted">{x.byBroker ? 'Added by you' : 'From the shipping company'} · {shortDate(x.at)}</span></span>{x.hasFile ? <button onClick={() => open(x.id)} className="btn-ghost !min-h-9 !px-3 text-xs"><ExternalLink size={13} aria-hidden="true" /> Open</button> : <span className="text-xs text-text-muted">generated</span>}</li>)}</ul> : <Empty>No documents yet.</Empty>}

@@ -17,6 +17,10 @@ import { startSourcingSweeps } from './sourcing'
 import { startFlowSweeps } from './flow'
 import { slugForHost } from './brand'
 import { startExportSchedule } from './system'
+import { uploadGuard } from './uploadGuard'
+import { securityHeaders } from './securityHeaders'
+import { whenLeader } from './jobLeader'
+import { demoDataEnabled } from './db'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
@@ -25,6 +29,8 @@ const port = Number(process.env.PORT || 5000)
 
 async function main() {
   const db = await getDb() // connect, migrate, seed before accepting traffic
+  // Background jobs run in one process only (see jobLeader.ts) — never twice, never silently not at all.
+  whenLeader(getDb, async () => {
   ais.start(db).catch((e) => console.error('[ais]', e))
   startAirSweep()
   startCarrierSync(getDb)
@@ -39,17 +45,23 @@ async function main() {
   ;(await import('./quickbooks')).startQuickBooksSweeps(getDb)
   ;(await import('./autopilot')).startAutopilotSweeps(getDb)
   ;(await import('./driverHr')).startDriverHrSweeps(getDb)
-  // Atlantic Bridge demo runs after the broker demo so that seed doesn't pick up its shipments.
-  void getDb().then(async (db) => { await (await import('./brokerPortal')).seedBrokerPortalDemo(db).catch((e) => console.error('[broker] demo seed', e)); const ab = await import('./atlanticDemo'); await ab.seedAtlanticBridgeDemo(db); await ab.seedAtlanticPaymentsDemo(db); await ab.seedAtlanticOpsDemo(db).catch((e) => console.error('[atlantic] ops demo', e)); await (await import('./teamHrDemo')).seedTeamHrDemo(db) }).catch((e) => console.error('[atlantic] demo seed', e))
+  startExportSchedule(getDb)
+  })
   // A shipment in a container takes the container's ETA. Bring any that drifted (loaded before this rule) into line, quietly; the old date is kept as eta_original.
   void getDb().then((db) => db.query(`update shipments s set eta_original = coalesce(s.eta_original, s.eta), eta = c.eta from containers c where s.container_id = c.id and c.eta is not null and s.eta is distinct from c.eta and s.status <> 'delivered' and s.cancelled_at is null`)).catch((e) => console.error('[containers] eta align', e))
+  if (demoDataEnabled()) {
+  // Atlantic Bridge demo runs after the broker demo so that seed doesn't pick up its shipments.
+  void getDb().then(async (db) => { await (await import('./brokerPortal')).seedBrokerPortalDemo(db).catch((e) => console.error('[broker] demo seed', e)); const ab = await import('./atlanticDemo'); await ab.seedAtlanticBridgeDemo(db); await ab.seedAtlanticPaymentsDemo(db); await ab.seedAtlanticOpsDemo(db).catch((e) => console.error('[atlantic] ops demo', e)); await (await import('./teamHrDemo')).seedTeamHrDemo(db) }).catch((e) => console.error('[atlantic] demo seed', e))
   // Demo quotes from before ship dates existed get one, so customers can compare by ship and arrival dates. Only fills empty ones on demo shippers.
   void getDb().then((db) => db.query(`update quotes q set ships_on = current_date + (3 + abs(hashtext(q.id)) % 16) where q.ships_on is null and q.status = 'sent' and exists (select 1 from shippers s where s.id = q.shipper_id and s.demo)`)).catch((e) => console.error('[quotes] ship-date backfill', e))
   void getDb().then(async (db) => (await import('./driverHr2')).seedDriverHrDemo(db)).catch((e) => console.error('[driver-hr] demo seed', e))
-  startExportSchedule(getDb)
+  }
   const app = express()
   app.disable('x-powered-by')
-  app.set('trust proxy', 1)
+  app.use(securityHeaders) // CSP, no framing (except /embed), nosniff, HSTS on https
+  // How many proxies sit in front of the app (Replit: usually 1). If the admin System page shows the same address for
+  // everyone, raise TRUST_PROXY_HOPS. Rate limits key on the address this produces (req.ip).
+  app.set('trust proxy', Math.max(0, Number(process.env.TRUST_PROXY_HOPS ?? 1) || 0))
   app.use(compression()) // /api/live/region carries thousands of vessels; gzip cuts it ~8x
   app.post('/api/payments/webhook', express.raw({ type: '*/*', limit: '1mb' }), (req, res) => { stripeWebhook(getDb)(req, res).catch((e) => { console.error('[stripe webhook]', e); res.status(500).json({ error: 'Webhook failed.' }) }) }) // raw body: Stripe signatures are computed over the exact bytes
   app.post('/api/paystack/webhook', express.raw({ type: '*/*', limit: '1mb' }), (req, res) => { void import('./momo').then((m) => m.paystackWebhook(getDb)(req, res)).catch((e) => { console.error('[paystack webhook]', e); res.status(500).json({ error: 'Webhook failed.' }) }) })
@@ -57,6 +69,7 @@ async function main() {
   app.get('/api/assistant/meta', (req, res) => { void import('./assistant').then((m) => m.metaVerify(req, res)) })
   app.post('/api/assistant/meta', express.raw({ type: '*/*', limit: '1mb' }), (req, res) => { void import('./assistant').then((m) => m.metaInbound(getDb)(req, res)).catch((e) => { console.error('[assistant] meta', e); if (!res.headersSent) res.status(500).end() }) })
   app.use(express.json({ limit: '10mb' })) // document uploads and POD photos travel as base64 in JSON
+  app.use('/api', uploadGuard) // …so every one of them is checked here first (complete data URL, allowed type)
   app.use(cookieParser())
   app.use('/api', apiRouter())
   // Anything else under /api is a typo or a stale client — answer in JSON, never with the website's HTML.

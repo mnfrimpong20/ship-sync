@@ -28,6 +28,7 @@ import { attachShipmentToClient } from './clients'
 import { getSettings as paymentSettings, markPaid, paymentOut, refundPayment, stripe, stripeMode } from './payments'
 import { countryByCode, type ShipmentStatus } from '../src/lib/data'
 import { ORIGINS, asOrigin, localPrice, type Origin } from '../src/lib/sourcingOrigins'
+import { safeFetch } from './safeFetch'
 
 type Row = Record<string, any>
 interface Deps {
@@ -562,7 +563,8 @@ export function mountSourcing(r: Router, d: Deps) {
     let html = ''; let fetched = false
     try {
       const target = process.env.LINK_IMPORT_PROXY ? `${process.env.LINK_IMPORT_PROXY}${encodeURIComponent(url.href)}` : url.href
-      const r = await fetch(target, { signal: AbortSignal.timeout(9000), redirect: 'follow', headers: { 'user-agent': 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Mobile Safari/537.36', accept: 'text/html,*/*;q=0.8', 'accept-language': originForLink(platform, url.hostname) === 'CN' ? 'zh-CN,zh;q=0.9,en;q=0.8' : originForLink(platform, url.hostname) === 'GB' ? 'en-GB,en;q=0.9' : 'en-US,en;q=0.9' } })
+      // safeFetch: public addresses only, every redirect re-checked (a product link must never reach our own network).
+      const r = await (process.env.LINK_IMPORT_PROXY ? fetch : safeFetch)(target, { signal: AbortSignal.timeout(9000), headers: { 'user-agent': 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Mobile Safari/537.36', accept: 'text/html,*/*;q=0.8', 'accept-language': originForLink(platform, url.hostname) === 'CN' ? 'zh-CN,zh;q=0.9,en;q=0.8' : originForLink(platform, url.hostname) === 'GB' ? 'en-GB,en;q=0.9' : 'en-US,en;q=0.9' } })
       if (r.ok) { html = (await r.text()).slice(0, 2_000_000); fetched = true }
     } catch { /* blocked or slow — fall back to what the link itself tells us */ }
     const p = html ? parseProductPage(url.href, html) : { platform, productId: (url.pathname.match(/(\d{6,})/)?.[1] ?? url.searchParams.get('id') ?? ''), title: '', description: '', image: '', price: null as number | null, currency: currencyFor(platform, url.hostname), moq: null as number | null }
@@ -799,9 +801,14 @@ export function startSourcingSweeps(getDb: () => Promise<Db>) {
 }
 
 /** Platform-owned shipper + demo agents in Guangzhou, London and Houston + a few suppliers in each. Idempotent. */
-export async function seedSourcingDemo(db: Db) {
+/** The platform's own sourcing desk (a shipper row that owns sourcing jobs). Needed in production too. */
+export async function ensureSourcingDesk(db: Db) {
   await db.query(`insert into shippers (id,name,tagline,hq,founded,modes,destinations,origins,cargo,rating,reviews,verified,response_hours,on_time,services,about,price_index,plan,initials,hue,demo,verified_at) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true,$12,$13,$14,$15,$16,$17,$18,$19,false,now()) on conflict (id) do nothing`,
     [SOURCING_SHIPPER, 'Ntemtem Sourcing', 'Source, buy, inspect and ship from China — one team, one price', 'Guangzhou, China', 2026, JSON.stringify(['ocean', 'air']), JSON.stringify(['GH', 'NG', 'LR', 'TG', 'CI', 'SL', 'SN']), JSON.stringify(['Guangzhou, CN', 'Shenzhen, CN', 'Yiwu, CN']), JSON.stringify(['commercial', 'boxes', 'pallets', 'container20', 'container40']), 5, 0, 24, 98, JSON.stringify(['Supplier sourcing', 'Factory audits', 'Quality inspection', 'Consolidation', 'Export documents']), 'Ntemtem’s own sourcing team in Guangzhou, Shenzhen and Yiwu. We buy in Ntemtem’s name, inspect before anything ships, and hand your goods to the ocean or air leg.', 100, 'pro', 'SS', '#F5B82E'])
+}
+
+export async function seedSourcingDemo(db: Db) {
+  await ensureSourcingDesk(db)
   const { rows: ex } = await db.query('select 1 from users where email = $1', ['china@shipsync.demo'])
   if (!ex.length) {
     const bcrypt = await import('bcryptjs'); const hash = await bcrypt.default.hash('shipsync', 10)

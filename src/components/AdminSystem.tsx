@@ -8,10 +8,26 @@ const errMsg = (e: unknown, fb: string) => (e instanceof Error ? e.message : fb)
 const kb = (b: number) => (b > 1_048_576 ? `${(b / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`)
 
 /** Admin → System: wiring check, error log, nightly exports and the contact inbox. */
+/** "Ready to launch?" — every setting the published app needs, ticked off live. */
+function LaunchChecklist() {
+  const [info, setInfo] = useState<SystemInfo | null>(null)
+  useEffect(() => { siteApi.system().then(setInfo).catch(() => {}) }, [])
+  const items = info?.launch ?? []; const done = items.filter((x) => x.ok).length
+  if (!items.length) return null
+  return (
+    <div className="card-dark p-5" data-testid="launch-checklist">
+      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">Ready to launch?</h3><Pill tone={done === items.length ? 'teal' : 'gold'}>{done} of {items.length} done</Pill></div>
+      <p className="mt-1 text-xs text-text-muted">Add these as secrets in Replit (Tools → Secrets) — the list updates after the app restarts.</p>
+      <ul className="mt-3 divide-y divide-border text-sm">{items.map((x) => <li key={x.key} className="flex items-start gap-3 py-2"><span aria-hidden="true" className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-xs font-bold ${x.ok ? 'bg-teal/15 text-teal' : 'bg-gold/15 text-gold-deep'}`}>{x.ok ? '✓' : '!'}</span><span><span className="font-semibold">{x.label}</span><span className="sr-only">{x.ok ? ' — done' : ' — to do'}</span>{!x.ok && <span className="block text-xs text-text-muted">{x.how}</span>}</span></li>)}</ul>
+    </div>
+  )
+}
+
 export function AdminSystem() {
   return (
     <section className="mt-8" aria-label="System">
-      <div className="grid gap-5 lg:grid-cols-2">
+      <LaunchChecklist />
+      <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <SystemCard />
         <ExportsCard />
       </div>
@@ -33,6 +49,8 @@ function SystemCard() {
       {info && (
         <>
           <ul className="mt-3 divide-y divide-border">
+            {info.you && <li className="flex items-center justify-between gap-3 py-1.5 text-sm" data-testid="your-ip"><span>Your address, as the server sees it<span className="block text-xs text-text-muted">Should be your own internet address. If it's the same for everyone, set TRUST_PROXY_HOPS to {info.you.trusted + 1}.</span></span><span className="font-mono text-xs text-text-muted">{info.you.ip || '—'}</span></li>}
+            <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>Demo data</span><Pill tone={info.demoData ? 'gold' : 'teal'}>{info.demoData ? 'On — demo logins work' : 'Off'}</Pill></li>
             <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>Database</span><span className={`text-xs ${info.database.startsWith('postgres') ? 'text-text-muted' : 'text-danger'}`}>{info.database}</span></li>
             <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>Email</span><Pill tone={info.email === 'resend' ? 'green' : 'danger'}>{info.email}</Pill></li>
             <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>SMS</span><Pill tone={info.sms === 'off' ? 'muted' : 'green'}>{info.sms}</Pill></li>

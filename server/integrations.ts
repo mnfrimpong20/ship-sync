@@ -17,6 +17,8 @@ import { can, type ApiUser } from './api'
 import { featureOn, requirePerk } from './features'
 import { notifyShipperStaff } from './notify'
 import { statusLabels, type ShipmentStatus } from '../src/lib/data'
+import { safeFetch } from './safeFetch'
+import { csvCell as safeCsvCell } from '../src/lib/csvCell'
 
 type Row = Record<string, any>
 interface Deps {
@@ -29,7 +31,7 @@ const J = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : v)
 const num = (v: unknown) => Number(v ?? 0) || 0
 const D = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : v == null ? '' : String(v).slice(0, 10))
 const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v))
-const csvCell = (v: unknown) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+const csvCell = safeCsvCell
 const toCsv = (head: string[], rows: unknown[][]) => [head.join(','), ...rows.map((r) => r.map(csvCell).join(','))].join('\n')
 const usDate = (v: unknown) => { const s = D(v); if (!s) return ''; const [y, m, d] = s.split('-'); return `${m}/${d}/${y}` }
 const ukDate = (v: unknown) => { const s = D(v); if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}` }
@@ -76,7 +78,7 @@ export function deliverDue(db: Db): Promise<void> {
       let status = 0, err = ''
       try {
         const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 10_000)
-        const r = await fetch(d.url, { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'Ntemtem-Webhooks/1', 'x-ntemtem-event': d.event, 'x-ntemtem-delivery': d.id, 'x-ntemtem-signature': `t=${t},v1=${sig}` }, body, signal: ctl.signal })
+        const r = await safeFetch(d.url, { httpsOnly: process.env.NODE_ENV === 'production', method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'Ntemtem-Webhooks/1', 'x-ntemtem-event': d.event, 'x-ntemtem-delivery': d.id, 'x-ntemtem-signature': `t=${t},v1=${sig}` }, body, signal: ctl.signal })
         clearTimeout(timer); status = r.status; if (!r.ok) err = `HTTP ${r.status}`
       } catch (e) { err = e instanceof Error ? (e.name === 'AbortError' ? 'Timed out after 10 s' : e.message) : String(e) }
       const attempts = Number(d.attempts) + 1

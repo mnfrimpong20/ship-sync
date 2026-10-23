@@ -10,7 +10,15 @@ import { seedPaymentsDemo } from './payments'
 import { seedDestinations } from './geoMeta'
 
 /** HIDE_DEMO_SHIPPERS=true removes the fictional seed shippers from every public list (directory, matching, home stats) without deleting them. */
-export const hideDemoShippers = () => /^(1|true|yes)$/i.test(process.env.HIDE_DEMO_SHIPPERS ?? '')
+/** Replit sets REPLIT_DEPLOYMENT=1 on the published app (never in the workspace). */
+export const isDeployment = () => process.env.REPLIT_DEPLOYMENT === '1'
+/**
+ * Demo data (sample shippers, customers, shipments and the demo logins, all with the shared demo password).
+ * On in the workspace and local tests; OFF on the published app unless DEMO_DATA=on is set on purpose.
+ */
+export const demoDataEnabled = () => { const v = (process.env.DEMO_DATA ?? '').toLowerCase(); return v ? /^(1|on|true|yes)$/.test(v) : !isDeployment() }
+/** Demo shippers are hidden from the public site whenever demo data is off, or when HIDE_DEMO_SHIPPERS says so. */
+export const hideDemoShippers = () => { const v = process.env.HIDE_DEMO_SHIPPERS; return v ? /^(1|true|yes)$/i.test(v) : !demoDataEnabled() }
 /** SQL fragment for public shipper queries (`where <publicShipperSql()>`): never the platform's own sourcing desk, and no demo shippers once hidden. */
 export const publicShipperSql = (alias = '') => `${alias}id <> 'ship-sync-sourcing' and ${alias}archived_at is null and coalesce(${alias}standing, 'good') <> 'paused'${hideDemoShippers() ? ` and ${alias}demo = false` : ''}`
 import { seedGroupageDemo } from './groupage'
@@ -30,6 +38,8 @@ let db: Db | null = null
 export async function getDb(): Promise<Db> {
   if (db) return db
   const url = process.env.DATABASE_URL
+  // The published app must use the real database: the local fallback lives on disk that Replit wipes on every restart.
+  if (!url && (isDeployment() || (process.env.NODE_ENV === 'production' && !process.env.PGLITE_DIR))) throw new Error('DATABASE_URL is not set. Create the production database in Replit (Database → Create) before publishing; refusing to start on a temporary local database.')
   if (url) {
     const { default: pg } = await import('pg')
     const pool = new pg.Pool({ connectionString: url, ssl: /localhost|127\.0\.0\.1/.test(url) ? undefined : { rejectUnauthorized: false } })
@@ -42,8 +52,20 @@ export async function getDb(): Promise<Db> {
     db = { kind: 'pglite', query: (sql, params) => lite.query(sql, params as never[]) as never }
   }
   await migrate(db)
-  await seed(db)
+  // Guards against double-clicks and two requests at once: the database itself refuses the second one.
+  for (const [name, sql] of [
+    ['one open payout per company', `create unique index if not exists payouts_one_open on payouts(shipper_id) where status = 'requested'`],
+    ['one shipment per booked request', `create unique index if not exists shipments_one_per_request on shipments(request_id) where request_id is not null`],
+  ]) await db.query(sql).catch((e) => console.warn(`[db] could not add guard "${name}" (existing duplicates?):`, (e as Error).message))
+  // Reference data every install needs (real, not demo).
+  await seedDestinations(db)
+  await (await import('./sourcing')).ensureSourcingDesk(db)
+  await rollSchedule(db)
   await ensureAdmins(db)
+  if (!demoDataEnabled()) { await (await import('./supplies')).seedSupplies(db); await lockDemoAccounts(db); return db }
+  console.log('[db] demo data on (set DEMO_DATA=off to disable)')
+  await seed(db)
+  await seedDemoAdmin(db)
   await seedClientDemo(db)
   await seedOpsDemo(db)
   await seedDirectoryDemo(db)
@@ -59,10 +81,8 @@ export async function getDb(): Promise<Db> {
   await seedPaymentsDemo(db)
   await seedGroupageDemo(db)
   await seedBrokersDemo(db)
-  await rollSchedule(db)
   await seedWarehouseDemo(db)
   await seedSourcingDemo(db)
-  await seedDestinations(db)
   await (await import('./analyticsSeed')).seedAnalyticsDemo(db)
   await (await import('./analyticsSeed')).seedAnalyticsCosts(db)
   // plans: the two main demo shippers are on Pro; everyone else on Starter gets a trial window
@@ -1571,7 +1591,7 @@ async function applyDemoLogos(d: Db) {
 }
 
 async function seed(d: Db) {
-  const { rows } = await d.query<{ n: string }>('select count(*)::text as n from shippers')
+  const { rows } = await d.query<{ n: string }>(`select count(*)::text as n from shippers where id <> 'ship-sync-sourcing'`)
   if (Number(rows[0].n) > 0) return
   console.log('[db] seeding demo data')
 
@@ -1622,10 +1642,22 @@ async function seed(d: Db) {
   }
 }
 
-/** Admin accounts: the demo admin (password `shipsync`) plus any emails in ADMIN_EMAILS. Idempotent, runs on every boot. */
-async function ensureAdmins(d: Db) {
+/** The demo admin (password `shipsync`) — only when demo data is on. */
+async function seedDemoAdmin(d: Db) {
   const hash = await bcrypt.hash(DEMO_PASSWORD, 10)
   await d.query(`insert into users (id,email,name,password_hash,role,shipper_id,is_admin) values ('u_admin','admin@shipsync.demo','Ntemtem Admin',$1,'customer',null,true) on conflict (email) do update set is_admin = true`, [hash])
+}
+/**
+ * Demo data off (the published app): every demo login is shut — no admin rights, no password that works, no live sessions.
+ * Covers a database that was copied from the workspace with demo data in it.
+ */
+async function lockDemoAccounts(d: Db) {
+  const demo = `email like '%@shipsync.demo' or email like '%.demo'`
+  await d.query(`delete from sessions where user_id in (select id from users where ${demo})`)
+  await d.query(`update users set is_admin = false, password_hash = '!demo-locked' where (${demo}) and password_hash <> '!demo-locked'`)
+}
+/** Admin accounts come from ADMIN_EMAILS (comma-separated): sign up normally, then add your email there. Idempotent, runs on every boot. */
+async function ensureAdmins(d: Db) {
   const extra = (process.env.ADMIN_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
   if (extra.length) await d.query('update users set is_admin = true where email = any($1::text[])', [extra])
 }

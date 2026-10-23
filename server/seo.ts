@@ -10,6 +10,7 @@ import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { publicShipperSql, type Db, hideDemoShippers } from './db'
 import { NOINDEX, SITEMAP_PATHS, pageMeta } from '../src/lib/pageMeta'
+import { siteConfig } from './site'
 
 type Row = Record<string, any>
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -62,7 +63,18 @@ export function mountSeo(app: Express, getDb: () => Promise<Db>, dist: string) {
       .replace(/(<meta property="og:title" content=")[^"]*(")/, `$1${esc(title)}$2`)
       .replace(/(<meta property="og:description" content=")[^"]*(")/, `$1${esc(description)}$2`)
     out = /<meta property="og:url"/.test(out) ? out.replace(/(<meta property="og:url" content=")[^"]*(")/, `$1${esc(url)}$2`) : out.replace('</head>', `  <meta property="og:url" content="${esc(url)}" />\n  </head>`)
+    // WhatsApp, Facebook and LinkedIn need a full address for the preview image.
+    out = out.replace(/(<meta property="og:image" content=")\/([^"]*")/, `$1${esc(baseUrl(req))}/$2`)
     out = out.replace('</head>', `  <link rel="canonical" href="${esc(url)}" />\n${NOINDEX.test(p) ? '    <meta name="robots" content="noindex" />\n' : ''}  </head>`)
+    // Home page: tell search engines who Ntemtem is (organisation + site), so results can show the brand properly.
+    if (p === '/') {
+      const cfg = siteConfig(); const base = baseUrl(req)
+      const ld = [
+        { '@context': 'https://schema.org', '@type': 'Organization', name: 'Ntemtem', ...(cfg.legalName ? { legalName: cfg.legalName } : {}), url: base, logo: `${base}/og.png`, ...(cfg.email ? { email: cfg.email } : {}), ...(cfg.phone ? { telephone: cfg.phone } : {}), ...(Object.values(cfg.social).length ? { sameAs: Object.values(cfg.social) } : {}) },
+        { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Ntemtem', url: base, potentialAction: { '@type': 'SearchAction', target: `${base}/track?ref={ref}`, 'query-input': 'required name=ref' } },
+      ]
+      out = out.replace('</head>', `  <script type="application/ld+json">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>\n  </head>`)
+    }
     if (NOINDEX.test(p)) res.set('X-Robots-Tag', 'noindex')
     res.set('Cache-Control', 'no-cache').type('html').send(out)
   })

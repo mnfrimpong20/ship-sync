@@ -13,6 +13,7 @@ import { randomBytes } from 'node:crypto'
 import type { Request, Response, NextFunction, Router, RequestHandler } from 'express'
 import type { Db } from './db'
 import type { ApiUser } from './api'
+import { csvCell as safeCsvCell } from '../src/lib/csvCell'
 
 type Row = Record<string, any>
 interface Deps {
@@ -25,7 +26,7 @@ interface Deps {
 const SESSION_COOKIE = 'ss_session'
 const RETURN_COOKIE = 'ss_admin_return'
 const id = () => 'au_' + randomBytes(8).toString('hex')
-const ipOf = (req: Request) => (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || req.ip || ''
+const ipOf = (req: Request) => req.ip || ''
 
 /** Routes too chatty or too private to log (reading, messaging, sign-in, telemetry, scanning). */
 const SKIP = [/^\/auth\//, /^\/notifications/, /^\/errors/, /^\/track/, /^\/contact/, /^\/geocode/, /\/messages$/, /^\/scan/, /^\/live/, /^\/view-as\/exit$/, /^\/admin\/view-as$/, /^\/telemetry/, /^\/stripe/, /^\/announcements\//, /^\/widget/]
@@ -98,7 +99,7 @@ export function auditMiddleware(getDb: () => Promise<Db>): RequestHandler {
 }
 
 const out = (r: Row) => ({ id: r.id, at: r.at instanceof Date ? r.at.toISOString() : r.at, actorId: r.actor_id, actor: r.actor_name, actorEmail: r.actor_email, role: r.actor_role, viewAsBy: r.view_as_by_name ?? r.view_as_by ?? null, shipperId: r.shipper_id, shipperName: r.shipper_name ?? null, method: r.method, path: r.path, action: r.action, entity: r.entity, entityId: r.entity_id, status: r.status, data: r.data, ip: r.ip })
-const csv = (rows: ReturnType<typeof out>[]) => ['at,actor,email,role,company,action,path,entity_id,view_as_by,ip', ...rows.map((r) => [r.at, r.actor, r.actorEmail, r.role, r.shipperName ?? '', r.action, `${r.method} ${r.path}`, r.entityId ?? '', r.viewAsBy ?? '', r.ip ?? ''].map((v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }).join(','))].join('\n')
+const csv = (rows: ReturnType<typeof out>[]) => ['at,actor,email,role,company,action,path,entity_id,view_as_by,ip', ...rows.map((r) => [r.at, r.actor, r.actorEmail, r.role, r.shipperName ?? '', r.action, `${r.method} ${r.path}`, r.entityId ?? '', r.viewAsBy ?? '', r.ip ?? ''].map((v) => safeCsvCell(v)).join(','))].join('\n')
 
 export function mountAudit(r: Router, d: Deps) {
   const { getDb, requireUser, requireAdmin, HttpError, wrap } = d

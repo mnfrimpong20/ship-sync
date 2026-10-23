@@ -3,8 +3,9 @@ import { createHash, randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { defaultShipsOn } from './shipDate'
-import { publicShipperSql, getDb, makeRef, uid, type Db } from './db'
+import { demoDataEnabled, publicShipperSql, getDb, makeRef, uid, type Db } from './db'
 import { isDriver, staffGuard } from './staffGuard'
+import { whenLeader } from './jobLeader'
 import { nextStatus, statusLabels, statusOrder, type CargoType, type ShipmentStatus } from '../src/lib/data'
 import { alongGreatCircle, destGeo, greatCircle, originCoords, type LngLat } from '../src/lib/geo'
 import { ais, aircraft, airStatus, flightPosition, flightRoute, flightsInRegion, type Position } from './live'
@@ -102,7 +103,8 @@ type Row = Record<string, any>
 
 const SESSION_COOKIE = 'ss_session'
 const SESSION_DAYS = 30
-const DEMO_AUTO_QUOTES = (process.env.DEMO_AUTO_QUOTES ?? 'true') !== 'false'
+/** Demo shippers quote new requests automatically — only while demo data is on (never on the published app by default). */
+const demoQuotesOn = () => { const v = process.env.DEMO_AUTO_QUOTES; return v ? v !== 'false' : demoDataEnabled() }
 
 /* ---------------- helpers ---------------- */
 const ISO = (v: unknown) => (v instanceof Date ? v.toISOString() : typeof v === 'string' ? v : String(v))
@@ -194,6 +196,11 @@ class HttpError extends Error {
   status: number
   constructor(status: number, message: string) { super(message); this.status = status }
 }
+/** "Kwaku Ofori" → "Kwaku O." — enough to recognise your own shipment, not enough to identify a stranger's. */
+const maskName = (n: unknown) => { const p = String(n ?? '').trim().split(/\s+/).filter(Boolean); return p.length > 1 ? `${p[0]} ${p[p.length - 1][0]}.` : p[0] ?? '' }
+/** Password hashing cost: ~0.25 s per hash — slow enough to make guessing stolen hashes impractical. */
+export const BCRYPT_COST = 12
+const TIMING_HASH = bcrypt.hashSync('timing-only-not-a-password', 12)
 const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next)
 
 /* ---------------- auth ---------------- */
@@ -240,7 +247,9 @@ function throttle(key: string, max: number, windowMs: number, Err: typeof HttpEr
   if (buckets.size > 10_000) for (const [k, v] of buckets) if (v.every((t) => now - t > windowMs)) buckets.delete(k)
 }
 const clearThrottle = (key: string) => buckets.delete(key)
-const clientIp = (req: Request) => (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() || req.ip || 'unknown'
+// The visitor's address as the trusted proxy reported it (index.ts sets how many proxies to trust). Never the leftmost
+// X-Forwarded-For entry: the visitor writes that one themselves, so it can't be used for rate limits.
+const clientIp = (req: Request) => req.ip || 'unknown'
 
 const requireUser = async (db: Db, req: Request) => {
   const u = await currentUser(db, req); if (!u) throw new HttpError(401, 'Please sign in.')
@@ -280,7 +289,7 @@ async function signupUser(db: Db, input: { name: string; email: string; password
       [shipperId, company, '', '', new Date().getFullYear(), '', initials, '#F5B82E'],
     )
   }
-  const hash = await bcrypt.hash(input.password, 10)
+  const hash = await bcrypt.hash(input.password, BCRYPT_COST)
   await db.query('insert into users (id,email,name,password_hash,role,shipper_id) values ($1,$2,$3,$4,$5,$6)', [id, email, input.name.trim(), hash, input.role, shipperId])
   return loadUserWithCompany(db, id)
 }
@@ -517,7 +526,8 @@ export function apiRouter() {
     const email = body.email.toLowerCase(); const ip = clientIp(req)
     throttle(`login:ip:${ip}`, 30, 15 * 60_000, HttpError); throttle(`login:email:${email}`, 10, 15 * 60_000, HttpError)
     const { rows } = await db.query<Row>('select * from users where email = $1', [email])
-    if (!rows[0] || !(await bcrypt.compare(body.password, rows[0].password_hash))) throw new HttpError(401, 'Email or password is incorrect.')
+    // Unknown emails still pay for a bcrypt compare, so response time doesn't reveal which accounts exist.
+    if (!(await bcrypt.compare(body.password, rows[0]?.password_hash ?? TIMING_HASH)) || !rows[0]) throw new HttpError(401, 'Email or password is incorrect.')
     clearThrottle(`login:email:${email}`)
     await createSession(db, res, rows[0].id, req)
     res.json({ user: await loadUserWithCompany(db, rows[0].id) })
@@ -597,10 +607,11 @@ export function apiRouter() {
     throttle(`reset:ip:${clientIp(req)}`, 20, 60 * 60_000, HttpError)
     const { rows } = await db.query<Row>(`select * from password_resets where token = $1 and used_at is null and expires_at > now()`, [b.token])
     if (!rows[0]) throw new HttpError(400, 'This reset link has expired or was already used. Request a new one.')
-    const hash = await bcrypt.hash(b.password, 10)
+    const hash = await bcrypt.hash(b.password, BCRYPT_COST)
     await db.query('update users set password_hash = $2 where id = $1', [rows[0].user_id, hash])
     await db.query('update password_resets set used_at = now() where token = $1', [b.token])
     await db.query('delete from sessions where user_id = $1', [rows[0].user_id]) // sign out everywhere else
+    await db.query('delete from device_pins where user_id = $1', [rows[0].user_id]) // …and forget phone PINs someone else may have set up
     await createSession(db, res, rows[0].user_id, req)
     res.json({ user: await loadUserWithCompany(db, rows[0].user_id) })
   }))
@@ -759,7 +770,7 @@ export function apiRouter() {
       await notifyShipperStaff(db, body.preferredShipperId, { kind: 'new_lead', title: `${quoted.length ? 'Instant quote sent — ' : body.source === 'link' ? 'New order from your link — ' : body.source === 'branded' ? 'New client request from your branded page — ' : 'A customer chose you — '}${rows[0].ref}`, body: `${body.contact.name} · ${cargoText(body)} · ${body.origin} → ${body.destination}${quoted.length ? ` · $${quoted[0].price.toLocaleString()} from your rate card` : '. Send a quote.'}`, link: '/dashboard/leads', dedupe: `lead:${id}` }, ['owner', 'dispatcher', 'agent'])
     } else {
       await instantQuotesFromRates(db, rows[0])
-      if (DEMO_AUTO_QUOTES) await demoAutoQuotes(db, rows[0])
+      if (demoQuotesOn()) await demoAutoQuotes(db, rows[0])
       await notifyNewLead(db, rows[0])
     }
     await attachDefaultSupplies(db, rows[0]).catch((e) => console.error('[supplies] defaults', e))
@@ -910,16 +921,16 @@ export function apiRouter() {
   mountAnalytics(r, { getDb, requireUser, HttpError, wrap })
   mountAudit(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
   mountBilling(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
-  startBillingSweeps(getDb)
+  whenLeader(getDb, () => startBillingSweeps(getDb))
   mountCosts(r, { getDb, requireUser, HttpError, wrap })
   mountGrowth(r, { getDb, requireUser, HttpError, wrap })
   mountIntegrations(r, { getDb, requireUser, HttpError, wrap })
-  startGrowthSweeps(getDb); startWebhookSweeps(getDb)
+  whenLeader(getDb, () => { startGrowthSweeps(getDb); startWebhookSweeps(getDb) })
   mountAdminInsights(r, { getDb, requireUser, requireAdmin, HttpError, wrap })
-  startScorecardSweeps(getDb)
+  whenLeader(getDb, () => startScorecardSweeps(getDb))
   mountCustomerHub(r, { getDb, requireUser, HttpError, wrap })
   mountAccount(r, { getDb, requireUser, HttpError, wrap })
-  startCustomerSweeps(getDb)
+  whenLeader(getDb, () => startCustomerSweeps(getDb))
   mountContainers(r, { getDb, requireUser, HttpError, wrap, loadShipments })
   mountLabels(r, { getDb, requireUser, HttpError, wrap })
   mountScans(r, { getDb, requireUser, HttpError, wrap })
@@ -973,8 +984,8 @@ export function apiRouter() {
     },
   }
   mountRequestFlow(r, { getDb, requireUser, HttpError, wrap, loadRequests: loadRequests as never, ...requestDeps,
-    announce: async (db, row) => { await instantQuotesFromRates(db, row); if (DEMO_AUTO_QUOTES) await demoAutoQuotes(db, row); await notifyNewLead(db, row) } })
-  startRequestSweeps(getDb, requestDeps)
+    announce: async (db, row) => { await instantQuotesFromRates(db, row); if (demoQuotesOn()) await demoAutoQuotes(db, row); await notifyNewLead(db, row) } })
+  whenLeader(getDb, () => startRequestSweeps(getDb, requestDeps))
   r.post('/admin/sweeps-requests', wrap(async (req, res) => { const db = await getDb(); await requireAdmin(db, req); await sweepRequests(db, requestDeps); res.json({ ok: true }) }))
 
   r.get('/live/region', wrap(async (_req, res) => {
@@ -1004,9 +1015,20 @@ export function apiRouter() {
   }))
   r.get('/track/:ref', wrap(async (req, res) => {
     const db = await getDb()
+    throttle(`track:${clientIp(req)}`, 120, 10 * 60_000, HttpError) // plenty for real use; stops guessing references at speed
     const [shipment] = await loadShipments(db, 'upper(ref) = upper($1)', [req.params.ref], { includeCancelled: true })
     if (!shipment) throw new HttpError(404, 'We couldn’t find a shipment with that reference.')
-    res.json({ shipment, pieces: await piecesForTracking(db, shipment.id), pod: shipment.status === 'delivered' ? await proofOfDelivery(db, shipment.id) : null, driver: shipment.status === 'delivered' ? null : await driverForShipment(db, shipment.id).catch(() => null) })
+    // Anyone with the reference can track it, but only the customer, the shipping company and Ntemtem see who it's for
+    // and the delivery photo/signature. Everyone else (e.g. a competing shipper who saw the ref on the requests board)
+    // gets a first name and initial and no proof-of-delivery images.
+    const viewer = await currentUser(db, req)
+    const { rows: own } = await db.query<Row>('select user_id from shipments where id = $1', [shipment.id])
+    const insider = !!viewer && (viewer.admin || viewer.shipperId === shipment.shipperId || (!!own[0]?.user_id && viewer.id === own[0].user_id))
+    const podFull = shipment.status === 'delivered' ? await proofOfDelivery(db, shipment.id) : null
+    const pod = podFull && !insider ? { at: (podFull as { at: string | null }).at } : podFull
+    const pub = insider ? shipment : (({ clientId: _c, consigneeId: _n, containerId: _k, autoBy: _a, ...rest }) => ({ ...rest, customer: maskName(shipment.customer) }))(shipment as typeof shipment & Record<string, unknown>)
+    res.set('Cache-Control', 'no-store')
+    res.json({ shipment: pub, pieces: await piecesForTracking(db, shipment.id), pod, driver: shipment.status === 'delivered' ? null : await driverForShipment(db, shipment.id).catch(() => null) })
   }))
 
   // errors
@@ -1016,6 +1038,8 @@ export function apiRouter() {
     if (err instanceof HttpError) return res.status(err.status).json({ error: err.message })
     if (err && typeof (err as { httpStatus?: unknown }).httpStatus === 'number') return res.status((err as { httpStatus: number }).httpStatus).json({ error: (err as Error).message })
     if (err && typeof err === 'object' && 'type' in err && (err as { type: string }).type === 'entity.parse.failed') return res.status(400).json({ error: 'Malformed JSON body.' })
+    // A uniqueness guard caught a double submit (two clicks, two tabs): the first one already went through.
+    if (err && typeof err === 'object' && (err as { code?: string }).code === '23505') return res.status(409).json({ error: (err as { constraint?: string }).constraint === 'payouts_one_open' || /payouts_one_open/.test(String((err as Error).message)) ? 'You already have a payout request waiting — it will be paid before you can request another.' : 'That was already done — refresh to see the latest.' })
     console.error(err)
     record(err, req).catch(() => {})
     res.status(500).json({ error: 'Something went wrong on our side. Please try again.' })

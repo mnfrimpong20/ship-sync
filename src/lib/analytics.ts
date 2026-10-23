@@ -1,4 +1,5 @@
 import { api } from './store'
+import { csvCell } from './csvCell'
 
 export interface Kpi { value: number | null; prev: number | null; delta: number | null; unit: 'pct' | 'pts' }
 export interface RateRow { key: string; label: string; quoted: number; won: number; winRate: number | null }
@@ -76,7 +77,7 @@ export const analyticsApi = {
 /** Rows → CSV text (RFC 4180 quoting). */
 export function toCsv(rows: Record<string, unknown>[]) {
   if (!rows.length) return ''
-  const cols = Object.keys(rows[0]); const q = (v: unknown) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+  const cols = Object.keys(rows[0]); const q = csvCell
   return [cols.join(','), ...rows.map((r) => cols.map((c) => q(r[c])).join(','))].join('\n')
 }
 export function downloadCsv(name: string, rows: Record<string, unknown>[]) {

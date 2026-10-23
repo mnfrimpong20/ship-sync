@@ -98,8 +98,9 @@ export function mountAccount(r: Router, d: Deps) {
     const { rows: [p] } = await db.query<Row>('select password_hash from users where id = $1', [self(u)])
     if (!(await bcrypt.compare(b.current, p.password_hash))) throw new HttpError(400, 'Your current password is not right.')
     if (b.current === b.next) throw new HttpError(400, 'Choose a password you haven’t used here.')
-    await db.query('update users set password_hash = $2 where id = $1', [self(u), await bcrypt.hash(b.next, 10)])
+    await db.query('update users set password_hash = $2 where id = $1', [self(u), await bcrypt.hash(b.next, 12)])
     const { rows: gone } = await db.query('delete from sessions where user_id = $1 and id <> $2 returning id', [self(u), req.cookies?.ss_session ?? ''])
+    await db.query('delete from device_pins where user_id = $1', [self(u)]) // a new password forgets every phone PIN too
     res.json({ ok: true, signedOut: gone.length })
   }))
 

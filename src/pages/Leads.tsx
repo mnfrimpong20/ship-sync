@@ -14,6 +14,7 @@ import { usd } from '../lib/payments'
 import { cargoLabel, cargoName, countries, countryByCode, type CargoType, type Mode } from '../lib/data'
 import { Empty, ModeBadge, Pill, fmtDate, fmtDateTime, money } from '../components/ui'
 import { fadeUp, stagger } from '../lib/motion'
+import { csvCell } from '../lib/csvCell'
 
 type Bucket = 'all' | 'new' | 'quoted' | 'won' | 'lost' | 'open'
 type Sort = 'newest' | 'ready' | 'oldest' | 'ref'
@@ -224,7 +225,7 @@ export default function Leads() {
   const shipmentFor = (r: QuoteRequest) => shipments.find((s) => s.requestId === r.id)
   const exportCsv = () => {
     const head = ['Ref', 'Status', 'Received', 'Mode', 'Origin', 'Destination', 'Cargo', 'Qty', 'Weight kg', 'Ready', 'Customer', 'Email', 'Phone', 'My quote', 'Transit days', 'Competing quotes']
-    const lines = list.map(({ r, st, mine }) => [r.ref, stageLabel[st], r.createdAt.slice(0, 10), r.mode, r.origin, countryByCode(r.destination)?.name ?? r.destination, cargoLabel(r.cargo as CargoType), r.quantity, r.weightKg ?? '', r.readyDate, r.contact.name, r.contact.email, r.contact.phone, mine?.price ?? '', mine?.transitDays ?? '', r.competingQuotes ?? ''].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    const lines = list.map(({ r, st, mine }) => [r.ref, stageLabel[st], r.createdAt.slice(0, 10), r.mode, r.origin, countryByCode(r.destination)?.name ?? r.destination, cargoLabel(r.cargo as CargoType), r.quantity, r.weightKg ?? '', r.readyDate, r.contact.name, r.contact.email, r.contact.phone, mine?.price ?? '', mine?.transitDays ?? '', r.competingQuotes ?? ''].map((v) => csvCell(v)).join(','))
     const blob = new Blob([[head.join(','), ...lines].join('\n')], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `leads-${today()}.csv`; a.click(); URL.revokeObjectURL(a.href)
   }
   const chip = (b: Bucket, label: string, n: number) => <button key={b} onClick={() => set({ b: b === 'open' ? undefined : b })} aria-pressed={bucket === b} className={`rounded-full border px-3 py-1.5 text-sm focus-ring ${bucket === b ? 'border-gold bg-gold/15 text-gold-deep font-semibold' : 'border-border text-text-muted hover:text-text'}`}>{label} <span className="tabular-nums">{n}</span></button>

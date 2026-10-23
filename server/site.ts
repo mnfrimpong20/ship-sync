@@ -22,7 +22,7 @@ export function siteConfig() {
   const e = (k: string) => (process.env[k] ?? '').trim()
   const wa = e('CONTACT_WHATSAPP').replace(/[^\d]/g, '')
   return {
-    email: e('CONTACT_EMAIL'), phone: e('CONTACT_PHONE'), whatsapp: wa, whatsappUrl: wa ? `https://wa.me/${wa}` : '', address: e('CONTACT_ADDRESS'),
+    email: e('CONTACT_EMAIL'), phone: e('CONTACT_PHONE'), whatsapp: wa, whatsappUrl: wa ? `https://wa.me/${wa}` : '', address: e('CONTACT_ADDRESS'), legalName: e('COMPANY_LEGAL_NAME'),
     social: Object.fromEntries((['linkedin', 'instagram', 'facebook', 'x', 'tiktok', 'youtube'] as const).map((k) => [k, e(`SOCIAL_${k.toUpperCase()}`)]).filter(([, v]) => v)) as Record<string, string>,
     demoHidden: hideDemoShippers(),
     hoursNote: e('CONTACT_HOURS') || 'Mon–Fri 9:00–18:00 US Central · UK team Mon–Fri 9:00–17:30 UK time · China team Mon–Sat 9:00–18:00 CST',
@@ -44,11 +44,13 @@ export function mountSite(r: Router, d: Deps) {
   r.get('/site/stats', wrap(async (_req, res) => {
     const db = await getDb()
     const { rows: sh } = await db.query<Row>(`select count(*)::int as n, count(*) filter (where verified)::int as v from shippers where id <> 'ship-sync-sourcing' and ${publicShipperSql()}`)
-    const { rows: q } = await db.query<Row>(`select count(*)::int as n from quotes`)
-    const { rows: s } = await db.query<Row>(`select count(*)::int as n, count(*) filter (where status = 'delivered')::int as d from shipments`)
+    // With the demo switch on, demo companies' quotes and shipments don't count toward the public numbers.
+    const real = hideDemoShippers()
+    const { rows: q } = await db.query<Row>(`select count(*)::int as n from quotes q ${real ? 'join shippers sh on sh.id = q.shipper_id where sh.demo = false' : ''}`)
+    const { rows: s } = await db.query<Row>(`select count(*)::int as n, count(*) filter (where s.status = 'delivered')::int as d from shipments s ${real ? 'join shippers sh on sh.id = s.shipper_id where sh.demo = false' : ''}`)
     const { rows: ot } = await db.query<Row>(`select coalesce(round(avg(on_time))::int, 0) as p from shippers where on_time > 0 and id <> 'ship-sync-sourcing' and ${publicShipperSql()}`)
-    const { rows: dests } = await db.query<Row>(`select count(distinct destination)::int as n from shipments`)
-    const { rows: rq } = await db.query<Row>(`select count(*)::int as n from requests where created_at > now() - interval '30 days'`)
+    const { rows: dests } = await db.query<Row>(`select count(distinct s.destination)::int as n from shipments s ${real ? 'join shippers sh on sh.id = s.shipper_id where sh.demo = false' : ''}`)
+    const { rows: rq } = await db.query<Row>(`select count(*)::int as n from requests r ${real ? `left join users u on u.id = r.user_id where coalesce(u.email, '') not like '%.demo' and` : 'where'} r.created_at > now() - interval '30 days'`)
     res.set('Cache-Control', 'public, max-age=120')
     res.json({ shippers: sh[0].n, verifiedShippers: sh[0].v, quotes: q[0].n, shipments: s[0].n, delivered: s[0].d, onTimePct: Number(ot[0].p), destinations: Math.max(Number(dests[0].n), 7), requests30: Number(rq[0]?.n ?? 0) })
   }))

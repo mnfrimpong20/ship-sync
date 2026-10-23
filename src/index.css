@@ -105,7 +105,8 @@ table, dl, .tabular-nums, [data-testid$="card"] { font-variant-numeric: tabular-
 @utility section-y { @apply py-20 md:py-28; }
 @media print { header, footer, nav, aside, .no-print { display: none !important } body { background: #fff; color: #000 } .card-dark { box-shadow: none !important; break-inside: avoid } }
 @utility eyebrow { @apply text-xs font-semibold uppercase tracking-[0.14em] text-gold-deep; }
-@utility focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-bg; }
+/* Two-tone focus ring: the deep-gold edge reads on cream (≈5:1), the bright-gold band on navy and charcoal — 3:1+ on every background. */
+@utility focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-gold-deep focus-visible:ring-offset-2 focus-visible:ring-offset-gold; }
 @utility btn { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 text-[15px] font-semibold transition-colors duration-200 focus-ring; }
 @utility btn-gold { @apply btn bg-gold text-on-accent hover:bg-gold-hover; }
 @utility btn-ghost { @apply btn border border-border bg-transparent text-text hover:border-text hover:bg-surface; }
@@ -159,7 +160,7 @@ table, dl, .tabular-nums, [data-testid$="card"] { font-variant-numeric: tabular-
 .ntm-bar { animation: ntm-bar 1.3s cubic-bezier(.4,0,.2,1) infinite }
 @media (prefers-reduced-motion: reduce) { .ntm-chev, .ntm-box, .ntm-bar { animation: none } .ntm-bar { width: 100% } }
 /* Links inside sentences are underlined, not told apart by colour alone. */
-.ss-app p a:not([class*="btn"]), .ss-app li > p a:not([class*="btn"]), p > a.text-gold-deep:not([class*="btn"]) { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px }
+.ss-app p a:not([class*="btn"]), .ss-app li > p a:not([class*="btn"]), p > a.text-gold-deep:not([class*="btn"]), dd > a.text-gold-deep:not([class*="btn"]) { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px }
 
 /* Finished / inactive rows: tinted instead of faded, so their text keeps full contrast. */
 .dimmed { background-color: color-mix(in srgb, var(--color-surface-2) 60%, transparent); }
@@ -205,4 +206,11 @@ html.road .ss-app :is(.card-dark, .border-border) { border-color: color-mix(in s
   #main div:has(> .stat-card) { display: flex !important; overflow-x: auto; gap: 0.5rem; margin-left: -1.25rem; margin-right: -1.25rem; padding: 0 1.25rem 0.25rem; scroll-padding-left: 1.25rem; scroll-snap-type: x proximity; scrollbar-width: none; }
   #main div:has(> .stat-card)::-webkit-scrollbar { display: none; }
   #main div:has(> .stat-card) > .stat-card { flex: 0 0 44%; scroll-snap-align: start; }
+}
+
+/* A grid with no explicit columns gets one column that may shrink to the screen — otherwise its widest child
+   (a long word, a row of buttons) sets the width and the page scrolls sideways on small phones or with large text.
+   In the base layer, so any grid-cols-* utility (sm:, lg:…) still wins. */
+@layer base {
+  .grid:not([class^="grid-cols-"]):not([class*=" grid-cols-"]):not([class*="grid-flow-col"]) { grid-template-columns: minmax(0, 1fr); }
 }

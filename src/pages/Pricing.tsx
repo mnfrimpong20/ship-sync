@@ -83,7 +83,7 @@ export default function PricingPage() {
                   <p className="mt-1 text-xs text-text-muted">{p.team == null ? 'Unlimited team members' : `Up to ${p.team} team members`}</p>
                   <ul className="mt-6 flex-1 space-y-2.5 text-sm">
                     {CORE.map((f) => <li key={f} className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" />{f}</li>)}
-                    {ALL_PERKS.map((f) => p.perks.includes(f) ? <li key={f} className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" />{f}</li> : <li key={f} className="flex gap-2 text-text-muted"><Minus size={16} className="mt-0.5 shrink-0" aria-hidden="true" />{f}</li>)}
+                    {ALL_PERKS.map((f) => p.perks.includes(f) ? <li key={f} className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" />{f}</li> : <li key={f} className="flex gap-2 text-text-muted"><Minus size={16} className="mt-0.5 shrink-0" aria-hidden="true" /><span><span className="sr-only">Not included: </span>{f}</span></li>)}
                     {p.key === 'enterprise' && <li className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-gold-deep" aria-hidden="true" />Featured placement in the directory</li>}
                   </ul>
                   <Link to="/signup?role=shipper" className={`mt-7 ${hi ? 'btn-gold' : 'btn-ghost'}`}>{p.priceUsd === 0 ? 'Start free' : `Start with ${p.label}`}</Link>

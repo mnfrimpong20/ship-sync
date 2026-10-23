@@ -8,7 +8,7 @@
 import type { Express, Request } from 'express'
 import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { publicShipperSql, type Db } from './db'
+import { publicShipperSql, type Db, hideDemoShippers } from './db'
 import { NOINDEX, SITEMAP_PATHS, pageMeta } from '../src/lib/pageMeta'
 
 type Row = Record<string, any>
@@ -47,6 +47,13 @@ export function mountSeo(app: Express, getDb: () => Promise<Db>, dist: string) {
         const { rows } = await (await getDb()).query<Row>(`select name, tagline, about from shippers where id = $1 and ${publicShipperSql()}`, [decodeURIComponent(m[1])])
         if (rows[0]) { title = `${rows[0].name} — shipping to West Africa · Ntemtem`; description = String(rows[0].tagline || rows[0].about || description).slice(0, 200) }
       } catch { /* fall back to the generic profile title */ }
+    }
+    const bm = /^\/brokers\/(?!join$)([^/]+)$/.exec(p)
+    if (bm) {
+      try {
+        const { rows } = await (await getDb()).query<Row>(`select name, company, about from brokers where id = $1 and active${hideDemoShippers() ? ` and coalesce(email, '') not like '%.demo'` : ''}`, [decodeURIComponent(bm[1])])
+        if (rows[0]) { title = `${rows[0].name}${rows[0].company ? ` — ${rows[0].company}` : ''} · customs broker · Ntemtem`; description = String(rows[0].about || description).slice(0, 200) }
+      } catch { /* generic title */ }
     }
     const url = `${baseUrl(req)}${p}`
     let out = html()

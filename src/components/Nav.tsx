@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useScroll, useSpring } from 'motion/react'
-import { LogIn, Mail, LifeBuoy, Anchor, ArrowRight, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X, Printer } from 'lucide-react'
+import { Mail, PackageSearch, LifeBuoy, Anchor, ArrowRight, BarChart3, Boxes, Building2, Calculator, ChartLine, ChevronDown, Globe, Globe2, House, Inbox, Landmark, LayoutDashboard, Link2, LogOut, Menu, Radar, Receipt, Route, ScanLine, Ship, ShieldCheck, Tag, Truck, Users, UsersRound, X, Printer } from 'lucide-react'
 import { Logo, VerifiedMark } from './ui'
 import { useStore } from '../lib/store'
 
@@ -25,7 +25,6 @@ const services: { title: string; items: Service[] }[] = [
     { to: '/lanes', label: 'Lane prices', blurb: 'What it really costs on your lane', icon: BarChart3 },
     { to: '/duty', label: 'Duty estimator', blurb: 'Landed cost at Tema, Lagos and more', icon: Calculator },
     { to: '/brokers', label: 'Customs brokers', blurb: 'Licensed clearing agents at the port', icon: Landmark },
-    { to: '/broker-portal/login', label: 'Broker sign in', blurb: 'For clearing agents on Ntemtem — or apply to join', icon: LogIn },
   ] },
   { title: 'Follow along', items: [
     { to: '/live', label: 'Live map', blurb: 'Ships and flights on the Gulf of Guinea', icon: Radar },
@@ -62,7 +61,8 @@ export default function Nav() {
   const [svc, setSvc] = useState(false)
   const { user, logout } = useStore()
   const [side, setSide] = useState<Side>(() => user?.role === 'shipper' ? 'shippers' : 'senders')
-  const svcRef = useRef<HTMLDivElement>(null)
+  const svcRef = useRef<HTMLDivElement>(null); const svcBtn = useRef<HTMLButtonElement>(null)
+  const headerRef = useRef<HTMLElement>(null); const menuBtn = useRef<HTMLButtonElement>(null)
   const closeTimer = useRef<number | null>(null)
   const hovering = useRef(false)
   const loc = useLocation()
@@ -79,11 +79,27 @@ export default function Nav() {
   useEffect(() => { setOpen(false); setMenu(false); setSvc(false) }, [loc])
   useEffect(() => {
     if (!svc && !menu) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSvc(false); setMenu(false) } }
+    // Esc closes and puts keyboard focus back on the button that opened it.
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { if (svc) svcBtn.current?.focus(); setSvc(false); setMenu(false) } }
     const onClick = (e: MouseEvent) => { if (svcRef.current && !svcRef.current.contains(e.target as Node)) setSvc(false) }
     window.addEventListener('keydown', onKey); window.addEventListener('mousedown', onClick)
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('mousedown', onClick) }
   }, [svc, menu])
+  // Phone menu: the page behind is out of reach (keyboard, screen readers, scrolling) until it closes.
+  useEffect(() => {
+    if (!open) return
+    const behind = [document.getElementById('main'), document.querySelector('footer'), document.querySelector('[data-testid=wa-bubble]')].filter(Boolean) as HTMLElement[]
+    behind.forEach((el) => el.setAttribute('inert', '')); const prev = document.body.style.overflow; document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setOpen(false); menuBtn.current?.focus(); return }
+      if (e.key !== 'Tab' || !headerRef.current) return
+      const f = [...headerRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')].filter((x) => x.offsetParent)
+      if (!f.length) return
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus() } else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => { behind.forEach((el) => el.removeAttribute('inert')); document.body.style.overflow = prev; window.removeEventListener('keydown', onKey) }
+  }, [open])
   const hoverOpen = () => { hovering.current = true; if (closeTimer.current) window.clearTimeout(closeTimer.current); setSvc(true) }
   const hoverClose = () => { hovering.current = false; closeTimer.current = window.setTimeout(() => setSvc(false), 160) }
   // A click while the pointer is already hovering keeps it open (touch/keyboard users toggle).
@@ -94,14 +110,14 @@ export default function Nav() {
   const groups = side === 'senders' ? services : shipperServices
 
   return (
-    <header className={`sticky top-0 z-50 border-b transition-colors duration-300 ${scrolled || !marketing ? 'border-border bg-bg/90 backdrop-blur-xl' : 'border-border/60 bg-bg'}`}>
+    <header ref={headerRef} className={`sticky top-0 z-50 border-b transition-colors duration-300 ${scrolled || !marketing ? 'border-border bg-bg/90 backdrop-blur-xl' : 'border-border/60 bg-bg'}`}>
       {marketing && <motion.div className="absolute inset-x-0 top-0 h-0.5 origin-left bg-gold" style={{ scaleX: progress }} aria-hidden="true" />}
       <div className="container-fluid flex h-[72px] items-center justify-between gap-4">
         <Logo />
         <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Primary">
           <NavItem to={primary[0].to} label={primary[0].label} />
           <div ref={svcRef} className="relative" onMouseEnter={hoverOpen} onMouseLeave={hoverClose}>
-            <button onClick={toggleSvc} aria-expanded={svc} aria-haspopup="menu" className={`group relative flex min-h-11 items-center gap-1 whitespace-nowrap rounded-md px-3 text-[15px] font-medium transition-colors focus-ring ${serviceActive || svc ? 'text-gold-deep' : 'text-text-muted hover:text-text'}`} data-testid="nav-services">
+            <button ref={svcBtn} onClick={toggleSvc} aria-expanded={svc} aria-haspopup="menu" className={`group relative flex min-h-11 items-center gap-1 whitespace-nowrap rounded-md px-3 text-[15px] font-medium transition-colors focus-ring ${serviceActive || svc ? 'text-gold-deep' : 'text-text-muted hover:text-text'}`} data-testid="nav-services">
               Services <ChevronDown size={14} className={`transition-transform ${svc ? 'rotate-180' : ''}`} aria-hidden="true" />
               <span className={`absolute inset-x-3 bottom-2 h-px origin-left bg-gold transition-transform duration-200 ${serviceActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`} aria-hidden="true" />
             </button>
@@ -120,6 +136,7 @@ export default function Nav() {
                       </div>
                     ))}
                   </div>
+                  {side === 'senders' && <p className="border-t border-border px-5 py-2.5 text-sm text-text-muted" data-testid="services-brokers">Licensed customs broker? <Link to="/broker-portal/login" className="font-semibold text-gold-deep underline">Broker sign in</Link> · <Link to="/brokers/join" className="font-semibold text-gold-deep underline">Join the network</Link></p>}
                   {side === 'shippers' && (
                     <div className="flex items-center justify-between gap-4 bg-partner px-5 py-3.5 text-[#FBF6EC]">
                       <p className="text-sm"><strong>Run your shipping business on Ntemtem.</strong> <span className="text-[#C9C1B1]">Free Pro trial for new partners.</span></p>
@@ -163,13 +180,16 @@ export default function Nav() {
             <Link to="/quote" className="btn-gold !min-h-10 whitespace-nowrap !px-5 text-sm">Get a quote</Link>
           </motion.div>
         </div>
-        <button className="grid h-11 w-11 place-items-center rounded-lg text-text focus-ring lg:hidden" onClick={() => setOpen((o) => !o)} aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open}>
-          {open ? <X /> : <Menu />}
-        </button>
+        <div className="flex items-center gap-1 lg:hidden">
+          <Link to="/track" className="grid h-11 w-11 place-items-center rounded-lg text-text focus-ring" aria-label="Track a shipment" data-testid="nav-track-phone"><PackageSearch size={22} aria-hidden="true" /></Link>
+          <button ref={menuBtn} className="grid h-11 w-11 place-items-center rounded-lg text-text focus-ring" onClick={() => setOpen((o) => !o)} aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} aria-controls="mobile-menu">
+            {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+          </button>
+        </div>
       </div>
       <AnimatePresence>
         {open && (
-          <motion.nav initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="max-h-[calc(100dvh-72px)] overflow-y-auto border-t border-border bg-bg lg:hidden" aria-label="Mobile" data-testid="mobile-menu">
+          <motion.nav initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="max-h-[calc(100dvh-72px)] overflow-y-auto overscroll-contain border-t border-border bg-bg lg:hidden" aria-label="Menu" id="mobile-menu" data-testid="mobile-menu">
             <div className="container-fluid flex flex-col py-3">
               <div className="grid grid-cols-2 gap-2 pb-3">
                 {primary.map((l) => <Link key={l.to} to={l.to} className="flex min-h-12 items-center justify-center rounded-xl border border-border text-[15px] font-semibold focus-ring">{l.label}</Link>)}
@@ -189,6 +209,7 @@ export default function Nav() {
                   <Link to="/signup?role=shipper" className="inline-flex min-h-11 items-center justify-center rounded-full bg-gold text-[15px] font-bold text-on-accent focus-ring">List your company</Link>
                 </div>
               </div>
+              <p className="mt-3 text-sm text-text-muted" data-testid="mobile-brokers">Customs broker? <Link to="/broker-portal/login" className="font-semibold text-gold-deep underline">Broker sign in</Link> · <Link to="/brokers/join" className="font-semibold text-gold-deep underline">Join</Link></p>
               <div className="mt-3 grid grid-cols-2 gap-2" data-testid="mobile-help"><Link to="/help" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-[15px] font-semibold focus-ring"><LifeBuoy size={16} aria-hidden="true" /> Help centre</Link><Link to="/contact" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-[15px] font-semibold focus-ring"><Mail size={16} aria-hidden="true" /> Contact us</Link></div>
               <div className="mt-3 flex flex-col gap-2 pb-2">
                 {user ? (

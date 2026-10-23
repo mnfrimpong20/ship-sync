@@ -133,7 +133,7 @@ export default function Quote({ locked }: { locked?: { shipper: OrderShipper; in
 
   return (
     <div className="bg-bg text-text">
-      <div className="container-x grid gap-10 py-10 md:py-16 lg:grid-cols-12">
+      <div className="container-x grid grid-cols-1 gap-10 py-10 md:py-16 lg:grid-cols-12">
         <div className="lg:col-span-7">
           <p className="eyebrow mb-2">{locked ? `Order from ${locked.shipper.name}` : 'Request quotes'}</p>
           <h1 className="!text-[clamp(2rem,4vw,3rem)]">{locked ? 'Tell us what you’re sending' : 'Tell shippers what you’re sending'}</h1>

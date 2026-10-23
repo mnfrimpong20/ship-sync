@@ -40,13 +40,20 @@ const HIDE_ON = ['/dashboard', '/admin', '/r/', '/p/', '/s/', '/pay', '/doc', '/
 export function WhatsAppBubble() {
   const cfg = useSiteConfig(); const loc = useLocation()
   const [closed, setClosed] = useState(() => { try { return sessionStorage.getItem('ss-wa-closed') === '1' } catch { return false } })
-  const [ready, setReady] = useState(false)
+  const [ready, setReady] = useState(false); const [clear, setClear] = useState(true)
   useEffect(() => { const t = setTimeout(() => setReady(true), 2500); return () => clearTimeout(t) }, [])
+  // Stay out of the way: not over the home hero's numbers (wait until people scroll), and not over the footer, which has its own WhatsApp link.
+  useEffect(() => {
+    const home = loc.pathname === '/'
+    const check = () => { const all = document.querySelectorAll('footer'); const f = all[all.length - 1]; const footerIn = !!f && f.getBoundingClientRect().top < window.innerHeight - 40; setClear(!footerIn && (!home || window.scrollY > window.innerHeight * 0.6)) }
+    check(); window.addEventListener('scroll', check, { passive: true }); window.addEventListener('resize', check)
+    return () => { window.removeEventListener('scroll', check); window.removeEventListener('resize', check) }
+  }, [loc.pathname])
   if (!cfg?.whatsappUrl || closed || HIDE_ON.some((p) => loc.pathname.startsWith(p))) return null
   const text = loc.pathname.startsWith('/track') ? 'Hi Ntemtem, where is my shipment? My reference is ' : loc.pathname.startsWith('/for-shippers') ? 'Hi Ntemtem, I run a shipping company and want to list it.' : 'Hi Ntemtem, '
   const close = () => { setClosed(true); try { sessionStorage.setItem('ss-wa-closed', '1') } catch { /* private mode */ } }
   return (
-    <AnimatePresence>{ready && (
+    <AnimatePresence>{ready && clear && (
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} className="no-print group fixed bottom-24 right-4 z-40 flex items-center gap-2 md:bottom-6 md:right-6" data-testid="wa-bubble" role="complementary" aria-label="WhatsApp chat">
         <a href={waWithText(cfg.whatsappUrl, text)} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#1f7a4d] px-4 text-sm font-semibold text-white shadow-lg hover:bg-[#186640] focus-ring" aria-label="Chat with Ntemtem on WhatsApp"><MessageCircle size={18} aria-hidden="true" /><span className="hidden sm:inline">Chat with us</span></a>
         <button onClick={close} className="grid h-7 w-7 place-items-center rounded-full border border-border bg-surface text-text-muted shadow hover:text-text" aria-label="Hide the chat button"><X size={13} /></button>

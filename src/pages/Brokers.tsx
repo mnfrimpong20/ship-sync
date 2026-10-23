@@ -1,3 +1,4 @@
+import { setPageTitle } from '../lib/site'
 import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
@@ -182,6 +183,7 @@ export default function BrokersPage() {
               <Empty title={all.length ? 'No brokers match' : 'No brokers listed yet'} body={all.length ? 'Try another port or clear a filter. Shippers can also clear through their own agents.' : 'We’re onboarding licensed agents port by port. Shippers can still clear through their own agents.'} action={all.length ? <button onClick={clear} className="btn-ghost !min-h-10 !px-4 text-sm">Clear filters</button> : undefined} />
             ) : (
               <motion.div key={rows.map((b) => b.id).join()} initial="hidden" animate="show" variants={stagger} className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                <h2 className="sr-only">Brokers</h2>
                 {rows.map((b) => <BrokerDirectoryCard key={b.id} b={b} cargo={cargo} />)}
               </motion.div>
             )}
@@ -198,6 +200,7 @@ export function BrokerProfile() {
   const { id = '' } = useParams(); const { user } = useStore()
   const [d, setD] = useState<Awaited<ReturnType<typeof brokersApi.profile>> | null>(null); const [error, setError] = useState('')
   useEffect(() => { setD(null); brokersApi.profile(id).then(setD).catch((e) => setError(e instanceof Error ? e.message : 'Not found.')) }, [id])
+  useEffect(() => { if (d) setPageTitle(`${d.broker.name}${d.broker.company ? ` — ${d.broker.company}` : ''} · customs broker`) }, [d])
   useEffect(() => { if (d && window.location.hash.endsWith('#book')) document.getElementById('book')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, [d])
   if (error) return <div className="container-x py-20 text-text"><Empty title="Broker not found" body="This listing may have been removed or the link is wrong." action={<Link to="/brokers" className="btn-gold">All brokers</Link>} /></div>
   if (!d) return <BrandLoader label="Loading profile…" />

@@ -66,7 +66,7 @@ export default function Footer() {
       </div>
       <div className="border-t border-border">
         <div className="container-fluid flex flex-col gap-2 py-6 text-xs text-text-muted md:flex-row md:items-center md:justify-between">
-          <p>© {new Date().getFullYear()} Ntemtem. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Ntemtem{cfg?.legalName ? ` · operated by ${cfg.legalName}` : ''}. All rights reserved.</p>
           <nav aria-label="Legal" className="flex flex-wrap gap-x-5 gap-y-2"><Link to="/privacy" className="hover:text-text focus-ring rounded">Privacy policy</Link><Link to="/terms" className="hover:text-text focus-ring rounded">Terms of service</Link><Link to="/shipper-agreement" className="hover:text-text focus-ring rounded">Shipper agreement</Link></nav>
         </div>
       </div>

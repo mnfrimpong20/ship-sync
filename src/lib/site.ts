@@ -2,7 +2,14 @@ import { pageMeta } from './pageMeta'
 import { useEffect, useState } from 'react'
 import { api } from './store'
 
-export interface SiteConfig { email: string; phone: string; whatsapp: string; whatsappUrl: string; address: string; social: Record<string, string>; hoursNote: string; demoHidden: boolean }
+export interface SiteConfig { email: string; phone: string; whatsapp: string; whatsappUrl: string; address: string; legalName?: string; social: Record<string, string>; hoursNote: string; demoHidden: boolean }
+/** A public number is only shown once it means something — a new marketplace shouldn't advertise "0% on time". */
+export const statReady = {
+  verifiedShippers: (s: SiteStats) => s.verifiedShippers >= 3,
+  quotes: (s: SiteStats) => s.quotes >= 50,
+  shipments: (s: SiteStats) => s.shipments >= 25,
+  onTime: (s: SiteStats) => s.onTimePct > 0 && s.delivered >= 20,
+}
 export interface SiteStats { shippers: number; verifiedShippers: number; quotes: number; shipments: number; delivered: number; onTimePct: number; destinations: number; requests30?: number }
 export interface ContactInput { name: string; email: string; phone: string; company: string; topic: 'quote' | 'tracking' | 'shipper' | 'sourcing' | 'partnership' | 'other'; message: string; website?: string }
 
@@ -30,6 +37,9 @@ export function useSiteConfig() {
   useEffect(() => { if (cached) return; siteApi.config().then((x) => { cached = x; setC(x) }).catch(() => {}) }, [])
   return c
 }
+
+/** A page that knows a better title than the route table (a company's name, a 404) sets it after the route's own. */
+export function setPageTitle(t: string) { setTimeout(() => { document.title = `${t} · Ntemtem`; document.head.querySelector('meta[property="og:title"]')?.setAttribute('content', document.title) }, 0) }
 
 /** Per-route browser title + description + Open Graph tags (shared table in pageMeta.ts). */
 export function applyPageMeta(pathname: string) {

@@ -25,7 +25,7 @@ export function DirectoryCard({ s, quote }: { s: Shipper; quote?: string }) {
       <div className="flex items-start gap-3.5">
         <Avatar initials={s.initials} hue={s.hue} logo={s.logo} size={52} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2"><PlanBadge s={s} />{s.verified && <VerifiedBadge />}</div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><PlanBadge s={s} />{s.verified && <VerifiedBadge />}</div>
           <h3 className="mt-1 truncate !text-[17px] leading-tight"><Link to={`/shippers/${s.id}`} className="focus-ring hover:text-gold-deep">{s.name}</Link></h3>
           <p className="line-clamp-2 min-h-10 text-sm leading-5 text-text-muted">{s.tagline}</p>
         </div>
@@ -314,6 +314,7 @@ export default function Directory() {
               <Empty title="No shippers match" body="Try widening the destination or cargo type — or answer five questions and we’ll match you." action={<div className="flex gap-2"><button onClick={clear} className="btn-ghost !min-h-10 !px-4 text-sm">Clear filters</button><button onClick={() => setWizard(true)} className="btn-gold !min-h-10 !px-4 text-sm"><Sparkles size={15} aria-hidden="true" /> Find my shipper</button></div>} />
             ) : (
               <motion.div key={`${res?.page}-${res?.shippers.map((s) => s.id).join()}`} initial="hidden" animate="show" variants={stagger} className={`grid gap-5 md:grid-cols-2 xl:grid-cols-3 ${loading ? 'dimmed' : ''}`} aria-busy={loading}>
+                <h2 className="sr-only">Shipping companies</h2>
                 {res?.shippers.map((s) => <DirectoryCard key={s.id} s={s} quote={`/quote?shipper=${s.id}&destination=${dest || s.destinations[0]}${origin ? `&origin=${encodeURIComponent(origin)}` : ''}${mode !== 'either' ? `&mode=${mode}` : ''}${cargo ? `&cargo=${cargo}` : ''}`} />)}
               </motion.div>
             )}

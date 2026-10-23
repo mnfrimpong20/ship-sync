@@ -36,7 +36,7 @@ export default function SourcingPage() {
           {cfg && <motion.p variants={fadeUp} className="mt-4 text-xs text-text-muted">{cfg.stats.agents} agent{cfg.stats.agents === 1 ? '' : 's'} on the ground · {cfg.stats.verifiedSuppliers} verified suppliers in 3 countries · {cfg.stats.completed} orders shipped</motion.p>}
         </motion.div>
         <section className="mx-auto mt-12 max-w-5xl" data-testid="origins">
-          <p className="eyebrow mb-2 text-center">Where we buy</p>
+          <h2 className="eyebrow mb-2 text-center">Where we buy</h2>
           <div className="grid gap-4 md:grid-cols-3">{ORIGIN_CODES.map((c) => { const o = ORIGINS[c]; const rate = cfg?.origins?.find((x) => x.code === c)?.perUsd; return (
             <div key={c} className="card-dark flex flex-col p-5" data-testid={`origin-${c}`}><Flag code={o.code} size={26} className="rounded-[4px]" /><h3 className="mt-2 !text-lg">{o.name}</h3><p className="mt-1 text-sm text-text-muted">{o.blurb}</p>
               <p className="mt-3 text-xs"><span className="font-semibold">Popular:</span> <span className="text-text-muted">{o.examples}</span></p>
@@ -51,7 +51,7 @@ export default function SourcingPage() {
               <Link to={`/sourcing/new?tier=${t.id}`} className="btn-ghost mt-3 !min-h-9 text-sm">Choose</Link></motion.div>) })}
         </motion.div>
         <section id="how" className="mx-auto mt-16 max-w-5xl">
-          <p className="eyebrow mb-2 text-center">How it works</p>
+          <h2 className="eyebrow mb-2 text-center">How it works</h2>
           <ol className="grid gap-4 md:grid-cols-4">
             {[[Search, 'Tell us what you need', 'Describe the product, quantity, target price and where it’s going. Paste supplier links if you have them.'], [Factory, 'We find & price it', 'Your agent shortlists factories, wholesalers or stores and returns a landed-cost quote: goods price, our fee, inspection, freight, insurance and duty.'], [ShieldCheck, 'Pay in stages, in escrow', `Accept a quote and pay the deposit (fee + inspection + ${p ? Math.round(p.depositPct * 100) : 30}% of the goods). The balance is only due after you approve the inspection photos.`], [Ship, 'We ship it', 'Goods are received at our warehouse in Guangzhou, London or Houston, exported and tracked like any Ntemtem shipment — all the way to your door if you choose.']].map(([I, t, b], i) => { const Icon = I as typeof Search; return <li key={i} className="card-dark p-5"><span className="grid h-8 w-8 place-items-center rounded-full bg-gold/15 text-gold-deep"><Icon size={16} aria-hidden="true" /></span><p className="mt-3 font-semibold">{i + 1}. {t as string}</p><p className="mt-1 text-sm text-text-muted">{b as string}</p></li> })}
           </ol>
@@ -76,7 +76,7 @@ function WorkedExamples({ p }: { p: Pricing }) {
   const rows = ex.map((e) => { const factory = (e.unit * e.qty) / rate(e.origin); const fee = Math.max(p.minFeeUsd, factory * p.servicePct); const total = factory + fee + p.inspectionUsd + p.handlingUsd + e.freight + e.insurance; return { ...e, factory, fee, total, deposit: fee + p.inspectionUsd + factory * p.depositPct } })
   return (
     <section className="mx-auto mt-14 max-w-5xl" data-testid="worked-examples">
-      <p className="eyebrow mb-2 text-center">What it actually costs</p>
+      <h2 className="eyebrow mb-2 text-center">What it actually costs</h2>
       <h2 className="text-center !text-2xl">One order from each country, priced the way we price yours</h2>
       <div className="mt-6 grid gap-4 md:grid-cols-3">{rows.map((r) => (
         <div key={r.title} className="card-dark flex flex-col p-5 text-sm"><p className="font-semibold">{r.title}</p><p className="text-xs text-text-muted">{r.spec} · {r.days}</p>

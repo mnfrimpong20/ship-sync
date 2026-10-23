@@ -55,6 +55,8 @@ export default function HeroVideo({ active, onNext, paused, staticOnly }: { acti
       <img src={still(scenes[0])} alt="" width={1920} height={1080} className="absolute inset-0 h-full w-full object-cover" decoding="async" fetchPriority="high" onError={() => setBroken((b) => ({ ...b, [scenes[0].id]: true }))} />
       {scenes.map((sc, i) => {
         const on = i === active
+        // Stills mode (phones, data saver): only the photo on screen and the next one are downloaded.
+        if (staticOnly && i !== active && i !== (active + 1) % scenes.length) return null
         const style = { opacity: on && (sc.kind === 'photo' || staticOnly || ready[sc.id]) ? 1 : 0, transitionDuration: `${FADE_MS}ms` }
         if (sc.kind === 'photo' || staticOnly) return (
           <img key={sc.id} src={still(sc)} alt="" width={1920} height={1080} loading={i === 0 ? 'eager' : 'lazy'} decoding="async" onError={() => setBroken((b) => ({ ...b, [sc.id]: true }))}

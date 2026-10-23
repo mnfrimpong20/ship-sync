@@ -210,7 +210,7 @@ export default function Live() {
 
         <div className="mt-8 grid gap-6 lg:grid-cols-12">
           <div className="lg:col-span-9">
-            <div ref={box} className="ss-map h-[62vh] min-h-[420px]" role="img" aria-label="Live map of vessels and aircraft around West Africa" />
+            <div ref={box} className="ss-map h-[62vh] min-h-[420px]" role="region" aria-label="Live map of vessels and aircraft around West Africa" />
             <p className="mt-2 flex items-start gap-2 text-xs text-text-muted"><TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden="true" /> Positions come from public, delayed feeds (AISStream, adsb.fi, adsb.lol). Terrestrial AIS only covers the coast, so ships mid-ocean are not shown. Not for navigation or safety decisions. Basemap © CARTO, © OpenStreetMap contributors.</p>
           </div>
           <aside className="lg:col-span-3">

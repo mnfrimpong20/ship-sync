@@ -65,6 +65,8 @@ async function main() {
   mountSeoFiles(app, getDb)
   if (isProd) {
     const dist = path.join(root, 'dist')
+    // Built JS/CSS have the content hash in their names, so they never change — browsers keep them for a year.
+    app.use('/assets', express.static(path.join(dist, 'assets'), { index: false, immutable: true, maxAge: '365d' }))
     app.use(express.static(dist, { index: false, maxAge: '1h' }))
     mountSeo(app, getDb, dist)
   } else {

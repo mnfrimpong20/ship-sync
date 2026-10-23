@@ -35,13 +35,13 @@ export function Mark({ size = 34, partner = false }: { size?: number; partner?: 
 
 export function Logo({ light = true, className = '', tagline = true, partner = false }: { light?: boolean; className?: string; tagline?: boolean; partner?: boolean }) {
   return (
-    <Link to="/" className={`inline-flex items-center gap-2.5 focus-ring rounded-md ${className}`} aria-label={partner ? 'Ntemtem Partner home' : 'Ntemtem home'}>
+    <Link to="/" className={`inline-flex min-w-0 items-center gap-2.5 focus-ring rounded-md ${className}`} aria-label={partner ? 'Ntemtem Partner home' : 'Ntemtem home'}>
       <Mark size={34} partner={partner} />
-      <span className="flex flex-col leading-none">
+      <span className="flex min-w-0 flex-col leading-none">
         <span className={`font-heading text-[1.45rem] font-extrabold tracking-[-0.02em] ${light ? 'text-text' : 'text-ink'}`}>ntemtem</span>
         {partner
           ? <span className="mt-1 whitespace-nowrap text-[9.5px] font-bold uppercase tracking-[0.16em] text-gold-deep">Partner</span>
-          : tagline && <span className={`mt-1 whitespace-nowrap text-[9.5px] font-semibold uppercase tracking-[0.16em] ${light ? 'text-text-muted' : 'text-ink/70'}`}>{TAGLINE}</span>}
+          : tagline && <span className={`mt-1 truncate text-[9.5px] font-semibold uppercase tracking-[0.16em] max-[379px]:hidden ${light ? 'text-text-muted' : 'text-ink/70'}`}>{TAGLINE}</span>}
       </span>
     </Link>
   )
@@ -155,7 +155,7 @@ export function Avatar({ initials, hue, size = 48, logo }: { initials: string; h
 
 export function ShipperCard({ s, light = false }: { s: Shipper; light?: boolean }) {
   return (
-    <motion.article variants={fadeUp} whileHover={{ y: -4 }} transition={{ duration: 0.2 }} className={`${light ? 'card-light' : 'card-dark'} flex h-full flex-col p-6`}>
+    <motion.article variants={fadeUp} whileHover={{ y: -4 }} transition={{ duration: 0.2 }} className={`${light ? 'card-light' : 'card-dark'} flex h-full min-w-0 flex-col p-5 sm:p-6`}>
       <div className="flex items-start gap-4">
         <Avatar initials={s.initials} hue={s.hue} logo={s.logo} />
         <div className="min-w-0 flex-1">
@@ -177,9 +177,9 @@ export function ShipperCard({ s, light = false }: { s: Shipper; light?: boolean 
         <div><dt className={light ? 'text-ink-muted' : 'text-text-muted'}>Responds</dt><dd className={`font-semibold ${light ? 'text-ink' : 'text-text'}`}>~{s.responseHours}h</dd></div>
         <div><dt className={light ? 'text-ink-muted' : 'text-text-muted'}>Since</dt><dd className={`font-semibold ${light ? 'text-ink' : 'text-text'}`}>{s.founded}</dd></div>
       </dl>
-      <div className="mt-5 flex gap-2">
-        <Link to={`/shippers/${s.id}`} className={`${light ? 'btn-light' : 'btn-ghost'} flex-1 !min-h-10 !px-4 text-sm`}>View profile</Link>
-        <Link to={`/quote?shipper=${s.id}&destination=${s.destinations[0]}`} className="btn-gold flex-1 !min-h-10 !px-4 text-sm">Get quote</Link>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Link to={`/shippers/${s.id}`} className={`${light ? 'btn-light' : 'btn-ghost'} min-w-[7.5rem] flex-1 !min-h-10 !px-4 text-sm`}>View profile</Link>
+        <Link to={`/quote?shipper=${s.id}&destination=${s.destinations[0]}`} className="btn-gold min-w-[7.5rem] flex-1 !min-h-10 !px-4 text-sm">Get quote</Link>
       </div>
     </motion.article>
   )

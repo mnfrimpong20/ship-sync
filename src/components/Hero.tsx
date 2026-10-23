@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { siteApi, type SiteStats } from '../lib/site'
+import { siteApi, statReady, type SiteStats } from '../lib/site'
 import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowRight, Plane, Ship, ShieldCheck, Clock, Pause, Play } from 'lucide-react'
@@ -30,7 +30,9 @@ export default function Hero() {
   useEffect(() => {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true
-    if (reduce || saveData) setStaticOnly(true)
+    // Phones get the still image: a 5 MB looping video is a lot of someone's mobile data.
+    const phone = window.matchMedia('(max-width: 640px)').matches
+    if (reduce || saveData || phone) setStaticOnly(true)
     if (reduce) setPaused(true)
   }, [])
   const copy = sceneCopy[scenes[scene].id]
@@ -76,7 +78,7 @@ export default function Hero() {
             <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}><Link to="/signup?role=shipper" className="btn-ghost w-full !border-white/50 !text-white hover:!border-white hover:!bg-white/10 sm:w-auto">List your shipping company</Link></motion.div>
           </motion.div>
           <motion.ul variants={fadeUp} className="mt-10 hidden flex-wrap gap-x-8 sm:flex gap-y-3 text-sm text-text-muted">
-            <li className="flex items-center gap-2"><VerifiedMark size={16} aria-hidden="true" /> {stats ? `${stats.verifiedShippers} verified shippers` : 'Verified shippers, clearly marked'}</li>
+            <li className="flex items-center gap-2"><VerifiedMark size={16} aria-hidden="true" /> {stats && statReady.verifiedShippers(stats) ? `${stats.verifiedShippers} verified shippers` : 'Verified shippers, clearly marked'}</li>
             <li className="flex items-center gap-2"><ShieldCheck size={16} className="text-teal" aria-hidden="true" /> Payment protected until the shipper confirms</li>
             <li className="flex items-center gap-2"><Clock size={16} className="text-gold-deep" aria-hidden="true" /> Quotes within 24 hours</li>
           </motion.ul>
@@ -123,7 +125,7 @@ export default function Hero() {
 
       <div className="container-fluid relative">
         <motion.dl initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger} className="grid grid-cols-2 gap-6 border-t border-border py-10 md:grid-cols-4">
-          {[[stats ? String(stats.verifiedShippers) : '—', 'Verified shippers'], [stats ? String(stats.destinations) : '7', 'West African countries'], [stats ? stats.quotes.toLocaleString() : '—', 'Quotes issued'], [stats ? `${stats.onTimePct}%` : '—', 'Average on-time rate']].map(([v, l]) => (
+          {([[stats && statReady.verifiedShippers(stats) ? String(stats.verifiedShippers) : null, 'Verified shippers'], [stats ? String(stats.destinations) : '7', 'West African countries'], [stats && statReady.quotes(stats) ? stats.quotes.toLocaleString() : null, 'Quotes issued'], [stats && statReady.onTime(stats) ? `${stats.onTimePct}%` : null, 'Average on-time rate']] as [string | null, string][]).filter(([v]) => v != null).map(([v, l]) => (
             <motion.div key={l} variants={fadeUp}>
               <dt className="text-sm text-text-muted">{l}</dt>
               <dd className="font-heading text-3xl font-bold text-text md:text-4xl">{v}</dd>

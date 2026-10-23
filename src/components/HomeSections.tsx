@@ -190,7 +190,7 @@ export function FeaturedShippers() {
   return (
     <Section id="featured" light>
       <SectionHeader light eyebrow="Shipper directory" title="Companies customers book again" body="Ratings come only from customers who booked through Ntemtem." />
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {featured.map((s) => <ShipperCard key={s.id} s={s} light />)}
       </div>
       <motion.div variants={fadeUp} className="mt-10 text-center">
@@ -209,7 +209,7 @@ export function Testimonials() {
   return (
     <Section id="testimonials">
       <SectionHeader eyebrow="Recent reviews" title="What customers said after delivery" body="Real reviews from people who booked and received their shipment through Ntemtem." />
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {list.map((t) => (
           <motion.figure key={t.id} variants={fadeUp} className="card-dark flex flex-col p-7" data-testid="home-review">
             <p className="text-gold-deep" aria-label={`${t.rating} out of 5 stars`}>{'★'.repeat(t.rating)}<span className="text-border">{'★'.repeat(5 - t.rating)}</span></p>
@@ -275,7 +275,7 @@ export function Pricing() {
             <p className="mt-4 flex items-baseline gap-1"><span className={`font-heading text-5xl font-bold ${p.highlight ? 'text-gold' : 'text-ink'}`}>${live[p.key] ?? p.price}</span><span className={p.highlight ? 'text-[#C9C1B1]' : 'text-ink-muted'}>{p.per}</span></p>
             <ul className="mt-6 flex-1 space-y-2.5 text-sm">
               {p.features.map((f) => <li key={f} className={`flex gap-2 ${p.highlight ? 'text-[#FBF6EC]' : 'text-ink'}`}><Check size={16} className={`mt-0.5 shrink-0 ${p.highlight ? 'text-gold' : 'text-gold-deep'}`} aria-hidden="true" />{f}</li>)}
-              {p.missing.map((f) => <li key={f} className="flex gap-2 text-ink-muted/70"><Minus size={16} className="mt-0.5 shrink-0" aria-hidden="true" />{f}</li>)}
+              {p.missing.map((f) => <li key={f} className="flex gap-2 text-ink-muted"><Minus size={16} className="mt-0.5 shrink-0" aria-hidden="true" /><span><span className="sr-only">Not included: </span><span className="line-through decoration-ink-muted/50">{f}</span></span></li>)}
             </ul>
             <Link to="/signup?role=shipper" className={`mt-7 ${p.highlight ? 'btn-gold' : 'btn-light'}`}>{p.price === 0 ? 'Start free' : p.highlight ? `Try ${p.name} free` : `Choose ${p.name}`}</Link>
           </motion.div>

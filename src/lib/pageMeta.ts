@@ -6,6 +6,7 @@ export const HOME_TITLE = 'Ntemtem — Send it. Shipping home to Ghana & West Af
 export const DEFAULT_DESC = 'Ntemtem — Twi for quickly-quickly — connects you with verified air and ocean shippers carrying boxes, barrels, cars and cargo home to Ghana, Nigeria and across West Africa.'
 const TITLES: [RegExp, string, string?][] = [
   [/^\/$/, '', 'Compare verified shippers to Ghana, Nigeria and across West Africa. Clear prices, protected payments, tracked all the way home.'],
+  [/^\/how$/, 'How it works'], [/^\/faq$/, 'Questions people ask'],
   [/^\/for-shippers/, 'For shipping companies', 'Run your shipping business on Ntemtem: matched leads, rate cards, containers, warehouse scanning, protected payments and equipment.'],
   [/^\/pricing/, 'Pricing', 'Free for senders. Simple monthly plans for shipping companies, with a 30-day free Pro trial.'],
   [/^\/quote/, 'Get freight quotes', 'Post your shipment once and let verified shippers compete with itemised quotes.'],

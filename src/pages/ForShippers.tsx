@@ -7,7 +7,7 @@ import { motion } from 'motion/react'
 import { ArrowRight, Check, ChartLine, ChevronDown, Lock, MessageCircle, ScanLine, Ship, ShieldCheck, Users, Wallet, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { api } from '../lib/store'
-import { siteApi, type SiteStats } from '../lib/site'
+import { siteApi, statReady, type SiteStats } from '../lib/site'
 import { suppliesApi } from '../lib/supplies'
 import { Mark, money, VerifiedBadge } from '../components/ui'
 import { fadeUp, stagger, viewport } from '../lib/motion'
@@ -133,7 +133,7 @@ export default function ForShippersPage() {
     <div className="bg-bg text-text" data-testid="for-shippers-page">
       {/* 1 · Hero — partner charcoal */}
       <section className="bg-partner text-[#FBF6EC]">
-        <div className="container-x grid items-center gap-12 pb-12 pt-16 md:pt-20 lg:grid-cols-12">
+        <div className="container-x grid grid-cols-1 items-center gap-12 pb-12 pt-16 md:pt-20 lg:grid-cols-12">
           <motion.div className="lg:col-span-7" initial="hidden" animate="show" variants={stagger}>
             <motion.div variants={fadeUp} className="mb-6 flex items-center gap-3">
               <Mark size={44} partner />
@@ -165,7 +165,7 @@ export default function ForShippersPage() {
         {/* Live numbers — real, from the database */}
         <div className="container-x">
           <dl className="grid grid-cols-2 gap-6 border-t border-white/10 py-8 md:grid-cols-4" data-testid="fs-stats">
-            {[[stats?.shipments, 'Shipments booked on Ntemtem'], [stats?.quotes, 'Quotes sent by shippers'], [stats?.verifiedShippers, 'Verified shippers'], [stats?.destinations, 'West African countries served']].map(([v, l]) => (
+            {([[stats && statReady.shipments(stats) ? stats.shipments : null, 'Shipments booked on Ntemtem'], [stats && statReady.quotes(stats) ? stats.quotes : null, 'Quotes sent by shippers'], [stats && statReady.verifiedShippers(stats) ? stats.verifiedShippers : null, 'Verified shippers'], [stats?.destinations ?? 7, 'West African countries served']] as [number | null, string][]).filter(([v]) => v != null).map(([v, l]) => (
               <div key={String(l)}><dt className="text-sm text-[#C9C1B1]">{l}</dt><dd className="mt-1 font-heading text-3xl font-extrabold text-[#FBF6EC]">{v == null ? '—' : Number(v).toLocaleString()}</dd></div>
             ))}
           </dl>

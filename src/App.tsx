@@ -142,8 +142,8 @@ function MobileCta() {
     <AnimatePresence>{show && (
       <motion.div initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }} transition={{ duration: 0.2 }} className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 p-3 backdrop-blur-xl md:hidden" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }} data-testid="mobile-cta">
         {loc.pathname.startsWith('/for-shippers')
-          ? <div className="flex gap-2"><Link to="/pricing?for=shippers" className="btn-ghost flex-1 !min-h-11 text-sm">Plans</Link><Link to="/signup?role=shipper" className="btn-gold flex-[2] !min-h-11 text-sm">List your company</Link></div>
-          : <div className="flex gap-2"><Link to="/track" className="btn-ghost flex-1 !min-h-11 text-sm">Track</Link><Link to="/quote" className="btn-gold flex-[2] !min-h-11 text-sm">Get a quote</Link></div>}
+          ? <div className="flex gap-2"><Link to="/pricing?for=shippers" className="btn-ghost min-w-0 flex-1 !min-h-11 !px-3 text-sm">Plans</Link><Link to="/signup?role=shipper" className="btn-gold min-w-0 flex-[2] !min-h-11 !px-3 text-sm">List your company</Link></div>
+          : <div className="flex gap-2"><Link to="/track" className="btn-ghost min-w-0 flex-1 !min-h-11 !px-3 text-sm">Track</Link><Link to="/quote" className="btn-gold min-w-0 flex-[2] !min-h-11 !px-3 text-sm">Get a quote</Link></div>}
       </motion.div>)}</AnimatePresence>
   )
 }

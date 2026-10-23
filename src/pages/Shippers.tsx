@@ -1,3 +1,4 @@
+import { setPageTitle } from '../lib/site'
 import { BrandLoader } from '../components/BrandLoader'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -25,6 +26,7 @@ export function ShipperProfile() {
   const { id } = useParams()
   const { ready, shipperById } = useStore()
   const s = shipperById(id ?? '')
+  useEffect(() => { if (s) setPageTitle(`${s.name} — shipping to West Africa`) }, [s?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!s) return; try { const k = 'ss-recent-shippers'; const cur = (JSON.parse(localStorage.getItem(k) ?? '[]') as string[]).filter((x) => x !== s.id); localStorage.setItem(k, JSON.stringify([s.id, ...cur].slice(0, 6))) } catch { /* storage blocked */ } }, [s])
   if (!s && !ready) return <BrandLoader label="Loading profile…" />
   if (!s) return (

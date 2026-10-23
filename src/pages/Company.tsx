@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { LifeBuoy, Check, Globe2, Mail, MapPin, MessageCircle, Phone, Search, ShieldCheck, Users } from 'lucide-react'
-import { siteApi, useSiteConfig, type ContactInput, type SiteStats } from '../lib/site'
+import { setPageTitle, siteApi, statReady, useSiteConfig, type ContactInput, type SiteStats } from '../lib/site'
 import { fadeUp, stagger } from '../lib/motion'
 import { Logo } from '../components/ui'
 import { HELP } from '../lib/help'
@@ -12,7 +12,7 @@ const err = (e: unknown, fb: string) => (e instanceof Error ? e.message : fb)
 
 /* ================= About ================= */
 export function AboutPage() {
-  const [st, setSt] = useState<SiteStats | null>(null)
+  const [st, setSt] = useState<SiteStats | null>(null); const cfg = useSiteConfig()
   useEffect(() => { siteApi.stats().then(setSt).catch(() => {}) }, [])
   const values: [string, string][] = [
     ['Verified, or not listed', 'Every shipper on Ntemtem has had its business registration, licence and insurance checked before the badge appears. No badge, no bookings.'],
@@ -27,11 +27,12 @@ export function AboutPage() {
           <motion.p variants={fadeUp} className="eyebrow mb-2">About Ntemtem</motion.p>
           <motion.h1 variants={fadeUp} className="!text-[clamp(2rem,4.5vw,3.4rem)]">The marketplace for freight to West Africa.</motion.h1>
           <motion.p variants={fadeUp} className="mt-4 text-lg text-text-muted">Most freight to Ghana, Nigeria and their neighbours is still booked through word of mouth: a cousin's forwarder, a number on a flyer, a WhatsApp group. It works until it doesn't — a barrel that sits at Tema for six weeks, a car with the wrong paperwork, a deposit paid to someone who stops answering. Ntemtem keeps the relationships and adds the guardrails.</motion.p>
-          <motion.p variants={fadeUp} className="mt-4 text-text-muted">We are a US company with an sourcing teams on the ground in China (Guangzhou, Shenzhen and Yiwu), the UK and the USA. Customers post a shipment once and verified shippers compete for it with itemised quotes; the customer picks, pays into escrow, and follows the shipment to the door. For businesses that need stock, our own China team sources, buys, inspects and ships — one price, one timeline.</motion.p>
+          <motion.p variants={fadeUp} className="mt-4 text-text-muted">We are a US company with sourcing teams on the ground in China (Guangzhou, Shenzhen and Yiwu), the UK and the USA. Customers post a shipment once and verified shippers compete for it with itemised quotes; the customer picks, pays into escrow, and follows the shipment to the door. For businesses that need stock, our own China team sources, buys, inspects and ships — one price, one timeline.</motion.p>
         </motion.div>
         {st && <motion.div initial="hidden" animate="show" variants={stagger} className="mx-auto mt-10 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4" data-testid="about-stats">
-          {[[st.verifiedShippers, 'verified shippers'], [st.destinations, 'West African countries'], [st.quotes, 'quotes issued'], [`${st.onTimePct}%`, 'average on-time']].map(([v, l]) => <motion.div key={String(l)} variants={fadeUp} className="card-dark p-4"><p className="font-heading text-3xl font-bold tabular-nums">{v}</p><p className="text-xs text-text-muted">{l}</p></motion.div>)}
+          {([[statReady.verifiedShippers(st) ? st.verifiedShippers : null, 'verified shippers'], [st.destinations, 'West African countries'], [statReady.quotes(st) ? st.quotes : null, 'quotes issued'], [statReady.onTime(st) ? `${st.onTimePct}%` : null, 'average on-time']] as [string | number | null, string][]).filter(([v]) => v != null).map(([v, l]) => <motion.div key={String(l)} variants={fadeUp} className="card-dark p-4"><p className="font-heading text-3xl font-bold tabular-nums">{v}</p><p className="text-xs text-text-muted">{l}</p></motion.div>)}
         </motion.div>}
+        {(cfg?.legalName || cfg?.address) && <p className="mx-auto mt-8 max-w-3xl rounded-xl border border-border bg-surface px-4 py-3 text-center text-sm" data-testid="about-company"><b>Who runs Ntemtem:</b> {[cfg.legalName, cfg.address].filter(Boolean).join(' · ')}</p>}
         <section className="mx-auto mt-14 max-w-5xl">
           <p className="eyebrow mb-2 text-center">What we stand for</p>
           <div className="grid gap-4 md:grid-cols-2">{values.map(([t, b]) => <div key={t} className="card-dark p-5"><p className="font-semibold">{t}</p><p className="mt-1 text-sm text-text-muted">{b}</p></div>)}</div>
@@ -92,6 +93,7 @@ export function ContactPage() {
               <ul className="space-y-2 text-text-muted">
                 {cfg?.email && <li className="flex items-center gap-2"><Mail size={14} className="text-gold-deep" aria-hidden="true" /><a href={`mailto:${cfg.email}`} className="hover:text-gold-deep">{cfg.email}</a></li>}
                 {cfg?.phone && <li className="flex items-center gap-2"><Phone size={14} className="text-gold-deep" aria-hidden="true" /><a href={`tel:${cfg.phone.replace(/[^+\d]/g, '')}`} className="hover:text-gold-deep">{cfg.phone}</a></li>}
+                {cfg?.legalName && <li className="text-text-muted">Ntemtem is operated by <b className="text-text">{cfg.legalName}</b>.</li>}
                 {cfg?.address && <li className="flex items-start gap-2"><MapPin size={14} className="mt-0.5 text-gold-deep" aria-hidden="true" /><span>{cfg.address}</span></li>}
                 {cfg && !cfg.email && !cfg.phone && !cfg.whatsappUrl && <li>Use the form — it goes straight to the team.</li>}
               </ul>
@@ -167,6 +169,7 @@ export function LegalPage({ kind }: { kind: keyof typeof LEGAL }) {
 export function NotFound() {
   const nav = useNavigate(); const { '*': rest } = useParams(); const [ref, setRef] = useState('')
   const looksLikeRef = /^(SS|NT)-[A-Z0-9]{6}$/i.test((rest ?? '').replace(/^track\/?/, ''))
+  useEffect(() => { setPageTitle('Page not found') }, [])
   return (
     <div className="bg-bg text-text">
       <div className="container-x max-w-xl py-20 text-center" data-testid="not-found">

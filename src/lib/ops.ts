@@ -52,7 +52,7 @@ export const ROLE_BASE: Record<StaffRole, Area[] | 'all'> = {
   delivery_driver: ['routes'],
   driver: ['routes'],
 }
-const ALWAYS = ['/dashboard/costs', '/dashboard/campaigns', '/dashboard/integrations', '/dashboard/activity', '/dashboard/billing', '/dashboard/shipper', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/documents', '/dashboard/invoices', '/dashboard/runs', '/dashboard/suppliers', '/dashboard/drivers', '/dashboard/payslip']
+const ALWAYS = ['/dashboard/hr', '/dashboard/me', '/dashboard/costs', '/dashboard/campaigns', '/dashboard/integrations', '/dashboard/activity', '/dashboard/billing', '/dashboard/shipper', '/dashboard/notifications', '/dashboard/scan', '/dashboard/labels', '/dashboard/documents', '/dashboard/invoices', '/dashboard/runs', '/dashboard/suppliers', '/dashboard/drivers', '/dashboard/payslip']
 /** Effective areas for a person: role defaults + allow − deny. */
 export function areasFor(role: StaffRole | undefined, perms?: StaffPerms): Area[] | 'all' {
   const base = ROLE_BASE[role ?? 'owner']

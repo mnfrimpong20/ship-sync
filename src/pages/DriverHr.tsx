@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Award, Camera, Check, ChevronRight, FileText, MessageSquareWarning, PlayCircle, Send, X } from 'lucide-react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { Link, NavLink, Navigate, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, Award, Camera, Check, ChevronRight, Coffee, FileText, LogIn, LogOut, MessageSquareWarning, PlayCircle, Send, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { isDriverRole } from '../lib/roles'
 import { useT } from '../lib/i18n'
@@ -13,15 +13,22 @@ import { SignaturePad } from '../components/SignaturePad'
 import { Big, Choice } from '../components/driver/DriverUi'
 import { Breakdown, PayslipView } from '../components/driver/OfficeHr'
 import { CardCamera } from '../components/driver/CardCamera'
+import { driverApi, type ShiftView } from '../lib/driverApi'
+import { roleHome, type StaffRole } from '../lib/ops'
 import QRCode from 'qrcode'
 
 const addDays = (d: string, n: number) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10) }
 const today = () => new Date().toISOString().slice(0, 10)
 const errOf = (e: unknown, f: string) => (e instanceof Error ? e.message : f)
 
+/** Drivers and office staff share these pages; drivers get the extras (badge, agreement, quiz) and live under My runs. */
+const SelfCtx = createContext<{ driver: boolean; home: string }>({ driver: true, home: '/dashboard/runs' })
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
-  const t = useT()
-  return <div className="bg-bg text-text"><div className="container-x max-w-2xl py-5 pb-28 md:py-8"><Link to="/dashboard/runs" className="inline-flex min-h-11 items-center gap-1.5 text-base text-text-muted hover:text-text focus-ring"><ArrowLeft size={18} aria-hidden="true" /> {t('My runs')}</Link><h1 className="mt-1 !text-[1.7rem] leading-tight">{title}</h1>{children}</div></div>
+  const t = useT(); const { driver, home } = useContext(SelfCtx)
+  return <div className="bg-bg text-text"><div className="container-x max-w-2xl py-5 pb-28 md:py-8">
+    <Link to={home} className="inline-flex min-h-11 items-center gap-1.5 text-base text-text-muted hover:text-text focus-ring"><ArrowLeft size={18} aria-hidden="true" /> {driver ? t('My runs') : t('Dashboard')}</Link>
+    {!driver && <nav aria-label={t('My HR')} className="mt-2 flex gap-1 rounded-2xl border border-border bg-surface p-1">{([['pay', 'My pay'], ['time', 'My time'], ['file', 'My file']] as const).map(([k, l]) => <NavLink key={k} to={`/dashboard/me/${k}`} className={({ isActive }) => `flex min-h-11 flex-1 items-center justify-center rounded-xl text-sm font-semibold ${isActive ? 'bg-gold text-on-accent' : 'text-text-muted hover:text-text'}`}>{t(l)}</NavLink>)}</nav>}
+    <h1 className="mt-3 !text-[1.7rem] leading-tight">{title}</h1>{children}</div></div>
 }
 const Card = ({ title, children, id, testid }: { title: string; children: React.ReactNode; id: string; testid?: string }) => <section className="mt-5 rounded-3xl border border-border bg-surface p-5" aria-labelledby={id} data-testid={testid}><h2 id={id} className="!text-lg">{title}</h2>{children}</section>
 const Msg = ({ err, ok }: { err?: string; ok?: string }) => <>{err && <p role="alert" className="mt-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-base text-danger">{err}</p>}{ok && <p role="status" className="mt-3 rounded-xl border border-teal/40 bg-teal/10 px-3 py-2 text-base">{ok}</p>}</>
@@ -39,12 +46,12 @@ function PayHistory({ rows, cur }: { rows: PaySummary['history']; cur: string })
   )
 }
 function MyPay() {
-  const t = useT(); const disp = useDisplay()
+  const t = useT(); const disp = useDisplay(); const { driver } = useContext(SelfCtx)
   const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.myPay>> | null>(null); const [sum, setSum] = useState<PaySummary | null>(null); const [rank, setRank] = useState<Awaited<ReturnType<typeof hrApi.myRank>> | null>(null)
   const [qs, setQs] = useState<PayQuery[]>([]); const [ars, setArs] = useState<AdvanceReq[]>([]); const [err, setErr] = useState(''); const [ok, setOk] = useState('')
   const [det, setDet] = useState<PayDetail | null>(null); const [open, setOpen] = useState(false); const [q, setQ] = useState<{ line: string; note: string } | null>(null)
   const [adv, setAdv] = useState<{ amount: string; currency: string; reason: string; installments: number } | null>(null); const [busy, setBusy] = useState(false)
-  const load = () => { hrApi.myPay().then(setD).catch((e) => setErr(errOf(e, t('Could not load.')))); hrApi.paySummary().then(setSum).catch(() => {}); hrApi.myRank().then(setRank).catch(() => {}); hrApi.myQueries().then(setQs).catch(() => {}); hrApi.myAdvances().then(setArs).catch(() => {}) }
+  const load = () => { hrApi.myPay().then(setD).catch((e) => setErr(errOf(e, t('Could not load.')))); hrApi.paySummary().then(setSum).catch(() => {}); if (driver) hrApi.myRank().then(setRank).catch(() => {}); hrApi.myQueries().then(setQs).catch(() => {}); hrApi.myAdvances().then(setArs).catch(() => {}) }
   useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   if (!d) return <Shell title={t('My pay')}>{err ? <Msg err={err} /> : <BrandLoader full={false} />}</Shell>
   const c = d.current; const curr = sum?.currency ?? c.currency
@@ -56,7 +63,7 @@ function MyPay() {
     <Shell title={t('My pay')}>
       {sum && <section className="mt-4 grid grid-cols-2 gap-2" aria-label={t('Pay day')} data-testid="pay-summary">
         <div className="rounded-2xl border-2 border-gold bg-gold/10 p-4"><p className="text-sm text-text-muted">{t('Pay day')}</p><p className="text-xl font-bold">{niceDay(sum.payDay, { lang: disp.lang })}</p><p className="text-sm">{sum.closesIn === 0 ? t('Period closes today') : t('Period closes in {n} days', { n: sum.closesIn })}</p></div>
-        <div className="rounded-2xl border-2 border-border bg-surface p-4"><p className="text-sm text-text-muted">{t('Earned today')}</p><p className="text-xl font-bold tabular-nums" data-testid="earned-today">{money(sum.today.earned, curr)}</p><p className="text-sm">{(sum.today.stops === 1 ? t('1 stop') : t('{n} stops', { n: sum.today.stops }))} · {sum.today.hours} h</p></div>
+        <div className="rounded-2xl border-2 border-border bg-surface p-4"><p className="text-sm text-text-muted">{driver ? t('Earned today') : t('Hours today')}</p><p className="text-xl font-bold tabular-nums" data-testid="earned-today">{driver || sum.today.earned ? money(sum.today.earned, curr) : `${sum.today.hours} h`}</p><p className="text-sm">{driver ? `${sum.today.stops === 1 ? t('1 stop') : t('{n} stops', { n: sum.today.stops })} · ` : ''}{sum.today.hours} h</p></div>
       </section>}
       {d.owed > 0 && <p className="mt-4 rounded-2xl border-2 border-teal/50 bg-teal/10 p-4 text-base font-semibold" data-testid="owed">{t('{amount} approved and on its way to you.', { amount: money(d.owed, d.payslips[0]?.currency) })}</p>}
       {rank?.show && rank.rank && <p className="mt-4 flex items-center gap-2 rounded-2xl bg-surface-2 p-4 text-base"><Award size={20} className="text-gold-deep" aria-hidden="true" /> {t('You’re number {n} of {of} drivers this month.', { n: rank.rank, of: rank.of ?? 0 })}</p>}
@@ -96,8 +103,27 @@ function MyPay() {
 }
 
 /* ---------------- Time off & rota ---------------- */
+/** Office staff clock in here (drivers do it on My runs). */
+function ClockCard() {
+  const t = useT(); const [v, setV] = useState<ShiftView | null>(null); const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
+  useEffect(() => { driverApi.shift().then(setV).catch((e) => setErr(errOf(e, t('Could not load.')))) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const go = async (a: 'in' | 'break' | 'resume' | 'out') => { setBusy(true); setErr(''); try { setV(await driverApi.clock(a)) } catch (e) { setErr(errOf(e, t('Could not save.'))) } finally { setBusy(false) } }
+  const c = v?.current
+  return (
+    <Card title={t('Clock in & out')} id="clk-h" testid="clock">
+      <p className="mt-1 text-base">{!v ? t('Loading…') : c ? (c.onBreak ? t('On a break') : t('On shift since {time}', { time: new Date(c.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })) : t('Not clocked in')} {v && <span className="text-sm text-text-muted">· {t('{n} h this week', { n: v.week })}</span>}</p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {!c ? <div className="col-span-2"><Big tone="gold" disabled={busy || !v} onClick={() => go('in')} testid="clock-in"><LogIn size={20} aria-hidden="true" /> {t('Clock in')}</Big></div> : <>
+          <Big disabled={busy} onClick={() => go(c.onBreak ? 'resume' : 'break')} testid="clock-break"><Coffee size={20} aria-hidden="true" /> {c.onBreak ? t('Back from break') : t('Start a break')}</Big>
+          <Big tone="danger" disabled={busy} onClick={() => go('out')} testid="clock-out"><LogOut size={20} aria-hidden="true" /> {t('Clock out')}</Big></>}
+      </div>
+      <Msg err={err} />
+    </Card>
+  )
+}
+
 function MyTime() {
-  const t = useT(); const disp = useDisplay()
+  const t = useT(); const disp = useDisplay(); const { driver } = useContext(SelfCtx)
   const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.myLeave>> | null>(null); const [rota, setRota] = useState<Rota | null>(null)
   const [f, setF] = useState({ kind: 'vacation' as Leave['kind'], start: addDays(today(), 7), end: addDays(today(), 7), swapWith: '', note: '' }); const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [ok, setOk] = useState('')
   const load = () => { hrApi.myLeave().then(setD).catch((e) => setErr(errOf(e, t('Could not load.')))); hrApi.rota(today(), 14).then(setRota).catch(() => {}) }
@@ -106,6 +132,7 @@ function MyTime() {
   const days = Array.from({ length: 14 }, (_, i) => addDays(today(), i))
   return (
     <Shell title={t('Time off & rota')}>
+      {!driver && <ClockCard />}
       {d && <p className="mt-3 text-lg" data-testid="leave-balance">{t('{left} of {all} holiday days left this year', { left: d.balance.left, all: d.balance.allowance })}</p>}
       <Card title={t('My next two weeks')} id="rota-h" testid="my-rota">
         {!rota ? <p className="text-text-muted">{t('Loading…')}</p> : <ul className="mt-2 divide-y divide-border">{days.map((dd) => { const e = rota.entries.find((x) => x.day === dd); const lv = rota.leave.find((x) => x.start <= dd && x.end >= dd); const runs = rota.runs.filter((x) => x.day === dd)
@@ -131,7 +158,7 @@ function MyTime() {
 
 /* ---------------- My file: onboarding, agreement, training, papers, details ---------------- */
 function MyFile() {
-  const t = useT(); const [sp] = useSearchParams()
+  const t = useT(); const [sp] = useSearchParams(); const { driver } = useContext(SelfCtx)
   const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.me>> | null>(null); const [err, setErr] = useState(''); const [ok, setOk] = useState('')
   const load = () => hrApi.me().then(setD).catch((e) => setErr(errOf(e, t('Could not load.'))))
   useEffect(() => { void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -143,10 +170,10 @@ function MyFile() {
         <ul className="mt-2 grid gap-1.5">{p.checklist.map((c) => <li key={c.key} className="flex items-center gap-2 text-base">{c.done ? <Check size={18} className="text-teal" aria-label={t('Done')} /> : <X size={18} className="text-text-muted" aria-label={t('Not done')} />}{t(c.label)}</li>)}</ul>
       </Card>
       {p.expiringSoon.length > 0 && <p className="mt-4 rounded-2xl border-2 border-danger/50 bg-danger/10 p-4 text-base" role="alert">{p.expiringSoon.map((e) => <span key={e.kind} className="block">{e.expired ? t('{doc} has expired — upload the new one.', { doc: t(e.label) }) : t('{doc} expires {date}.', { doc: t(e.label), date: e.date })}</span>)}</p>}
-      <Agreement company={d.company} person={p} onDone={() => { setOk(t('Agreement signed.')); void load() }} />
-      <Training videos={d.settings.trainingVideos} passed={!!p.training?.passedAt} onDone={() => void load()} open={sp.get('quiz') === '1'} />
+      {driver && <Agreement company={d.company} person={p} onDone={() => { setOk(t('Agreement signed.')); void load() }} />}
+      {driver && <Training videos={d.settings.trainingVideos} passed={!!p.training?.passedAt} onDone={() => void load()} open={sp.get('quiz') === '1'} />}
       <Papers person={p} onDone={(m) => { setOk(m); void load() }} />
-      <BadgeCard />
+      {driver && <BadgeCard />}
       <Details person={p} onDone={(m) => { setOk(m); void load() }} />
       <Msg err={err} ok={ok} />
     </Shell>
@@ -181,10 +208,11 @@ function Training({ videos, passed, onDone, open }: { videos: { title: string; u
     </Card>
   )
 }
-const PAPER_KINDS: [string, string, boolean][] = [['licence', 'Driving licence', true], ['id', 'ID', true], ['medical', 'Medical card', false], ['insurance', 'Insurance', false], ['permit', 'Work / DOT / DVLA permit', false]]
+const DRIVER_PAPERS: [string, string, boolean][] = [['licence', 'Driving licence', true], ['id', 'ID', true], ['medical', 'Medical card', false], ['insurance', 'Insurance', false], ['permit', 'Work / DOT / DVLA permit', false]]
+const OFFICE_PAPERS: [string, string, boolean][] = [['id', 'ID', true], ['contract', 'Signed employment contract', false], ['right_to_work', 'Right to work', false], ['tax', 'Tax form (W-4 / SSNIT / TIN)', false], ['certificate', 'Certificate', false], ['permit', 'Work permit', false]]
 function Papers({ person, onDone }: { person: Person; onDone: (m: string) => void }) {
-  const t = useT(); const [sp] = useSearchParams(); const renew = sp.get('renew')
-  const [kind, setKind] = useState(renew && PAPER_KINDS.some((k) => k[0] === renew) ? renew : 'licence'); const [exp, setExp] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
+  const t = useT(); const [sp] = useSearchParams(); const renew = sp.get('renew'); const { driver } = useContext(SelfCtx); const PAPER_KINDS = driver ? DRIVER_PAPERS : OFFICE_PAPERS
+  const [kind, setKind] = useState(renew && PAPER_KINDS.some((k) => k[0] === renew) ? renew : PAPER_KINDS[0][0]); const [exp, setExp] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
   const [cam, setCam] = useState<null | 'front' | 'back' | 'single'>(null)
   const box = useRef<HTMLElement>(null)
   useEffect(() => { if (renew) setTimeout(() => box.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300) }, [renew])
@@ -193,7 +221,7 @@ function Papers({ person, onDone }: { person: Person; onDone: (m: string) => voi
   const save = async (dataUrl: string, side: '' | 'front' | 'back') => {
     setBusy(true); setErr('')
     try {
-      await hrApi.addDoc('me', { kind, title: `${PAPER_KINDS.find((k) => k[0] === kind)?.[1] ?? kind}${side ? ` — ${side}` : ''}`, dataUrl, expiresOn: kind === 'id' ? null : exp || null, side })
+      await hrApi.addDoc('me', { kind, title: `${PAPER_KINDS.find((k) => k[0] === kind)?.[1] ?? kind}${side ? ` — ${side}` : ''}`, dataUrl, expiresOn: ['id', 'contract', 'tax', 'certificate'].includes(kind) ? null : exp || null, side })
       if (side === 'front' && twoSided) { setCam('back'); onDone(t('Front saved — now the back.')) } else { setCam(null); onDone(t('Uploaded — the office will check it.')); setExp('') }
     } catch (e) { setErr(errOf(e, t('Could not upload.'))); setCam(null) } finally { setBusy(false) }
   }
@@ -204,10 +232,10 @@ function Papers({ person, onDone }: { person: Person; onDone: (m: string) => voi
       {person.docs.length ? <ul className="mt-2 divide-y divide-border text-base">{person.docs.map((x) => <li key={x.id} className="py-2.5" data-testid="my-doc"><div className="flex items-center gap-2"><FileText size={18} aria-hidden="true" /><span className="min-w-0 flex-1">{x.title || x.kind}{x.expiresOn ? <span className="block text-sm text-text-muted">{t('Expires {date}', { date: x.expiresOn })}</span> : null}</span>{status(x)}</div>{x.status === 'rejected' && x.reviewNote && <p className="mt-1 rounded-xl bg-danger/10 p-2 text-sm">“{x.reviewNote}” — {x.reviewedBy}</p>}</li>)}</ul> : <p className="mt-2 text-base text-text-muted">{t('Nothing uploaded yet.')}</p>}
       <div className="mt-4 grid gap-3">
         <div><label htmlFor="pap-kind" className="label-dark">{renew ? t('Upload the new one') : t('What is it?')}</label><select id="pap-kind" className="input-dark !min-h-12" value={kind} onChange={(e) => setKind(e.target.value)}>{PAPER_KINDS.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}</select></div>
-        {kind !== 'id' && <div><label htmlFor="pap-exp" className="label-dark">{t('Expiry date')}</label><input id="pap-exp" type="date" className="input-dark !min-h-12" value={exp} onChange={(e) => setExp(e.target.value)} /></div>}
+        {!['id', 'contract', 'tax', 'certificate'].includes(kind) && <div><label htmlFor="pap-exp" className="label-dark">{t('Expiry date')}</label><input id="pap-exp" type="date" className="input-dark !min-h-12" value={exp} onChange={(e) => setExp(e.target.value)} /></div>}
         <Big tone="gold" disabled={busy} onClick={() => setCam(twoSided ? 'front' : 'single')} testid="pap-camera"><Camera size={20} aria-hidden="true" /> {busy ? t('Uploading…') : twoSided ? t('Photograph the front, then the back') : t('Take a photo')}</Big>
       </div>
-      {cam && <CardCamera title={cam === 'back' ? t('{doc} — back', { doc: label }) : cam === 'front' ? t('{doc} — front', { doc: label }) : label} hint={cam === 'back' ? t('Turn it over and photograph the back.') : t('Lay it flat on a dark surface, in good light, with no glare.')} shape={kind === 'insurance' || kind === 'permit' ? 'page' : 'card'} onClose={() => setCam(null)} onPhoto={(u) => void save(u, cam === 'single' ? '' : cam)} />}
+      {cam && <CardCamera title={cam === 'back' ? t('{doc} — back', { doc: label }) : cam === 'front' ? t('{doc} — front', { doc: label }) : label} hint={cam === 'back' ? t('Turn it over and photograph the back.') : t('Lay it flat on a dark surface, in good light, with no glare.')} shape={['id', 'licence'].includes(kind) ? 'card' : 'page'} onClose={() => setCam(null)} onPhoto={(u) => void save(u, cam === 'single' ? '' : cam)} />}
       <Msg err={err} />
     </section>
   )
@@ -257,13 +285,17 @@ function Details({ person, onDone }: { person: Person; onDone: (m: string) => vo
   )
 }
 
-/** /dashboard/runs/pay · /dashboard/runs/time · /dashboard/runs/me */
-export default function DriverHr({ section }: { section: 'pay' | 'time' | 'me' }) {
+/** Drivers: /dashboard/runs/pay · time · me. Office staff: /dashboard/me/pay · time · file (same pages, without the driver extras). */
+export default function DriverHr({ section, office = false }: { section: 'pay' | 'time' | 'me'; office?: boolean }) {
   const { ready, user } = useStore()
   if (!ready) return <BrandLoader partner />
-  if (!user) return <Navigate to={`/login?role=shipper&next=/dashboard/runs/${section}`} replace />
-  if (!isDriverRole(user.staffRole)) return <Navigate to="/dashboard/drivers" replace />
-  return section === 'pay' ? <MyPay /> : section === 'time' ? <MyTime /> : <MyFile />
+  const here = office ? `/dashboard/me/${section === 'me' ? 'file' : section}` : `/dashboard/runs/${section}`
+  if (!user) return <Navigate to={`/login?role=shipper&next=${here}`} replace />
+  if (user.role !== 'shipper') return <Navigate to="/dashboard" replace />
+  const driver = isDriverRole(user.staffRole)
+  if (driver && office) return <Navigate to={`/dashboard/runs/${section}`} replace />
+  if (!driver && !office) return <Navigate to={`/dashboard/me/${section === 'me' ? 'file' : section}`} replace />
+  return <SelfCtx.Provider value={{ driver, home: driver ? '/dashboard/runs' : roleHome[(user.staffRole ?? 'owner') as StaffRole] ?? '/dashboard/shipper' }}>{section === 'pay' ? <MyPay /> : section === 'time' ? <MyTime /> : <MyFile />}</SelfCtx.Provider>
 }
 
 /** /dashboard/payslip/:id — drivers and the office. */

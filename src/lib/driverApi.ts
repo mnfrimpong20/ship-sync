@@ -58,7 +58,7 @@ export const driverApi = {
   cash: () => api<{ drivers: { staffId: string; name: string; due: number; stops: { stopId: string; label: string; runName: string; amountUsd: number }[] }[]; handovers: { id: string; name: string; expected: number; received: number; diff: number; at: string; by: string; note: string }[] }>('/drivers/cash'),
   handover: (staffId: string, received: number, note: string, deduct = false) => api<{ ok: true; expected: number; received: number; diff: number }>(`/drivers/${staffId}/cash`, { json: { received, note, deduct } }),
   stats: (days = 30) => api<{ days: number; drivers: DriverStat[] }>(`/drivers/stats?days=${days}`),
-  setPay: (staffId: string, pay: { perStop: number; perRun: number; perHour: number; currency: string }) => api(`/drivers/${staffId}/pay`, { method: 'PUT', json: pay }),
+  setPay: (staffId: string, pay: { perStop: number; perRun: number; perHour: number; monthly?: number; currency: string }) => api(`/drivers/${staffId}/pay`, { method: 'PUT', json: pay }),
 }
 
 /** Read text aloud (next stop, etc.). Uses the phone's own voice; silently does nothing where unsupported. */

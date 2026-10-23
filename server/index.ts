@@ -40,7 +40,7 @@ async function main() {
   ;(await import('./autopilot')).startAutopilotSweeps(getDb)
   ;(await import('./driverHr')).startDriverHrSweeps(getDb)
   // Atlantic Bridge demo runs after the broker demo so that seed doesn't pick up its shipments.
-  void getDb().then(async (db) => { await (await import('./brokerPortal')).seedBrokerPortalDemo(db).catch((e) => console.error('[broker] demo seed', e)); const ab = await import('./atlanticDemo'); await ab.seedAtlanticBridgeDemo(db); await ab.seedAtlanticPaymentsDemo(db) }).catch((e) => console.error('[atlantic] demo seed', e))
+  void getDb().then(async (db) => { await (await import('./brokerPortal')).seedBrokerPortalDemo(db).catch((e) => console.error('[broker] demo seed', e)); const ab = await import('./atlanticDemo'); await ab.seedAtlanticBridgeDemo(db); await ab.seedAtlanticPaymentsDemo(db); await (await import('./teamHrDemo')).seedTeamHrDemo(db) }).catch((e) => console.error('[atlantic] demo seed', e))
   // A shipment in a container takes the container's ETA. Bring any that drifted (loaded before this rule) into line, quietly; the old date is kept as eta_original.
   void getDb().then((db) => db.query(`update shipments s set eta_original = coalesce(s.eta_original, s.eta), eta = c.eta from containers c where s.container_id = c.id and c.eta is not null and s.eta is distinct from c.eta and s.status <> 'delivered' and s.cancelled_at is null`)).catch((e) => console.error('[containers] eta align', e))
   // Demo quotes from before ship dates existed get one, so customers can compare by ship and arrival dates. Only fills empty ones on demo shippers.

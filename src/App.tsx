@@ -26,6 +26,7 @@ const InvoiceView = lazy(() => import('./pages/InvoiceView'))
 const Team = lazy(() => import('./pages/Team'))
 const Fleet = lazy(() => import('./pages/Fleet'))
 const Drivers = lazy(() => import('./pages/Drivers'))
+const TeamHr = lazy(() => import('./pages/TeamHr'))
 const RunsList = lazy(() => import('./pages/Routes'))
 const RoutePlanner = lazy(() => import('./pages/RoutePlanner'))
 const MyRuns = lazy(() => import('./pages/MyRuns'))
@@ -243,6 +244,11 @@ export default function App() {
               <Route path="/dashboard/runs/pay" element={<DriverHr section="pay" />} />
               <Route path="/dashboard/runs/time" element={<DriverHr section="time" />} />
               <Route path="/dashboard/runs/me" element={<DriverHr section="me" />} />
+              <Route path="/dashboard/hr" element={<TeamHr />} />
+              <Route path="/dashboard/me/pay" element={<DriverHr section="pay" office />} />
+              <Route path="/dashboard/me/time" element={<DriverHr section="time" office />} />
+              <Route path="/dashboard/me/file" element={<DriverHr section="me" office />} />
+              <Route path="/dashboard/me" element={<Navigate to="/dashboard/me/pay" replace />} />
               <Route path="/dashboard/payslip/:id" element={<PayslipPage />} />
               <Route path="/dashboard/scan" element={<Scan />} />
               <Route path="/dashboard/notifications" element={<Notifications />} />

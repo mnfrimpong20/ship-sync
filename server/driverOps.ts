@@ -408,9 +408,10 @@ export function mountDriverOps(r: Router, d: Deps) {
     res.set('Cache-Control', 'no-store'); res.json({ days, drivers: out })
   }))
   r.put('/drivers/:staffId/pay', wrap(async (req, res) => {
-    const db = await getDb(); const { shipperId } = await officeOnly(db, req)
-    const b = z.object({ perStop: z.number().min(0).max(10000).default(0), perRun: z.number().min(0).max(100000).default(0), perHour: z.number().min(0).max(1000).default(0), currency: z.enum(['USD', 'GHS', 'NGN', 'XOF', 'GBP', 'EUR']).default('USD') }).parse(req.body)
-    const { rows } = await db.query<Row>('update staff set pay = $3 where id = $1 and shipper_id = $2 returning id', [String(req.params.staffId), shipperId, JSON.stringify(b)]); if (!rows[0]) throw new HttpError(404, 'Driver not found.')
+    const db = await getDb(); const { shipperId, role } = await officeOnly(db, req)
+    { const { rows: t } = await db.query<Row>('select role from staff where id = $1 and shipper_id = $2', [String(req.params.staffId), shipperId]); if (t[0] && !isDriverRole(t[0].role) && !['owner', 'finance'].includes(role)) throw new HttpError(403, 'Only the owner or finance can set office pay.') }
+    const b = z.object({ perStop: z.number().min(0).max(10000).default(0), perRun: z.number().min(0).max(100000).default(0), perHour: z.number().min(0).max(1000).default(0), monthly: z.number().min(0).max(10_000_000).default(0), currency: z.enum(['USD', 'GHS', 'NGN', 'XOF', 'GBP', 'EUR']).default('USD') }).parse(req.body)
+    const { rows } = await db.query<Row>('update staff set pay = $3 where id = $1 and shipper_id = $2 returning id', [String(req.params.staffId), shipperId, JSON.stringify(b)]); if (!rows[0]) throw new HttpError(404, 'Person not found.')
     res.json({ ok: true, pay: b })
   }))
   r.get('/drivers/timesheet.csv', wrap(async (req, res) => {

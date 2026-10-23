@@ -1,29 +1,31 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { AlertTriangle, Banknote, Check, Clock, Fuel, MessageSquare, ShieldAlert, Truck } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Banknote, Check, Clock, Fuel, MessageSquare, ShieldAlert, Truck, UsersRound } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { isDriverRole } from '../lib/roles'
-import { driverApi, type DriverPos, type DriverStat, type Expense, type Incident, type Shift } from '../lib/driverApi'
+import { driverApi, type DriverPos, type Expense, type Incident, type Shift } from '../lib/driverApi'
 import { fadeUp, stagger } from '../lib/motion'
 import { BrandLoader } from '../components/BrandLoader'
 import { StatCard, Th, thead, trow } from '../components/board'
 import { fmtDateTime } from '../components/ui'
 import RunMap from '../components/RunMap'
-import { AnalyticsTab, HoursTab, PayrollTab, PeopleTab, RotaTab } from '../components/driver/OfficeHr'
+import { AnalyticsTab } from '../components/driver/OfficeHr'
 
 const money = (n: number, cur = 'USD') => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n) } catch { return `${cur} ${n}` } }
 const ago = (iso: string) => { const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago` }
 const Empty = ({ children }: { children: React.ReactNode }) => <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-text-muted">{children}</p>
-type Tab = 'road' | 'cash' | 'payroll' | 'time' | 'rota' | 'analytics' | 'people'
-const TABS: [Tab, string][] = [['road', 'On the road'], ['cash', 'Cash'], ['payroll', 'Payroll'], ['time', 'Hours'], ['rota', 'Rota & time off'], ['analytics', 'Analytics'], ['people', 'People']]
+type Tab = 'road' | 'cash' | 'analytics'
+const TABS: [Tab, string][] = [['road', 'On the road'], ['cash', 'Cash & expenses'], ['analytics', 'Analytics']]
+/** Pay, hours, rota and HR files moved to Team & HR — old links still land in the right place. */
+const MOVED: Record<string, string> = { payroll: 'payroll', time: 'hours', rota: 'rota', people: 'people' }
 
-/** Office view of the drivers: where they are, what they've said, cash to hand in, hours, expenses, performance and pay. */
+/** Office view of the drivers on the job: where they are, what they've said, cash to hand in, expenses and performance. HR lives in Team & HR. */
 export default function Drivers() {
-  const { ready, user } = useStore()
-  const [sp, setSp] = useSearchParams(); const tab = (TABS.some(([k]) => k === sp.get('tab')) ? sp.get('tab') : 'road') as Tab
+  const { ready, user } = useStore(); const nav = useNavigate()
+  const [sp, setSp] = useSearchParams(); const moved = MOVED[sp.get('tab') ?? '']; const tab = (TABS.some(([k]) => k === sp.get('tab')) ? sp.get('tab') : 'road') as Tab
   const [pos, setPos] = useState<DriverPos[] | null>(null); const [msgs, setMsgs] = useState<Awaited<ReturnType<typeof driverApi.allMessages>>['messages']>([]); const [inc, setInc] = useState<Incident[]>([])
-  const [cash, setCash] = useState<Awaited<ReturnType<typeof driverApi.cash>> | null>(null); const [shifts, setShifts] = useState<(Shift & { name: string })[]>([]); const [exp, setExp] = useState<Expense[]>([]); const [stats, setStats] = useState<DriverStat[]>([])
+  const [cash, setCash] = useState<Awaited<ReturnType<typeof driverApi.cash>> | null>(null); const [shifts, setShifts] = useState<(Shift & { name: string })[]>([]); const [exp, setExp] = useState<Expense[]>([])
   const [err, setErr] = useState(''); const [toast, setToast] = useState('')
   const load = () => {
     driverApi.positions().then((r) => setPos(r.drivers)).catch((e) => { setPos([]); setErr(e instanceof Error ? e.message : 'Could not load.') })
@@ -32,10 +34,10 @@ export default function Drivers() {
     driverApi.cash().then(setCash).catch(() => {})
     driverApi.shifts().then((r) => setShifts(r.shifts)).catch(() => {})
     driverApi.expenses().then((r) => setExp(r.expenses)).catch(() => {})
-    driverApi.stats(30).then((r) => setStats(r.drivers)).catch(() => {})
   }
   useEffect(() => { if (!ready || user?.role !== 'shipper') return; load(); const x = setInterval(() => { if (document.visibilityState === 'visible') driverApi.positions().then((r) => setPos(r.drivers)).catch(() => {}) }, 30000); return () => clearInterval(x) }, [ready, user]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (toast) { const x = setTimeout(() => setToast(''), 4000); return () => clearTimeout(x) } }, [toast])
+  if (moved) return <Navigate to={`/dashboard/hr?tab=${moved}${sp.get('p') ? `&p=${sp.get('p')}` : ''}`} replace />
   if (!ready) return <BrandLoader />
   if (!user || user.role !== 'shipper') return <Navigate to="/dashboard" replace />
   if (isDriverRole(user.staffRole)) return <Navigate to="/dashboard/runs" replace />
@@ -50,7 +52,8 @@ export default function Drivers() {
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <motion.p variants={fadeUp} className="eyebrow mb-1">Drivers</motion.p>
           <motion.h1 variants={fadeUp} className="!text-[clamp(1.75rem,3.5vw,2.5rem)]">{pos.length ? `${pos.length} on the road now` : 'Nobody on the road right now'}</motion.h1>
-          <motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Live positions while drivers have the app open, their messages and problem reports, cash to hand in, hours, expenses and pay.</motion.p>
+          <motion.p variants={fadeUp} className="mt-1 max-w-2xl text-text-muted">Live positions while drivers have the app open, their messages and problem reports, cash to hand in, expenses and performance.</motion.p>
+          <motion.p variants={fadeUp} className="mt-3"><Link to="/dashboard/hr" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-sm hover:border-gold" data-testid="to-hr"><UsersRound size={14} className="text-gold-deep" aria-hidden="true" /> Pay, hours, rota and HR files are in <b>Team &amp; HR</b> <ArrowRight size={14} aria-hidden="true" /></Link></motion.p>
           {err && <p role="alert" className="mt-4 text-sm text-danger">{err}</p>}
           {toast && <p role="status" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-teal/40 bg-teal/10 px-4 py-2.5 text-sm text-teal"><Check size={15} aria-hidden="true" /> {toast}</p>}
 
@@ -58,7 +61,7 @@ export default function Drivers() {
             <StatCard label="On the road" value={pos.length} hint={unread ? `${unread} unread message${unread === 1 ? '' : 's'}` : 'Live while the app is open'} icon={Truck} active={tab === 'road'} warn={unread > 0} onClick={() => setSp({ tab: 'road' })} />
             <StatCard label="Open problems" value={openInc.length} hint={openInc.length ? 'Reported by drivers' : 'Nothing reported'} icon={ShieldAlert} warn={openInc.length > 0} onClick={() => setSp({ tab: 'road' })} />
             <StatCard label="Cash to hand in" value={money(cashDue)} hint={`${cash?.drivers.length ?? 0} driver${cash?.drivers.length === 1 ? '' : 's'}`} icon={Banknote} active={tab === 'cash'} warn={cashDue > 0} onClick={() => setSp({ tab: 'cash' })} />
-            <StatCard label="Hours this week" value={weekHours} hint="From clock-ins" icon={Clock} active={tab === 'time'} onClick={() => setSp({ tab: 'time' })} />
+            <StatCard label="Hours this week" value={weekHours} hint="From clock-ins — open in Team & HR" icon={Clock} onClick={() => nav('/dashboard/hr?tab=hours')} />
           </motion.div>
 
           <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-1 border-b border-border" role="tablist" aria-label="Driver views">
@@ -67,12 +70,8 @@ export default function Drivers() {
 
           <div className="mt-6" role="tabpanel">
             {tab === 'road' && <Road pos={pos} msgs={msgs} inc={inc} onInc={async (i) => { await driverApi.closeIncident(i.id, i.status === 'open' ? 'closed' : 'open'); setInc((x) => x.map((y) => (y.id === i.id ? { ...y, status: y.status === 'open' ? 'closed' : 'open' } : y))) }} />}
-            {tab === 'cash' && cash && <Cash cash={cash} onDone={(m) => { setToast(m); driverApi.cash().then(setCash).catch(() => {}) }} />}
-            {tab === 'payroll' && <PayrollTab stats={stats} onStats={() => driverApi.stats(30).then((r) => setStats(r.drivers)).catch(() => {})} toast={setToast} />}
-            {tab === 'time' && <div className="grid gap-8"><HoursTab toast={setToast} /><Expenses exp={exp} /></div>}
-            {tab === 'rota' && <RotaTab toast={setToast} />}
+            {tab === 'cash' && <div className="grid gap-8">{cash && <Cash cash={cash} onDone={(m) => { setToast(m); driverApi.cash().then(setCash).catch(() => {}) }} />}<Expenses exp={exp} /></div>}
             {tab === 'analytics' && <AnalyticsTab />}
-            {tab === 'people' && <PeopleTab open={sp.get('p')} onOpen={(id) => setSp(id ? { tab: 'people', p: id } : { tab: 'people' })} toast={setToast} isOwner={user.staffRole === 'owner' || (!user.staffRole && !!user.shipperId)} canPay={['owner', 'finance', undefined].includes(user.staffRole)} />}
           </div>
         </motion.div>
       </div>

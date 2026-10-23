@@ -5,7 +5,7 @@ import { adoptAccountDisplay } from '../lib/prefs'
 import { Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Bot, LifeBuoy, Anchor, BarChart3, LineChart, Calculator, Megaphone, Plug, CreditCard, History, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X, Printer } from 'lucide-react'
+import { IdCard, Bot, LifeBuoy, Anchor, BarChart3, LineChart, Calculator, Megaphone, Plug, CreditCard, History, Factory, Globe2, Smartphone, BellRing, Boxes, CalendarCheck, Receipt, ChevronDown, Tags, Container, ExternalLink, FileText, Globe, Inbox, LayoutDashboard, LogOut, MapPinned, Menu, Package, PlusCircle, Radar, ScanLine, Search, ShieldCheck, Ship, Star, Truck, UserCog, Users, UsersRound, Wallet, Warehouse, X, Printer } from 'lucide-react'
 import { Avatar, Logo, Mark } from './ui'
 import { PlatformBanners } from './PlatformBanners'
 import { NotificationBell } from './NotificationBell'
@@ -103,6 +103,8 @@ export default function AppShell() {
         ...(['owner', 'dispatcher', 'finance'].includes(staffRole) ? [{ to: '/dashboard/costs', label: 'Costs & profit', icon: Calculator, group: 'Money' } as Item] : []),
         { to: '/dashboard/reviews', label: 'Reviews', icon: Star, group: 'Money' },
         ...(canManage ? [{ to: '/dashboard/fleet', label: 'Fleet', icon: Truck, group: 'Company', more: true } as Item] : []),
+        ...(['owner', 'dispatcher', 'finance'].includes(staffRole) ? [{ to: '/dashboard/hr', label: 'Team & HR', icon: IdCard, group: 'Company' } as Item] : []),
+        ...(staffRole !== 'owner' && !isDriverRole(staffRole) ? [{ to: '/dashboard/me/pay', label: 'My pay & time', icon: IdCard, group: 'Company' } as Item] : []),
         { to: '/dashboard/team', label: 'Team', icon: UsersRound, group: 'Company' },
         ...(canManage ? [{ to: '/dashboard/integrations', label: 'Integrations', icon: Plug, group: 'Company', more: true } as Item, { to: '/dashboard/activity', label: 'Activity log', icon: History, group: 'Company', more: true } as Item] : []),
         ...(['owner', 'finance'].includes(staffRole) ? [{ to: '/dashboard/billing', label: 'Plan & billing', icon: CreditCard, group: 'Company', more: true } as Item] : []),

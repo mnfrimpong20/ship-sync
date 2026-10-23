@@ -12,8 +12,9 @@ export interface Person {
   licence: { class?: string; last4?: string; state?: string }; emergency: { name?: string; phone?: string; relation?: string }; payout: { method?: string; momo?: string; zelle?: string; bankName?: string; bankLast4?: string }; expiries: Record<string, string>
   contractSignedAt: string | null; contractName: string; training: { score: number; tries: number; passedAt: string | null } | null; offboarding: Record<string, unknown> | null
   leave: { allowance: number; used: number; left: number }; checklist: CheckItem[]; docs: { id: string; kind: string; title: string; mime: string; expiresOn: string | null; uploadedBy: string; at: string; status: 'pending' | 'checked' | 'rejected'; reviewNote: string; reviewedBy: string; side: string }[]
-  expiringSoon: { kind: string; label: string; date: string; expired: boolean }[]; pay: { perStop?: number; perRun?: number; perHour?: number; currency?: string }; owed?: number; docCount?: number
+  expiringSoon: { kind: string; label: string; date: string; expired: boolean }[]; pay: StaffPay; owed?: number; docCount?: number; isDriver?: boolean
 }
+export interface StaffPay { perStop?: number; perRun?: number; perHour?: number; monthly?: number; currency?: string }
 export interface Leave { id: string; staffId: string; name?: string; swapName?: string; kind: 'vacation' | 'sick' | 'personal' | 'swap'; start: string; end: string; swapWith: string | null; note: string; status: 'pending' | 'approved' | 'declined'; decidedBy: string; decisionNote?: string; at: string }
 export interface Rota { from: string; days: number; staff: { id: string; name: string; role: string }[]; entries: { staffId: string; day: string; kind: 'work' | 'off' | 'leave'; start: string; end: string; note: string }[]; leave: { staffId: string; start: string; end: string; kind: string }[]; runs: { id: string; name: string; day: string; staffId: string; kind: string }[] }
 export interface Week { week: string; stops: number; done: number; onTimePct: number | null; firstTryPct: number | null; incidents: number; rating: number | null; cashOkPct: number | null }
@@ -46,7 +47,7 @@ export const hrApi = {
   adjust: (id: string, b: { kind: string; amount: number; currency: string; note: string; installments: number }) => api(`/drivers/people/${id}/adjustments`, { json: b }),
   delAdjust: (id: string) => api(`/drivers/adjustments/${id}`, { method: 'DELETE' }),
   decideExpense: (id: string, status: 'approved' | 'rejected', paidBy?: 'driver' | 'company', note = '') => api(`/drivers/expenses/${id}/decide`, { json: { status, paidBy, note } }),
-  pay: () => api<{ settings: HrSettings; current: { start: string; end: string }; preview: (SlipCalc & { staffId: string; name: string })[]; periods: { id: string; start: string; end: string; status: string; lockedBy: string; slips: number; paid: number; total: number }[]; payslips: Payslip[]; expenses: ExpenseRow[]; adjustments: Adjustment[] }>('/drivers/pay'),
+  pay: () => api<{ settings: HrSettings; current: { start: string; end: string }; preview: (SlipCalc & { staffId: string; name: string; role?: string; pay?: StaffPay })[]; periods: { id: string; start: string; end: string; status: string; lockedBy: string; slips: number; paid: number; total: number }[]; payslips: Payslip[]; expenses: ExpenseRow[]; adjustments: Adjustment[] }>('/drivers/pay'),
   close: (start: string) => api<{ ok: true; periodId: string; payslips: number }>('/drivers/pay/close', { json: { start } }),
   approveAll: (periodId: string) => api<{ ok: true; approved: number }>(`/drivers/pay/periods/${periodId}/approve-all`, { json: {} }),
   slip: (id: string) => api<{ payslip: Payslip; employment: string; payout: Person['payout'] }>(`/drivers/payslips/${id}`),

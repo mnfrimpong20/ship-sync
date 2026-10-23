@@ -5,7 +5,7 @@ import { uid, type Db } from './db'
 import type { ApiUser } from './api'
 import { isDriverRole } from '../src/lib/roles'
 import { notify, notifyShipperStaff } from './notify'
-import { hrSettings, periodFor, EXPIRY_LABEL } from './driverHr'
+import { hrSettings, periodFor, EXPIRY_LABEL, selfHr } from './driverHr'
 
 /* Driver self-service extras: pay breakdown and queries, advance requests, pay-day countdown, cancel time off,
  * paper review status, driver ID badge (public check), clock-in reminders, and demo data for Gold Coast. */
@@ -25,15 +25,15 @@ const minutes = (hm: string) => { const [h, m] = hm.split(':').map(Number); retu
 
 /** Rota says you start at 08:00 and you haven't clocked in by 08:15 → one nudge (and the office knows at 45 min). */
 export async function sweepClockIn(db: Db) {
-  const { rows } = await db.query<Row>(`select ro.*, s.name, s.user_id, s.base, s.shipper_id as sid from rota ro join staff s on s.id = ro.staff_id where ro.kind = 'work' and ro.start_time <> '' and ro.day between current_date - 1 and current_date + 1 and s.status = 'active'`)
+  const { rows } = await db.query<Row>(`select ro.*, s.name, s.user_id, s.base, s.role, s.shipper_id as sid from rota ro join staff s on s.id = ro.staff_id where ro.kind = 'work' and ro.start_time <> '' and ro.day between current_date - 1 and current_date + 1 and s.status = 'active'`)
   for (const r of rows) {
     const st = await hrSettings(db, r.sid); if (!st.clockInReminder) continue
     const now = localNow(r.base === 'destination' ? st.tzDestination : st.tzOrigin); if (DATE(r.day) !== now.day) continue
     const late = minutes(now.hm) - minutes(r.start_time); if (late < 15 || late > 240) continue
     const { rows: sh } = await db.query('select 1 from shifts where staff_id = $1 and (end_at is null or start_at > now() - interval \'8 hours\') limit 1', [r.staff_id]); if (sh[0]) continue
     const { rows: lv } = await db.query(`select 1 from leave_requests where staff_id = $1 and status = 'approved' and $2::date between start_date and end_date`, [r.staff_id, now.day]); if (lv[0]) continue
-    if (r.user_id) await notify(db, { userId: r.user_id, kind: 'system', title: `Your shift started at ${r.start_time} — clock in`, body: 'Open My runs and tap Clock in. If you’re off today, tell the office.', link: '/dashboard/runs', dedupe: `clockin:${r.id}` })
-    if (late >= 45) await notifyShipperStaff(db, r.sid, { kind: 'system', title: `${r.name} hasn’t clocked in (shift ${r.start_time})`, body: 'They were reminded at 15 minutes.', link: '/dashboard/drivers?tab=rota', dedupe: `clockin:${r.id}:o` }, ['owner', 'dispatcher'])
+    if (r.user_id) await notify(db, { userId: r.user_id, kind: 'system', title: `Your shift started at ${r.start_time} — clock in`, body: isDriverRole(r.role) ? 'Open My runs and tap Clock in. If you’re off today, tell the office.' : 'Open My time and tap Clock in. If you’re off today, tell the office.', link: isDriverRole(r.role) ? '/dashboard/runs' : '/dashboard/me/time', dedupe: `clockin:${r.id}` })
+    if (late >= 45) await notifyShipperStaff(db, r.sid, { kind: 'system', title: `${r.name} hasn’t clocked in (shift ${r.start_time})`, body: 'They were reminded at 15 minutes.', link: '/dashboard/hr?tab=rota', dedupe: `clockin:${r.id}:o` }, ['owner', 'dispatcher'])
   }
 }
 
@@ -47,6 +47,8 @@ export function mountDriverHr2(r: Router, d: Deps) {
     return { u, me, shipperId: u.shipperId, role: String(me.role), driver: isDriverRole(me.role) }
   }
   const driverOnly = async (db: Db, req: Request) => { const x = await staffOf(db, req); if (!x.driver) throw new HttpError(403, 'For drivers.'); return x }
+  /** Drivers and office staff with their own staff record. */
+  const selfOnly = async (db: Db, req: Request) => { const x = await staffOf(db, req); if (String(x.me.id).startsWith('owner:')) throw new HttpError(403, 'Your account has no staff record.'); return x }
   const office = async (db: Db, req: Request, roles = ['owner', 'dispatcher', 'finance']) => { const x = await staffOf(db, req); if (x.driver || !roles.includes(x.role)) throw new HttpError(403, `This needs the ${roles.join(' / ')} role.`); return x }
 
   /* ---- what's behind the money: stops, runs and shifts for a payslip or the current period ---- */
@@ -70,16 +72,21 @@ export function mountDriverHr2(r: Router, d: Deps) {
   r.get('/drivers/payslips/:id/detail', wrap(async (req, res) => {
     const db = await getDb(); const x = await staffOf(db, req)
     const { rows } = await db.query<Row>('select * from payslips where id = $1 and shipper_id = $2', [String(req.params.id), x.shipperId]); const sl = rows[0]
-    if (!sl || (x.driver && (sl.staff_id !== x.me.id || sl.status === 'draft'))) throw new HttpError(404, 'Payslip not found.')
+    if (!sl) throw new HttpError(404, 'Payslip not found.')
+    const own = sl.staff_id === x.me.id
+    const { rows: who } = await db.query<Row>('select role from staff where id = $1', [sl.staff_id])
+    const officeView = !x.driver && ['owner', 'dispatcher', 'finance'].includes(x.role) && (x.role !== 'dispatcher' || isDriverRole(who[0]?.role))
+    if (!own && !officeView) throw new HttpError(404, 'Payslip not found.')
+    if (own && !officeView && sl.status === 'draft') throw new HttpError(404, 'Payslip not found.')
     res.set('Cache-Control', 'no-store'); res.json(await detail(db, sl.staff_id, x.shipperId, { slip: sl }))
   }))
   r.get('/drivers/me/pay/detail', wrap(async (req, res) => {
-    const db = await getDb(); const { me, shipperId } = await driverOnly(db, req); const st = await hrSettings(db, shipperId); const cur = periodFor(st, today())
+    const db = await getDb(); const { me, shipperId } = await selfOnly(db, req); const st = await hrSettings(db, shipperId); const cur = periodFor(st, today())
     res.set('Cache-Control', 'no-store'); res.json(await detail(db, me.id, shipperId, { end: cur.end }))
   }))
   /** Pay day, earned today, last 12 payslips and the year so far — for the driver's pay screen and home card. */
   r.get('/drivers/me/pay/summary', wrap(async (req, res) => {
-    const db = await getDb(); const { me, shipperId } = await driverOnly(db, req); const st = await hrSettings(db, shipperId); const cur = periodFor(st, today())
+    const db = await getDb(); const { me, shipperId } = await selfOnly(db, req); const st = await hrSettings(db, shipperId); const cur = periodFor(st, today())
     const { rows: s } = await db.query<Row>('select * from staff where id = $1', [me.id]); const pay = J<{ perStop?: number; perRun?: number; perHour?: number; currency?: string }>(s[0]?.pay, {})
     const { rows: td } = await db.query<Row>(`select count(*) filter (where st.status = 'done')::int as stops, count(distinct r.id) filter (where st.status = 'done')::int as runs from run_stops st join runs r on r.id = st.run_id where r.driver_id = $1 and st.done_at::date = current_date`, [me.id])
     const { rows: hr } = await db.query<Row>(`select coalesce(sum(extract(epoch from (coalesce(end_at, now()) - start_at)) / 3600), 0) as h from shifts where staff_id = $1 and start_at::date = current_date`, [me.id])
@@ -95,55 +102,55 @@ export function mountDriverHr2(r: Router, d: Deps) {
 
   /* ---- "Something's wrong" on a payslip ---- */
   r.post('/drivers/payslips/:id/query', wrap(async (req, res) => {
-    const db = await getDb(); const { me, shipperId } = await driverOnly(db, req)
+    const db = await getDb(); const { me, shipperId } = await selfOnly(db, req)
     const b = z.object({ line: z.string().trim().max(200).default(''), note: z.string().trim().min(5, 'Say what looks wrong.').max(1000) }).parse(req.body)
     const pid = String(req.params.id)
     if (pid !== 'current') { const { rows } = await db.query('select 1 from payslips where id = $1 and staff_id = $2', [pid, me.id]); if (!rows[0]) throw new HttpError(404, 'Payslip not found.') }
     const id = 'pq_' + uid()
     await db.query('insert into payslip_queries (id,payslip_id,shipper_id,staff_id,line,note) values ($1,$2,$3,$4,$5,$6)', [id, pid === 'current' ? null : pid, shipperId, me.id, b.line, b.note])
-    await notifyShipperStaff(db, shipperId, { kind: 'payment', title: `${me.name} has a question about their pay`, body: `${b.line ? `${b.line}: ` : ''}${b.note.slice(0, 140)}`, link: '/dashboard/drivers?tab=payroll', dedupe: `pq:${id}` }, ['owner', 'finance'])
+    await notifyShipperStaff(db, shipperId, { kind: 'payment', title: `${me.name} has a question about their pay`, body: `${b.line ? `${b.line}: ` : ''}${b.note.slice(0, 140)}`, link: '/dashboard/hr?tab=payroll', dedupe: `pq:${id}` }, ['owner', 'finance'])
     res.status(201).json({ ok: true })
   }))
   const qOut = (q: Row) => ({ id: q.id, payslipId: q.payslip_id, staffId: q.staff_id, name: q.name ?? undefined, line: q.line, note: q.note, status: q.status, answer: q.answer, answeredBy: q.answered_by, answeredAt: ISO(q.answered_at), at: ISO(q.at) })
-  r.get('/drivers/me/queries', wrap(async (req, res) => { const db = await getDb(); const { me } = await driverOnly(db, req); const { rows } = await db.query<Row>('select * from payslip_queries where staff_id = $1 order by at desc limit 20', [me.id]); res.json({ queries: rows.map(qOut) }) }))
+  r.get('/drivers/me/queries', wrap(async (req, res) => { const db = await getDb(); const { me } = await selfOnly(db, req); const { rows } = await db.query<Row>('select * from payslip_queries where staff_id = $1 order by at desc limit 20', [me.id]); res.json({ queries: rows.map(qOut) }) }))
   r.get('/drivers/queries', wrap(async (req, res) => { const db = await getDb(); const { shipperId } = await office(db, req); const { rows } = await db.query<Row>(`select q.*, s.name from payslip_queries q join staff s on s.id = q.staff_id where q.shipper_id = $1 and (q.status = 'open' or q.at > now() - interval '30 days') order by q.status = 'open' desc, q.at desc`, [shipperId]); res.set('Cache-Control', 'no-store'); res.json({ queries: rows.map(qOut) }) }))
   r.post('/drivers/queries/:id/answer', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, me } = await office(db, req, ['owner', 'finance', 'dispatcher'])
     const { answer } = z.object({ answer: z.string().trim().min(2).max(1000) }).parse(req.body)
     const { rows } = await db.query<Row>(`update payslip_queries set status = 'answered', answer = $3, answered_by = $4, answered_at = now() where id = $1 and shipper_id = $2 returning *`, [String(req.params.id), shipperId, answer, me.name]); const q = rows[0]; if (!q) throw new HttpError(404, 'Not found.')
-    const { rows: u } = await db.query<Row>('select user_id from staff where id = $1', [q.staff_id])
-    if (u[0]?.user_id) await notify(db, { userId: u[0].user_id, kind: 'payment', title: 'The office answered your pay question', body: answer.slice(0, 160), link: '/dashboard/runs/pay', dedupe: `pq:${q.id}:a` })
+    const { rows: u } = await db.query<Row>('select user_id, role from staff where id = $1', [q.staff_id])
+    if (u[0]?.user_id) await notify(db, { userId: u[0].user_id, kind: 'payment', title: 'The office answered your pay question', body: answer.slice(0, 160), link: selfHr(u[0]?.role, 'pay'), dedupe: `pq:${q.id}:a` })
     res.json({ ok: true })
   }))
 
   /* ---- ask for an advance ---- */
   r.post('/drivers/me/advance', wrap(async (req, res) => {
-    const db = await getDb(); const { me, shipperId } = await driverOnly(db, req)
+    const db = await getDb(); const { me, shipperId } = await selfOnly(db, req)
     const b = z.object({ amount: z.number().positive().max(100000), currency: z.enum(['USD', 'GHS', 'NGN', 'XOF', 'GBP', 'EUR']), reason: z.string().trim().min(3, 'Say what it’s for.').max(300), installments: z.number().int().min(1).max(12) }).parse(req.body)
     const { rows: open } = await db.query(`select 1 from advance_requests where staff_id = $1 and status = 'pending'`, [me.id]); if (open[0]) throw new HttpError(409, 'You already have a request waiting.')
     const id = 'ar_' + uid()
     await db.query('insert into advance_requests (id,shipper_id,staff_id,amount,currency,reason,installments) values ($1,$2,$3,$4,$5,$6,$7)', [id, shipperId, me.id, b.amount, b.currency, b.reason, b.installments])
-    await notifyShipperStaff(db, shipperId, { kind: 'payment', title: `${me.name} asks for an advance of ${b.currency} ${b.amount}`, body: `${b.reason} · repay over ${b.installments} payslip${b.installments === 1 ? '' : 's'}`, link: '/dashboard/drivers?tab=payroll', dedupe: `ar:${id}` }, ['owner', 'finance'])
+    await notifyShipperStaff(db, shipperId, { kind: 'payment', title: `${me.name} asks for an advance of ${b.currency} ${b.amount}`, body: `${b.reason} · repay over ${b.installments} payslip${b.installments === 1 ? '' : 's'}`, link: '/dashboard/hr?tab=payroll', dedupe: `ar:${id}` }, ['owner', 'finance'])
     res.status(201).json({ ok: true })
   }))
   const arOut = (a: Row) => ({ id: a.id, staffId: a.staff_id, name: a.name ?? undefined, amount: Number(a.amount), currency: a.currency, reason: a.reason, installments: Number(a.installments), status: a.status, decidedBy: a.decided_by, note: a.decision_note, at: ISO(a.at) })
-  r.get('/drivers/me/advances', wrap(async (req, res) => { const db = await getDb(); const { me } = await driverOnly(db, req); const { rows } = await db.query<Row>('select * from advance_requests where staff_id = $1 order by at desc limit 10', [me.id]); res.json({ requests: rows.map(arOut) }) }))
+  r.get('/drivers/me/advances', wrap(async (req, res) => { const db = await getDb(); const { me } = await selfOnly(db, req); const { rows } = await db.query<Row>('select * from advance_requests where staff_id = $1 order by at desc limit 10', [me.id]); res.json({ requests: rows.map(arOut) }) }))
   r.get('/drivers/advance-requests', wrap(async (req, res) => { const db = await getDb(); const { shipperId } = await office(db, req); const { rows } = await db.query<Row>(`select a.*, s.name from advance_requests a join staff s on s.id = a.staff_id where a.shipper_id = $1 and (a.status = 'pending' or a.at > now() - interval '30 days') order by a.status = 'pending' desc, a.at desc`, [shipperId]); res.set('Cache-Control', 'no-store'); res.json({ requests: rows.map(arOut) }) }))
   r.post('/drivers/advance-requests/:id/decide', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, me } = await office(db, req, ['owner', 'finance'])
     const b = z.object({ status: z.enum(['approved', 'declined']), note: z.string().trim().max(300).default(''), amount: z.number().positive().max(100000).optional(), installments: z.number().int().min(1).max(12).optional() }).parse(req.body)
-    const { rows } = await db.query<Row>(`select a.*, s.user_id from advance_requests a join staff s on s.id = a.staff_id where a.id = $1 and a.shipper_id = $2`, [String(req.params.id), shipperId]); const a = rows[0]
+    const { rows } = await db.query<Row>(`select a.*, s.user_id, s.role from advance_requests a join staff s on s.id = a.staff_id where a.id = $1 and a.shipper_id = $2`, [String(req.params.id), shipperId]); const a = rows[0]
     if (!a) throw new HttpError(404, 'Not found.'); if (a.status !== 'pending') throw new HttpError(409, 'Already decided.')
     const amount = b.amount ?? Number(a.amount); const inst = b.installments ?? Number(a.installments)
     await db.query('update advance_requests set status = $2, decided_by = $3, decision_note = $4, amount = $5, installments = $6 where id = $1', [a.id, b.status, me.name, b.note, amount, inst])
     if (b.status === 'approved') await db.query('insert into pay_adjustments (id,shipper_id,staff_id,kind,amount,currency,note,installments,remaining,created_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$5,$9)', ['pa_' + uid(), shipperId, a.staff_id, 'advance', amount, a.currency, a.reason, inst, me.name])
-    if (a.user_id) await notify(db, { userId: a.user_id, kind: 'payment', title: b.status === 'approved' ? `Advance approved: ${a.currency} ${amount}` : 'Advance not approved', body: b.status === 'approved' ? `Repaid over ${inst} payslip${inst === 1 ? '' : 's'}.${b.note ? ` ${b.note}` : ''}` : b.note || 'Talk to the office.', link: '/dashboard/runs/pay' })
+    if (a.user_id) await notify(db, { userId: a.user_id, kind: 'payment', title: b.status === 'approved' ? `Advance approved: ${a.currency} ${amount}` : 'Advance not approved', body: b.status === 'approved' ? `Repaid over ${inst} payslip${inst === 1 ? '' : 's'}.${b.note ? ` ${b.note}` : ''}` : b.note || 'Talk to the office.', link: selfHr(a.role, 'pay') })
     res.json({ ok: true })
   }))
 
   /* ---- cancel a request that's still waiting ---- */
   r.delete('/drivers/me/leave/:id', wrap(async (req, res) => {
-    const db = await getDb(); const { me } = await driverOnly(db, req)
+    const db = await getDb(); const { me } = await selfOnly(db, req)
     const { rows } = await db.query<Row>(`delete from leave_requests where id = $1 and staff_id = $2 and status = 'pending' returning id`, [String(req.params.id), me.id])
     if (!rows[0]) throw new HttpError(409, 'Only requests that are still waiting can be cancelled.'); res.json({ ok: true })
   }))
@@ -154,9 +161,9 @@ export function mountDriverHr2(r: Router, d: Deps) {
     const b = z.object({ status: z.enum(['checked', 'rejected']), note: z.string().trim().max(300).default('') }).parse(req.body)
     if (b.status === 'rejected' && b.note.length < 3) throw new HttpError(400, 'Say what’s wrong so they can fix it.')
     const { rows } = await db.query<Row>(`update driver_docs set status = $3, review_note = $4, reviewed_by = $5 where id = $1 and shipper_id = $2 returning *`, [String(req.params.id), shipperId, b.status, b.note, me.name]); const doc = rows[0]; if (!doc) throw new HttpError(404, 'Not found.')
-    const { rows: u } = await db.query<Row>('select user_id from staff where id = $1', [doc.staff_id])
+    const { rows: u } = await db.query<Row>('select user_id, role from staff where id = $1', [doc.staff_id])
     const label = doc.kind === 'id' ? 'ID' : (EXPIRY_LABEL[doc.kind] ?? doc.title ?? doc.kind)
-    if (u[0]?.user_id) await notify(db, { userId: u[0].user_id, kind: 'system', title: b.status === 'checked' ? `${label} checked` : `${label}: please upload it again`, body: b.status === 'checked' ? `By ${me.name}.` : b.note, link: b.status === 'rejected' ? `/dashboard/runs/me?renew=${doc.kind}` : '/dashboard/runs/me', dedupe: `doc:${doc.id}:${b.status}` })
+    if (u[0]?.user_id) await notify(db, { userId: u[0].user_id, kind: 'system', title: b.status === 'checked' ? `${label} checked` : `${label}: please upload it again`, body: b.status === 'checked' ? `By ${me.name}.` : b.note, link: b.status === 'rejected' ? `${selfHr(u[0]?.role, 'me')}?renew=${doc.kind}` : selfHr(u[0]?.role, 'me'), dedupe: `doc:${doc.id}:${b.status}` })
     res.json({ ok: true })
   }))
 
@@ -193,7 +200,7 @@ export function mountDriverHr2(r: Router, d: Deps) {
 }
 
 /* ---------------- demo pay, time and papers for Gold Coast's two drivers (runs once) ---------------- */
-const PNG_CARD = (label: string, color: string) => { const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" rx="24" fill="${color}"/><rect x="32" y="110" width="150" height="190" rx="10" fill="#ffffff55"/><text x="210" y="80" font-family="Arial" font-size="34" font-weight="bold" fill="#fff">${label}</text><text x="210" y="150" font-family="Arial" font-size="22" fill="#fff">SAMPLE — DEMO ONLY</text><rect x="210" y="190" width="360" height="16" rx="8" fill="#ffffff66"/><rect x="210" y="225" width="300" height="16" rx="8" fill="#ffffff66"/><rect x="210" y="260" width="250" height="16" rx="8" fill="#ffffff66"/></svg>`; return { mime: 'image/svg+xml', data: Buffer.from(svg).toString('base64') } }
+export const PNG_CARD = (label: string, color: string) => { const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" rx="24" fill="${color}"/><rect x="32" y="110" width="150" height="190" rx="10" fill="#ffffff55"/><text x="210" y="80" font-family="Arial" font-size="34" font-weight="bold" fill="#fff">${label}</text><text x="210" y="150" font-family="Arial" font-size="22" fill="#fff">SAMPLE — DEMO ONLY</text><rect x="210" y="190" width="360" height="16" rx="8" fill="#ffffff66"/><rect x="210" y="225" width="300" height="16" rx="8" fill="#ffffff66"/><rect x="210" y="260" width="250" height="16" rx="8" fill="#ffffff66"/></svg>`; return { mime: 'image/svg+xml', data: Buffer.from(svg).toString('base64') } }
 export async function seedDriverHrDemo(db: Db) {
   const { rows: s } = await db.query<Row>(`select id, name, pay, base from staff where id in ('st_demo_kwesi','st_demo_efua') and shipper_id = 'gold-coast-freight'`)
   if (s.length < 2) return

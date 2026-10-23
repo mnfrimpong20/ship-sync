@@ -69,6 +69,9 @@ export interface Quote {
   price: number
   currency: 'USD'
   transitDays: number
+  /** When the shipper can load it and send it off; arrivesOn = shipsOn + transitDays. */
+  shipsOn?: string | null
+  arrivesOn?: string | null
   validUntil: string
   notes: string
   includes: string[]
@@ -104,7 +107,7 @@ interface Store {
   refresh: () => Promise<void>
   createRequest: (r: NewRequest) => Promise<QuoteRequest>
   acceptQuote: (requestId: string, quoteId: string) => Promise<Shipment>
-  sendQuote: (requestId: string, q: { price: number; transitDays: number; notes: string; includes: string[]; validUntil?: string; kind?: 'firm' | 'estimate'; mode?: 'air' | 'ocean'; supplies?: QuoteSupplyLine[] }) => Promise<void>
+  sendQuote: (requestId: string, q: { price: number; transitDays: number; shipsOn?: string | null; notes: string; includes: string[]; validUntil?: string; kind?: 'firm' | 'estimate'; mode?: 'air' | 'ocean'; supplies?: QuoteSupplyLine[] }) => Promise<void>
   advanceShipment: (id: string, note?: string) => Promise<void>
   matchShippers: (r: Pick<QuoteRequest, 'origin' | 'destination' | 'mode' | 'cargo'> & Partial<Pick<QuoteRequest, 'quantity' | 'weightKg' | 'pickup' | 'delivery' | 'insurance'>>) => Promise<Match[]>
   track: (ref: string) => Promise<Shipment | null>

@@ -3,11 +3,12 @@ import { platformApi, type QuoteTemplate } from '../lib/platform'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Download, ExternalLink, Filter, Inbox, Lock, Mail, MessageSquare, Phone, Search, Send, Tag, Trophy, Users, X, XCircle } from 'lucide-react'
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Download, ExternalLink, Filter, Inbox, Lock, Mail, MessageSquare, Phone, Search, Send, Tag, Trophy, Users, X, XCircle } from 'lucide-react'
 import { requestsApi } from '../lib/requests'
 import { MessageThread } from '../components/RequestPanel'
 import { useStore, type Quote, type QuoteRequest, type QuoteSupplyLine } from '../lib/store'
 import { suppliesApi, type PackingItem } from '../lib/supplies'
+import { containersApi, type Container } from '../lib/containers'
 import { DeclaredItems } from '../components/Compliance'
 import { usd } from '../lib/payments'
 import { cargoLabel, countries, countryByCode, type CargoType, type Mode } from '../lib/data'
@@ -63,6 +64,10 @@ function TemplateBar({ r, form, setForm }: { r: QuoteRequest; form: { price: str
   )
 }
 
+const isoDay = (d: Date) => d.toISOString().slice(0, 10)
+const plusDays = (iso: string, n: number) => isoDay(new Date(new Date(iso + 'T12:00:00Z').getTime() + n * 86400000))
+const dayLabel = (iso: string) => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+
 function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (msg: string) => void; onCancel: () => void; prev?: Quote }) {
   const { sendQuote, user, shipperById } = useStore()
   const tagline = user?.shipperId ? shipperById(user.shipperId)?.tagline ?? '' : ''
@@ -70,6 +75,19 @@ function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (ms
   const [form, setForm] = useState({ price: prev ? String(prev.price) : sg ? String(sg.price) : '', transit: prev ? String(prev.transitDays) : sg ? String(sg.transitDays) : r.mode === 'air' ? '7' : '30', notes: prev?.notes ?? sg?.notes ?? '', valid: '14', kind: (prev?.kind ?? (r.weightKg ? 'firm' : 'estimate')) as 'firm' | 'estimate', mode: (prev?.mode ?? (r.mode === 'air' ? 'air' : 'ocean')) as 'air' | 'ocean' })
   const [busy, setBusy] = useState(false); const [error, setError] = useState('')
   const [skip, setSkip] = useState<string[]>([])
+  // When the goods can go: the shipper's open containers to this country give one-tap dates.
+  const today = isoDay(new Date())
+  const [shipsOn, setShipsOn] = useState<string>(prev?.shipsOn && prev.shipsOn >= today ? prev.shipsOn : '')
+  const [boxes, setBoxes] = useState<Container[]>([])
+  useEffect(() => { if (form.mode !== 'ocean') return; containersApi.list().then((cs) => setBoxes(cs.filter((c) => ['booked', 'loading'].includes(c.status) && c.destination === r.destination && c.etd && c.etd >= today).sort((a, b) => a.etd!.localeCompare(b.etd!)).slice(0, 3))).catch(() => {}) }, [form.mode, r.destination]) // eslint-disable-line react-hooks/exhaustive-deps
+  const transitN = Number(form.transit) || 0
+  const arrives = shipsOn && transitN ? plusDays(shipsOn, transitN) : ''
+  const beforeReady = !!shipsOn && !!r.readyDate && shipsOn < r.readyDate.slice(0, 10)
+  const quick: { label: string; date: string; hint?: string }[] = [
+    ...boxes.map((c) => ({ label: `${c.ref} · sails ${dayLabel(c.etd!)}`, date: c.etd!, hint: c.cutoffDate ? `Load by ${dayLabel(c.cutoffDate)}` : undefined })),
+    ...(form.mode === 'air' ? [{ label: 'Tomorrow', date: plusDays(today, 1) }, { label: 'In 3 days', date: plusDays(today, 3) }] : []),
+    ...(r.readyDate && r.readyDate.slice(0, 10) >= today ? [{ label: `When their goods are ready (${dayLabel(r.readyDate.slice(0, 10))})`, date: r.readyDate.slice(0, 10) }] : []),
+  ]
   // Packing supplies the customer asked for: start from the previous quote, else the default (own list, else Ntemtem).
   const [sup, setSup] = useState<QuoteSupplyLine[]>(() => prev?.supplies?.length ? prev.supplies : r.suggestedSupplies ?? [])
   const [opts, setOpts] = useState<{ own: PackingItem[]; ntem: { id: string; name: string; kind: string; priceUsd: number; available: number }[] } | null>(null)
@@ -91,7 +109,8 @@ function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (ms
     const validUntil = new Date(Date.now() + Math.max(1, Number(form.valid) || 14) * 86400000).toISOString().slice(0, 10)
     const dropped = skip.filter(optional)
     const notes = [form.notes || (tagline ? `${tagline}.` : ''), dropped.length ? `Not included: ${dropped.join(', ').toLowerCase()}.` : ''].filter(Boolean).join(' ')
-    try { await sendQuote(r.id, { price, transitDays: transit, notes, includes, validUntil, kind: form.kind, mode: form.mode, supplies: sup.length ? sup : undefined }); onDone(`${prev ? 'Updated quote' : 'Quote'} of ${money(price)} sent to ${r.contact.name}.`) } catch (err) { setError(err instanceof Error ? err.message : 'Could not send the quote.') } finally { setBusy(false) }
+    if (!shipsOn) { setBusy(false); setError('Add the date it can ship — customers compare quotes by when goods leave and arrive.'); document.getElementById(`s-${r.id}`)?.focus(); return }
+    try { await sendQuote(r.id, { price, transitDays: transit, shipsOn, notes, includes, validUntil, kind: form.kind, mode: form.mode, supplies: sup.length ? sup : undefined }); onDone(`${prev ? 'Updated quote' : 'Quote'} of ${money(price)} sent to ${r.contact.name}.`) } catch (err) { setError(err instanceof Error ? err.message : 'Could not send the quote.') } finally { setBusy(false) }
   }
   return (
     <form onSubmit={submit} className="grid gap-3" aria-label={`Quote for ${r.ref}`} data-testid="quote-form">
@@ -109,6 +128,14 @@ function QuoteForm({ r, onDone, onCancel, prev }: { r: QuoteRequest; onDone: (ms
         <div><label htmlFor={`p-${r.id}`} className="label-dark">{r.supplies?.length ? 'Freight price (USD)' : 'Total price (USD)'}</label><input id={`p-${r.id}`} type="number" min={1} required autoFocus className="input-dark !min-h-10 tabular-nums" placeholder="590" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
         <div><label htmlFor={`t-${r.id}`} className="label-dark">Transit (days)</label><input id={`t-${r.id}`} type="number" min={1} required className="input-dark !min-h-10 tabular-nums" value={form.transit} onChange={(e) => setForm({ ...form, transit: e.target.value })} /></div>
         <div><label htmlFor={`v-${r.id}`} className="label-dark">Valid for (days)</label><input id={`v-${r.id}`} type="number" min={1} max={60} className="input-dark !min-h-10 tabular-nums" value={form.valid} onChange={(e) => setForm({ ...form, valid: e.target.value })} data-testid="qf-valid" /></div>
+      </div>
+      <div className="rounded-lg border border-border bg-surface-2/40 p-3" data-testid="qf-schedule">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div><label htmlFor={`s-${r.id}`} className="label-dark">Ships on</label><input id={`s-${r.id}`} type="date" min={today} max={plusDays(today, 183)} required className="input-dark !min-h-10" value={shipsOn} onChange={(e) => setShipsOn(e.target.value)} aria-describedby={`sh-${r.id}`} data-testid="qf-ships-on" /><p id={`sh-${r.id}`} className="mt-1 text-xs text-text-muted">{form.mode === 'air' ? 'The flight their goods go on.' : 'When it’s loaded and the container sails.'}</p></div>
+          <div><p className="label-dark">Arrives about</p><p className={`flex min-h-10 items-center gap-2 rounded-lg border border-dashed px-3 text-sm ${arrives ? 'border-teal/50 font-semibold text-teal' : 'border-border text-text-muted'}`} aria-live="polite" data-testid="qf-arrives"><CalendarDays size={15} aria-hidden="true" />{arrives ? dayLabel(arrives) : 'Pick a ship date'}</p><p className="mt-1 text-xs text-text-muted">{arrives ? `Ship date + ${transitN} days transit` : 'Worked out from the transit days.'}</p></div>
+        </div>
+        {quick.length > 0 && <div className="mt-2.5 flex flex-wrap gap-1.5">{quick.map((x) => <button key={x.label} type="button" onClick={() => setShipsOn(x.date)} aria-pressed={shipsOn === x.date} title={x.hint} className={`rounded-full border px-2.5 py-1 text-xs focus-ring ${shipsOn === x.date ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border text-text-muted hover:border-gold'}`}>{x.label}</button>)}</div>}
+        {beforeReady && <p className="mt-2 text-xs text-gold-deep">Their goods are ready {dayLabel(r.readyDate.slice(0, 10))} — that’s after this ship date.</p>}
       </div>
       <div className="flex gap-1.5" role="radiogroup" aria-label="Firm or estimate">{(['firm', 'estimate'] as const).map((k) => <button key={k} type="button" role="radio" aria-checked={form.kind === k} onClick={() => setForm({ ...form, kind: k })} className={`flex-1 rounded-lg border px-2 py-1.5 text-left text-xs focus-ring ${form.kind === k ? 'border-gold bg-gold/15 text-gold-deep' : 'border-border text-text-muted'}`} data-testid={`qf-kind-${k}`}><span className="block font-semibold">{k === 'firm' ? 'Firm price' : 'Estimate'}</span><span className="block">{k === 'firm' ? 'This is what they pay' : 'Final after weighing at check-in'}</span></button>)}</div>
       <div><label htmlFor={`n-${r.id}`} className="label-dark">Notes to customer</label><textarea id={`n-${r.id}`} rows={2} className="input-dark py-2 text-sm" placeholder="Sailing date, what’s included, duty handling…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
@@ -148,7 +175,7 @@ function MyQuote({ q, r, onRequote, onDone }: { q: Quote; r: QuoteRequest; onReq
   return (
     <div data-testid="my-quote">
       <div className="flex items-baseline justify-between"><p className={`font-heading text-2xl font-bold tabular-nums ${dead ? 'text-text-muted line-through' : ''}`}>{money(q.price)}</p><Pill tone={q.status === 'accepted' ? 'green' : q.status === 'declined' || dead ? 'muted' : 'teal'}>{label}</Pill></div>
-      <dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><div><dt className="text-text-muted">Transit</dt><dd>{q.transitDays} days{q.mode ? ` · ${q.mode}` : ''}</dd></div><div><dt className="text-text-muted">Valid until</dt><dd>{q.validUntil ? fmtDate(q.validUntil + 'T12:00:00Z') : '—'}</dd></div><div><dt className="text-text-muted">Type</dt><dd>{q.kind === 'estimate' ? 'Estimate' : 'Firm'}</dd></div></dl>
+      <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">{q.shipsOn && <><div><dt className="text-text-muted">Ships</dt><dd>{dayLabel(q.shipsOn)}</dd></div><div><dt className="text-text-muted">Arrives about</dt><dd>{q.arrivesOn ? dayLabel(q.arrivesOn) : '—'}</dd></div></>}<div><dt className="text-text-muted">Transit</dt><dd>{q.transitDays} days{q.mode ? ` · ${q.mode}` : ''}</dd></div><div><dt className="text-text-muted">Valid until</dt><dd>{q.validUntil ? fmtDate(q.validUntil + 'T12:00:00Z') : '—'}</dd></div><div><dt className="text-text-muted">Type</dt><dd>{q.kind === 'estimate' ? 'Estimate' : 'Firm'}</dd></div></dl>
       {q.includes.length > 0 && <ul className="mt-3 flex flex-wrap gap-1.5">{q.includes.map((i) => <li key={i}><Pill tone="muted">{i}</Pill></li>)}</ul>}
       {(q.supplies?.length ?? 0) > 0 && <ul className="mt-3 space-y-1 text-xs" data-testid="my-quote-supplies">{q.supplies!.map((l) => <li key={l.kind} className="flex justify-between gap-2">{l.source === 'none' ? <span className="text-text-muted">Not supplying {l.kind}</span> : <><span>{l.qty} × {l.name} <span className="text-text-muted">· {l.source === 'ntemtem' ? 'sent by Ntemtem (paid to Ntemtem)' : 'yours'}</span></span><span className="tabular-nums">{usd((l.unitUsd ?? 0) * l.qty)}</span></>}</li>)}</ul>}
       {q.notes && <p className="mt-3 text-xs text-text-muted">“{q.notes}”</p>}

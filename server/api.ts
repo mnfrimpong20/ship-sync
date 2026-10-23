@@ -116,7 +116,10 @@ const shipperOut = (r: Row) => ({
   priceIndex: r.price_index, plan: r.plan, standing: r.standing ?? 'good', qualityScore: J(r.quality)?.score ?? null, initials: r.initials, hue: r.hue, demo: r.demo, verifiedAt: r.verified_at ? ISO(r.verified_at) : undefined, createdAt: r.created_at ? ISO(r.created_at) : undefined,
 })
 const quoteMode = (r: Row) => (r.mode === 'air' || r.mode === 'ocean' ? r.mode : (J(r.includes) as string[] ?? []).includes('Air freight') ? 'air' : 'ocean')
-const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.shipper_id, price: r.price, currency: r.currency, transitDays: r.transit_days, validUntil: DATE(r.valid_until), notes: r.notes, includes: J(r.includes), status: r.status, sentAt: ISO(r.sent_at), updatedAt: r.updated_at ? ISO(r.updated_at) : undefined,
+/** The day a quote's goods should arrive: the day it ships plus the transit days. */
+const arrivalDate = (shipsOn: string, days: number) => new Date(new Date(shipsOn + 'T12:00:00Z').getTime() + days * 86400000).toISOString().slice(0, 10)
+const niceDay = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+const quoteOut = (r: Row) => ({ id: r.id, requestId: r.request_id, shipperId: r.shipper_id, price: r.price, currency: r.currency, transitDays: r.transit_days, shipsOn: DATE(r.ships_on), arrivesOn: r.ships_on ? arrivalDate(DATE(r.ships_on)!, Number(r.transit_days)) : null, validUntil: DATE(r.valid_until), notes: r.notes, includes: J(r.includes), status: r.status, sentAt: ISO(r.sent_at), updatedAt: r.updated_at ? ISO(r.updated_at) : undefined,
   kind: (r.kind ?? 'firm') as 'firm' | 'estimate', mode: quoteMode(r) as 'air' | 'ocean', supplies: J(r.supplies ?? '[]') as QuoteSupplyLine[], suppliesUsd: suppliesTotal(J(r.supplies ?? '[]') as QuoteSupplyLine[]), expired: r.status === 'sent' && DATE(r.valid_until) < new Date().toISOString().slice(0, 10) })
 /** Shippers see only the town of the supplies address until the job is theirs (same rule as the contact details). */
 const maskSupAddr = (a: unknown, full: boolean) => (!a ? undefined : full ? a : { city: (a as Row).city, state: (a as Row).state, country: (a as Row).country })
@@ -465,7 +468,7 @@ const zProfile = z.object({
   responseHours: z.number().int().min(1).max(168),
 })
 const zVerify = z.object({ verified: z.boolean(), plan: z.enum(['starter', 'pro', 'enterprise']).optional(), note: z.string().trim().max(500).optional() })
-const zQuote = z.object({ price: z.number().int().min(1), transitDays: z.number().int().min(1), notes: z.string().max(2000).default(''), includes: z.array(z.string()).default([]), validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), kind: z.enum(['firm', 'estimate']).default('firm'), mode: z.enum(['air', 'ocean']).optional() , supplies: z.array(z.object({ kind: z.enum(['barrel', 'box', 'lock', 'tape', 'other']), qty: z.number().int().min(1).max(50), source: z.enum(['shipper', 'ntemtem', 'none']), supplyId: z.string().max(60).optional(), productId: z.string().max(60).optional() })).max(5).optional() })
+const zQuote = z.object({ price: z.number().int().min(1), transitDays: z.number().int().min(1), notes: z.string().max(2000).default(''), includes: z.array(z.string()).default([]), validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), shipsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), kind: z.enum(['firm', 'estimate']).default('firm'), mode: z.enum(['air', 'ocean']).optional() , supplies: z.array(z.object({ kind: z.enum(['barrel', 'box', 'lock', 'tape', 'other']), qty: z.number().int().min(1).max(50), source: z.enum(['shipper', 'ntemtem', 'none']), supplyId: z.string().max(60).optional(), productId: z.string().max(60).optional() })).max(5).optional() })
 
 /* ---------------- router ---------------- */
 export function apiRouter() {
@@ -737,19 +740,21 @@ export function apiRouter() {
     if (rows[0].preferred_shipper_id && rows[0].preferred_shipper_id !== user.shipperId) throw new HttpError(403, 'This client asked another shipper.')
     const today = new Date().toISOString().slice(0, 10)
     if (body.validUntil && body.validUntil < today) throw new HttpError(400, 'The quote can’t be valid until a date in the past.')
+    if (body.shipsOn && body.shipsOn < today) throw new HttpError(400, 'The ship date can’t be in the past.')
+    if (body.shipsOn && body.shipsOn > new Date(Date.now() + 183 * 86400000).toISOString().slice(0, 10)) throw new HttpError(400, 'The ship date must be within the next six months.')
     const qMode = rows[0].mode === 'either' ? body.mode ?? (body.includes.includes('Air freight') ? 'air' : 'ocean') : rows[0].mode
     if (rows[0].mode !== 'either' && body.mode && body.mode !== rows[0].mode) throw new HttpError(400, `The client asked for ${rows[0].mode} freight.`)
     const prev = await db.query<Row>('select status from quotes where request_id = $1 and shipper_id = $2', [req.params.id, user.shipperId])
     if (prev.rows[0]?.status === 'withdrawn' || prev.rows[0]?.status === 'expired') await db.query(`update quotes set status = 'sent' where request_id = $1 and shipper_id = $2`, [req.params.id, user.shipperId])
     await db.query('insert into quotes (id,request_id,shipper_id,price,transit_days,valid_until,notes,includes,sent_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict (request_id, shipper_id) do update set price = excluded.price, transit_days = excluded.transit_days, valid_until = excluded.valid_until, notes = excluded.notes, includes = excluded.includes, sent_at = now(), sent_by = excluded.sent_by',
       [uid(), req.params.id, user.shipperId, body.price, body.transitDays, body.validUntil ?? new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10), body.notes, JSON.stringify(body.includes), user.staffId ?? null])
-    await db.query(`update quotes set kind = $3, mode = $4, updated_at = now(), status = case when status in ('withdrawn','expired') then 'sent' else status end, expiry_reminded_at = null where request_id = $1 and shipper_id = $2`, [req.params.id, user.shipperId, body.kind, qMode])
+    await db.query(`update quotes set kind = $3, mode = $4, ships_on = case when $5::boolean then $6::date else ships_on end, updated_at = now(), status = case when status in ('withdrawn','expired') then 'sent' else status end, expiry_reminded_at = null where request_id = $1 and shipper_id = $2`, [req.params.id, user.shipperId, body.kind, qMode, body.shipsOn !== undefined, body.shipsOn ?? null])
     { // Packing supplies the customer asked for: priced from the shipper's list or Ntemtem's catalogue.
       const needs = rows[0].supplies ? (J(rows[0].supplies) as SupplyNeed[]) : []
       const lines = needs.length ? (body.supplies ? await resolveQuoteSupplies(db, user.shipperId!, needs, body.supplies as QuoteSupplyLine[]) : await defaultQuoteSupplies(db, user.shipperId!, needs)) : []
       await db.query('update quotes set supplies = $3 where request_id = $1 and shipper_id = $2', [req.params.id, user.shipperId, JSON.stringify(lines)])
     }
-    await notify(db, { userId: rows[0].user_id, kind: 'quote_received', title: `${user.company ?? 'A shipper'} quoted $${body.price.toLocaleString()} on ${rows[0].ref}`, body: `${body.transitDays} days transit${body.includes.length ? ` · ${body.includes.join(', ')}` : ''}. Open your dashboard to compare and accept.`, link: '/dashboard', dedupe: `rq:${rows[0].id}:q:${user.shipperId}:${Date.now()}` })
+    await notify(db, { userId: rows[0].user_id, kind: 'quote_received', title: `${user.company ?? 'A shipper'} quoted $${body.price.toLocaleString()} on ${rows[0].ref}`, body: `${body.shipsOn ? `Ships ${niceDay(body.shipsOn)}, arrives about ${niceDay(arrivalDate(body.shipsOn, body.transitDays))} · ` : ''}${body.transitDays} days transit${body.includes.length ? ` · ${body.includes.join(', ')}` : ''}. Open your dashboard to compare and accept.`, link: '/dashboard', dedupe: `rq:${rows[0].id}:q:${user.shipperId}:${Date.now()}` })
     const [request] = await loadRequests(db, 'id = $1', [req.params.id])
     res.status(201).json({ request: { ...request, suppliesAddress: maskSupAddr(request.suppliesAddress, false), contact: contactFor(request, user.shipperId!, false), quotes: request.quotes.filter((x) => x.shipperId === user.shipperId), competingQuotes: request.quotes.filter((x) => x.shipperId !== user.shipperId).length } })
   }))
@@ -776,7 +781,7 @@ export function apiRouter() {
     await db.query(`update requests set status = 'booked' where id = $1`, [q.request_id])
     const { rows: losers } = await db.query<Row>(`select * from quotes where request_id = $1 and id <> $2 and status = 'declined'`, [q.request_id, q.id])
     await db.query('insert into shipments (id,ref,request_id,shipper_id,user_id,mode,origin,destination,cargo,description,status,eta,customer) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
-      [sid, r0.ref, r0.id, q.shipper_id, user.id, mode, r0.origin, r0.destination, r0.cargo, r0.description || `${r0.quantity} × ${r0.cargo}`, 'booked', new Date(Date.now() + (q.transit_days + 4) * 86400000).toISOString().slice(0, 10), r0.contact_name])
+      [sid, r0.ref, r0.id, q.shipper_id, user.id, mode, r0.origin, r0.destination, r0.cargo, r0.description || `${r0.quantity} × ${r0.cargo}`, 'booked', q.ships_on && DATE(q.ships_on)! >= new Date().toISOString().slice(0, 10) ? arrivalDate(DATE(q.ships_on)!, Number(q.transit_days)) : new Date(Date.now() + (q.transit_days + 4) * 86400000).toISOString().slice(0, 10), r0.contact_name])
     await db.query('insert into shipment_events (shipment_id,status,place,note) values ($1,$2,$3,$4)', [sid, 'booked', r0.origin, `Booking confirmed with ${shipper.name}. Quote accepted at $${q.price}.`])
     await attachShipmentToClient(db, q.shipper_id, user.id, sid, r0.contact_name, r0.contact_email)
     await consigneeToClient(db, sid, r0.consignee ? J(r0.consignee) : null)

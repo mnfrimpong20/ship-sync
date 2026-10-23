@@ -1442,6 +1442,7 @@ create table if not exists price_adjustments (
   status text not null default 'proposed', token text, sent_at timestamptz, decided_at timestamptz, decided_by text not null default '', created_at timestamptz not null default now()
 );
 alter table quotes add column if not exists original_price numeric;
+alter table quotes add column if not exists ships_on date;
 alter table run_stops add column if not exists eta_from text not null default '';
 alter table run_stops add column if not exists eta_to text not null default '';
 alter table run_stops add column if not exists pod jsonb;

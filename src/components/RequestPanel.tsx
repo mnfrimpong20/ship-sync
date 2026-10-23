@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { AlertTriangle, Ban, Clock, Globe2, Lock, MessageSquare, Pencil, Plane, Send, Ship } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Ban, Clock, Globe2, Lock, MessageSquare, Pencil, Plane, Send, Ship } from 'lucide-react'
 import { useStore, type Quote, type QuoteRequest } from '../lib/store'
 import { missingServices, requestsApi, type RequestMessage } from '../lib/requests'
 import { refreshShipments } from '../lib/flowEvents'
@@ -41,16 +41,25 @@ export function MessageThread({ requestId, shipperId, onClose, compact }: { requ
 const SUPPLY_WORD: Record<string, string> = { barrel: 'barrels', box: 'boxes', lock: 'barrel locks', tape: 'tape', other: 'supplies' }
 /** What the customer pays for a quote: freight plus any packing supplies priced in it. */
 const totalOf = (q: Quote) => q.price + (q.suppliesUsd ?? 0)
+const shortDay = (iso: string) => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+const TAG_ORDER = ['Lowest price', 'Arrives first', 'Ships soonest', 'Best rated', 'Shortest transit']
+type QuoteSort = 'price' | 'ships' | 'arrives' | 'transit'
+const SORTS: [QuoteSort, string][] = [['price', 'Lowest price'], ['ships', 'Ships soonest'], ['arrives', 'Arrives first'], ['transit', 'Shortest transit']]
+/** Quotes without a ship date sort after the ones that have one. */
+const dayKey = (d?: string | null) => d ?? '9999-12-31'
 export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest; accept: (r: QuoteRequest, quoteId: string) => void; busyQuote: string | null; threadFor?: string | null }) {
   const { shipperById } = useStore()
   const [thread, setThread] = useState<string | null>(threadFor ?? null)
+  const [sort, setSort] = useState<QuoteSort>('price')
   const quotes = r.quotes
   const tags = useMemo(() => {
     const ls = quotes.filter(live); const t = new Map<string, string[]>()
     const add = (id: string | undefined, tag: string) => { if (!id) return; t.set(id, [...(t.get(id) ?? []), tag]) }
     if (ls.length > 1) {
       add([...ls].sort((a, b) => totalOf(a) - totalOf(b))[0]?.id, 'Lowest price')
-      const fast = [...ls].sort((a, b) => a.transitDays - b.transitDays); if (fast[0] && fast[0].transitDays < (fast[1]?.transitDays ?? Infinity)) add(fast[0].id, 'Fastest')
+      const fast = [...ls].sort((a, b) => a.transitDays - b.transitDays); if (fast[0] && fast[0].transitDays < (fast[1]?.transitDays ?? Infinity)) add(fast[0].id, 'Shortest transit')
+      const soon = ls.filter((q) => q.shipsOn).sort((a, b) => a.shipsOn!.localeCompare(b.shipsOn!)); if (soon[0] && soon[0].shipsOn !== soon[1]?.shipsOn) add(soon[0].id, 'Ships soonest')
+      const first = ls.filter((q) => q.arrivesOn).sort((a, b) => a.arrivesOn!.localeCompare(b.arrivesOn!)); if (first[0] && first[0].arrivesOn !== first[1]?.arrivesOn) add(first[0].id, 'Arrives first')
       const rated = [...ls].map((q) => ({ q, s: shipperById(q.shipperId) })).filter((x) => (x.s?.reviews ?? 0) > 0).sort((a, b) => (b.s!.rating - a.s!.rating) || (b.s!.reviews - a.s!.reviews)); if (rated[0]) add(rated[0].q.id, 'Best rated')
     }
     return t
@@ -58,17 +67,22 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
   const groups: { label: string; icon: typeof Ship; list: Quote[] }[] = r.mode === 'either'
     ? ([['ocean', 'Ocean freight', Ship], ['air', 'Air freight', Plane]] as const).map(([m, label, icon]) => ({ label, icon, list: quotes.filter((q) => (q.mode ?? 'ocean') === m) })).filter((g) => g.list.length)
     : [{ label: '', icon: Ship, list: quotes }]
-  const order = (a: Quote, b: Quote) => Number(live(b)) - Number(live(a)) || totalOf(a) - totalOf(b)
+  const by = { price: (a: Quote, b: Quote) => totalOf(a) - totalOf(b), ships: (a: Quote, b: Quote) => dayKey(a.shipsOn).localeCompare(dayKey(b.shipsOn)), arrives: (a: Quote, b: Quote) => dayKey(a.arrivesOn).localeCompare(dayKey(b.arrivesOn)), transit: (a: Quote, b: Quote) => a.transitDays - b.transitDays }[sort]
+  const order = (a: Quote, b: Quote) => Number(live(b)) - Number(live(a)) || by(a, b) || totalOf(a) - totalOf(b)
+  const liveCount = quotes.filter(live).length
   return (
     <div className="mt-4 space-y-4">
-      <div className="no-print flex justify-end"><button onClick={() => window.print()} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="print-quotes">Print / save quotes as PDF</button></div>
+      <div className="no-print flex flex-wrap items-center justify-between gap-2">
+        {liveCount > 1 ? <div className="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label="Sort quotes"><span className="text-text-muted">Sort by</span>{SORTS.map(([k, l]) => <button key={k} onClick={() => setSort(k)} aria-pressed={sort === k} className={`rounded-full border px-2.5 py-1 focus-ring ${sort === k ? 'border-gold bg-gold/15 font-semibold text-gold-deep' : 'border-border text-text-muted hover:border-gold'}`} data-testid={`quote-sort-${k}`}>{l}</button>)}</div> : <span />}
+        <button onClick={() => window.print()} className="btn-ghost !min-h-8 !px-2.5 text-xs" data-testid="print-quotes">Print / save quotes as PDF</button>
+      </div>
       {groups.map((g) => (
         <div key={g.label || 'all'}>
           {g.label && <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-text-muted"><g.icon size={13} aria-hidden="true" /> {g.label} · {g.list.length}</p>}
           <div className="grid gap-3 md:grid-cols-2">
             {[...g.list].sort(order).map((q) => {
               const s = shipperById(q.shipperId) ?? { id: q.shipperId, name: 'Shipper', initials: 'SS', hue: '#F5B82E', rating: 0, reviews: 0, verified: false }
-              const t = tags.get(q.id) ?? []
+              const t = [...(tags.get(q.id) ?? [])].sort((a, b) => TAG_ORDER.indexOf(a) - TAG_ORDER.indexOf(b)).slice(0, 2)
               const missing = missingServices(r, q.includes)
               const dead = !live(q) && q.status !== 'accepted'
               return (
@@ -77,7 +91,12 @@ export function QuoteList({ r, accept, busyQuote, threadFor }: { r: QuoteRequest
                   <div className="flex items-start gap-3">
                     <Avatar initials={s.initials} hue={s.hue} logo={'logo' in s ? s.logo : null} size={40} />
                     <div className="min-w-0 flex-1"><p className="flex items-center gap-1 truncate text-sm font-semibold text-text">{s.name}</p>{s.verified && <p className="mt-1"><VerifiedBadge /></p>}<div className="mt-1 flex flex-wrap gap-1.5"><Rating value={s.rating} count={s.reviews} /></div></div>
-                    <div className="text-right"><p className="font-heading text-2xl font-bold text-text" data-testid="quote-total">{money(totalOf(q))}</p><p className="text-xs text-text-muted">{q.suppliesUsd ? `${money(q.price)} freight + ${money(q.suppliesUsd)} supplies · ` : ''}~{q.transitDays} days{q.kind === 'estimate' ? ' · estimate' : ''}</p></div>
+                    <div className="text-right"><p className="font-heading text-2xl font-bold text-text" data-testid="quote-total">{money(totalOf(q))}</p><p className="text-xs text-text-muted">{q.suppliesUsd ? `${money(q.price)} freight + ${money(q.suppliesUsd)} supplies` : q.kind === 'estimate' ? 'estimate' : 'all in'}{q.suppliesUsd && q.kind === 'estimate' ? ' · estimate' : ''}</p></div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg bg-surface-2/60 px-3 py-2 text-xs" data-testid="quote-schedule">
+                    <div><p className="text-text-muted">Ships</p><p className={`font-semibold ${t.includes('Ships soonest') ? 'text-gold-deep' : 'text-text'}`}>{q.shipsOn ? shortDay(q.shipsOn) : 'Not given'}</p></div>
+                    <div className="flex flex-col items-center text-text-muted"><span className="tabular-nums">{q.transitDays} days</span><ArrowRight size={14} aria-hidden="true" /></div>
+                    <div className="text-right"><p className="text-text-muted">Arrives about</p><p className={`font-semibold ${t.includes('Arrives first') ? 'text-teal' : 'text-text'}`}>{q.arrivesOn ? shortDay(q.arrivesOn) : '—'}</p></div>
                   </div>
                   <ul className="mt-3 flex flex-wrap gap-1.5">{q.includes.map((x) => <li key={x} className="rounded-full border border-border px-2 py-0.5 text-xs text-text-muted">{x}</li>)}</ul>
                   {(q.supplies?.length ?? 0) > 0 && (

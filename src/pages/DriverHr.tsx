@@ -3,6 +3,8 @@ import { Link, NavLink, Navigate, useParams, useSearchParams } from 'react-route
 import { ArrowLeft, Award, Camera, Check, ChevronRight, Coffee, FileText, LogIn, LogOut, MessageSquareWarning, PlayCircle, Send, X } from 'lucide-react'
 import { useStore } from '../lib/store'
 import { isDriverRole } from '../lib/roles'
+import { PinCard } from '../components/driver/PinCard'
+import { expiryText, ShiftReview } from '../components/driver/HomeCards'
 import { useT } from '../lib/i18n'
 import { useDisplay } from '../lib/prefs'
 import { niceDay } from '../lib/dates'
@@ -110,6 +112,8 @@ function ClockCard() {
   const go = async (a: 'in' | 'break' | 'resume' | 'out') => { setBusy(true); setErr(''); try { setV(await driverApi.clock(a)) } catch (e) { setErr(errOf(e, t('Could not save.'))) } finally { setBusy(false) } }
   const c = v?.current
   return (
+    <>
+    {v?.review && <ShiftReview sh={v.review} onSaved={setV} />}
     <Card title={t('Clock in & out')} id="clk-h" testid="clock">
       <p className="mt-1 text-base">{!v ? t('Loading…') : c ? (c.onBreak ? t('On a break') : t('On shift since {time}', { time: new Date(c.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })) : t('Not clocked in')} {v && <span className="text-sm text-text-muted">· {t('{n} h this week', { n: v.week })}</span>}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -119,6 +123,7 @@ function ClockCard() {
       </div>
       <Msg err={err} />
     </Card>
+    </>
   )
 }
 
@@ -158,7 +163,7 @@ function MyTime() {
 
 /* ---------------- My file: onboarding, agreement, training, papers, details ---------------- */
 function MyFile() {
-  const t = useT(); const [sp] = useSearchParams(); const { driver } = useContext(SelfCtx)
+  const t = useT(); const disp = useDisplay(); const [sp] = useSearchParams(); const { driver } = useContext(SelfCtx)
   const [d, setD] = useState<Awaited<ReturnType<typeof hrApi.me>> | null>(null); const [err, setErr] = useState(''); const [ok, setOk] = useState('')
   const load = () => hrApi.me().then(setD).catch((e) => setErr(errOf(e, t('Could not load.'))))
   useEffect(() => { void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -169,12 +174,13 @@ function MyFile() {
       <Card title={left.length ? t('Getting started · {n} to do', { n: left.length }) : t('All set')} id="ob-h" testid="checklist">
         <ul className="mt-2 grid gap-1.5">{p.checklist.map((c) => <li key={c.key} className="flex items-center gap-2 text-base">{c.done ? <Check size={18} className="text-teal" aria-label={t('Done')} /> : <X size={18} className="text-text-muted" aria-label={t('Not done')} />}{t(c.label)}</li>)}</ul>
       </Card>
-      {p.expiringSoon.length > 0 && <p className="mt-4 rounded-2xl border-2 border-danger/50 bg-danger/10 p-4 text-base" role="alert">{p.expiringSoon.map((e) => <span key={e.kind} className="block">{e.expired ? t('{doc} has expired — upload the new one.', { doc: t(e.label) }) : t('{doc} expires {date}.', { doc: t(e.label), date: e.date })}</span>)}</p>}
+      {p.expiringSoon.length > 0 && <p className="mt-4 rounded-2xl border-2 border-danger/50 bg-danger/10 p-4 text-base" role="alert">{p.expiringSoon.map((e) => <span key={e.kind} className="block">{expiryText(t, e, disp.lang)}{e.expired ? ` — ${t('upload the new one below.')}` : ''}</span>)}</p>}
       {driver && <Agreement company={d.company} person={p} onDone={() => { setOk(t('Agreement signed.')); void load() }} />}
       {driver && <Training videos={d.settings.trainingVideos} passed={!!p.training?.passedAt} onDone={() => void load()} open={sp.get('quiz') === '1'} />}
       <Papers person={p} onDone={(m) => { setOk(m); void load() }} />
       {driver && <BadgeCard />}
       <Details person={p} onDone={(m) => { setOk(m); void load() }} />
+      <PinCard always />
       <Msg err={err} ok={ok} />
     </Shell>
   )
@@ -229,7 +235,7 @@ function Papers({ person, onDone }: { person: Person; onDone: (m: string) => voi
   return (
     <section ref={box} className={`mt-5 rounded-3xl border bg-surface p-5 ${renew ? 'border-2 border-gold' : 'border-border'}`} aria-labelledby="pap-h" data-testid="papers">
       <h2 id="pap-h" className="!text-lg">{t('My papers')}</h2>
-      {person.docs.length ? <ul className="mt-2 divide-y divide-border text-base">{person.docs.map((x) => <li key={x.id} className="py-2.5" data-testid="my-doc"><div className="flex items-center gap-2"><FileText size={18} aria-hidden="true" /><span className="min-w-0 flex-1">{x.title || x.kind}{x.expiresOn ? <span className="block text-sm text-text-muted">{t('Expires {date}', { date: x.expiresOn })}</span> : null}</span>{status(x)}</div>{x.status === 'rejected' && x.reviewNote && <p className="mt-1 rounded-xl bg-danger/10 p-2 text-sm">“{x.reviewNote}” — {x.reviewedBy}</p>}</li>)}</ul> : <p className="mt-2 text-base text-text-muted">{t('Nothing uploaded yet.')}</p>}
+      {person.docs.length ? <ul className="mt-2 divide-y divide-border text-base">{person.docs.map((x) => <li key={x.id} className="py-2.5" data-testid="my-doc"><div className="flex items-center gap-2"><FileText size={18} aria-hidden="true" /><span className="min-w-0 flex-1">{x.title || x.kind}{x.expiresOn ? <span className="block text-sm text-text-muted">{t('Expires {date}', { date: niceDay(x.expiresOn) })}</span> : null}</span>{status(x)}</div>{x.status === 'rejected' && x.reviewNote && <p className="mt-1 rounded-xl bg-danger/10 p-2 text-sm">“{x.reviewNote}” — {x.reviewedBy}</p>}</li>)}</ul> : <p className="mt-2 text-base text-text-muted">{t('Nothing uploaded yet.')}</p>}
       <div className="mt-4 grid gap-3">
         <div><label htmlFor="pap-kind" className="label-dark">{renew ? t('Upload the new one') : t('What is it?')}</label><select id="pap-kind" className="input-dark !min-h-12" value={kind} onChange={(e) => setKind(e.target.value)}>{PAPER_KINDS.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}</select></div>
         {!['id', 'contract', 'tax', 'certificate'].includes(kind) && <div><label htmlFor="pap-exp" className="label-dark">{t('Expiry date')}</label><input id="pap-exp" type="date" className="input-dark !min-h-12" value={exp} onChange={(e) => setExp(e.target.value)} /></div>}

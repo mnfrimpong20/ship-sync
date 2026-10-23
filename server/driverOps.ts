@@ -59,6 +59,31 @@ export async function driverForShipment(db: Db, shipmentId: string) {
 const zPhoto = z.string().max(600_000).regex(/^data:image\/(jpeg|png|webp);base64,/)
 const zSig = z.string().max(120_000).regex(/^data:image\/png;base64,/)
 
+const RECEIPT_KINDS = ['fuel', 'toll', 'parking', 'repair', 'meal', 'other'] as const
+const RECEIPT_CUR = ['USD', 'GHS', 'NGN', 'XOF', 'GBP', 'EUR'] as const
+export async function readReceipt(photo: string): Promise<{ ai: boolean; amount?: number; currency?: string; kind?: string; vendor?: string }> {
+  const key = process.env.ANTHROPIC_API_KEY?.trim(); if (!key) return { ai: false }
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(photo); if (!m) return { ai: true }
+  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 20000)
+  try {
+    const r = await fetch((process.env.ANTHROPIC_API_URL?.trim() || 'https://api.anthropic.com') + '/v1/messages', { method: 'POST', signal: ctl.signal, headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({
+      model: process.env.RECEIPT_MODEL?.trim() || process.env.ASSISTANT_MODEL?.trim() || 'claude-haiku-5-5', max_tokens: 200,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } },
+        { type: 'text', text: `This is a receipt a delivery driver paid. Reply with JSON only: {"amount": total paid as a number, "currency": one of ${RECEIPT_CUR.join('/')}, "kind": one of ${RECEIPT_KINDS.join('/')}, "vendor": shop name}. Use null for anything you can't read. Ghana cedis are GHS, naira NGN, CFA XOF.` },
+      ] }] }) })
+    if (!r.ok) return { ai: true }
+    const j = await r.json() as { content?: { type: string; text?: string }[] }
+    const txt = (j.content ?? []).map((c) => c.text ?? '').join(''); const js = /\{[\s\S]*\}/.exec(txt); if (!js) return { ai: true }
+    const o = JSON.parse(js[0]) as Record<string, unknown>
+    const amount = typeof o.amount === 'number' && o.amount > 0 && o.amount < 1_000_000 ? Math.round(o.amount * 100) / 100 : undefined
+    const currency = RECEIPT_CUR.includes(o.currency as never) ? String(o.currency) : undefined
+    const kind = RECEIPT_KINDS.includes(o.kind as never) ? String(o.kind) : undefined
+    const vendor = typeof o.vendor === 'string' ? o.vendor.slice(0, 60) : undefined
+    return { ai: true, amount, currency, kind, vendor }
+  } catch { return { ai: true } } finally { clearTimeout(timer) }
+}
+
 export function mountDriverOps(r: Router, d: Deps) {
   const { getDb, requireUser, HttpError, wrap } = d
   /** Signed-in shipper staff with their staff row. */
@@ -327,6 +352,12 @@ export function mountDriverOps(r: Router, d: Deps) {
     await notifyShipperStaff(db, shipperId, { kind: 'payment', title: `${me.name} logged ${b.kind}: ${b.currency} ${b.amount}`, body: b.paidBy === 'company' ? 'Paid with the company card.' : 'Approve it under Drivers → Pay to pay them back.', link: '/dashboard/drivers?tab=payroll', dedupe: `exp:${id}` }, ['owner', 'finance'])
     res.status(201).json({ ok: true, amountUsd: usd })
   }))
+  /** Read a receipt photo (amount, currency, what for) so the driver only checks it. Needs ANTHROPIC_API_KEY; otherwise { ai: false }. */
+  r.post('/drivers/expenses/read', wrap(async (req, res) => {
+    const db = await getDb(); await staffOf(db, req)
+    const { photo } = z.object({ photo: zPhoto }).parse(req.body)
+    res.json(await readReceipt(photo))
+  }))
   r.get('/drivers/expenses', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId, office, me } = await staffOf(db, req)
     const { rows } = await db.query<Row>(`select e.*, s.name from driver_expenses e join staff s on s.id = e.staff_id where e.shipper_id = $1 ${office ? '' : 'and e.staff_id = $2'} and e.at > now() - interval '35 days' order by e.at desc`, office ? [shipperId] : [shipperId, me.id])
@@ -334,11 +365,39 @@ export function mountDriverOps(r: Router, d: Deps) {
   }))
 
   /* ---- shifts ---- */
-  const shiftOut = (x: Row) => { const br = (J(x.breaks) ?? []) as { start: string; end?: string }[]; const end = x.end_at ? new Date(x.end_at).getTime() : Date.now(); const brMs = br.reduce((n, b) => n + ((b.end ? new Date(b.end).getTime() : Date.now()) - new Date(b.start).getTime()), 0); return { id: x.id, start: ISO(x.start_at), end: ISO(x.end_at), onBreak: br.some((b) => !b.end), breaks: br, hours: Math.max(0, Math.round(((end - new Date(x.start_at).getTime() - brMs) / 3600000) * 100) / 100) } }
+  const shiftOut = (x: Row) => { const br = (J(x.breaks) ?? []) as { start: string; end?: string }[]; const end = x.end_at ? new Date(x.end_at).getTime() : Date.now(); const brMs = br.reduce((n, b) => n + ((b.end ? new Date(b.end).getTime() : Date.now()) - new Date(b.start).getTime()), 0); const fl = (J(x.flags) ?? {}) as Record<string, unknown>; return { id: x.id, start: ISO(x.start_at), end: ISO(x.end_at), onBreak: br.some((b) => !b.end), breaks: br, auto: fl.autoClosed ? (fl.confirm as 'pending' | 'confirmed' | 'fixed') ?? 'pending' : null, hours: Math.max(0, Math.round(((end - new Date(x.start_at).getTime() - brMs) / 3600000) * 100) / 100) } }
   r.get('/shifts/me', wrap(async (req, res) => {
     const db = await getDb(); const { me } = await staffOf(db, req)
-    const { rows } = await db.query<Row>(`select * from shifts where staff_id = $1 and start_at > now() - interval '7 days' order by start_at desc`, [me.id])
-    const list = rows.map(shiftOut); res.set('Cache-Control', 'no-store'); res.json({ current: list.find((s) => !s.end) ?? null, week: Math.round(list.reduce((n, s) => n + s.hours, 0) * 10) / 10, shifts: list })
+    await import('./driverHr').then((m) => m.closeStaleShift(db, me.id)).catch((e) => console.error('[shift] auto-close', e))
+    res.set('Cache-Control', 'no-store'); res.json(await myShifts(db, me.id))
+  }))
+  const myShifts = async (db: Db, staffId: string) => {
+    const { rows } = await db.query<Row>(`select * from shifts where staff_id = $1 and start_at > now() - interval '7 days' order by start_at desc`, [staffId])
+    const list = rows.map(shiftOut)
+    return { current: list.find((s) => !s.end) ?? null, review: list.find((s) => s.auto === 'pending') ?? null, week: Math.round(list.reduce((n, s) => n + s.hours, 0) * 10) / 10, shifts: list }
+  }
+  /** "That's right" or the real clock-out time, for a shift that closed itself. */
+  r.post('/shifts/:id/confirm', wrap(async (req, res) => {
+    const db = await getDb(); const { me, shipperId } = await staffOf(db, req)
+    const b = z.object({ end: z.string().datetime({ offset: true }).optional() }).parse(req.body ?? {})
+    const { rows } = await db.query<Row>('select * from shifts where id = $1 and staff_id = $2', [String(req.params.id), me.id]); const x = rows[0]
+    if (!x) throw new HttpError(404, 'Shift not found.')
+    const fl = (J(x.flags) ?? {}) as Record<string, unknown>
+    if (!fl.autoClosed || fl.confirm !== 'pending') throw new HttpError(409, 'This shift doesn’t need checking.')
+    if (x.paid_slip) throw new HttpError(409, 'This shift is already on a payslip — ask the office to correct it.')
+    if (b.end) {
+      const end = new Date(b.end).getTime(); const start = new Date(x.start_at).getTime()
+      if (end <= start) throw new HttpError(400, 'Clock-out must be after you clocked in.')
+      if (end > Date.now()) throw new HttpError(400, 'That time is in the future.')
+      if (end - start > 24 * 3600000) throw new HttpError(400, 'That makes the shift longer than 24 hours — ask the office to correct it.')
+      const br = ((J(x.breaks) ?? []) as { start: string; end?: string }[]).filter((k) => new Date(k.start).getTime() < end).map((k) => (k.end && new Date(k.end).getTime() <= end ? k : { ...k, end: b.end! }))
+      const edits = [...((J(x.edits) ?? []) as Row[]), { by: me.name, at: new Date().toISOString(), reason: 'Corrected the automatic clock-out.', before: { start: ISO(x.start_at), end: ISO(x.end_at) } }]
+      await db.query('update shifts set end_at = $2, breaks = $3, flags = $4, edits = $5 where id = $1', [x.id, b.end, JSON.stringify(br), JSON.stringify({ ...fl, confirm: 'fixed' }), JSON.stringify(edits)])
+      const hs = await import('./driverHr').then((m) => m.hrSettings(db, shipperId)); const { rows: sb } = await db.query<Row>('select base from staff where id = $1', [me.id])
+      let when = b.end; try { when = new Intl.DateTimeFormat('en-US', { timeZone: sb[0]?.base === 'destination' ? hs.tzDestination : hs.tzOrigin, weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(b.end)) } catch { /* bad tz */ }
+      await notifyShipperStaff(db, shipperId, { kind: 'system', title: `${me.name} corrected their clock-out`, body: `The shift that closed itself now ends ${when}. Check it on the timesheet.`, link: '/dashboard/hr?tab=hours' }, ['owner', 'dispatcher']).catch(() => {})
+    } else await db.query('update shifts set flags = $2 where id = $1', [x.id, JSON.stringify({ ...fl, confirm: 'confirmed' })])
+    res.json(await myShifts(db, me.id))
   }))
   r.post('/shifts/clock', wrap(async (req, res) => {
     const db = await getDb(); const { me, shipperId } = await staffOf(db, req)
@@ -353,8 +412,7 @@ export function mountDriverOps(r: Router, d: Deps) {
       if (action === 'resume' || action === 'out') for (const b of br) if (!b.end) b.end = now
       await db.query(`update shifts set breaks = $2${action === 'out' ? ', end_at = now()' : ''} where id = $1`, [cur.id, JSON.stringify(br)])
     }
-    const { rows: out } = await db.query<Row>(`select * from shifts where staff_id = $1 and start_at > now() - interval '7 days' order by start_at desc`, [me.id])
-    const list = out.map(shiftOut); res.json({ current: list.find((s) => !s.end) ?? null, week: Math.round(list.reduce((n, s) => n + s.hours, 0) * 10) / 10, shifts: list })
+    res.json(await myShifts(db, me.id))
   }))
 
   /* ---- cash handover ---- */

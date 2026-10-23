@@ -166,7 +166,16 @@ const EXP_KINDS = [['fuel', 'Fuel'], ['toll', 'Toll'], ['parking', 'Parking'], [
 export function ExpenseSheet({ run, onClose, onDone, defaultCurrency = 'USD' }: { run?: Run; onClose: () => void; onDone: (usd: number) => void; defaultCurrency?: string }) {
   const t = useT()
   const [kind, setKind] = useState('fuel'); const [paidBy, setPaidBy] = useState<'driver' | 'company'>('driver'); const [amount, setAmount] = useState(''); const [cur, setCur] = useState(defaultCurrency); const [photo, setPhoto] = useState(''); const [note, setNote] = useState('')
-  const [busy, setBusy] = useState(false); const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [reading, setReading] = useState(false); const [read, setRead] = useState('')
+  const onPhoto = async (p: string) => {
+    setPhoto(p); setRead(''); if (!p) return
+    setReading(true)
+    try {
+      const r = await driverApi.readReceipt(p); if (!r.ai) return
+      if (r.amount) setAmount(String(r.amount)); if (r.currency) setCur(r.currency); if (r.kind) setKind(r.kind); if (r.vendor && !note) setNote(r.vendor)
+      setRead(r.amount ? t('Filled in from the receipt — check the amount before saving.') : t('Couldn’t read the receipt — type the amount.'))
+    } catch { /* type it by hand */ } finally { setReading(false) }
+  }
   const submit = async () => {
     const n = Number(amount); if (!n) { setErr(t('Enter the amount.')); return }
     if (!photo) { setErr(t('Take a photo of the receipt.')); return }
@@ -175,14 +184,15 @@ export function ExpenseSheet({ run, onClose, onDone, defaultCurrency = 'USD' }: 
   }
   return (
     <Sheet title={t('Fuel & expenses')} onClose={onClose} testid="expense-sheet" footer={<Big tone="gold" onClick={submit} disabled={busy} testid="exp-save"><Fuel size={20} aria-hidden="true" /> {busy ? t('Saving…') : t('Save expense')}</Big>}>
-      <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label={t('What for?')}>{EXP_KINDS.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => setKind(k)} className={`min-h-12 rounded-xl border-2 text-base font-semibold focus-ring ${kind === k ? 'border-gold bg-gold/15' : 'border-border'}`}>{t(l)}</button>)}</div>
+      <PhotoField value={photo} onChange={(p) => void onPhoto(p)} label={t('Photo of the receipt')} testid="exp-photo" />
+      {reading ? <p role="status" className="mt-2 text-sm text-text-muted">{t('Reading the receipt…')}</p> : read ? <p role="status" className="mt-2 rounded-xl bg-gold/10 px-3 py-2 text-sm" data-testid="exp-read">{read}</p> : null}
+      <div className="mt-4 grid grid-cols-3 gap-2" role="radiogroup" aria-label={t('What for?')}>{EXP_KINDS.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => setKind(k)} className={`min-h-12 rounded-xl border-2 text-base font-semibold focus-ring ${kind === k ? 'border-gold bg-gold/15' : 'border-border'}`}>{t(l)}</button>)}</div>
       <div className="mt-4 grid grid-cols-[1fr_7rem] gap-2">
         <div><label htmlFor="exp-amt" className="label-dark">{t('Amount')}</label><input id="exp-amt" inputMode="decimal" className="input-dark !min-h-14 text-2xl font-bold tabular-nums" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} data-testid="exp-amount" /></div>
         <div><label htmlFor="exp-cur" className="label-dark">{t('Currency')}</label><select id="exp-cur" className="input-dark !min-h-14 text-base" value={cur} onChange={(e) => setCur(e.target.value)}>{['USD', 'GHS', 'NGN', 'XOF', 'GBP', 'EUR'].map((c) => <option key={c}>{c}</option>)}</select></div>
       </div>
       <p className="label-dark mt-4" id="exp-paid">{t('Who paid?')}</p>
       <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby="exp-paid"><Choice on={paidBy === 'driver'} onClick={() => setPaidBy('driver')} testid="exp-me">{t('I paid — pay me back')}</Choice><Choice on={paidBy === 'company'} onClick={() => setPaidBy('company')} testid="exp-company">{t('Company / fuel card')}</Choice></div>
-      <div className="mt-4"><PhotoField value={photo} onChange={setPhoto} label={t('Photo of the receipt')} testid="exp-photo" /></div>
       <label htmlFor="exp-note" className="label-dark mt-4">{t('Note')} <span className="font-normal text-text-muted">({t('optional')})</span></label>
       <input id="exp-note" className="input-dark !min-h-12" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('e.g. Shell, Spintex Road')} />
       <p className="mt-3 text-sm text-text-muted">{paidBy === 'driver' ? t('Once the office approves it, it’s on your next payslip.') : t('It goes into Costs & profit for the office.')}</p>

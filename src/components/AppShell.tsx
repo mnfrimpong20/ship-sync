@@ -10,7 +10,8 @@ import { Avatar, Logo, Mark } from './ui'
 import { PlatformBanners } from './PlatformBanners'
 import { NotificationBell } from './NotificationBell'
 import { QuickSearch } from './QuickSearch'
-import { telLink, useDispatch, useMyRuns, useQueued } from '../lib/driver'
+import { useMyRuns, useQueued } from '../lib/driver'
+import { DispatchHost, openDispatch } from './driver/DispatchSheet'
 import { DisplaySettings } from './DisplaySettings'
 import { useStore } from '../lib/store'
 import { clientsApi } from '../lib/clients'
@@ -314,6 +315,7 @@ export default function AppShell() {
         </main>
         {!isShipper && <BottomBar unread={summary?.unread ?? 0} owe={summary?.owe ?? 0} onMenu={() => setOpen(true)} />}
         {isDriver && <DriverBar />}
+        {isDriver && <DispatchHost />}
       </div>
     </div>
   )
@@ -345,7 +347,7 @@ function BottomBar({ unread, owe, onMenu }: { unread: number; owe: number; onMen
 /** Thumb-reach bar for drivers: my runs, the next stop, scan, call dispatch. */
 function DriverBar() {
   const loc = useLocation(); const t = useT(); const { user } = useStore()
-  const { runs } = useMyRuns(); const { phone } = useDispatch(); const queued = useQueued()
+  const { runs } = useMyRuns(); const queued = useQueued()
   const cur = (runs ?? []).find((r) => r.status === 'in_progress') ?? (runs ?? []).find((r) => r.status === 'planned')
   const items: { to: string; label: string; icon: typeof Home; on: boolean; badge?: number }[] = [
     { to: '/dashboard/runs', label: t('My runs'), icon: MapPinned, on: loc.pathname === '/dashboard/runs' },
@@ -360,8 +362,7 @@ function DriverBar() {
           {it.badge ? <span className="absolute left-[calc(50%+6px)] top-1.5 min-w-5 rounded-full bg-gold px-1 text-center text-xs font-bold leading-5 text-on-accent" aria-label={t('{n} updates waiting', { n: it.badge })}>{it.badge}</span> : null}
         </Link>
       ))}
-      {phone ? <a href={telLink(phone)} className="flex min-h-16 flex-col items-center justify-center gap-0.5 text-sm text-text-muted focus-ring" data-testid="db-call"><Phone size={22} aria-hidden="true" />{t('Dispatch')}</a>
-        : <Link to="/dashboard/runs" className="flex min-h-16 flex-col items-center justify-center gap-0.5 text-sm text-text-muted focus-ring"><Phone size={22} aria-hidden="true" />{t('Dispatch')}</Link>}
+      <button type="button" onClick={() => openDispatch()} className="flex min-h-16 flex-col items-center justify-center gap-0.5 text-sm text-text-muted focus-ring" data-testid="db-dispatch"><Phone size={22} aria-hidden="true" />{t('Dispatch')}</button>
     </nav>
   )
 }

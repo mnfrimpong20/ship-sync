@@ -145,6 +145,7 @@ async function leaderboard(db: Db, shipperId: string) {
 /* ---------------- sweeps: papers expiring, long shifts, missed clock-outs ---------------- */
 export async function sweepDriverHr(db: Db) {
   await import('./driverHr2').then((m) => m.sweepClockIn(db)).catch((e) => console.error('[driver-hr] clock-in', e))
+  await import('./ops').then((m) => m.runAutoSummaries(db)).catch((e) => console.error('[driver-hr] run summaries', e))
   const { rows: profs } = await db.query<Row>(`select p.*, s.name, s.user_id, s.shipper_id, s.role from driver_profiles p join staff s on s.id = p.staff_id where p.status <> 'offboarded'`)
   const t = today()
   for (const p of profs) {
@@ -157,15 +158,47 @@ export async function sweepDriverHr(db: Db) {
       if (p.user_id) await notify(db, { userId: p.user_id, kind: 'system', title: step === 'expired' ? `Your ${EXPIRY_LABEL[k].toLowerCase()} has expired` : `Your ${EXPIRY_LABEL[k].toLowerCase()} expires ${d}`, body: 'Upload the new one under My file.', link: `${selfHr(p.role, 'me')}?renew=${k}`, dedupe: `exp:${p.staff_id}:${k}:${d}:${step}:me` })
     }
   }
-  const { rows: open } = await db.query<Row>(`select sh.*, s.name, s.user_id, s.role from shifts sh join staff s on s.id = sh.staff_id where sh.end_at is null`)
+  const { rows: open } = await db.query<Row>(`select sh.*, s.name, s.user_id, s.role, s.base from shifts sh join staff s on s.id = sh.staff_id where sh.end_at is null`)
   for (const x of open) {
     const st = await hrSettings(db, x.shipper_id); const h = (Date.now() - new Date(x.start_at).getTime()) / 3600000
-    const level = h >= st.maxShiftHours + 2 ? 'missed' : h >= st.maxShiftHours ? 'max' : h >= st.warnShiftHours ? 'warn' : null; if (!level) continue
+    if (h >= st.maxShiftHours + 2) { await autoCloseShift(db, x, st); continue }
+    const level = h >= st.maxShiftHours ? 'max' : h >= st.warnShiftHours ? 'warn' : null; if (!level) continue
     const flags = J<Record<string, boolean>>(x.flags, {}); if (flags[level]) continue
     await db.query('update shifts set flags = $2 where id = $1', [x.id, JSON.stringify({ ...flags, [level]: true })])
-    if (x.user_id) await notify(db, { userId: x.user_id, kind: 'system', title: level === 'missed' ? 'Did you forget to clock out?' : `You’ve been on shift ${Math.floor(h)} hours`, body: level === 'missed' ? 'Clock out now, or tell the office what time you finished.' : level === 'max' ? 'That’s the longest shift allowed — finish up and clock out.' : 'Take a break if you haven’t.', link: isDriverRole(x.role) ? '/dashboard/runs' : '/dashboard/me/time', dedupe: `shift:${x.id}:${level}` })
-    if (level !== 'warn') await notifyShipperStaff(db, x.shipper_id, { kind: 'system', title: level === 'missed' ? `${x.name} may have forgotten to clock out` : `${x.name} has been on shift ${Math.floor(h)} hours`, body: 'Fix the clock-out time under Team & HR → Hours if needed.', link: '/dashboard/hr?tab=hours', dedupe: `shift:${x.id}:${level}:o` }, ['owner', 'dispatcher'])
+    if (x.user_id) await notify(db, { userId: x.user_id, kind: 'system', title: `You’ve been on shift ${Math.floor(h)} hours`, body: level === 'max' ? 'That’s the longest shift allowed — finish up and clock out.' : 'Take a break if you haven’t.', link: isDriverRole(x.role) ? '/dashboard/runs' : '/dashboard/me/time', dedupe: `shift:${x.id}:${level}` })
+    if (level === 'max') await notifyShipperStaff(db, x.shipper_id, { kind: 'system', title: `${x.name} has been on shift ${Math.floor(h)} hours`, body: 'If they forgot to clock out, it closes itself 2 hours after the limit.', link: '/dashboard/hr?tab=hours', dedupe: `shift:${x.id}:${level}:o` }, ['owner', 'dispatcher'])
   }
+}
+
+/**
+ * Forgotten clock-out: 2 hours past the longest shift allowed, the shift closes itself at the person's last
+ * activity (last stop or run summary, plus 15 minutes) — or a normal 8-hour day if there was none. They're asked
+ * to confirm or fix the time; the office sees it marked on the timesheet.
+ */
+export async function autoCloseShift(db: Db, x: Row, st?: HrSettings) {
+  st ??= await hrSettings(db, x.shipper_id)
+  const start = new Date(x.start_at).getTime()
+  const { rows: act } = await db.query<Row>(`select greatest(
+      (select max(st.done_at) from run_stops st join runs r on r.id = st.run_id where r.driver_id = $1 and st.done_at > $2 and st.done_at <= now()),
+      (select max(r.summary_sent_at) from runs r where r.driver_id = $1 and r.summary_sent_at > $2 and r.summary_sent_at <= now())) as last`, [x.staff_id, new Date(start).toISOString()])
+  const last = act[0]?.last ? new Date(act[0].last).getTime() : 0
+  let end = last ? last + 15 * 60000 : start + Math.min(8, st.maxShiftHours) * 3600000
+  end = Math.min(end, Date.now(), start + st.maxShiftHours * 3600000); if (end <= start) end = start + 60000
+  const endIso = new Date(end).toISOString()
+  const br = J<{ start: string; end?: string }[]>(x.breaks, []).filter((b) => new Date(b.start).getTime() < end).map((b) => (b.end && new Date(b.end).getTime() <= end ? b : { ...b, end: endIso }))
+  const flags = { ...J<Record<string, unknown>>(x.flags, {}), missed: true, autoClosed: true, confirm: 'pending', autoFrom: last ? 'activity' : 'default' }
+  const edits = [...J<Row[]>(x.edits, []), { by: 'Ntemtem (automatic)', at: new Date().toISOString(), reason: last ? 'No clock-out — closed 15 minutes after the last stop.' : 'No clock-out and no stops — closed at 8 hours.', before: { start: ISO(x.start_at), end: null } }]
+  const { rows: done } = await db.query('update shifts set end_at = $2, breaks = $3, flags = $4, edits = $5 where id = $1 and end_at is null returning id', [x.id, endIso, JSON.stringify(br), JSON.stringify(flags), JSON.stringify(edits)])
+  if (!done.length) return
+  const tz = x.base === 'destination' ? st.tzDestination : st.tzOrigin
+  let when = endIso; try { when = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(end)) } catch { /* bad tz */ }
+  if (x.user_id) await notify(db, { userId: x.user_id, kind: 'system', title: `You didn’t clock out — we closed your shift at ${when}`, body: 'Check the time. If it’s wrong, fix it in one tap.', link: isDriverRole(x.role) ? '/dashboard/runs' : '/dashboard/me/time', dedupe: `shift:${x.id}:auto` })
+  if (x.name) await notifyShipperStaff(db, x.shipper_id, { kind: 'system', title: `${x.name}’s shift was closed automatically (${when})`, body: 'They forgot to clock out. They’ve been asked to confirm the time.', link: '/dashboard/hr?tab=hours', dedupe: `shift:${x.id}:auto:o` }, ['owner', 'dispatcher'])
+}
+/** Close this person's forgotten shift right away (when they open the app), instead of waiting for the sweep. */
+export async function closeStaleShift(db: Db, staffId: string) {
+  const { rows } = await db.query<Row>('select sh.*, s.name, s.user_id, s.role, s.base from shifts sh join staff s on s.id = sh.staff_id where sh.staff_id = $1 and sh.end_at is null', [staffId])
+  for (const x of rows) { const st = await hrSettings(db, x.shipper_id); if ((Date.now() - new Date(x.start_at).getTime()) / 3600000 >= st.maxShiftHours + 2) await autoCloseShift(db, x, st) }
 }
 export function startDriverHrSweeps(getDb: () => Promise<Db>) {
   const run = () => getDb().then(sweepDriverHr).catch((e) => console.error('[driver-hr] sweep', e))

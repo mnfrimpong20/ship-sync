@@ -125,6 +125,20 @@ const runDistance = (start: { lat: number; lon: number } | null, stops: { lat?: 
   return Math.round(t * 10) / 10
 }
 
+let autoSummaries: ((db: Db) => Promise<void>) | null = null
+/** Sweep: send end-of-run summaries drivers forgot to send. */
+export async function runAutoSummaries(db: Db) { if (autoSummaries) await autoSummaries(db) }
+type SummaryRun = { id: string; name: string; stops: { status: string; label: string; note: string; pod?: { pieces?: number } | null; collected?: { method: string; amountUsd: number } | null }[] }
+export async function sendRunSummary(db: Db, run: SummaryRun, shipperId: string, by: string, note: string, auto = false) {
+  const done = run.stops.filter((s) => s.status === 'done'); const skipped = run.stops.filter((s) => s.status === 'skipped'); const pending = run.stops.filter((s) => s.status === 'pending')
+  const pieces = done.reduce((n, s) => n + (s.pod?.pieces ?? 0), 0)
+  const cash = run.stops.reduce((n, s) => n + (s.collected?.method === 'cash' ? s.collected.amountUsd : 0), 0); const momo = run.stops.reduce((n, s) => n + (s.collected?.method === 'mobile_money' ? s.collected.amountUsd : 0), 0)
+  const body = [`${done.length} done`, skipped.length ? `${skipped.length} skipped (${skipped.map((s) => `${s.label}: ${s.note || 'no reason'}`).join('; ')})` : '', pending.length ? `${pending.length} not reached` : '', pieces ? `${pieces} pieces` : '', cash ? `$${cash.toLocaleString()} cash` : '', momo ? `$${momo.toLocaleString()} mobile money` : '', note, auto ? 'Sent automatically an hour after the last stop.' : ''].filter(Boolean).join(' · ')
+  await notifyShipperStaff(db, shipperId, { kind: 'shipment_status', title: `${by} finished “${run.name}”`, body, link: `/dashboard/routes/${run.id}`, dedupe: auto ? `autosum:${run.id}` : undefined }, ['owner', 'dispatcher'])
+  await db.query('update runs set summary_sent_at = now() where id = $1', [run.id])
+  return body
+}
+
 export function mountOps(r: Router, d: Deps) {
   const { getDb, requireUser, createSession, loadUserWithCompany, HttpError, wrap, loadShipments } = d
   /** The signed-in staff member and their role; owners without a staff row are created on the fly. */
@@ -164,6 +178,19 @@ export function mountOps(r: Router, d: Deps) {
     return rows.map((x) => runOut(x, stops.filter((s) => s.run_id === x.id)))
   }
   const ownRun = async (db: Db, shipperId: string, id: string) => { const [run] = await loadRuns(db, 'r.id = $1 and r.shipper_id = $2', [id, shipperId]); if (!run) throw new HttpError(404, 'Run not found.'); return run }
+  /** Every stop closed an hour ago and no summary yet: send it for the driver and finish the run. */
+  autoSummaries = async (db: Db) => {
+    const { rows } = await db.query<Row>(`select r.id, r.shipper_id, r.status, r.vehicle_id, s.name as driver from runs r join staff s on s.id = r.driver_id
+      where r.summary_sent_at is null and r.status in ('in_progress','done') and r.run_date >= current_date - 1
+        and exists (select 1 from run_stops st where st.run_id = r.id)
+        and not exists (select 1 from run_stops st where st.run_id = r.id and st.status = 'pending')
+        and (select max(st.done_at) from run_stops st where st.run_id = r.id) between now() - interval '24 hours' and now() - interval '60 minutes'`)
+    for (const x of rows) {
+      const run = await ownRun(db, x.shipper_id, x.id)
+      await sendRunSummary(db, run, x.shipper_id, x.driver, '', true)
+      if (x.status === 'in_progress') { await db.query(`update runs set status = 'done' where id = $1`, [x.id]); if (x.vehicle_id) await db.query(`update vehicles set status = 'available' where id = $1 and status = 'on_run'`, [x.vehicle_id]) }
+    }
+  }
 
   // ---- me (role for the UI)
   r.get('/team/me', wrap(async (req, res) => { const db = await getDb(); const { me } = await staffOf(db, req); res.json({ staff: staffOut(me) }) }))
@@ -336,12 +363,7 @@ export function mountOps(r: Router, d: Deps) {
     const run = await ownRun(db, shipperId, String(req.params.id))
     if (isDriverRole(role) && run.driverId !== me.id) throw new HttpError(403, 'Not your run.')
     const { note } = z.object({ note: z.string().trim().max(500).default('') }).parse(req.body ?? {})
-    const done = run.stops.filter((s) => s.status === 'done'); const skipped = run.stops.filter((s) => s.status === 'skipped'); const pending = run.stops.filter((s) => s.status === 'pending')
-    const pieces = done.reduce((n, s) => n + (s.pod?.pieces ?? 0), 0)
-    const cash = run.stops.reduce((n, s) => n + (s.collected?.method === 'cash' ? s.collected.amountUsd : 0), 0); const momo = run.stops.reduce((n, s) => n + (s.collected?.method === 'mobile_money' ? s.collected.amountUsd : 0), 0)
-    const body = [`${done.length} done`, skipped.length ? `${skipped.length} skipped (${skipped.map((s) => `${s.label}: ${s.note || 'no reason'}`).join('; ')})` : '', pending.length ? `${pending.length} not reached` : '', pieces ? `${pieces} pieces` : '', cash ? `$${cash.toLocaleString()} cash` : '', momo ? `$${momo.toLocaleString()} mobile money` : '', note].filter(Boolean).join(' · ')
-    await notifyShipperStaff(db, shipperId, { kind: 'shipment_status', title: `${me.name} finished “${run.name}”`, body, link: `/dashboard/routes/${run.id}` }, ['owner', 'dispatcher'])
-    await db.query('update runs set summary_sent_at = now() where id = $1', [run.id])
+    const body = await sendRunSummary(db, run, shipperId, me.name, note)
     res.json({ ok: true, body })
   }))
   r.post('/runs', wrap(async (req, res) => {
@@ -373,7 +395,13 @@ export function mountOps(r: Router, d: Deps) {
       if (run.kind === 'delivery' && run.status !== 'in_progress') { const { issueDeliveryCodes } = await import('./driverOps'); await issueDeliveryCodes(db, run.id).catch((e) => console.error('[codes]', e)) }
     }
     if (b.status === 'done' || b.status === 'cancelled') { if (run.vehicleId) await db.query(`update vehicles set status = 'available' where id = $1 and status = 'on_run'`, [run.vehicleId]) }
-    res.json({ run: await ownRun(db, shipperId, run.id) })
+    // Starting a run clocks the driver in if they forgot.
+    let clockedIn = false
+    if (isDriver && b.status === 'in_progress' && run.status !== 'in_progress' && !String(me.id).startsWith('owner:')) {
+      const { rows: open } = await db.query('select 1 from shifts where staff_id = $1 and end_at is null limit 1', [me.id])
+      if (!open.length) { await db.query('insert into shifts (id,shipper_id,staff_id) values ($1,$2,$3)', ['sh_' + uid(), shipperId, me.id]); clockedIn = true }
+    }
+    res.json({ run: await ownRun(db, shipperId, run.id), clockedIn })
   }))
   r.post('/runs/:id/optimise', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId } = await staffOf(db, req, ...MANAGE)
@@ -386,6 +414,25 @@ export function mountOps(r: Router, d: Deps) {
     await db.query('update runs set distance_km = $2 where id = $1', [run.id, runDistance(run.start, [...done, ...order.map((i) => pending[i])])])
     if (run.status === 'in_progress') { const { notifyDriver } = await import('./driverOps'); await notifyDriver(db, run.id, `Your stops on “${run.name}” were reordered`, 'Open your run for the new order.').catch(() => {}) }
     res.json({ run: await ownRun(db, shipperId, run.id) })
+  }))
+  /** Driver: put the stops still to do in the shortest order from where they are now. */
+  r.post('/runs/:id/reorder-from', wrap(async (req, res) => {
+    const db = await getDb(); const { shipperId, me, role } = await staffOf(db, req)
+    const run = await ownRun(db, shipperId, String(req.params.id))
+    if (isDriverRole(role) && run.driverId !== me.id) throw new HttpError(403, 'Not your run.')
+    if (!isDriverRole(role) && !MANAGE.includes(role)) throw new HttpError(403, 'This needs the owner or dispatcher role.')
+    if (run.status === 'done' || run.status === 'cancelled') throw new HttpError(409, 'This run is finished.')
+    const at = z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).parse(req.body)
+    const pending = run.stops.filter((s) => s.status === 'pending'); const done = run.stops.filter((s) => s.status !== 'pending')
+    if (pending.filter((s) => s.lat != null && s.lon != null).length < 2) throw new HttpError(400, 'Not enough stops with a map location to reorder.')
+    const order = optimiseOrder(at, pending)
+    const before = pending.map((s) => s.id).join(); const after = order.map((i) => pending[i].id).join()
+    let seq = 0
+    for (const s of done) await db.query('update run_stops set seq = $2 where id = $1', [s.id, seq++])
+    for (const i of order) await db.query('update run_stops set seq = $2 where id = $1', [pending[i].id, seq++])
+    await db.query('update runs set distance_km = $2 where id = $1', [run.id, runDistance(run.start, [...done, ...order.map((i) => pending[i])])])
+    if (before !== after && isDriverRole(role)) await notifyShipperStaff(db, shipperId, { kind: 'shipment_status', title: `${me.name} reordered the stops on “${run.name}”`, body: `Next: ${pending[order[0]].label}. Customers’ time windows weren’t changed.`, link: `/dashboard/routes/${run.id}`, dedupe: `reorder:${run.id}:${after}` }, ['owner', 'dispatcher']).catch(() => {})
+    res.json({ run: await ownRun(db, shipperId, run.id), changed: before !== after })
   }))
   r.post('/runs/:id/stops', wrap(async (req, res) => {
     const db = await getDb(); const { shipperId } = await staffOf(db, req, ...MANAGE)

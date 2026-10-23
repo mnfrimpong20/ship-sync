@@ -20,8 +20,8 @@ export interface StopDetails {
 }
 export interface RunPieces { stops: { stopId: string; seq: number; label: string; ref: string; status: string; pieces: { id: string; seq: number; labelCode: string; loaded: boolean; dropped: boolean }[] }[] }
 export interface RunMessage { id: string; stopId: string | null; from: string; side: 'driver' | 'office'; body: string; audio: string | null; at: string }
-export interface Shift { id: string; start: string; end: string | null; onBreak: boolean; breaks: { start: string; end?: string }[]; hours: number }
-export interface ShiftView { current: Shift | null; week: number; shifts: Shift[] }
+export interface Shift { id: string; start: string; end: string | null; onBreak: boolean; breaks: { start: string; end?: string }[]; hours: number; /** Closed itself after a forgotten clock-out. */ auto?: 'pending' | 'confirmed' | 'fixed' | null }
+export interface ShiftView { current: Shift | null; review?: Shift | null; week: number; shifts: Shift[] }
 export interface DriverStat { staffId: string; name: string; role: string; runs: number; stops: number; done: number; skipped: number; completionPct: number | null; onTimePct: number | null; perDay: number; reasons: Record<string, number>; hours: number; pay: { perStop?: number; perRun?: number; perHour?: number; currency?: string }; earned: number }
 export interface Incident { id: string; kind: string; description: string; photos: string[]; by: string; ref: string | null; runId: string | null; runName: string | null; claim: boolean; status: 'open' | 'closed'; at: string }
 export interface DriverPos { staffId: string; name: string; role: string; runId: string; runName: string; kind: string; pending: number; lat: number; lon: number; at: string }
@@ -51,8 +51,10 @@ export const driverApi = {
   allMessages: () => api<{ messages: (RunMessage & { runId: string; runName: string; stopLabel: string | null; unread: boolean })[] }>('/drivers/messages'),
   expense: (body: { paidBy?: 'driver' | 'company'; runId?: string; kind: string; amount: number; currency: string; photo?: string; note: string }) => api<{ ok: true; amountUsd: number }>('/drivers/expenses', { json: body }),
   expenses: () => api<{ expenses: Expense[] }>('/drivers/expenses'),
+  readReceipt: (photo: string) => api<{ ai: boolean; amount?: number; currency?: string; kind?: string; vendor?: string }>('/drivers/expenses/read', { json: { photo } }),
   shift: () => api<ShiftView>('/shifts/me'),
   clock: (action: 'in' | 'break' | 'resume' | 'out') => api<ShiftView>('/shifts/clock', { json: { action } }),
+  confirmShift: (id: string, end?: string) => api<ShiftView>(`/shifts/${id}/confirm`, { json: end ? { end } : {} }),
   shifts: () => api<{ shifts: (Shift & { name: string; staffId: string })[] }>('/drivers/shifts'),
   myCash: () => api<{ due: number; stops: { stopId: string; label: string; runName: string; amountUsd: number }[]; handovers: { id: string; expected: number; received: number; at: string; by: string; note: string }[] }>('/drivers/cash'),
   cash: () => api<{ drivers: { staffId: string; name: string; due: number; stops: { stopId: string; label: string; runName: string; amountUsd: number }[] }[]; handovers: { id: string; name: string; expected: number; received: number; diff: number; at: string; by: string; note: string }[] }>('/drivers/cash'),

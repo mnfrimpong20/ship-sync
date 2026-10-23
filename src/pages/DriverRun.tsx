@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Banknote, Check, CheckCircle2, ChevronDown, Clock, CreditCard, Flag, Fuel, KeyRound, LocateFixed, Map as MapIcon, MessageCircle, MessageSquare, Minus, Navigation, Package, PackageCheck, Phone, Play, Plus, Route, Send, ShieldCheck, SkipForward, Smartphone, Sun, Undo2, Volume2, Warehouse, WifiOff } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Banknote, Check, CheckCircle2, ChevronDown, Clock, CreditCard, Flag, Fuel, KeyRound, LocateFixed, LogOut, Map as MapIcon, MessageCircle, MessageSquare, Minus, Navigation, Package, PackageCheck, Phone, Play, Plus, Route, Send, ShieldCheck, SkipForward, Smartphone, Sun, Undo2, Volume2, Warehouse, WifiOff } from 'lucide-react'
 import { opsApi, type Run, type RunStop } from '../lib/ops'
 import { stopOrQueue, startQueueSync, type StopPatch } from '../lib/scan'
-import { daySummary, routeLink, stopLink, telLink, useDispatch, useMyRuns, useOnline, useQueued, useWakeLock, waLink } from '../lib/driver'
+import { daySummary, routeLink, stopLink, telLink, useMyRuns, useOnline, useQueued, useWakeLock, waLink } from '../lib/driver'
+import { openDispatch, setDispatchContext } from '../components/driver/DispatchSheet'
 import { setDisplay, useDisplay } from '../lib/prefs'
 import { useT } from '../lib/i18n'
 import { niceDay } from '../lib/dates'
@@ -14,7 +15,7 @@ import { fmtDateTime } from '../components/ui'
 import { Big, Choice, PhotoField, Sheet } from '../components/driver/DriverUi'
 import { ExpenseSheet, IncidentSheet, MessagesSheet, PieceScanSheet, VehicleCheckSheet, useLiveLocation, useRunWatch } from '../components/driver/DriverTools'
 import { PayQr, StopTools, useStopDetails } from '../components/driver/StopTools'
-import { speak, type StopDetails } from '../lib/driverApi'
+import { driverApi, speak, type StopDetails } from '../lib/driverApi'
 
 const money = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
 const SKIPS = [['not_home', 'Nobody home'], ['wrong_address', 'Wrong address'], ['refused', 'Refused'], ['no_access', 'Couldn’t get in']] as const
@@ -143,11 +144,27 @@ function OnWaySheet({ stop, onClose, onSend }: { stop: RunStop; onClose: () => v
   )
 }
 
+/** After the last run of the day: "Clock out?" — so shifts don't stay open overnight. */
+function EndOfDay({ runId }: { runId: string }) {
+  const t = useT(); const { runs } = useMyRuns(); const [open, setOpen] = useState<boolean | null>(null); const [busy, setBusy] = useState(false); const [done, setDone] = useState('')
+  useEffect(() => { driverApi.shift().then((v) => setOpen(!!v.current)).catch(() => {}) }, [])
+  const today = new Date().toISOString().slice(0, 10)
+  const more = (runs ?? []).some((r) => r.id !== runId && (r.status === 'in_progress' || (r.status === 'planned' && r.date <= today)))
+  if (done) return <p role="status" className="mt-3 rounded-2xl border border-teal/40 bg-teal/10 p-3 text-base" data-testid="eod-done">{done}</p>
+  if (!open || more) return null
+  return (
+    <div className="mt-3 rounded-2xl border-2 border-border p-4" data-testid="eod">
+      <p className="text-base font-semibold">{t('That’s your last run today. Clock out?')}</p>
+      <div className="mt-3"><Big tone="gold" disabled={busy} onClick={async () => { setBusy(true); try { const v = await driverApi.clock('out'); setDone(t('Clocked out — {h} h this week. Safe trip home.', { h: v.week })) } catch { setBusy(false) } }} testid="eod-clockout"><LogOut size={20} aria-hidden="true" /> {t('Clock out')}</Big></div>
+    </div>
+  )
+}
+
 /** The driver's run: one big card for the next stop, the rest as a short list, done stops folded away. */
 export default function DriverRun({ id }: { id: string }) {
   const t = useT(); const disp = useDisplay()
   const { runs, offline: stale, error, reload, patchLocal, setRun } = useMyRuns(); const online = useOnline(); const offline = stale || !online
-  const queued = useQueued(); const { phone: dispatchPhone, who: dispatchWho } = useDispatch()
+  const queued = useQueued()
   const run = runs?.find((r) => r.id === id) ?? null
   const [sheet, setSheet] = useState<null | { kind: 'proof' | 'skip' | 'onway'; stop: RunStop }>(null)
   const [pick, setPick] = useState<string | null>(null)
@@ -161,6 +178,7 @@ export default function DriverRun({ id }: { id: string }) {
   const pending = ordered.filter((s) => s.status === 'pending'); const finished = ordered.filter((s) => s.status !== 'pending')
   const next = pending.find((s) => s.id === pick) ?? pending[0]
   const [tool, setTool] = useState<null | { kind: 'vcheck' | 'load' | 'drop' | 'incident' | 'msg' | 'expense'; stopId?: string; start?: boolean }>(null)
+  useEffect(() => { setDispatchContext(next?.id); return () => setDispatchContext(undefined) }, [next?.id])
   const { d, reload: reloadDetails } = useStopDetails(run?.id, next?.id, !offline, run?.status)
   const loc = useLiveLocation(run, (labels) => setInfo(t('Arriving soon — {names} told you’re a few minutes away.', { names: labels.join(', ') })))
   useRunWatch(run, reload, (n) => { setInfo(t('{n} new stops added by dispatch.', { n })); if (navigator.vibrate) navigator.vibrate([60, 40, 60]) })
@@ -179,14 +197,24 @@ export default function DriverRun({ id }: { id: string }) {
   }
   const act = async (fn: () => Promise<Run>) => { setBusy(true); setErr(''); try { setRun(await fn()) } catch (e) { setErr(e instanceof Error ? e.message : t('Something went wrong.')) } finally { setBusy(false) } }
   const readAloud = (s: RunStop) => { const parts = [t('Next stop'), s.contact || s.label, s.address, s.etaFrom ? t('between {a} and {b}', { a: s.etaFrom, b: s.etaTo ?? '' }) : '', s.note, s.collectUsd ? t('Collect {amount}', { amount: money(s.collectUsd) }) : '']; if (!speak(parts.filter(Boolean).join('. '), disp.lang)) setErr(t('This phone can’t read aloud.')) }
-  const start = () => { if (!run.vehicleCheck) setTool({ kind: 'vcheck', start: true }); else void act(() => opsApi.updateRun(run.id, { status: 'in_progress' })) }
+  const begin = async () => { setBusy(true); setErr(''); try { const r = await opsApi.startRun(run.id); setRun(r.run); if (r.clockedIn) setInfo(t('Run started — and you’re clocked in.')) } catch (e) { setErr(e instanceof Error ? e.message : t('Something went wrong.')) } finally { setBusy(false) } }
+  const start = () => { if (!run.vehicleCheck) setTool({ kind: 'vcheck', start: true }); else void begin() }
+  const reorder = () => {
+    if (!navigator.geolocation) { setErr(t('This phone can’t share its location.')); return }
+    setBusy(true); setErr('')
+    navigator.geolocation.getCurrentPosition(async (p) => { try { const r = await opsApi.reorderFrom(run.id, p.coords.latitude, p.coords.longitude); setRun(r.run); setPick(null); setInfo(r.changed ? t('Stops reordered from where you are. Dispatch was told.') : t('Your order is already the shortest from here.')) } catch (e) { setErr(e instanceof Error ? e.message : t('Could not reorder.')) } finally { setBusy(false) } }, () => { setBusy(false); setErr(t('Location is blocked. Allow it for this site.')) }, { enableHighAccuracy: true, timeout: 20000 })
+  }
+  const canReorder = run.status === 'in_progress' && pending.filter((s) => s.lat != null && s.lon != null).length >= 2
   const all = routeLink(pending)
   const sum = daySummary([run])
 
   return (
     <div className="bg-bg text-text">
       <div className="container-x max-w-2xl py-5 pb-28 md:py-8">
-        <Link to="/dashboard/runs" className="inline-flex min-h-11 items-center gap-1.5 text-base text-text-muted hover:text-text focus-ring"><ArrowLeft size={18} aria-hidden="true" /> {t('My runs')}</Link>
+        <div className="flex items-center justify-between gap-2">
+          <Link to="/dashboard/runs" className="inline-flex min-h-11 items-center gap-1.5 text-base text-text-muted hover:text-text focus-ring"><ArrowLeft size={18} aria-hidden="true" /> {t('My runs')}</Link>
+          <button onClick={() => void setDisplay({ road: !disp.road })} aria-pressed={!!disp.road} className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border-2 px-3 text-sm font-semibold focus-ring ${disp.road ? 'border-gold bg-gold/15' : 'border-border bg-surface'}`} data-testid="road-mode" title={t('Bigger text, dark at night')}><Sun size={16} aria-hidden="true" /> {disp.road ? t('Road mode on') : t('Road mode')}</button>
+        </div>
         <h1 className="mt-1 !text-[1.7rem] leading-tight">{run.name}</h1>
         <p className="mt-1 text-base text-text-muted">{run.kind === 'pickup' ? t('Pickups') : t('Deliveries')} · {niceDay(run.date, { lang: disp.lang })}{run.vehicleName ? ` · ${run.vehicleName}` : ''}{run.distanceKm ? ` · ~${run.distanceKm} km` : ''}</p>
         <div className="mt-3 flex items-center gap-3" aria-label={t('{done} of {n} stops done', { done: finished.length, n: ordered.length })}>
@@ -210,25 +238,24 @@ export default function DriverRun({ id }: { id: string }) {
         {/* ---- next stop ---- */}
         {next && (
           <section className="mt-5 rounded-3xl border-2 border-gold bg-surface p-5 shadow-sm" aria-labelledby="next-h" data-testid="next-stop">
-            <p className="text-sm font-bold uppercase tracking-wider text-gold-deep">{t('Next stop')} · {ordered.indexOf(next) + 1}/{ordered.length}{next.tries ? ` · ${t('try {n}', { n: next.tries + 1 })}` : ''}</p>
+            <div className="flex items-start justify-between gap-2"><p className="pt-1 text-sm font-bold uppercase tracking-wider text-gold-deep">{t('Next stop')} · {ordered.indexOf(next) + 1}/{ordered.length}{next.tries ? ` · ${t('try {n}', { n: next.tries + 1 })}` : ''}</p><button onClick={() => readAloud(next)} className="-mr-2 -mt-1 grid h-11 w-11 shrink-0 place-items-center rounded-xl text-gold-deep focus-ring" aria-label={t('Read aloud')} title={t('Read aloud')} data-testid="read-aloud"><Volume2 size={20} aria-hidden="true" /></button></div>
             <h2 id="next-h" className="mt-1 !text-2xl leading-tight">{next.contact || next.label}</h2>
             {next.contact && next.contact !== next.label && <p className="text-base text-text-muted">{next.label}</p>}
             <p className="mt-2 text-lg leading-snug">{next.address || <span className="italic text-text-muted">{t('No address — call them')}</span>}</p>
             <p className="mt-1 flex flex-wrap gap-x-3 text-base text-text-muted">{next.shipmentRef && <span className="font-mono">{next.shipmentRef}</span>}{next.etaFrom && <span><Clock size={14} className="inline" aria-hidden="true" /> {next.etaFrom}{next.etaTo ? `–${next.etaTo}` : ''}</span>}{next.onWayAt && <span className="text-teal">{t('Told them you’re coming')}</span>}</p>
             {next.note && <p className="mt-2 rounded-xl bg-surface-2 px-3 py-2 text-base">“{next.note}”</p>}
-            <button onClick={() => readAloud(next)} className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-xl px-1 text-base font-semibold text-gold-deep focus-ring" data-testid="read-aloud"><Volume2 size={18} aria-hidden="true" /> {t('Read aloud')}</button>
             {next.collectUsd ? <p className={`mt-3 rounded-xl px-3 py-2 text-base font-bold ${next.collectRule === 'block' ? 'bg-danger/15 text-danger' : next.collectRule === 'off' ? 'bg-surface-2 text-text' : 'bg-gold/15 text-gold-deep'}`} data-testid="next-collect">{next.collectRule === 'off' ? t('{amount} owed — take a deposit if they want to pay now', { amount: money(next.collectUsd) }) : t('Collect {amount}', { amount: money(next.collectUsd) })}{next.collectRule === 'block' ? ` · ${t('before handing over')}` : ''}</p> : null}
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {(next.lat != null || next.address) && <a href={stopLink(next)} target="_blank" rel="noreferrer" className="col-span-2 flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-gold text-base font-semibold text-on-accent focus-ring" data-testid="nav-next"><Navigation size={20} aria-hidden="true" /> {t('Navigate')}</a>}
-              {next.phone && <a href={telLink(next.phone)} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring"><Phone size={20} aria-hidden="true" /> {t('Call')}</a>}
-              {next.phone && <a href={waLink(next.phone)} target="_blank" rel="noreferrer" className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring"><MessageCircle size={20} aria-hidden="true" /> WhatsApp</a>}
-              <button onClick={() => setTool({ kind: 'msg', stopId: next.id })} disabled={offline} className="col-span-2 flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring disabled:opacity-50" data-testid="msg-stop"><MessageSquare size={20} aria-hidden="true" /> {t('Message dispatch about this stop')}</button>
-              {run.status === 'in_progress' && <button onClick={() => setSheet({ kind: 'onway', stop: next })} disabled={offline} className="col-span-2 flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring disabled:opacity-50" data-testid="onway"><Send size={20} aria-hidden="true" /> {t('On my way')}</button>}
-            </div>
+            {(next.lat != null || next.address) && <a href={stopLink(next)} target="_blank" rel="noreferrer" className="mt-4 flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-gold text-base font-semibold text-on-accent focus-ring" data-testid="nav-next"><Navigation size={20} aria-hidden="true" /> {t('Navigate')}</a>}
+            {(() => { const n = (next.phone ? 2 : 0) + (run.status === 'in_progress' ? 1 : 0); if (!n) return null; const c = 'flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl border-2 border-border bg-surface px-1 text-sm font-semibold focus-ring disabled:opacity-50'; return (
+              <div className={`mt-2 grid gap-2 ${n === 3 ? 'grid-cols-3' : n === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {next.phone && <a href={telLink(next.phone)} className={c}><Phone size={20} aria-hidden="true" /> {t('Call')}</a>}
+                {next.phone && <a href={waLink(next.phone)} target="_blank" rel="noreferrer" className={c}><MessageCircle size={20} aria-hidden="true" /> WhatsApp</a>}
+                {run.status === 'in_progress' && <button onClick={() => setSheet({ kind: 'onway', stop: next })} disabled={offline} className={c} data-testid="onway"><Send size={20} aria-hidden="true" /> {next.onWayAt ? t('Told them') : t('On my way')}</button>}
+              </div>) })()}
             {run.status === 'in_progress' && <StopTools run={run} stop={next} d={d} reload={() => { reloadDetails(); void reload() }} onInfo={setInfo} />}
-            {run.status === 'in_progress' && <div className="mt-3 grid gap-2">
+            {run.status === 'in_progress' && <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
               <Big tone="gold" onClick={() => setSheet({ kind: 'proof', stop: next })} testid="stop-done"><CheckCircle2 size={22} aria-hidden="true" /> {run.kind === 'pickup' ? t('Mark collected') : t('Mark delivered')}</Big>
-              <Big onClick={() => setSheet({ kind: 'skip', stop: next })} testid="stop-skip"><SkipForward size={20} aria-hidden="true" /> {t('Can’t do it')}</Big>
+              <button onClick={() => setSheet({ kind: 'skip', stop: next })} className="flex min-h-14 flex-col items-center justify-center gap-0.5 whitespace-nowrap rounded-2xl border-2 border-border bg-surface px-3 text-sm font-semibold focus-ring" data-testid="stop-skip"><SkipForward size={18} aria-hidden="true" /> {t('Can’t do it')}</button>
             </div>}
           </section>
         )}
@@ -236,7 +263,8 @@ export default function DriverRun({ id }: { id: string }) {
         {/* ---- after the next one ---- */}
         {pending.length > 1 && (
           <section className="mt-6" aria-labelledby="later-h">
-            <div className="flex items-center justify-between"><h2 id="later-h" className="!text-lg">{t('Then')} <span className="font-normal text-text-muted">· {pending.length - 1}</span></h2>{all && <a href={all} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-base font-semibold text-gold-deep focus-ring" data-testid="route-all"><Route size={18} aria-hidden="true" /> {t('Whole route in Maps')}</a>}</div>
+            <h2 id="later-h" className="!text-lg">{t('Then')} <span className="font-normal text-text-muted">· {pending.length - 1}</span></h2>
+            {(canReorder || all) && <div className="mt-2 flex flex-wrap gap-2">{canReorder && <button onClick={reorder} disabled={busy || offline} className="inline-flex min-h-11 items-center gap-1.5 rounded-full border-2 border-border bg-surface px-3 text-sm font-semibold focus-ring disabled:opacity-50" data-testid="reorder-here"><LocateFixed size={16} aria-hidden="true" /> {t('Best order from here')}</button>}{all && <a href={all} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-full border-2 border-border bg-surface px-3 text-sm font-semibold focus-ring" data-testid="route-all"><Route size={16} aria-hidden="true" /> {t('Whole route in Maps')}</a>}</div>}
             <ol className="mt-2 space-y-2">
               {pending.filter((s) => s.id !== next?.id).map((s) => (
                 <li key={s.id}><button onClick={() => { setPick(s.id); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex min-h-16 w-full items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-left focus-ring" data-testid="later-stop">
@@ -254,7 +282,8 @@ export default function DriverRun({ id }: { id: string }) {
         {finished.length > 0 && (
           <section className="mt-6">
             <button onClick={() => setShowDone((v) => !v)} aria-expanded={showDone} className="flex min-h-12 w-full items-center justify-between rounded-2xl px-1 text-left text-lg font-semibold focus-ring" data-testid="done-toggle"><span>{t('Finished')} <span className="font-normal text-text-muted">· {finished.length}</span></span><ChevronDown size={20} className={`transition-transform ${showDone ? 'rotate-180' : ''}`} aria-hidden="true" /></button>
-            {showDone && <ul className="mt-1 divide-y divide-border rounded-2xl border border-border bg-surface">{finished.map((s) => <li key={s.id} className="flex items-center gap-3 px-4 py-3 text-base">{s.status === 'done' ? <Check size={18} className="shrink-0 text-teal" aria-label={t('Done')} /> : <SkipForward size={18} className="shrink-0 text-text-muted" aria-label={t('Skipped')} />}<span className="min-w-0 flex-1"><span className="block truncate">{s.contact || s.label}</span><span className="block truncate text-sm text-text-muted">{s.status === 'done' ? [s.pod?.receivedBy && t('to {name}', { name: s.pod.receivedBy }), s.pod?.pieces != null && t('{n} pieces', { n: s.pod.pieces }), s.pod?.hasPhoto && t('photo'), s.pod?.leftWith && t('left with {who}', { who: s.pod.leftWith.name || s.pod.leftWith.kind }), s.collected && `${money(s.collected.amountUsd)} ${({ cash: t('cash'), mobile_money: 'MoMo', zelle: 'Zelle', card: t('card') } as Record<string, string>)[s.collected.method]}`].filter(Boolean).join(' · ') : s.note}</span></span>{s.doneAt && <span className="shrink-0 text-sm text-text-muted">{fmtDateTime(s.doneAt).split(', ').pop()}</span>}</li>)}</ul>}
+            {showDone && <ul className="mt-1 divide-y divide-border rounded-2xl border border-border bg-surface">{finished.map((s) => <li key={s.id} className="flex items-center gap-3 px-4 py-3 text-base" data-testid="done-stop">{s.status === 'done' ? <Check size={18} className="shrink-0 text-teal" aria-label={t('Done')} /> : <SkipForward size={18} className="shrink-0 text-text-muted" aria-label={t('Skipped')} />}<span className="min-w-0 flex-1"><span className="block truncate">{s.contact || s.label}</span><span className="block truncate text-sm text-text-muted">{s.status === 'done' ? [s.pod?.receivedBy && t('to {name}', { name: s.pod.receivedBy }), s.pod?.pieces != null && t('{n} pieces', { n: s.pod.pieces }), s.pod?.hasPhoto && t('photo'), s.pod?.leftWith && t('left with {who}', { who: s.pod.leftWith.name || s.pod.leftWith.kind }), s.collected && `${money(s.collected.amountUsd)} ${({ cash: t('cash'), mobile_money: 'MoMo', zelle: 'Zelle', card: t('card') } as Record<string, string>)[s.collected.method]}`].filter(Boolean).join(' · ') : s.note}</span></span>{s.doneAt && <span className="shrink-0 text-sm text-text-muted">{fmtDateTime(s.doneAt).split(', ').pop()}</span>}<button onClick={() => openDispatch(s.id)} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-text-muted hover:text-text focus-ring" aria-label={t('Problem with {name}? Tell dispatch', { name: s.contact || s.label })} title={t('Something wrong? Tell dispatch')} data-testid="done-problem"><MessageSquare size={18} aria-hidden="true" /></button></li>)}</ul>}
+            {showDone && <p className="mt-2 px-1 text-sm text-text-muted">{t('Marked one wrong? Tap the message icon — dispatch can fix it.')}</p>}
           </section>
         )}
 
@@ -269,7 +298,7 @@ export default function DriverRun({ id }: { id: string }) {
               <div className="rounded-2xl bg-surface-2 p-3"><dt className="text-sm text-text-muted">{t('Money taken')}</dt><dd className="text-lg font-bold tabular-nums">{sum.cash || sum.momo ? <>{sum.cash ? `${money(sum.cash)} ${t('cash')}` : ''}{sum.cash && sum.momo ? <br /> : null}{sum.momo ? `${money(sum.momo)} MoMo` : ''}</> : '—'}</dd></div>
             </dl>
             {sum.cash > 0 && <p className="mt-3 text-base font-semibold">{t('Hand {amount} in cash to the office.', { amount: money(sum.cash) })}</p>}
-            {run.summarySentAt ? <p className="mt-4 rounded-2xl bg-teal/10 p-3 text-base text-teal" data-testid="summary-sent">{t('Sent to dispatch')} · {fmtDateTime(run.summarySentAt)}</p> : <>
+            {run.summarySentAt ? <><p className="mt-4 rounded-2xl bg-teal/10 p-3 text-base text-teal" data-testid="summary-sent">{t('Sent to dispatch')} · {fmtDateTime(run.summarySentAt)}</p><EndOfDay runId={run.id} /></> : <>
               <label htmlFor="sum-note" className="label-dark mt-4">{t('Anything to add?')} <span className="font-normal text-text-muted">({t('optional')})</span></label>
               <input id="sum-note" className="input-dark !min-h-12" value={sumNote} onChange={(e) => setSumNote(e.target.value)} placeholder={t('e.g. van needs fuel')} />
               <div className="mt-3"><Big tone="gold" disabled={busy || offline} onClick={async () => { setBusy(true); setErr(''); try { await opsApi.summary(run.id, sumNote); if (run.status === 'in_progress') await opsApi.updateRun(run.id, { status: 'done' }); await reload(); setInfo(t('Summary sent to dispatch.')) } catch (e) { setErr(e instanceof Error ? e.message : t('Could not send.')) } finally { setBusy(false) } }} testid="send-summary"><Send size={20} aria-hidden="true" /> {t('Send to dispatch & finish')}</Big></div>
@@ -281,25 +310,21 @@ export default function DriverRun({ id }: { id: string }) {
         <section className="mt-8 grid gap-2" aria-label={t('Tools')}>
           {run.kind === 'delivery' && run.status === 'in_progress' && <Big onClick={() => setTool({ kind: 'load' })} disabled={offline} testid="load-truck"><PackageCheck size={20} aria-hidden="true" /> {t('Load the truck')}</Big>}
           {run.kind === 'pickup' && finished.some((s) => s.status === 'done') && <Big tone={pending.length ? 'ghost' : 'gold'} onClick={() => setTool({ kind: 'drop' })} disabled={offline} testid="drop-warehouse"><Warehouse size={20} aria-hidden="true" /> {t('Drop at the warehouse')}</Big>}
-          <div className="grid grid-cols-2 gap-2">
-            <Big onClick={() => setTool({ kind: 'msg' })} disabled={offline} testid="msg-dispatch"><MessageSquare size={20} aria-hidden="true" /> {t('Message')}</Big>
-            <Big onClick={() => setTool({ kind: 'incident' })} disabled={offline} testid="report-incident"><AlertTriangle size={20} aria-hidden="true" /> {t('Report')}</Big>
-            <Big onClick={() => setTool({ kind: 'expense' })} disabled={offline} testid="add-expense"><Fuel size={20} aria-hidden="true" /> {t('Expense')}</Big>
-            <Big onClick={() => setTool({ kind: 'vcheck' })} disabled={offline} testid="vehicle-check"><ShieldCheck size={20} aria-hidden="true" /> {run.vehicleCheck ? t('Checked') : t('Vehicle')}</Big>
+          <div className="grid grid-cols-3 gap-2">
+            {([['incident', AlertTriangle, t('Report'), 'report-incident'], ['expense', Fuel, t('Expense'), 'add-expense'], ['vcheck', ShieldCheck, run.vehicleCheck ? t('Checked') : t('Vehicle'), 'vehicle-check']] as const).map(([k, I, l, id]) => <button key={k} onClick={() => setTool({ kind: k })} disabled={offline} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-border bg-surface px-1 text-sm font-semibold focus-ring hover:border-gold disabled:opacity-50" data-testid={id}><I size={22} aria-hidden="true" /> {l}</button>)}
           </div>
           {run.status === 'in_progress' && (late
             ? <div className="rounded-2xl border border-border bg-surface p-4" data-testid="late-form"><p className="text-base font-semibold">{t('About how late?')}</p><div className="mt-2 grid grid-cols-4 gap-2">{[15, 30, 60, 120].map((m) => <button key={m} disabled={busy} onClick={async () => { setBusy(true); try { const r = await opsApi.late(run.id, m); setLate(false); setInfo(r.told ? t('Told {n} customers.', { n: r.told }) : t('Noted on the run.')) } catch (e) { setErr(e instanceof Error ? e.message : t('Could not send.')) } finally { setBusy(false) } }} className="min-h-12 rounded-xl border-2 border-border text-base font-semibold focus-ring">{m >= 60 ? `${m / 60} h` : `${m}′`}</button>)}</div><button onClick={() => setLate(false)} className="mt-2 min-h-11 text-base text-text-muted">{t('Cancel')}</button></div>
             : <Big onClick={() => setLate(true)} disabled={offline} testid="running-late"><Clock size={20} aria-hidden="true" /> {t('Running late')}</Big>)}
-          {dispatchPhone && <a href={telLink(dispatchPhone)} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring"><Phone size={20} aria-hidden="true" /> {t('Call dispatch')}{dispatchWho ? ` · ${dispatchWho}` : ''}</a>}
+          <button onClick={() => openDispatch(next?.id)} className="hidden min-h-14 w-full items-center justify-center gap-2 rounded-2xl border-2 border-border bg-surface text-base font-semibold focus-ring lg:flex" data-testid="dispatch-desktop"><Phone size={20} aria-hidden="true" /> {t('Dispatch')}</button>
           <Big onClick={() => setShowMap((v) => !v)} testid="map-toggle"><MapIcon size={20} aria-hidden="true" /> {showMap ? t('Hide map') : t('Show map')}</Big>
           {showMap && <RunMap start={run.start} stops={ordered.map((s) => ({ id: s.id, seq: s.seq, label: s.label, lat: s.lat, lon: s.lon, status: s.status }))} draggable={false} onMove={() => {}} onClickMap={() => {}} focusId={next?.id ?? null} className="h-[380px]" />}
-          <button onClick={() => void setDisplay({ road: !disp.road })} aria-pressed={!!disp.road} className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border-2 text-base font-semibold focus-ring ${disp.road ? 'border-gold bg-gold/15' : 'border-border bg-surface'}`} data-testid="road-mode"><Sun size={20} aria-hidden="true" /> {disp.road ? t('Road mode is on') : t('Road mode: bigger text, dark at night')}</button>
           {run.status === 'in_progress' && pending.length > 0 && <button onClick={() => { if (confirm(t('Finish the run with {n} stops not done?', { n: pending.length }))) void act(() => opsApi.updateRun(run.id, { status: 'done' })) }} className="mt-2 inline-flex min-h-12 items-center justify-center gap-2 text-base text-text-muted"><Flag size={18} aria-hidden="true" /> {t('Finish run early')}</button>}
         </section>
         {queued > 0 && <p className="mt-3 text-center text-sm text-text-muted"><Package size={14} className="inline" aria-hidden="true" /> {t('{n} updates waiting', { n: queued })}</p>}
       </div>
 
-      {tool?.kind === 'vcheck' && <VehicleCheckSheet run={run} onClose={() => setTool(null)} onDone={(issues, safe) => { const wasStart = tool.start; setTool(null); if (!safe) { void reload(); setErr(t('Vehicle not safe — the office has been told. Don’t start the run in it.')); return } setInfo(issues.length ? t('Check saved — the office was told about: {issues}.', { issues: issues.join(', ') }) : t('Vehicle check saved.')); if (wasStart) void act(() => opsApi.updateRun(run.id, { status: 'in_progress' })); else void reload() }} />}
+      {tool?.kind === 'vcheck' && <VehicleCheckSheet run={run} onClose={() => setTool(null)} onDone={(issues, safe) => { const wasStart = tool.start; setTool(null); if (!safe) { void reload(); setErr(t('Vehicle not safe — the office has been told. Don’t start the run in it.')); return } setInfo(issues.length ? t('Check saved — the office was told about: {issues}.', { issues: issues.join(', ') }) : t('Vehicle check saved.')); if (wasStart) void begin(); else void reload() }} />}
       {(tool?.kind === 'load' || tool?.kind === 'drop') && <PieceScanSheet run={run} kind={tool.kind} onClose={() => setTool(null)} />}
       {tool?.kind === 'incident' && <IncidentSheet run={run} stopId={tool.stopId ?? next?.id} onClose={() => setTool(null)} onDone={(claim) => { setTool(null); setInfo(claim ? t('Sent. An insurance claim was opened.') : t('Sent to the office.')) }} />}
       {tool?.kind === 'msg' && <MessagesSheet run={run} stopId={tool.stopId} onClose={() => setTool(null)} />}

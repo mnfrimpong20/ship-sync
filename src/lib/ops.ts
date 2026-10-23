@@ -86,6 +86,8 @@ export const opsApi = {
   myRuns: () => api<{ runs: Run[] }>('/runs/mine').then((r) => r.runs),
   createRun: (i: RunInput) => api<{ run: Run }>('/runs', { json: i }).then((r) => r.run),
   updateRun: (id: string, p: Partial<Omit<RunInput, 'stops' | 'kind'>> & { status?: RunStatus }) => api<{ run: Run }>(`/runs/${id}`, { method: 'PATCH', json: p }).then((r) => r.run),
+  startRun: (id: string) => api<{ run: Run; clockedIn?: boolean }>(`/runs/${id}`, { method: 'PATCH', json: { status: 'in_progress' } }),
+  reorderFrom: (id: string, lat: number, lon: number) => api<{ run: Run; changed: boolean }>(`/runs/${id}/reorder-from`, { json: { lat, lon } }),
   optimise: (id: string) => api<{ run: Run }>(`/runs/${id}/optimise`, { method: 'POST' }).then((r) => r.run),
   addStop: (id: string, s: StopInput) => api<{ run: Run }>(`/runs/${id}/stops`, { json: s }).then((r) => r.run),
   onWay: (id: string, sid: string, minutes: number) => api<{ ok: true; texted: boolean; told: boolean; text: string }>(`/runs/${id}/stops/${sid}/on-way`, { json: { minutes } }),

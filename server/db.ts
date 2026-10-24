@@ -51,7 +51,9 @@ export async function getDb(): Promise<Db> {
     const lite = await PGlite.create(dir)
     db = { kind: 'pglite', query: (sql, params) => lite.query(sql, params as never[]) as never }
   }
+  const resetKey = await resetProductionOnce(db)
   await migrate(db)
+  if (resetKey) await db.query(`insert into settings (id, value) values ($1, $2) on conflict (id) do nothing`, [resetKey, JSON.stringify({ at: new Date().toISOString() })])
   // Guards against double-clicks and two requests at once: the database itself refuses the second one.
   for (const [name, sql] of [
     ['one open payout per company', `create unique index if not exists payouts_one_open on payouts(shipper_id) where status = 'requested'`],
@@ -89,6 +91,27 @@ export async function getDb(): Promise<Db> {
   await db.query(`update shippers set plan = 'pro' where demo and id in ('gold-coast-freight','atlantic-bridge') and plan = 'starter'`)
   await db.query(`update shippers set trial_ends_at = now() + interval '30 days' where trial_ends_at is null and plan = 'starter'`)
   return db
+}
+
+/**
+ * One-time wipe of the PUBLISHED app's database — for when Replit copied workspace (demo/test) data into production
+ * at first publish. Only runs when ALL of these hold: this is the published app (REPLIT_DEPLOYMENT=1), it's a real
+ * Postgres database, and RESET_PRODUCTION_DB is set to a value that hasn't been used before. It records the value
+ * after wiping, so restarts with the same secret do nothing. Remove the secret afterwards. Never touches the workspace.
+ */
+async function resetProductionOnce(d: Db): Promise<string | null> {
+  const v = (process.env.RESET_PRODUCTION_DB ?? '').trim()
+  if (!v || !isDeployment() || d.kind !== 'postgres') return null
+  if (v.length < 8) { console.warn('[db] RESET_PRODUCTION_DB ignored — use a value of at least 8 characters (e.g. erase-2026-10-24).'); return null }
+  const key = `db-reset:${v}`
+  const { rows: t } = await d.query<{ n: number }>(`select count(*)::int as n from information_schema.tables where table_schema = 'public' and table_name = 'settings'`)
+  if (t[0]?.n) { const { rows } = await d.query('select 1 from settings where id = $1', [key]); if (rows.length) return null }
+  console.warn(`[db] RESET_PRODUCTION_DB=${v}: erasing the production database (one time)…`)
+  await d.query('drop schema public cascade')
+  await d.query('create schema public')
+  await d.query('grant all on schema public to current_user')
+  console.warn('[db] production database erased; rebuilding tables and reference data. Remove RESET_PRODUCTION_DB now.')
+  return key
 }
 
 export const uid = () => randomBytes(6).toString('hex')

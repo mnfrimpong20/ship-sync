@@ -35,14 +35,37 @@ export interface Db {
 
 let db: Db | null = null
 
+/**
+ * Connect to Postgres with encryption AND certificate checking. The address's own sslmode is taken out (the pg library
+ * warns that its meaning changes in the next major version) and replaced by an explicit setting: local or
+ * sslmode=disable → plain; everything else → TLS with the certificate verified. If a server's certificate can't be
+ * verified (some internal/dev databases use their own), it connects encrypted without verification and says so once.
+ */
+async function openPool(url: string) {
+  const { default: pg } = await import('pg')
+  let u: URL | null = null; try { u = new URL(url) } catch { /* unusual address — pass it through untouched */ }
+  const mode = u?.searchParams.get('sslmode') ?? ''
+  if (u) { u.searchParams.delete('sslmode'); u.searchParams.delete('uselibpqcompat') }
+  const conn = u ? u.toString() : url
+  const local = !!u && (/^(localhost|127\.0\.0\.1|::1|\[::1\])$/.test(u.hostname) || mode === 'disable')
+  if (local) return new pg.Pool({ connectionString: conn })
+  const verified = new pg.Pool({ connectionString: conn, ssl: { rejectUnauthorized: true } })
+  try { await verified.query('select 1'); return verified } catch (e) {
+    const code = String((e as { code?: string }).code ?? '')
+    if (!/CERT|SELF_SIGNED|UNABLE_TO_VERIFY|ALTNAME/i.test(code + ' ' + (e as Error).message)) { await verified.end().catch(() => {}); throw e }
+    await verified.end().catch(() => {})
+    console.warn(`[db] The database's TLS certificate couldn't be verified (${code || (e as Error).message}) — connecting encrypted without certificate checks.`)
+    return new pg.Pool({ connectionString: conn, ssl: { rejectUnauthorized: false } })
+  }
+}
+
 export async function getDb(): Promise<Db> {
   if (db) return db
   const url = process.env.DATABASE_URL
   // The published app must use the real database: the local fallback lives on disk that Replit wipes on every restart.
   if (!url && (isDeployment() || (process.env.NODE_ENV === 'production' && !process.env.PGLITE_DIR))) throw new Error('DATABASE_URL is not set. Create the production database in Replit (Database → Create) before publishing; refusing to start on a temporary local database.')
   if (url) {
-    const { default: pg } = await import('pg')
-    const pool = new pg.Pool({ connectionString: url, ssl: /localhost|127\.0\.0\.1/.test(url) ? undefined : { rejectUnauthorized: false } })
+    const pool = await openPool(url)
     db = { kind: 'postgres', query: (sql, params) => pool.query(sql, params as never[]) as never }
   } else {
     const { PGlite } = await import('@electric-sql/pglite')

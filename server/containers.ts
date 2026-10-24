@@ -146,9 +146,10 @@ export function startCarrierSync(getDb: () => Promise<Db>) {
   const every = Math.max(1, Number(process.env.CARRIER_SYNC_MINUTES || 15)) * 60_000
   const tick = async () => {
     try {
+      if ((await import('./carriers')).carrierPause()) return // provider refused on account grounds — paused (logged once)
       const db = await getDb()
       const { rows } = await db.query<Row>(`select * from containers where tracking_status in ('pending','live','error') and status not in ('devanned','closed')`)
-      for (const c of rows) await syncContainer(db, c)
+      for (const c of rows) { await syncContainer(db, c); if ((await import('./carriers')).carrierPause()) break }
     } catch (e) { console.error('[carriers] sync', e) }
   }
   setTimeout(tick, 15_000); setInterval(tick, every)

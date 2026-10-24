@@ -164,7 +164,7 @@ export function mountSystem(r: Router, d: Deps) {
       demoData: demoDataEnabled(),
       demoShippersHidden: hideDemoShippers(), demoAutoQuotes: process.env.DEMO_AUTO_QUOTES ? process.env.DEMO_AUTO_QUOTES !== 'false' : demoDataEnabled(),
       email: emailProvider().id, sms: smsProvider().id, whatsapp: whatsappProvider().id,
-      stripe: has('STRIPE_SECRET_KEY') && has('STRIPE_WEBHOOK_SECRET'), ais: has('AISSTREAM_API_KEY'), terminal49: has('TERMINAL49_API_KEY'), appUrl: process.env.APP_URL ?? null,
+      stripe: has('STRIPE_SECRET_KEY') && has('STRIPE_WEBHOOK_SECRET'), ais: has('AISSTREAM_API_KEY'), terminal49: has('TERMINAL49_API_KEY'), carrierPaused: (await import('./carriers')).carrierPause()?.reason ?? null, appUrl: process.env.APP_URL ?? null,
       contact: { email: has('CONTACT_EMAIL'), phone: has('CONTACT_PHONE'), whatsapp: has('CONTACT_WHATSAPP') },
       users: { total: u[0].n, real: u[0].real }, shippers: { total: s[0].n, real: s[0].real },
       // Everything the published app needs before real customers arrive (shown as a checklist on this page).

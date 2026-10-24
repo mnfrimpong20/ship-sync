@@ -30,9 +30,10 @@ const port = Number(process.env.PORT || 5000)
 async function main() {
   const db = await getDb() // connect, migrate, seed before accepting traffic
   // Background jobs run in one process only (see jobLeader.ts) — never twice, never silently not at all.
-  whenLeader(getDb, async () => {
+  // Live vessel positions feed this process's own live map and tracking — every process needs it, so it isn't a "job".
   ais.start(db).catch((e) => console.error('[ais]', e))
-  startAirSweep()
+  startAirSweep() // same for live flights on the map
+  whenLeader(getDb, async () => {
   startCarrierSync(getDb)
   startNotifySweeps(getDb)
   startRecipientSweeps(getDb)

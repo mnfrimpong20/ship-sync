@@ -89,7 +89,9 @@ class AisWorker {
   get enabled() { return !!this.key }
   get status() {
     if (!this.enabled) return 'off' as const
-    return this.regional.status === 'live' || this.watch.status === 'live' ? 'live' as const : this.regional.status === 'error' ? 'error' as const : 'connecting' as const
+    // The sockets only exist once start() has run — asked any earlier (a tracking request during startup), say 'connecting'.
+    const r = this.regional?.status, w = this.watch?.status
+    return r === 'live' || w === 'live' ? 'live' as const : r === 'error' ? 'error' as const : 'connecting' as const
   }
   get lastError() { return this.regional?.lastError || this.watch?.lastError || '' }
 

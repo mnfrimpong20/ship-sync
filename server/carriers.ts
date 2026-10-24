@@ -106,6 +106,12 @@ export function parseDcsa(events: Any[]): CarrierSnapshot {
 
 
 /* ---------------------------------------------------------------- Terminal49 (aggregator) */
+/**
+ * When Terminal49 refuses on account grounds (401/403 — e.g. the free plan only allows creating tracking requests),
+ * every container would fail the same way every poll. Pause the whole provider for a day and say why, once.
+ */
+let t49Blocked: { until: number; reason: string } | null = null
+export const carrierPause = () => (t49Blocked && t49Blocked.until > Date.now() ? t49Blocked : null)
 const T49 = 'https://api.terminal49.com/v2'
 /** Standard Carrier Alpha Codes for the lines shippers type in. Unknown names fall back to Terminal49's auto-detect. */
 const SCAC: [RegExp, string][] = [[/maersk/i, 'MAEU'], [/\bmsc\b|mediterranean/i, 'MSCU'], [/cma|cgm/i, 'CMDU'], [/hapag|lloyd/i, 'HLCU'], [/\bone\b|ocean network/i, 'ONEY'], [/evergreen/i, 'EGLV'], [/cosco/i, 'COSU'], [/oocl/i, 'OOLU'], [/yang ?ming/i, 'YMLU'], [/zim/i, 'ZIMU'], [/hmm|hyundai/i, 'HDMU'], [/grimaldi/i, 'GRIU'], [/pil|pacific international/i, 'PCIU'], [/arkas/i, 'ARKU'], [/safmarine/i, 'SAFM'], [/sealand/i, 'SEJJ'], [/hamburg s/i, 'SUDU']]
@@ -126,6 +132,12 @@ const terminal49: CarrierAdapter = {
       const res = await fetch(base + path, { ...init, headers: { authorization: `Token ${key}`, accept: 'application/json', 'content-type': 'application/vnd.api+json', ...(init?.headers ?? {}) } })
       const body = (await res.json().catch(() => ({}))) as Any
       if (res.status === 429) throw new Error('Terminal49 rate limit hit — will retry on the next poll.')
+      if (res.status === 401 || res.status === 403) {
+        const detail = body?.errors?.[0]?.detail || body?.errors?.[0]?.title || res.statusText
+        if (!carrierPause()) console.warn(`[carriers] Terminal49 refused (${res.status}): ${detail} — pausing container tracking for 24 h. Upgrade the Terminal49 plan or remove TERMINAL49_API_KEY.`)
+        t49Blocked = { until: Date.now() + 24 * 3600_000, reason: `Terminal49 ${res.status}: ${detail}` }
+        throw new Error(t49Blocked.reason)
+      }
       if (!res.ok && res.status !== 422) throw new Error(`Terminal49 ${res.status}: ${body?.errors?.[0]?.detail || body?.errors?.[0]?.title || res.statusText}`)
       return { status: res.status, body }
     }

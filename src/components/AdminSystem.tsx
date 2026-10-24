@@ -58,6 +58,7 @@ function SystemCard() {
             <Flag on={info.stripe} label="Stripe payments" warn />
             <Flag on={info.ais} label="Live vessel positions (AIS)" />
             <Flag on={info.terminal49} label="Container tracking (Terminal49)" />
+            {info.carrierPaused && <li className="py-1.5 text-xs text-danger" data-testid="carrier-paused">Container tracking is paused for 24 h — {info.carrierPaused}. Upgrade the Terminal49 plan, or remove TERMINAL49_API_KEY to stop trying.</li>}
             <Flag on={info.contact.email && info.contact.phone} label="Public contact details" warn />
             <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>Demo shippers in public lists</span><Pill tone={info.demoShippersHidden ? 'green' : 'danger'}>{info.demoShippersHidden ? 'hidden' : 'visible'}</Pill></li>
             <li className="flex items-center justify-between gap-3 py-1.5 text-sm"><span>Demo auto-quotes</span><Pill tone={info.demoAutoQuotes ? 'danger' : 'green'}>{info.demoAutoQuotes ? 'on' : 'off'}</Pill></li>

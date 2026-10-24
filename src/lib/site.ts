@@ -28,7 +28,7 @@ export const siteApi = {
 }
 export interface AppError { id: string; source: 'api' | 'client' | 'job'; route: string | null; method: string | null; status: number | null; message: string; stack: string | null; userId: string | null; userAgent: string | null; resolvedAt: string | null; createdAt: string }
 export interface DbExport { name: string; bytes: number; at?: string }
-export interface SystemInfo { version: string | null; node: string; uptimeSec: number; env: string; database: string; you?: { ip: string; hops: number; trusted: number }; demoData?: boolean; demoShippersHidden: boolean; demoAutoQuotes: boolean; email: string; sms: string; whatsapp?: string; stripe: boolean; ais: boolean; terminal49: boolean; appUrl: string | null; contact: { email: boolean; phone: boolean; whatsapp: boolean }; users: { total: number; real: number }; shippers: { total: number; real: number }; launch?: { key: string; ok: boolean; label: string; how: string }[] }
+export interface SystemInfo { version: string | null; node: string; uptimeSec: number; env: string; database: string; you?: { ip: string; hops: number; trusted: number }; demoData?: boolean; demoShippersHidden: boolean; demoAutoQuotes: boolean; email: string; sms: string; whatsapp?: string; stripe: boolean; ais: boolean; terminal49: boolean; carrierPaused?: string | null; appUrl: string | null; contact: { email: boolean; phone: boolean; whatsapp: boolean }; users: { total: number; real: number }; shippers: { total: number; real: number }; launch?: { key: string; ok: boolean; label: string; how: string }[] }
 
 let cached: SiteConfig | null = null
 /** Public contact details (cached for the session). */
